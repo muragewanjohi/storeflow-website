@@ -111,8 +111,9 @@ All documentation is in the [`../docs/`](../docs/) folder.
 npm install
 
 # Set up environment variables
-cp .env.example .env.local
+Copy-Item env.template .env.local
 # Edit .env.local with your Supabase credentials
+# See docs/ENV_SETUP_GUIDE.md for detailed instructions
 
 # Run database migrations
 npx supabase migration up
