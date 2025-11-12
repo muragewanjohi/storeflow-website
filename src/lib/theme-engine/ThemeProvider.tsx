@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, useEffect, ReactNode } from 'react';
-import type { ThemeConfig, TenantThemeCustomizations } from '@/types/theme';
+import type { ThemeConfig, TenantThemeCustomizations, ThemeColors } from '@/types/theme';
 
 // ============================================
 // Theme Context
@@ -36,12 +36,19 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   // Merge theme config with tenant customizations
   const mergedConfig = useMemo(() => {
+    // Filter out undefined values from customizations
+    const customColors = tenantCustomizations?.colors 
+      ? Object.fromEntries(
+          Object.entries(tenantCustomizations.colors).filter(([_, v]) => v !== undefined)
+        ) as Partial<ThemeColors>
+      : {};
+    
     const merged: ThemeConfig = {
       ...config,
       colors: {
         ...config.colors,
-        ...tenantCustomizations?.colors,
-      },
+        ...customColors,
+      } as ThemeColors,
       typography: {
         ...config.typography,
         ...tenantCustomizations?.typography,
