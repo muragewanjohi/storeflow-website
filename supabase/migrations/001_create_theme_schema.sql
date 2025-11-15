@@ -4,9 +4,9 @@
 -- ============================================
 -- 1. CENTRAL THEMES TABLE (No tenant_id)
 -- ============================================
-CREATE TABLE themes (
+CREATE TABLE IF NOT EXISTS themes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
+  title VARCHAR(255) NOT NULL,  -- Note: Using 'title' to match actual schema
   slug VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
   author VARCHAR(255) DEFAULT 'StoreFlow',
@@ -14,15 +14,15 @@ CREATE TABLE themes (
   status BOOLEAN DEFAULT true,
   is_premium BOOLEAN DEFAULT false,
   price DECIMAL(10,2),
-  preview_url VARCHAR(500),
+  unique_key VARCHAR(255) UNIQUE,  -- Matches actual schema
+  theme_url VARCHAR(500),  -- Matches actual schema (was preview_url)
   screenshot_url VARCHAR(500),
-  demo_url VARCHAR(500),
+  -- Note: demo_url removed, not in actual schema
   
   -- Theme configuration as JSON
   config JSONB DEFAULT '{}',
   
-  -- Available customization options
-  customization_schema JSONB DEFAULT '{}',
+  -- Note: customization_schema and layouts removed, not in actual schema
   
   -- Default color palette
   colors JSONB DEFAULT '{}',
@@ -30,22 +30,19 @@ CREATE TABLE themes (
   -- Typography settings
   typography JSONB DEFAULT '{}',
   
-  -- Layout options
-  layouts JSONB DEFAULT '{}',
-  
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Indexes for themes
-CREATE INDEX idx_themes_slug ON themes(slug);
-CREATE INDEX idx_themes_status ON themes(status);
-CREATE INDEX idx_themes_premium ON themes(is_premium);
+CREATE INDEX IF NOT EXISTS idx_themes_slug ON themes(slug);
+CREATE INDEX IF NOT EXISTS idx_themes_status ON themes(status);
+CREATE INDEX IF NOT EXISTS idx_themes_premium ON themes(is_premium);
 
 -- ============================================
 -- 2. TENANT THEME SELECTION & CUSTOMIZATION
 -- ============================================
-CREATE TABLE tenant_themes (
+CREATE TABLE IF NOT EXISTS tenant_themes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   theme_id UUID NOT NULL REFERENCES themes(id),
@@ -82,14 +79,15 @@ CREATE TABLE tenant_themes (
 );
 
 -- Indexes for tenant_themes
-CREATE INDEX idx_tenant_themes_tenant_id ON tenant_themes(tenant_id);
-CREATE INDEX idx_tenant_themes_theme_id ON tenant_themes(theme_id);
-CREATE INDEX idx_tenant_themes_active ON tenant_themes(tenant_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_tenant_themes_tenant_id ON tenant_themes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_themes_theme_id ON tenant_themes(theme_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_themes_active ON tenant_themes(tenant_id, is_active);
 
 -- Enable RLS on tenant_themes
 ALTER TABLE tenant_themes ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Tenants can only see/modify their own theme
+DROP POLICY IF EXISTS "tenant_themes_isolation" ON tenant_themes;
 CREATE POLICY "tenant_themes_isolation"
   ON tenant_themes FOR ALL
   USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
@@ -97,7 +95,7 @@ CREATE POLICY "tenant_themes_isolation"
 -- ============================================
 -- 3. THEME COMPONENTS LIBRARY
 -- ============================================
-CREATE TABLE theme_components (
+CREATE TABLE IF NOT EXISTS theme_components (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   theme_id UUID NOT NULL REFERENCES themes(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
@@ -119,13 +117,13 @@ CREATE TABLE theme_components (
 );
 
 -- Indexes for theme_components
-CREATE INDEX idx_theme_components_theme_id ON theme_components(theme_id);
-CREATE INDEX idx_theme_components_category ON theme_components(category);
+CREATE INDEX IF NOT EXISTS idx_theme_components_theme_id ON theme_components(theme_id);
+CREATE INDEX IF NOT EXISTS idx_theme_components_category ON theme_components(category);
 
 -- ============================================
 -- 4. TENANT PAGE LAYOUTS (Page Builder)
 -- ============================================
-CREATE TABLE tenant_page_layouts (
+CREATE TABLE IF NOT EXISTS tenant_page_layouts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   page_type VARCHAR(100) NOT NULL, -- 'home', 'shop', 'product', 'about', etc.
@@ -144,13 +142,14 @@ CREATE TABLE tenant_page_layouts (
 );
 
 -- Indexes for tenant_page_layouts
-CREATE INDEX idx_tenant_page_layouts_tenant_id ON tenant_page_layouts(tenant_id);
-CREATE INDEX idx_tenant_page_layouts_page_type ON tenant_page_layouts(page_type);
+CREATE INDEX IF NOT EXISTS idx_tenant_page_layouts_tenant_id ON tenant_page_layouts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_page_layouts_page_type ON tenant_page_layouts(page_type);
 
 -- Enable RLS on tenant_page_layouts
 ALTER TABLE tenant_page_layouts ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Tenants can only see/modify their own layouts
+DROP POLICY IF EXISTS "tenant_page_layouts_isolation" ON tenant_page_layouts;
 CREATE POLICY "tenant_page_layouts_isolation"
   ON tenant_page_layouts FOR ALL
   USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
@@ -166,9 +165,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================
--- 6. SEED DEFAULT THEMES
+-- 6. SEED DEFAULT THEMES (only if they don't exist)
 -- ============================================
-INSERT INTO themes (name, slug, description, status, colors, typography, config) VALUES
+-- Note: Using actual column names from database schema (title, not name)
+INSERT INTO themes (title, slug, description, status, colors, typography, config, author, version) 
+SELECT * FROM (VALUES
 (
   'HexFashion',
   'hexfashion',
@@ -198,7 +199,9 @@ INSERT INTO themes (name, slug, description, status, colors, typography, config)
       "wishlist": true,
       "compareProducts": true
     }
-  }'::jsonb
+  }'::jsonb,
+  'StoreFlow',
+  '1.0.0'
 ),
 (
   'Aromatic',
@@ -229,7 +232,9 @@ INSERT INTO themes (name, slug, description, status, colors, typography, config)
       "wishlist": true,
       "compareProducts": false
     }
-  }'::jsonb
+  }'::jsonb,
+  'StoreFlow',
+  '1.0.0'
 ),
 (
   'BookPoint',
@@ -260,8 +265,11 @@ INSERT INTO themes (name, slug, description, status, colors, typography, config)
       "wishlist": true,
       "compareProducts": false
     }
-  }'::jsonb
-);
+  }'::jsonb,
+  'StoreFlow',
+  '1.0.0'
+)) AS v(title, slug, description, status, colors, typography, config, author, version)
+WHERE NOT EXISTS (SELECT 1 FROM themes WHERE themes.slug = v.slug);
 
 -- ============================================
 -- 7. COMMENTS FOR DOCUMENTATION
