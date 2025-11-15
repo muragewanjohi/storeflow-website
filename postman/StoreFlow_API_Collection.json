@@ -202,6 +202,326 @@
 			"description": "Domain management endpoints for custom domains"
 		},
 		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Landlord Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Registration successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Admin User\",\n    \"email\": \"admin@example.com\",\n    \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/landlord/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"landlord",
+								"register"
+							]
+						},
+						"description": "Register a new landlord (admin) user.\n\n**Day 12:** Supabase Authentication\n\n**Required Fields:**\n- name: Full name\n- email: Email address\n- password: Password (min 8 characters)\n\n**Response:**\n- User object with landlord role"
+					},
+					"response": []
+				},
+				{
+					"name": "Landlord Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Login successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"    pm.expect(jsonData.user.role).to.eql('landlord');",
+									"    ",
+									"    // Save session token if available",
+									"    if (jsonData.session && jsonData.session.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.session.access_token);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/landlord/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"landlord",
+								"login"
+							]
+						},
+						"description": "Login for landlord (admin) users.\n\n**Day 12:** Supabase Authentication\n\n**Required Fields:**\n- email: Email address\n- password: Password\n\n**Response:**\n- User object\n- Session token (saved to environment)"
+					},
+					"response": []
+				},
+				{
+					"name": "Tenant Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Login successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"    pm.expect(jsonData.user.role).to.be.oneOf(['tenant_admin', 'tenant_staff']);",
+									"    ",
+									"    // Save session token",
+									"    if (jsonData.session && jsonData.session.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.session.access_token);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"tenant@example.com\",\n    \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/tenant/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"tenant",
+								"login"
+							]
+						},
+						"description": "Login for tenant users (admin/staff).\n\n**Day 12:** Supabase Authentication\n\n**Note:** Requires tenant context (access via tenant subdomain)\n\n**Required Fields:**\n- email: Email address\n- password: Password\n\n**Response:**\n- User object with tenant_id\n- Session token"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has user data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('user');",
+									"    pm.expect(jsonData.user).to.have.property('id');",
+									"    pm.expect(jsonData.user).to.have.property('email');",
+									"    pm.expect(jsonData.user).to.have.property('role');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get current authenticated user information.\n\n**Day 12:** Supabase Authentication\n\n**Note:** Requires authentication (session cookie or token)\n\n**Response:**\n- User object with role and metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Logout successful\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    ",
+									"    // Clear auth token",
+									"    pm.environment.unset('auth_token');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Logout current user.\n\n**Day 12:** Supabase Authentication\n\n**Note:** Clears session cookies and tokens"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Token refreshed\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('session');",
+									"    ",
+									"    // Update auth token",
+									"    if (jsonData.session && jsonData.session.access_token) {",
+									"        pm.environment.set('auth_token', jsonData.session.access_token);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Refresh authentication token.\n\n**Day 12:** Supabase Authentication\n\n**Required Fields:**\n- refresh_token: Refresh token from login\n\n**Response:**\n- New session with access_token and refresh_token"
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints for landlord and tenant users"
+		},
+		{
 			"name": "Products",
 			"item": [
 				{
@@ -309,6 +629,14 @@
 					"    pm.request.headers.add({",
 					"        key: 'x-tenant-id',",
 					"        value: pm.environment.get('tenant_id')",
+					"    });",
+					"}",
+					"",
+					"// Auto-set auth token if available (for protected routes)",
+					"if (pm.environment.get('auth_token')) {",
+					"    pm.request.headers.add({",
+					"        key: 'Authorization',",
+					"        value: 'Bearer ' + pm.environment.get('auth_token')",
 					"    });",
 					"}"
 				]

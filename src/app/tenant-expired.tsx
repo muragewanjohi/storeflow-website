@@ -12,7 +12,7 @@ export default function TenantExpired() {
       <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900">Subscription Expired</h1>
         <p className="mt-4 text-gray-600">
-          This store's subscription has expired. Please renew your subscription to continue.
+          This store&apos;s subscription has expired. Please renew your subscription to continue.
         </p>
         <div className="mt-8">
           <Link

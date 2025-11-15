@@ -171,11 +171,14 @@ pm.test("Response has expected data", function () {
 - ✅ Get Domain Info (`GET /api/admin/domains`)
 - ✅ Remove Domain (`DELETE /api/admin/domains`)
 
-### Day 12: Supabase Authentication (Coming Soon)
-- ⏳ Landlord Login
-- ⏳ Tenant Login
-- ⏳ Logout
-- ⏳ Refresh Token
+### Day 12: Supabase Authentication ✅
+- ✅ Landlord Register
+- ✅ Landlord Login
+- ✅ Tenant Login
+- ✅ Get Current User
+- ✅ Logout
+- ✅ Refresh Token
+- ✅ User Management (List, Create, Update, Delete)
 
 ### Day 13-14: Tenant Management (Coming Soon)
 - ⏳ Create Tenant

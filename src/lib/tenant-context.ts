@@ -8,10 +8,33 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCachedTenant, setCachedTenant } from './tenant-context/cache';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for admin operations
-);
+/**
+ * Create Supabase client with service role key
+ * Handles missing environment variables gracefully
+ */
+function createSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      'Missing Supabase environment variables. ' +
+      'Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your .env.local file.'
+    );
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+// Create client lazily to avoid errors during module initialization
+let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient();
+  }
+  return supabaseClient;
+}
 
 export interface Tenant {
   id: string;
@@ -64,6 +87,20 @@ export async function getTenantFromRequest(
     }
 
     // Query tenant by subdomain or custom domain
+    let supabase;
+    try {
+      supabase = getSupabaseClient();
+    } catch (clientError: any) {
+      console.error('Failed to create Supabase client:', clientError.message);
+      // In development, provide helpful error message
+      if (process.env.NODE_ENV === 'development') {
+        console.error(
+          'Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env.local'
+        );
+      }
+      return null;
+    }
+
     const { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')
@@ -101,6 +138,19 @@ export async function getTenantFromRequest(
  */
 export async function setTenantContext(tenantId: string): Promise<void> {
   try {
+    let supabase;
+    try {
+      supabase = getSupabaseClient();
+    } catch (clientError: any) {
+      console.error('Failed to create Supabase client:', clientError.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error(
+          'Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env.local'
+        );
+      }
+      throw clientError;
+    }
+
     const { error } = await supabase.rpc('set_tenant_context', { 
       tenant_id: tenantId 
     });
@@ -126,6 +176,19 @@ export async function setTenantContext(tenantId: string): Promise<void> {
  */
 export async function getTenantContext(): Promise<string | null> {
   try {
+    let supabase;
+    try {
+      supabase = getSupabaseClient();
+    } catch (clientError: any) {
+      console.error('Failed to create Supabase client:', clientError.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error(
+          'Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in .env.local'
+        );
+      }
+      return null;
+    }
+
     const { data, error } = await supabase.rpc('get_tenant_context');
     
     if (error) {
@@ -148,4 +211,7 @@ export async function getTenantContext(): Promise<string | null> {
 export function getTenantIdFromHeaders(headers: Headers): string | null {
   return headers.get('x-tenant-id');
 }
+
+// Re-export client-side hooks for convenience
+export { useTenant, TenantProvider } from './tenant-context/provider';
 

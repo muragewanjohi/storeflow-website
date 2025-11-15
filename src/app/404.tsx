@@ -15,7 +15,7 @@ export default function NotFound() {
           Store Not Found
         </h2>
         <p className="mt-4 text-gray-600">
-          The store you're looking for doesn't exist or has been removed.
+          The store you&apos;re looking for doesn&apos;t exist or has been removed.
         </p>
         <div className="mt-8">
           <Link

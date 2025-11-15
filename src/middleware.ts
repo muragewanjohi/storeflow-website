@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getTenantFromRequest } from './lib/tenant-context';
+import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
@@ -31,8 +32,8 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Resolve tenant from hostname (with caching)
-    const tenant = await getCachedTenant(hostname);
+    // Resolve tenant from hostname
+    const tenant = await getTenantFromRequest(hostname);
 
     if (!tenant) {
       // Tenant not found - redirect to 404 page
@@ -63,12 +64,34 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-tenant-subdomain', tenant.subdomain);
     requestHeaders.set('x-tenant-name', tenant.name);
 
-    // Create response with tenant headers
+    // Create Supabase client for session refresh
     const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
+
+    // Refresh Supabase auth session if user is authenticated
+    // This ensures session stays valid across requests
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
+    // Refresh session (this updates cookies if needed)
+    await supabase.auth.getSession();
 
     // Also set response headers (for client-side access)
     response.headers.set('x-tenant-id', tenant.id);
