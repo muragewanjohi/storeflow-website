@@ -88,6 +88,7 @@ storeflow/
 - **[AI_PROMPT_LIBRARY.md](./docs/AI_PROMPT_LIBRARY.md)** - AI assistant prompts and context
 - **[SECURITY.md](./docs/SECURITY.md)** - Row-Level Security (RLS) implementation guide
 - **[PRISMA_EXPLANATION.md](./docs/PRISMA_EXPLANATION.md)** - Prisma ORM guide
+- **[POSTMAN_COLLECTION_GUIDE.md](./docs/POSTMAN_COLLECTION_GUIDE.md)** - API testing with Postman
 
 **External Documentation:**
 All migration and planning docs are in the [`../docs/`](../docs/) folder.

@@ -49,15 +49,25 @@ export async function getTenantFromRequest(
     }
 
     // Extract subdomain (first part before first dot)
-    // Handle localhost:3000 case
-    const parts = hostname.split(':')[0].split('.');
-    const subdomain = parts.length > 1 ? parts[0] : 'www';
+    // Handle localhost:3000 case for local development
+    const hostnameWithoutPort = hostname.split(':')[0];
+    const parts = hostnameWithoutPort.split('.');
+    
+    // For localhost, check for default tenant or use subdomain from env
+    let subdomain: string;
+    if (hostnameWithoutPort === 'localhost' || hostnameWithoutPort === '127.0.0.1') {
+      // Use default tenant subdomain from env, or try 'www' as fallback
+      subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'www';
+    } else {
+      // Extract subdomain from hostname (e.g., "teststore.dukanest.com" -> "teststore")
+      subdomain = parts.length > 1 ? parts[0] : 'www';
+    }
 
     // Query tenant by subdomain or custom domain
     const { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')
-      .or(`subdomain.eq.${subdomain},custom_domain.eq.${hostname}`)
+      .or(`subdomain.eq.${subdomain},custom_domain.eq.${hostnameWithoutPort}`)
       .eq('status', 'active')
       .single();
 

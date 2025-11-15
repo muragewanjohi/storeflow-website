@@ -21,14 +21,23 @@ export async function getCachedTenant(hostname: string): Promise<any | null> {
     return cached.tenant;
   }
 
-  // Try Vercel KV cache (if available)
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Try Vercel KV cache (if available and properly configured)
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  
+  // Skip KV if using placeholder values or not configured
+  if (
+    kvUrl && 
+    kvToken && 
+    !kvUrl.includes('your-kv-instance') && 
+    !kvToken.includes('your-kv-token')
+  ) {
     try {
       const kvResponse = await fetch(
-        `${process.env.KV_REST_API_URL}/get/tenant:${hostname}`,
+        `${kvUrl}/get/tenant:${hostname}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+            Authorization: `Bearer ${kvToken}`,
           },
         }
       );
@@ -60,13 +69,21 @@ export async function setCachedTenant(hostname: string, tenant: any): Promise<vo
   // Update memory cache
   memoryCache.set(hostname, { tenant, timestamp: now });
 
-  // Update Vercel KV cache (if available)
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Update Vercel KV cache (if available and properly configured)
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  
+  if (
+    kvUrl && 
+    kvToken && 
+    !kvUrl.includes('your-kv-instance') && 
+    !kvToken.includes('your-kv-token')
+  ) {
     try {
-      await fetch(`${process.env.KV_REST_API_URL}/set/tenant:${hostname}`, {
+      await fetch(`${kvUrl}/set/tenant:${hostname}`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+          Authorization: `Bearer ${kvToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -87,13 +104,21 @@ export async function setCachedTenant(hostname: string, tenant: any): Promise<vo
 export async function clearCachedTenant(hostname: string): Promise<void> {
   memoryCache.delete(hostname);
 
-  // Clear from Vercel KV (if available)
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Clear from Vercel KV (if available and properly configured)
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  
+  if (
+    kvUrl && 
+    kvToken && 
+    !kvUrl.includes('your-kv-instance') && 
+    !kvToken.includes('your-kv-token')
+  ) {
     try {
-      await fetch(`${process.env.KV_REST_API_URL}/del/tenant:${hostname}`, {
+      await fetch(`${kvUrl}/del/tenant:${hostname}`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+          Authorization: `Bearer ${kvToken}`,
         },
       });
     } catch (error) {

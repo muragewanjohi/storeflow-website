@@ -1,0 +1,338 @@
+{
+	"info": {
+		"_postman_id": "storeflow-api-collection",
+		"name": "StoreFlow API Collection",
+		"description": "Complete API collection for StoreFlow multi-tenant ecommerce platform. Updated after each development day.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "storeflow"
+	},
+	"item": [
+		{
+			"name": "Tenant Management",
+			"item": [
+				{
+					"name": "Get Current Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tenant data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/tenant/current",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"tenant",
+								"current"
+							]
+						},
+						"description": "Get the current tenant based on hostname/headers set by middleware.\n\n**Day 10:** Tenant Resolution System"
+					},
+					"response": []
+				}
+			],
+			"description": "Tenant-related API endpoints"
+		},
+		{
+			"name": "Domain Management",
+			"item": [
+				{
+					"name": "Add Custom Domain",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Domain added successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('domain');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"domain\": \"{{test_domain}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/domains",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"domains"
+							]
+						},
+						"description": "Add a custom domain to a tenant.\n\n**Day 11:** Vercel Domain Management\n\n**Required:**\n- Domain must be valid format (e.g., example.com)\n- Tenant must be authenticated\n\n**Response:**\n- Domain information\n- Verification status\n- DNS configuration instructions"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Domain Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has domain info\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('domain');",
+									"    pm.expect(jsonData).to.have.property('verification');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/domains?domain={{test_domain}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"domains"
+							],
+							"query": [
+								{
+									"key": "domain",
+									"value": "{{test_domain}}",
+									"description": "Domain name to get info for"
+								}
+							]
+						},
+						"description": "Get domain information and verification status.\n\n**Day 11:** Vercel Domain Management\n\n**Returns:**\n- Domain details\n- Verification status\n- DNS configuration instructions"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Domain",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Domain removed successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/domains?domain={{test_domain}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"domains"
+							],
+							"query": [
+								{
+									"key": "domain",
+									"value": "{{test_domain}}",
+									"description": "Domain name to remove"
+								}
+							]
+						},
+						"description": "Remove a custom domain from a tenant.\n\n**Day 11:** Vercel Domain Management\n\n**Note:** Domain must belong to the authenticated tenant."
+					},
+					"response": []
+				}
+			],
+			"description": "Domain management endpoints for custom domains"
+		},
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "Get Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has products array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('products');",
+									"    pm.expect(jsonData.products).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products"
+							]
+						},
+						"description": "Get all products for the current tenant.\n\n**Day 10:** Example API route with tenant context\n\n**Features:**\n- Automatically filtered by tenant_id via RLS\n- Returns products for current tenant only"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Product created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('product');",
+									"    pm.expect(jsonData.product).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Product\",\n    \"description\": \"This is a test product\",\n    \"price\": 29.99,\n    \"sku\": \"TEST-001\",\n    \"stock_quantity\": 100,\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products"
+							]
+						},
+						"description": "Create a new product for the current tenant.\n\n**Day 10:** Example API route\n\n**Required Fields:**\n- name: Product name\n- price: Product price\n\n**Optional Fields:**\n- description: Product description\n- sku: Stock keeping unit\n- stock_quantity: Quantity in stock\n- status: Product status (default: 'active')"
+					},
+					"response": []
+				}
+			],
+			"description": "Product management endpoints (Example implementation from Day 10)"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-set tenant headers if available",
+					"if (pm.environment.get('tenant_id')) {",
+					"    pm.request.headers.add({",
+					"        key: 'x-tenant-id',",
+					"        value: pm.environment.get('tenant_id')",
+					"    });",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test: Log response time",
+					"pm.test('Response time is less than 5000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+
