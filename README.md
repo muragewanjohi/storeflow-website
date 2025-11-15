@@ -57,10 +57,10 @@ storeflow/
 ## 🛠️ Technology Stack
 
 ### Core
-- **Next.js 14+** - React framework with App Router
+- **Next.js 15** - React framework with App Router
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
-- **shadcn/ui** - Component library
+- **shadcn/ui** - Component library (optional)
 
 ### Backend
 - **Supabase** - PostgreSQL database + Auth + Storage
@@ -69,23 +69,30 @@ storeflow/
 
 ### Hosting
 - **Vercel** - Multi-tenant platform
-- **Vercel KV** - Redis caching
+- **Vercel KV** - Redis caching (optional)
 - **Vercel Edge** - Edge functions
 
 ### Additional
 - **Zod** - Schema validation
 - **React Hook Form** - Form handling
 - **TanStack Query** - Data fetching
-- **Stripe** - Payment processing
+- **Pesapal** - Payment processing (Kenya)
 
 ---
 
 ## 📚 Documentation
 
-All documentation is in the [`../docs/`](../docs/) folder.
+**Project Documentation:**
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Complete development setup guide ⭐ **Start here!**
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design patterns
+- **[AI_PROMPT_LIBRARY.md](./docs/AI_PROMPT_LIBRARY.md)** - AI assistant prompts and context
+
+**External Documentation:**
+All migration and planning docs are in the [`../docs/`](../docs/) folder.
 
 **Start Here:**
 - **[Documentation Index](../docs/DOCUMENTATION_INDEX.md)** - Master index of all documentation
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Setup and development guide
 
 **Key Documents:**
 - **[Migration Roadmap](../docs/NODEJS_MIGRATION_UPDATED.md)** - Complete 49-day migration roadmap
@@ -124,44 +131,57 @@ npm run dev
 
 ### Environment Variables
 
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+Copy `.env.example` to `.env.local` and fill in your values:
 
-# Vercel
-VERCEL_URL=your-app.vercel.app
-VERCEL_TOKEN=your-vercel-token
-
-# App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+```bash
+Copy-Item .env.example .env.local
 ```
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed setup instructions.
+
+**Required Variables:**
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-side only!)
+- `DATABASE_URL` - PostgreSQL connection string
 
 ---
 
 ## 📋 Development Roadmap
 
-See `../NODEJS_MIGRATION_UPDATED.md` for the complete 49-day roadmap.
+See [`../docs/NODEJS_MIGRATION_UPDATED.md`](../docs/NODEJS_MIGRATION_UPDATED.md) for the complete 49-day roadmap.
+
+### Current Status: Day 7 Complete ✅
+
+**Completed:**
+- ✅ Project initialization (Day 6)
+- ✅ Development tools setup (Day 7)
+- ✅ Documentation created (Day 7)
+
+**Next Steps:**
+- Day 8: Database schema design
+- Day 9: Row-Level Security setup
+- Day 10: Tenant resolution system
 
 ### Quick Overview:
 
-**Week 1: Preparation**
+**Week 1: Preparation** ✅
 - Architecture study
 - Database schema design
 - Project initialization
+- Development tools
 
-**Week 2-3: Foundation**
+**Week 2-3: Foundation** (Upcoming)
 - Multi-tenancy core
-- Theme system
 - Authentication
+- Tenant management
 
-**Week 4-6: Features**
+**Week 4-6: Features** (Planned)
 - Products, Orders, Customers
 - Payment integration
 - Content management
 
-**Week 7: Launch**
+**Week 7: Launch** (Planned)
 - Testing
 - Documentation
 - Deployment

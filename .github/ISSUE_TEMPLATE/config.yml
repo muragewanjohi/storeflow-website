@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/your-org/storeflow/tree/main/docs
+    about: Check our documentation for setup guides and API references
+  - name: Migration Roadmap
+    url: https://github.com/your-org/storeflow/blob/main/docs/NODEJS_MIGRATION_UPDATED.md
+    about: See our complete migration roadmap and development plan
+

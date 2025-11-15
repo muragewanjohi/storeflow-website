@@ -1,0 +1,401 @@
+// ============================================
+// StoreFlow Prisma Schema
+// Multi-Tenant Ecommerce Platform
+// ============================================
+// 
+// This schema defines the database structure for StoreFlow
+// Central tables: No tenant_id (shared across all tenants)
+// Tenant-scoped tables: Include tenant_id for data isolation
+//
+// Generated: 2024
+// Version: 1.0
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// CENTRAL TABLES (No tenant_id)
+// ============================================
+
+/// Tenant registry - Central table for all tenants
+model Tenant {
+  id           String    @id @default(uuid()) @db.Uuid
+  subdomain    String    @unique @db.VarChar(255)
+  customDomain String?   @unique @map("custom_domain") @db.VarChar(255)
+  name         String    @db.VarChar(255)
+  planId       String?   @map("plan_id") @db.Uuid
+  expireDate   DateTime? @map("expire_date") @db.Timestamp(6)
+  startDate    DateTime? @default(now()) @map("start_date") @db.Timestamp(6)
+  renewStatus  String?   @map("renew_status") @db.VarChar(50)
+  status       String    @default("active") @db.VarChar(50)
+  themeSlug    String?   @map("theme_slug") @db.VarChar(100)
+  settings     Json?     @default("{}") @map("data")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  plan         PricePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  
+  // Tenant-scoped relations (will be added below)
+  products     Product[]
+  orders       Order[]
+  customers    Customer[]
+  categories   Category[]
+  pages        Page[]
+  blogs        Blog[]
+  paymentLogs  PaymentLog[]
+
+  @@index([subdomain], map: "idx_tenants_subdomain")
+  @@index([customDomain], map: "idx_tenants_custom_domain")
+  @@index([status], map: "idx_tenants_status")
+  @@map("tenants")
+}
+
+/// Subscription plans - Central table
+model PricePlan {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String    @db.VarChar(255)
+  price         Decimal   @db.Decimal(10, 2)
+  durationMonths Int      @map("duration_months") @db.Integer
+  features      Json      @default("{}")
+  status        String    @default("active") @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenants       Tenant[]
+
+  @@map("price_plans")
+}
+
+/// Landlord admin users - Central table
+model Admin {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  email     String    @unique @db.VarChar(255)
+  username  String?   @unique @db.VarChar(255)
+  password  String    @db.VarChar(255)
+  role      String    @default("admin") @db.VarChar(50)
+  image     String?   @db.VarChar(255)
+  status    String    @default("active") @db.VarChar(50)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([email], map: "idx_admins_email")
+  @@map("admins")
+}
+
+/// Available themes - Central table
+model Theme {
+  id           String    @id @default(uuid()) @db.Uuid
+  title        String    @db.VarChar(255)
+  slug         String    @unique @db.VarChar(100)
+  description  String?   @db.Text
+  author       String?   @db.VarChar(255)
+  version      String    @default("1.0.0") @db.VarChar(50)
+  status       Boolean   @default(true)
+  isPremium    Boolean   @default(false) @map("is_premium")
+  price        Decimal?  @db.Decimal(10, 2)
+  uniqueKey    String?   @unique @map("unique_key") @db.VarChar(255)
+  themeUrl     String?   @map("theme_url") @db.VarChar(500)
+  screenshotUrl String?  @map("screenshot_url") @db.VarChar(500)
+  config       Json      @default("{}")
+  colors       Json      @default("{}")
+  typography   Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([slug], map: "idx_themes_slug")
+  @@index([status], map: "idx_themes_status")
+  @@map("themes")
+}
+
+/// Available plugins - Central table
+model Plugin {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255)
+  slug        String    @unique @db.VarChar(100)
+  description String?   @db.Text
+  author      String?   @db.VarChar(255)
+  version     String    @default("1.0.0") @db.VarChar(50)
+  status      Boolean   @default(true)
+  isPremium   Boolean   @default(false) @map("is_premium")
+  price       Decimal?  @db.Decimal(10, 2)
+  config      Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([slug], map: "idx_plugins_slug")
+  @@index([status], map: "idx_plugins_status")
+  @@map("plugins")
+}
+
+/// Payment logs for tenant subscriptions - Central table (but tenant-scoped)
+model PaymentLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  userId        String?   @map("user_id") @db.Uuid
+  gateway       String    @db.VarChar(50)
+  amount        Decimal   @db.Decimal(10, 2)
+  currency      String    @default("USD") @db.VarChar(10)
+  status        String    @default("pending") @db.VarChar(50)
+  paymentId     String?   @map("payment_id") @db.VarChar(255)
+  transactionId String?   @map("transaction_id") @db.VarChar(255)
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_payment_logs_tenant_id")
+  @@index([status], map: "idx_payment_logs_status")
+  @@index([gateway], map: "idx_payment_logs_gateway")
+  @@map("payment_logs")
+}
+
+/// Custom domain mappings - Central table
+model CustomDomain {
+  id         String    @id @default(uuid()) @db.Uuid
+  oldDomain  String    @map("old_domain") @db.VarChar(255)
+  newDomain  String    @unique @map("new_domain") @db.VarChar(255)
+  status     String    @default("pending") @db.VarChar(50)
+  verifiedAt DateTime? @map("verified_at") @db.Timestamp(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([newDomain], map: "idx_custom_domains_new_domain")
+  @@map("custom_domains")
+}
+
+// ============================================
+// TENANT-SCOPED TABLES (With tenant_id)
+// ============================================
+
+/// Products - Tenant-scoped
+model Product {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  slug            String?   @db.VarChar(255)
+  description     String?   @db.Text
+  shortDescription String?  @map("short_description") @db.Text
+  price           Decimal   @db.Decimal(10, 2)
+  salePrice       Decimal?  @map("sale_price") @db.Decimal(10, 2)
+  sku             String?   @db.VarChar(100)
+  stockQuantity   Int       @default(0) @map("stock_quantity")
+  status          String    @default("active") @db.VarChar(50)
+  image           String?   @db.VarChar(255)
+  gallery         Json      @default("[]")
+  categoryId      String?   @map("category_id") @db.Uuid
+  brandId         String?   @map("brand_id") @db.Uuid
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderProducts   OrderProduct[]
+  productCategories ProductCategory[]
+
+  @@index([tenantId], map: "idx_products_tenant_id")
+  @@index([tenantId, status], map: "idx_products_tenant_status")
+  @@index([slug], map: "idx_products_slug")
+  @@index([sku], map: "idx_products_sku")
+  @@map("products")
+}
+
+/// Orders - Tenant-scoped
+model Order {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  orderNumber         String    @unique @map("order_number") @db.VarChar(100)
+  customerId          String?   @map("customer_id") @db.Uuid
+  name                String?   @db.VarChar(255)
+  email               String?   @db.VarChar(255)
+  phone               String?   @db.VarChar(50)
+  totalAmount         Decimal   @map("total_amount") @db.Decimal(10, 2)
+  status              String    @default("pending") @db.VarChar(50)
+  paymentStatus       String    @default("pending") @map("payment_status") @db.VarChar(50)
+  paymentGateway      String?   @map("payment_gateway") @db.VarChar(50)
+  paymentTrack        String?   @map("payment_track") @db.VarChar(255)
+  transactionId       String?   @map("transaction_id") @db.VarChar(255)
+  shippingAddress     Json?     @map("shipping_address")
+  billingAddress      Json?     @map("billing_address")
+  orderDetails        Json?     @map("order_details")
+  paymentMeta         Json?     @map("payment_meta")
+  coupon              String?   @db.VarChar(100)
+  couponDiscounted    Decimal?  @map("coupon_discounted") @db.Decimal(10, 2)
+  message             String?   @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer            Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  orderProducts       OrderProduct[]
+
+  @@index([tenantId], map: "idx_orders_tenant_id")
+  @@index([tenantId, status], map: "idx_orders_tenant_status")
+  @@index([orderNumber], map: "idx_orders_order_number")
+  @@index([customerId], map: "idx_orders_customer_id")
+  @@map("orders")
+}
+
+/// Order Products (Order Items) - Tenant-scoped
+model OrderProduct {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  orderId   String    @map("order_id") @db.Uuid
+  productId String?   @map("product_id") @db.Uuid
+  quantity  Int
+  price     Decimal   @db.Decimal(10, 2)
+  total     Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  // Relations
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "idx_order_products_tenant_id")
+  @@index([orderId], map: "idx_order_products_order_id")
+  @@index([productId], map: "idx_order_products_product_id")
+  @@map("order_products")
+}
+
+/// Customers - Tenant-scoped
+model Customer {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String    @db.VarChar(255)
+  email           String    @db.VarChar(255)
+  username        String?   @db.VarChar(255)
+  password        String?   @db.VarChar(255)
+  emailVerified   Boolean   @default(false) @map("email_verified")
+  emailVerifyToken String?  @map("email_verify_token") @db.VarChar(255)
+  mobile          String?   @db.VarChar(20)
+  company         String?   @db.VarChar(255)
+  address         String?   @db.Text
+  city            String?   @db.VarChar(100)
+  state           String?   @db.VarChar(100)
+  country         String?   @db.VarChar(100)
+  postalCode      String?   @map("postal_code") @db.VarChar(20)
+  image           String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders          Order[]
+
+  @@unique([tenantId, email], map: "idx_customers_tenant_email")
+  @@index([tenantId], map: "idx_customers_tenant_id")
+  @@index([email], map: "idx_customers_email")
+  @@map("customers")
+}
+
+/// Categories - Tenant-scoped
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  slug        String?   @db.VarChar(255)
+  parentId    String?   @map("parent_id") @db.Uuid
+  image       String?   @db.VarChar(255)
+  status      String    @default("active") @db.VarChar(50)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent      Category? @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryToCategory")
+  products    Product[]
+  productCategories ProductCategory[]
+
+  @@index([tenantId], map: "idx_categories_tenant_id")
+  @@index([parentId], map: "idx_categories_parent_id")
+  @@index([slug], map: "idx_categories_slug")
+  @@map("categories")
+}
+
+/// Product Categories (Many-to-Many) - Tenant-scoped
+model ProductCategory {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  productId  String    @map("product_id") @db.Uuid
+  categoryId String    @map("category_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  // Relations
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, productId, categoryId], map: "idx_product_categories_unique")
+  @@index([tenantId], map: "idx_product_categories_tenant_id")
+  @@index([productId], map: "idx_product_categories_product_id")
+  @@index([categoryId], map: "idx_product_categories_category_id")
+  @@map("product_categories")
+}
+
+/// Pages - Tenant-scoped
+model Page {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  title         String    @db.VarChar(255)
+  slug          String?   @unique @db.VarChar(255)
+  content       String?   @db.Text
+  metaTitle     String?   @map("meta_title") @db.VarChar(255)
+  metaDescription String?  @map("meta_description") @db.Text
+  metaTags      String?   @map("meta_tags") @db.Text
+  status        String    @default("draft") @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_pages_tenant_id")
+  @@index([slug], map: "idx_pages_slug")
+  @@index([tenantId, status], map: "idx_pages_tenant_status")
+  @@map("pages")
+}
+
+/// Blogs - Tenant-scoped
+model Blog {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  title         String    @db.VarChar(255)
+  slug          String?   @db.VarChar(255)
+  content       String?   @db.Text
+  excerpt       String?   @db.Text
+  categoryId    String?   @map("category_id") @db.Uuid
+  image         String?   @db.VarChar(255)
+  metaTitle     String?   @map("meta_title") @db.VarChar(255)
+  metaDescription String?  @map("meta_description") @db.Text
+  metaTags      String?   @map("meta_tags") @db.Text
+  status        String    @default("draft") @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Note: BlogCategory relation would be added if blog_categories table exists
+
+  @@index([tenantId], map: "idx_blogs_tenant_id")
+  @@index([slug], map: "idx_blogs_slug")
+  @@index([categoryId], map: "idx_blogs_category_id")
+  @@index([tenantId, status], map: "idx_blogs_tenant_status")
+  @@map("blogs")
+}
+
