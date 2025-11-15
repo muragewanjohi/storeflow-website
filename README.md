@@ -84,8 +84,10 @@ storeflow/
 
 **Project Documentation:**
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Complete development setup guide ⭐ **Start here!**
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design patterns
+- **[ARCHITECTURE.md](./docs/ARCHITECTURE.md)** - System architecture and design patterns
 - **[AI_PROMPT_LIBRARY.md](./docs/AI_PROMPT_LIBRARY.md)** - AI assistant prompts and context
+- **[SECURITY.md](./docs/SECURITY.md)** - Row-Level Security (RLS) implementation guide
+- **[PRISMA_EXPLANATION.md](./docs/PRISMA_EXPLANATION.md)** - Prisma ORM guide
 
 **External Documentation:**
 All migration and planning docs are in the [`../docs/`](../docs/) folder.

@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { getCachedTenant, setCachedTenant } from './tenant-context/cache';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,14 +29,30 @@ export interface Tenant {
 /**
  * Resolve tenant from hostname (subdomain or custom domain)
  * 
+ * Uses caching to improve performance. Checks cache first, then database.
+ * 
  * @param hostname - The hostname from the request (e.g., "tenant1.dukanest.com" or "custom.com")
+ * @param useCache - Whether to use cache (default: true)
  * @returns Tenant object or null if not found
  */
-export async function getTenantFromRequest(hostname: string): Promise<Tenant | null> {
+export async function getTenantFromRequest(
+  hostname: string,
+  useCache: boolean = true
+): Promise<Tenant | null> {
   try {
+    // Check cache first
+    if (useCache) {
+      const cached = await getCachedTenant(hostname);
+      if (cached) {
+        return cached as Tenant;
+      }
+    }
+
     // Extract subdomain (first part before first dot)
-    const subdomain = hostname.split('.')[0];
-    
+    // Handle localhost:3000 case
+    const parts = hostname.split(':')[0].split('.');
+    const subdomain = parts.length > 1 ? parts[0] : 'www';
+
     // Query tenant by subdomain or custom domain
     const { data: tenant, error } = await supabase
       .from('tenants')
@@ -47,6 +64,11 @@ export async function getTenantFromRequest(hostname: string): Promise<Tenant | n
     if (error || !tenant) {
       console.error('Tenant not found:', hostname, error);
       return null;
+    }
+
+    // Cache the result
+    if (useCache) {
+      await setCachedTenant(hostname, tenant);
     }
 
     return tenant as Tenant;
