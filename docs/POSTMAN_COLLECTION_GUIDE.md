@@ -309,8 +309,6 @@ After each day with API endpoints:
 
 ## 🔗 Related Documentation
 
-- [Day 11 Manual Testing Guide](./DAY_11_MANUAL_TESTING_GUIDE.md)
-- [Day 11 Testing Quick Start](./DAY_11_TESTING_QUICK_START.md)
 - [Postman Collection README](../postman/README.md)
 
 ---

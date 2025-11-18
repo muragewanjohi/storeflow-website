@@ -34,9 +34,11 @@ Update these variables in the environment:
 
 - **`base_url`** - Your API base URL (default: `http://localhost:3000`)
 - **`test_domain`** - Test domain for domain management (default: `test.example.com`)
-- **`tenant_id`** - Current tenant ID (optional, for testing)
+- **`tenant_id`** - Current tenant ID (auto-set by some requests)
 - **`tenant_subdomain`** - Tenant subdomain (default: `teststore`)
-- **`auth_token`** - Authentication token (when auth is implemented)
+- **`auth_token`** - Authentication token (auto-set after login)
+- **`plan_id`** - Price plan ID (auto-set by Get Price Plans request)
+- **`cron_secret_token`** - Secret token for cron endpoints (set manually)
 
 ---
 
@@ -44,6 +46,18 @@ Update these variables in the environment:
 
 ### Tenant Management
 - **Get Current Tenant** - Get tenant info from hostname/headers
+
+### Admin Tenant Management (Day 14)
+- **List Tenants** - List all tenants (landlord only)
+- **Get Tenant** - Get tenant details by ID
+- **Create Tenant** - Create new tenant with admin user
+- **Update Tenant** - Update tenant settings
+- **Delete Tenant** - Soft delete tenant
+- **Change Subdomain** - Change tenant subdomain
+- **Update Subscription** - Upgrade/downgrade/renew subscription
+- **Get Billing History** - View tenant billing history
+- **Get Price Plans** - List available price plans
+- **Subscription Expiry Checker** - Check for expired subscriptions (cron)
 
 ### Domain Management (Day 11)
 - **Add Custom Domain** - Add a custom domain to tenant
@@ -180,11 +194,17 @@ pm.test("Response has expected data", function () {
 - ✅ Refresh Token
 - ✅ User Management (List, Create, Update, Delete)
 
-### Day 13-14: Tenant Management (Coming Soon)
-- ⏳ Create Tenant
-- ⏳ Update Tenant
-- ⏳ Delete Tenant
-- ⏳ List Tenants
+### Day 13-14: Tenant Management ✅
+- ✅ Create Tenant (`POST /api/admin/tenants`)
+- ✅ List Tenants (`GET /api/admin/tenants`)
+- ✅ Get Tenant (`GET /api/admin/tenants/[id]`)
+- ✅ Update Tenant (`PUT /api/admin/tenants/[id]`)
+- ✅ Delete Tenant (`DELETE /api/admin/tenants/[id]`)
+- ✅ Change Subdomain (`PUT /api/admin/tenants/[id]/subdomain`)
+- ✅ Update Subscription (`PUT /api/admin/tenants/[id]/subscription`)
+- ✅ Get Billing History (`GET /api/admin/tenants/[id]/billing`)
+- ✅ Get Price Plans (`GET /api/admin/price-plans`)
+- ✅ Subscription Expiry Checker (`GET /api/admin/subscriptions/expiry-checker`)
 
 ### Day 15+: Product Management (Coming Soon)
 - ⏳ Update Product

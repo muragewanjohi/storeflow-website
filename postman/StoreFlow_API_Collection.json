@@ -616,6 +616,489 @@
 				}
 			],
 			"description": "Product management endpoints (Example implementation from Day 10)"
+		},
+		{
+			"name": "Admin Tenant Management",
+			"item": [
+				{
+					"name": "List Tenants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tenants array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('tenants');",
+									"    pm.expect(jsonData.tenants).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants"
+							]
+						},
+						"description": "List all tenants (landlord only).\n\n**Day 14:** Tenant Management\n\n**Note:** Requires landlord authentication\n\n**Response:**\n- Array of tenant objects with id, name, subdomain, status, etc."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tenant data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"    pm.expect(jsonData.tenant).to.have.property('id');",
+									"    ",
+									"    // Save tenant ID for other requests",
+									"    pm.environment.set('tenant_id', jsonData.tenant.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}"
+							]
+						},
+						"description": "Get tenant details by ID (landlord only).\n\n**Day 14:** Tenant Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Response:**\n- Tenant object with full details including plan information"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Tenant created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"    pm.expect(jsonData.tenant).to.have.property('id');",
+									"    ",
+									"    // Save tenant ID for other requests",
+									"    pm.environment.set('tenant_id', jsonData.tenant.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Store\",\n    \"subdomain\": \"teststore\",\n    \"adminEmail\": \"admin@teststore.com\",\n    \"adminPassword\": \"password123\",\n    \"adminName\": \"Store Admin\",\n    \"planId\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants"
+							]
+						},
+						"description": "Create a new tenant (landlord only).\n\n**Day 13-14:** Tenant Management\n\n**Required Fields:**\n- name: Store name\n- subdomain: Subdomain (3-63 chars, lowercase alphanumeric and hyphens)\n- adminEmail: Admin user email\n- adminPassword: Admin password (min 8 chars)\n- adminName: Admin user name\n\n**Optional Fields:**\n- planId: UUID of price plan (null for free trial)\n\n**Response:**\n- Tenant object with id, name, subdomain, status\n- Automatically creates admin user\n- Sends welcome email\n- Adds subdomain to Vercel"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Tenant updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Store Name\",\n    \"status\": \"active\",\n    \"plan_id\": null,\n    \"expire_date\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}"
+							]
+						},
+						"description": "Update tenant settings (landlord only).\n\n**Day 14:** Tenant Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Optional Fields:**\n- name: Store name\n- custom_domain: Custom domain (or null)\n- status: 'active', 'suspended', or 'expired'\n- plan_id: UUID of price plan (or null)\n- expire_date: Expiration date (ISO string or null)\n\n**Response:**\n- Updated tenant object"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Tenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Tenant deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.tenant.status).to.eql('deleted');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}"
+							]
+						},
+						"description": "Soft delete a tenant (landlord only).\n\n**Day 14:** Tenant Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Actions:**\n- Sets tenant status to 'deleted' (soft delete)\n- Removes subdomain from Vercel\n- Preserves data for potential restoration\n\n**Response:**\n- Deleted tenant object with status 'deleted'"
+					},
+					"response": []
+				},
+				{
+					"name": "Change Subdomain",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Subdomain changed successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"    pm.expect(jsonData.tenant).to.have.property('subdomain');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"newSubdomain\": \"newsubdomain\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}/subdomain",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}",
+								"subdomain"
+							]
+						},
+						"description": "Change tenant subdomain (landlord only).\n\n**Day 14:** Tenant Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Required Fields:**\n- newSubdomain: New subdomain (3-63 chars, lowercase alphanumeric and hyphens)\n\n**Actions:**\n- Validates subdomain format and availability\n- Updates subdomain in database\n- Removes old subdomain from Vercel\n- Adds new subdomain to Vercel\n\n**Response:**\n- Updated tenant object with new subdomain"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Subscription",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Subscription updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('tenant');",
+									"    pm.expect(jsonData).to.have.property('newExpireDate');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"plan_id\": \"{{plan_id}}\",\n    \"action\": \"upgrade\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}/subscription",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}",
+								"subscription"
+							]
+						},
+						"description": "Update tenant subscription (landlord only).\n\n**Day 14:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Required Fields:**\n- plan_id: UUID of the new price plan\n\n**Optional Fields:**\n- action: 'upgrade', 'downgrade', or 'renew' (default: 'upgrade')\n\n**Actions:**\n- Upgrade/Downgrade: Starts immediately with new plan duration\n- Renew: Extends from current expiration date\n\n**Response:**\n- Updated tenant object\n- New expiration date"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Billing History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has billing data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('billingHistory');",
+									"    pm.expect(jsonData).to.have.property('currentPlan');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/tenants/{{tenant_id}}/billing",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"tenants",
+								"{{tenant_id}}",
+								"billing"
+							]
+						},
+						"description": "Get tenant billing history (landlord only).\n\n**Day 14:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Response:**\n- Billing history array\n- Current plan information\n- Subscription status\n- Expiration date"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Price Plans",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has price plans\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('pricePlans');",
+									"    pm.expect(jsonData.pricePlans).to.be.an('array');",
+									"    ",
+									"    // Save first plan ID for subscription requests",
+									"    if (jsonData.pricePlans.length > 0) {",
+									"        pm.environment.set('plan_id', jsonData.pricePlans[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/price-plans",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"price-plans"
+							]
+						},
+						"description": "List all active price plans (landlord only).\n\n**Day 13-14:** Tenant Management\n\n**Response:**\n- Array of active price plans with id, name, price, duration_months, features"
+					},
+					"response": []
+				},
+				{
+					"name": "Subscription Expiry Checker",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Expiry check completed\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('results');",
+									"    pm.expect(jsonData.results).to.have.property('checked');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cron_secret_token}}",
+								"description": "CRON_SECRET_TOKEN for authentication"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/subscriptions/expiry-checker",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"subscriptions",
+								"expiry-checker"
+							]
+						},
+						"description": "Check for expired subscriptions and apply grace period logic.\n\n**Day 14:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs, not manually\n\n**Actions:**\n- Finds tenants with expired subscriptions\n- Applies grace period (default: 7 days)\n- Updates tenant status (expired/suspended)\n\n**Response:**\n- Results object with checked, expired, gracePeriod, suspended counts"
+					},
+					"response": []
+				}
+			],
+			"description": "Admin tenant management endpoints for landlords (Day 14)"
 		}
 	],
 	"event": [

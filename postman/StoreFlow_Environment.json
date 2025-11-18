@@ -31,6 +31,18 @@
 			"value": "",
 			"type": "secret",
 			"enabled": true
+		},
+		{
+			"key": "plan_id",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "cron_secret_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",

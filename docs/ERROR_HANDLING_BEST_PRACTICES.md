@@ -329,8 +329,6 @@ When implementing error handling, ensure:
 
 ## 📚 Related Documentation
 
-- [`DAY_12_COMPLETION.md`](./DAY_12_COMPLETION.md) - Authentication implementation
-- [`DAY_12_MANUAL_TESTING_GUIDE.md`](./DAY_12_MANUAL_TESTING_GUIDE.md) - Testing guide
 - [`SECURITY.md`](./SECURITY.md) - Security guidelines
 
 ---

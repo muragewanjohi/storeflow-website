@@ -222,6 +222,36 @@ After DNS propagates (15-30 minutes):
 2. Visit: `https://www.dukanest.com`
 3. Both should show your Vercel deployment
 
+### 5.4 Verify DNS Resolution
+
+**Test Apex Domain:**
+```bash
+nslookup dukanest.com
+# Should resolve to Vercel IP or CNAME
+```
+
+**Test www Subdomain:**
+```bash
+nslookup www.dukanest.com
+# Should resolve to Vercel IP or CNAME
+```
+
+**Or use online tool:**
+- https://www.whatsmydns.net/#A/dukanest.com
+- Should show Vercel IP addresses or CNAME target
+
+### 5.5 Verify Environment Variables
+
+Check your `.env.local` has:
+```env
+# Vercel Configuration
+VERCEL_TOKEN=vercel_your-token-here
+VERCEL_PROJECT_ID=prj_your-project-id-here
+
+# Domain Configuration
+NEXT_PUBLIC_APP_URL=https://dukanest.com
+```
+
 ---
 
 ## Step 6: Test Subdomain Routing
@@ -277,13 +307,38 @@ Once base domain is working, we'll update tenant creation to automatically add s
 3. **Verify domain in Vercel** - Domain must show "Valid Configuration"
 4. **Contact Vercel support** - If still not working after 1 hour
 
-### Issue: Subdomains Not Working
+### Issue: Subdomains Not Working / 404 DEPLOYMENT_NOT_FOUND
+
+**Symptoms:**
+- Subdomain shows 404 "DEPLOYMENT_NOT_FOUND" error
+- Subdomain DNS resolves but Vercel doesn't recognize it
+
+**Cause:**
+Even with wildcard DNS configured, Vercel needs each subdomain to be explicitly added to the project for SSL certificate issuance and deployment routing.
 
 **Solutions:**
-1. **Check wildcard DNS** - Verify `*.dukanest.com` CNAME exists (if using Namecheap DNS)
-2. **Use Vercel nameservers** - Wildcard works automatically with Vercel DNS
-3. **Check middleware** - Verify tenant resolution is working
-4. **Test DNS resolution:**
+
+1. **Add Subdomain to Vercel (Quick Fix):**
+   - **Via Dashboard:** Vercel Dashboard → Settings → Domains → Add Domain → Enter `subdomain.dukanest.com`
+   - **Via Script:** `npx tsx scripts/add-subdomain-to-vercel.ts <subdomain>`
+   - **Via API:** The tenant creation API now automatically adds subdomains
+
+2. **For Existing Tenants:**
+   ```bash
+   # Add existing tenant subdomains
+   npx tsx scripts/add-subdomain-to-vercel.ts myduka
+   npx tsx scripts/add-subdomain-to-vercel.ts carwash
+   ```
+
+3. **Verify:**
+   - Wait 5-15 minutes for SSL certificate
+   - Check Vercel Dashboard → Domains
+   - Test: `https://subdomain.dukanest.com`
+
+4. **Check wildcard DNS** - Verify `*.dukanest.com` CNAME exists (if using Namecheap DNS)
+5. **Use Vercel nameservers** - Wildcard works automatically with Vercel DNS
+6. **Check middleware** - Verify tenant resolution is working
+7. **Test DNS resolution:**
    ```bash
    nslookup teststore.dukanest.com
    ```
@@ -303,6 +358,57 @@ Once base domain is working, we'll update tenant creation to automatically add s
 **If you kept Namecheap DNS:**
 - SendGrid records should still work
 - No changes needed
+
+### Issue: Vercel API Authorization Errors
+
+**Error:** "Not authorized: Trying to access resource under scope..."
+
+**Problem:**
+Your Vercel token doesn't have access to the project.
+
+**Solutions:**
+1. **Check Token Scope:**
+   - Go to Vercel Dashboard → Settings → Tokens
+   - Verify your token has the correct scope
+   - For project-level access, token should have access to the specific project
+
+2. **Create New Token with Correct Scope:**
+   - Go to Vercel Dashboard → Settings → Tokens
+   - Click **Create Token**
+   - Select scope: **Full Account** (recommended) or **Specific Projects**
+   - If selecting specific projects, ensure your project is included
+   - Copy the token
+
+3. **Update Environment Variable:**
+   ```env
+   VERCEL_TOKEN=your-new-token-here
+   ```
+
+4. **Verify Project ID:**
+   - Check `VERCEL_PROJECT_ID` matches your project
+   - Get from: Vercel Dashboard → Project → Settings → General
+
+### Issue: Vercel API Rate Limits
+
+**Error:** "Rate limit exceeded"
+
+**Solutions:**
+1. **Wait and Retry:**
+   - Vercel API has rate limits
+   - Wait 1-2 minutes and retry
+   - The tenant creation API handles this gracefully (non-blocking)
+
+2. **Check API Usage:**
+   - Monitor Vercel Dashboard → Settings → Usage
+   - Consider implementing retry logic for production
+
+### Issue: Domain Already Exists
+
+**Error:** "Domain already exists"
+
+**This is normal!** The API handles this gracefully:
+- If domain already exists, it returns the existing domain info
+- No action needed - domain is already configured
 
 ---
 

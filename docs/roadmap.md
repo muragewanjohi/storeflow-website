@@ -1411,7 +1411,6 @@ vercel env add VERCEL_TOKEN
     - [x] Code generation templates ✅
     - [x] Common debugging scenarios ✅
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_7_COMPLETION.md`](../storeflow/docs/DAY_7_COMPLETION.md) for complete Day 7 summary
 
 ---
 
@@ -1435,7 +1434,6 @@ vercel env add VERCEL_TOKEN
   - [x] Add compound indexes (`tenant_id` + other fields) ✅
   - [x] Run migration: Schema synced to database using `prisma db push` ✅
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_8_COMPLETION.md`](../storeflow/docs/DAY_8_COMPLETION.md) for complete Day 8 summary
 
 **Day 9: Row-Level Security (RLS) Setup (8 hours)** ✅ COMPLETE
 - [x] **Morning (4h):** Create RLS policies in Supabase ✅ COMPLETE
@@ -1454,7 +1452,6 @@ vercel env add VERCEL_TOKEN
   
   **📄 Documentation:** 
   - See [`storeflow/docs/SECURITY.md`](../storeflow/docs/SECURITY.md) for complete RLS security guide
-  - See [`storeflow/docs/DAY_9_COMPLETION.md`](../storeflow/docs/DAY_9_COMPLETION.md) for Day 9 summary
   - Migration file: `storeflow/supabase/migrations/002_setup_rls_policies.sql`
 
 **Day 10: Tenant Resolution System (8 hours)** ✅ COMPLETE
@@ -1473,7 +1470,6 @@ vercel env add VERCEL_TOKEN
   - [ ] Write integration tests - **OPTIONAL** (can be done later)
 - [x] **Postman Collection:** Updated with `/api/tenant/current` endpoint ✅
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_10_COMPLETION.md`](../storeflow/docs/DAY_10_COMPLETION.md) for complete Day 10 summary
 
 **Day 11: Vercel Domain Management (8 hours)** ✅ COMPLETE
 - [x] **Morning (4h):** Implement domain API integration ✅ COMPLETE
@@ -1492,7 +1488,6 @@ vercel env add VERCEL_TOKEN
   - [ ] Test full domain lifecycle - **MANUAL TESTING REQUIRED**
 - [x] **Postman Collection:** Updated with `/api/admin/domains` endpoints (GET, POST, DELETE) ✅
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_11_COMPLETION.md`](../storeflow/docs/DAY_11_COMPLETION.md) for complete Day 11 summary
 
 **Day 12: Supabase Authentication (8 hours)** ✅ COMPLETE
 - [x] **Morning (4h):** Implement auth for landlord (admin) users ✅ COMPLETE
@@ -1513,7 +1508,7 @@ vercel env add VERCEL_TOKEN
   - [x] Add token refresh endpoint ✅
   - [x] Add authentication headers to existing requests ✅
   - [x] Add user management endpoints ✅
-  - [x] Manual testing ✅ (see [`DAY_12_MANUAL_TESTING_GUIDE.md`](../storeflow/docs/DAY_12_MANUAL_TESTING_GUIDE.md))
+  - [x] Manual testing ✅
 
 **Day 12.5: User Management UI & Dashboard Theme (4 hours)** ✅ COMPLETE
 - [x] **User Management UI (4h):** Create UI for tenant admin to manage staff users ✅ COMPLETE
@@ -1544,8 +1539,6 @@ vercel env add VERCEL_TOKEN
   - `src/components/providers/theme-provider.tsx` - Theme provider for dark mode
   
   **📄 Documentation:** 
-  - See [`storeflow/docs/DAY_12_COMPLETION.md`](../storeflow/docs/DAY_12_COMPLETION.md) for complete Day 12 summary
-  - See [`storeflow/docs/DAY_12_MANUAL_TESTING_GUIDE.md`](../storeflow/docs/DAY_12_MANUAL_TESTING_GUIDE.md) for comprehensive testing guide
   - See [`storeflow/docs/SHADCN_UI_INTEGRATION.md`](../storeflow/docs/SHADCN_UI_INTEGRATION.md) for Shadcn/ui integration details
   - See [`storeflow/docs/DASHBOARD_UI_ROADMAP_SUMMARY.md`](../storeflow/docs/DASHBOARD_UI_ROADMAP_SUMMARY.md) for dashboard UI roadmap
 
@@ -1562,7 +1555,6 @@ vercel env add VERCEL_TOKEN
     - [x] Enforce subdomain naming rules (lowercase, alphanumeric, hyphens only, 3-63 chars) ✅
     - [ ] Automatically create subdomain in Vercel (⏭️ Moved to Day 13.5 for early testing)
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_13_COMPLETION.md`](../storeflow/docs/DAY_13_COMPLETION.md) for complete Day 13 Morning summary
 
 - [x] **Day 13 Afternoon (4h):** Tenant onboarding ✅ COMPLETE
   - [x] Create tenant setup wizard (integrated into tenant creation form) ✅
@@ -1571,7 +1563,6 @@ vercel env add VERCEL_TOKEN
   - [x] Send welcome email to tenant admin (SendGrid integration) ✅
   - [x] Create initial tenant dashboard with welcome message ✅
   
-  **📄 Documentation:** See [`storeflow/docs/DAY_13_AFTERNOON_COMPLETION.md`](../storeflow/docs/DAY_13_AFTERNOON_COMPLETION.md) for complete Day 13 Afternoon summary
 - [x] **Day 13.5 (2-3h):** Vercel Domain Integration & Subdomain Creation ⭐ EARLY TESTING ✅ COMPLETE
   - [x] **Link domain to Vercel:** ✅
     - [x] Add `dukanest.com` domain to Vercel project (via dashboard) ✅
@@ -1596,34 +1587,37 @@ vercel env add VERCEL_TOKEN
     - [ ] Test with invalid/reserved subdomains (optional - can be done later)
   
   **📄 Documentation:** 
-  - See [`storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md`](../storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md) for complete setup guide
-  - See [`storeflow/docs/FIX_SUBDOMAIN_404.md`](../storeflow/docs/FIX_SUBDOMAIN_404.md) for troubleshooting guide
-  - See [`storeflow/docs/VERCEL_SETUP_STATUS.md`](../storeflow/docs/VERCEL_SETUP_STATUS.md) for current status
+  - See [`storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md`](../storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md) for complete setup guide and troubleshooting
+  - See [`storeflow/docs/VERCEL_SENDGRID_DNS_SETUP.md`](../storeflow/docs/VERCEL_SENDGRID_DNS_SETUP.md) for SendGrid DNS configuration
   
   **📝 Note:** This is moved forward from Day 45-46 since domain is already purchased. Early integration allows testing the full multi-tenant flow during development.
 
-- [ ] **Day 14 Morning (4h):** Tenant settings & management
-  - [ ] Build tenant settings page
-  - [ ] Implement subdomain change functionality
-    - [ ] Validate new subdomain availability
-    - [ ] Update subdomain in database
-    - [ ] Update subdomain in Vercel (remove old, add new)
-  - [ ] Add custom domain management (for tenant custom domains)
-  - [ ] Create tenant suspension/activation
-  - [ ] Implement tenant deletion (soft delete)
-    - [ ] Release subdomain when tenant is deleted (mark as available for reuse)
-    - [ ] Remove subdomain from Vercel
-    - [ ] Clean up tenant data (soft delete)
-- [ ] **Day 14 Afternoon (4h):** Subscription management
-  - [ ] Implement plan upgrade/downgrade
-  - [ ] Add subscription renewal
-  - [ ] Create subscription expiry checker (cron job)
-  - [ ] Implement grace period logic
-  - [ ] Add billing history
-- [ ] **Postman Collection:** Update with tenant management endpoints (`/api/admin/tenants/*`)
-  - [ ] Add tenant CRUD endpoints (GET, POST, PUT, DELETE)
-  - [ ] Add tenant settings endpoints
-  - [ ] Add subscription management endpoints
+- [x] **Day 14 Morning (4h):** Tenant settings & management ✅ COMPLETE
+  - [x] Build tenant settings page ✅
+  - [x] Implement subdomain change functionality ✅
+    - [x] Validate new subdomain availability ✅
+    - [x] Update subdomain in database ✅
+    - [x] Update subdomain in Vercel (remove old, add new) ✅
+  - [x] Add custom domain management (for tenant custom domains) ✅
+  - [x] Create tenant suspension/activation ✅
+  - [x] Implement tenant deletion (soft delete) ✅
+    - [x] Release subdomain when tenant is deleted (mark as available for reuse) ✅
+    - [x] Remove subdomain from Vercel ✅
+    - [x] Clean up tenant data (soft delete) ✅
+- [x] **Day 14 Afternoon (4h):** Subscription management ✅ COMPLETE
+  - [x] Implement plan upgrade/downgrade ✅
+  - [x] Add subscription renewal ✅
+  - [x] Create subscription expiry checker (cron job) ✅
+  - [x] Implement grace period logic ✅
+  - [x] Add billing history ✅
+- [x] **Postman Collection:** Update with tenant management endpoints (`/api/admin/tenants/*`) ✅ COMPLETE
+  - [x] Add tenant CRUD endpoints (GET, POST, PUT, DELETE) ✅
+  - [x] Add tenant settings endpoints ✅
+  - [x] Add subscription management endpoints ✅
+  
+  **📄 Documentation:** 
+  - See [`storeflow/docs/SUBSCRIPTION_MANAGEMENT.md`](../storeflow/docs/SUBSCRIPTION_MANAGEMENT.md) for subscription management guide
+  - See [`storeflow/docs/CRON_SECRET_TOKEN_SETUP.md`](../storeflow/docs/CRON_SECRET_TOKEN_SETUP.md) for cron token setup
 
 ---
 

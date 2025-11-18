@@ -24,12 +24,8 @@
 - **[STOREFLOW_CONFIG.md](./STOREFLOW_CONFIG.md)** - Configuration guide
 - **[STOREFLOW_DYNAMIC_URLS.md](./STOREFLOW_DYNAMIC_URLS.md)** - Dynamic URL configuration
 - **[STOREFLOW_BRANDING_GUIDE.md](./STOREFLOW_BRANDING_GUIDE.md)** - Branding and customization
-- **[STOREFLOW_PROJECT_STATUS.md](./STOREFLOW_PROJECT_STATUS.md)** - Project status tracking
 
 ### Day-by-Day Progress
-- **[DAY_7_COMPLETION.md](./DAY_7_COMPLETION.md)** - Day 7: Development Tools & Documentation
-- **[DAY_8_COMPLETION.md](./DAY_8_COMPLETION.md)** - Day 8: Database Schema Design
-- **[DAY_9_COMPLETION.md](./DAY_9_COMPLETION.md)** - Day 9: Row-Level Security Setup
 
 ### External Documentation
 All migration planning and roadmap docs are in the [`../../docs/`](../../docs/) folder.
