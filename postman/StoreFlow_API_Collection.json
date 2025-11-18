@@ -1099,6 +1099,799 @@
 				}
 			],
 			"description": "Admin tenant management endpoints for landlords (Day 14)"
+		},
+		{
+			"name": "Products",
+			"item": [
+				{
+					"name": "List Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has products array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('products');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"    ",
+									"    // Save first product ID if available",
+									"    if (jsonData.products && jsonData.products.length > 0) {",
+									"        pm.environment.set('product_id', jsonData.products[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products?page=1&limit=20&status=active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page (max 100)"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term (name, description, SKU)",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "active",
+									"description": "Filter by status",
+									"disabled": true
+								},
+								{
+									"key": "category_id",
+									"value": "",
+									"description": "Filter by category",
+									"disabled": true
+								},
+								{
+									"key": "min_price",
+									"value": "",
+									"description": "Minimum price",
+									"disabled": true
+								},
+								{
+									"key": "max_price",
+									"value": "",
+									"description": "Maximum price",
+									"disabled": true
+								},
+								{
+									"key": "in_stock",
+									"value": "",
+									"description": "Filter by stock (true/false)",
+									"disabled": true
+								},
+								{
+									"key": "sort_by",
+									"value": "created_at",
+									"description": "Sort field (name, price, created_at, updated_at)"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "Sort order (asc, desc)"
+								}
+							]
+						},
+						"description": "List products with search, filtering, and pagination.\n\n**Day 15:** Product Model & API\n\n**Query Parameters:**\n- page: Page number (default: 1)\n- limit: Items per page (default: 20, max: 100)\n- search: Search term (searches name, description, SKU)\n- status: Filter by status (active, inactive, draft, archived)\n- category_id: Filter by category UUID\n- brand_id: Filter by brand UUID\n- min_price: Minimum price filter\n- max_price: Maximum price filter\n- in_stock: Filter by stock availability (true/false)\n- sort_by: Sort field (name, price, created_at, updated_at)\n- sort_order: Sort order (asc, desc)\n\n**Response:**\n- products: Array of product objects\n- pagination: Pagination metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has product data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('product');",
+									"    pm.expect(jsonData.product).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Get product details by ID.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n\n**Response:**\n- Product object with variants included"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Product created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('product');",
+									"    pm.expect(jsonData.product).to.have.property('id');",
+									"    ",
+									"    // Save product ID for other requests",
+									"    pm.environment.set('product_id', jsonData.product.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Product\",\n    \"description\": \"This is a test product description\",\n    \"short_description\": \"Short description\",\n    \"price\": 29.99,\n    \"sale_price\": 24.99,\n    \"stock_quantity\": 100,\n    \"status\": \"active\",\n    \"category_id\": null,\n    \"brand_id\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products"
+							]
+						},
+						"description": "Create a new product.\n\n**Day 15:** Product Model & API\n\n**Required Fields:**\n- name: Product name\n- price: Product price (positive number)\n\n**Optional Fields:**\n- slug: URL slug (auto-generated if not provided)\n- description: Full product description\n- short_description: Short description (max 500 chars)\n- sale_price: Sale price (must be less than price)\n- sku: Stock keeping unit (auto-generated if not provided)\n- stock_quantity: Stock quantity (default: 0)\n- status: Product status (active, inactive, draft, archived)\n- image: Main product image URL\n- gallery: Array of image URLs\n- category_id: Category UUID\n- brand_id: Brand UUID\n- metadata: Additional metadata (JSON object)\n\n**Response:**\n- Product object with generated slug and SKU"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Product updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('product');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Product Name\",\n    \"price\": 39.99,\n    \"stock_quantity\": 150\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Update product.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n\n**Optional Fields (all fields optional):**\n- name: Product name\n- slug: URL slug\n- description: Full description\n- short_description: Short description\n- price: Product price\n- sale_price: Sale price\n- sku: Stock keeping unit\n- stock_quantity: Stock quantity\n- status: Product status\n- image: Main image URL\n- gallery: Array of image URLs\n- category_id: Category UUID\n- brand_id: Brand UUID\n- metadata: Additional metadata\n\n**Response:**\n- Updated product object"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Product deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}"
+							]
+						},
+						"description": "Delete product.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n\n**Note:** This permanently deletes the product and all related variants. Use with caution.\n\n**Response:**\n- Success message"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Product Image",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Image uploaded successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('url');",
+									"    pm.expect(jsonData).to.have.property('path');",
+									"    ",
+									"    // Save image URL for product creation/update",
+									"    pm.environment.set('product_image_url', jsonData.url);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": [],
+									"description": "Image file (JPEG, PNG, WebP, GIF, max 5MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/upload",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"upload"
+							]
+						},
+						"description": "Upload product image to Supabase Storage.\n\n**Day 15:** Product Model & API\n\n**Form Data:**\n- file: Image file (required)\n\n**Supported Formats:**\n- JPEG, JPG, PNG, WebP, GIF\n\n**File Size Limit:**\n- Maximum 5MB\n\n**Response:**\n- url: Public URL of uploaded image\n- path: Storage path\n\n**Note:** Requires Supabase Storage bucket 'product-images' to be created"
+					},
+					"response": []
+				},
+				{
+					"name": "List Product Variants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has variants array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('variants');",
+									"    pm.expect(jsonData.variants).to.be.an('array');",
+									"    ",
+									"    // Save first variant ID if available",
+									"    if (jsonData.variants && jsonData.variants.length > 0) {",
+									"        pm.environment.set('variant_id', jsonData.variants[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/variants",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"variants"
+							]
+						},
+						"description": "List all variants for a product.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n\n**Response:**\n- Array of variant objects"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product Variant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Variant created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('variant');",
+									"    pm.expect(jsonData.variant).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"attribute_id\": null,\n    \"attribute_value_id\": null,\n    \"price\": 34.99,\n    \"stock_quantity\": 50,\n    \"sku\": null,\n    \"image\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/variants",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"variants"
+							]
+						},
+						"description": "Create a new product variant.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n\n**Optional Fields:**\n- attribute_id: Attribute UUID (e.g., size, color)\n- attribute_value_id: Attribute value UUID\n- price: Variant price (overrides product price)\n- stock_quantity: Stock quantity (default: 0)\n- sku: Variant SKU (auto-generated if not provided)\n- image: Variant image URL\n\n**Response:**\n- Variant object with generated SKU"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product Variant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Variant updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('variant');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"price\": 39.99,\n    \"stock_quantity\": 75\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/variants/{{variant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"variants",
+								"{{variant_id}}"
+							]
+						},
+						"description": "Update product variant.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n- variant_id: UUID of the variant\n\n**Optional Fields (all optional):**\n- attribute_id: Attribute UUID\n- attribute_value_id: Attribute value UUID\n- price: Variant price\n- stock_quantity: Stock quantity\n- sku: Variant SKU\n- image: Variant image URL\n\n**Response:**\n- Updated variant object"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product Variant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Variant deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/products/{{product_id}}/variants/{{variant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"{{product_id}}",
+								"variants",
+								"{{variant_id}}"
+							]
+						},
+						"description": "Delete product variant.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- product_id: UUID of the product\n- variant_id: UUID of the variant\n\n**Response:**\n- Success message"
+					},
+					"response": []
+				}
+			],
+			"description": "Product management endpoints (Day 15)"
+		},
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "List Categories",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has categories array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('categories');",
+									"    pm.expect(jsonData.categories).to.be.an('array');",
+									"    ",
+									"    // Save first category ID if available",
+									"    if (jsonData.categories && jsonData.categories.length > 0) {",
+									"        pm.environment.set('category_id', jsonData.categories[0].id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/categories?parent_id=&status=active&include_children=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories"
+							],
+							"query": [
+								{
+									"key": "parent_id",
+									"value": "",
+									"description": "Filter by parent category UUID",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "active",
+									"description": "Filter by status (active, inactive)",
+									"disabled": true
+								},
+								{
+									"key": "include_children",
+									"value": "false",
+									"description": "Include child categories",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List categories with optional filtering.\n\n**Day 15:** Product Model & API\n\n**Query Parameters:**\n- parent_id: Filter by parent category UUID (null for top-level)\n- status: Filter by status (active, inactive)\n- include_children: Include child categories (true/false)\n\n**Response:**\n- Array of category objects with parent/child relationships"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has category data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"    pm.expect(jsonData.category).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/categories/{{category_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"{{category_id}}"
+							]
+						},
+						"description": "Get category details by ID.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- category_id: UUID of the category\n\n**Response:**\n- Category object with parent and children included"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Category created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"    pm.expect(jsonData.category).to.have.property('id');",
+									"    ",
+									"    // Save category ID for other requests",
+									"    pm.environment.set('category_id', jsonData.category.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Electronics\",\n    \"slug\": \"electronics\",\n    \"parent_id\": null,\n    \"image\": null,\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories"
+							]
+						},
+						"description": "Create a new category.\n\n**Day 15:** Product Model & API\n\n**Required Fields:**\n- name: Category name\n\n**Optional Fields:**\n- slug: URL slug (auto-generated if not provided)\n- parent_id: Parent category UUID (null for top-level)\n- image: Category image URL\n- status: Category status (active, inactive)\n\n**Response:**\n- Category object with generated slug"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Category updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('category');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Category Name\",\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/categories/{{category_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"{{category_id}}"
+							]
+						},
+						"description": "Update category.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- category_id: UUID of the category\n\n**Optional Fields (all optional):**\n- name: Category name\n- slug: URL slug\n- parent_id: Parent category UUID\n- image: Category image URL\n- status: Category status\n\n**Response:**\n- Updated category object"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Category deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/categories/{{category_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"categories",
+								"{{category_id}}"
+							]
+						},
+						"description": "Delete category.\n\n**Day 15:** Product Model & API\n\n**Path Parameters:**\n- category_id: UUID of the category\n\n**Validation:**\n- Cannot delete category with subcategories\n- Cannot delete category used by products\n\n**Response:**\n- Success message"
+					},
+					"response": []
+				}
+			],
+			"description": "Category management endpoints (Day 15)"
 		}
 	],
 	"event": [

@@ -39,6 +39,10 @@ Update these variables in the environment:
 - **`auth_token`** - Authentication token (auto-set after login)
 - **`plan_id`** - Price plan ID (auto-set by Get Price Plans request)
 - **`cron_secret_token`** - Secret token for cron endpoints (set manually)
+- **`product_id`** - Product ID (auto-set by product requests)
+- **`variant_id`** - Product variant ID (auto-set by variant requests)
+- **`category_id`** - Category ID (auto-set by category requests)
+- **`product_image_url`** - Product image URL (auto-set by upload request)
 
 ---
 
@@ -58,6 +62,25 @@ Update these variables in the environment:
 - **Get Billing History** - View tenant billing history
 - **Get Price Plans** - List available price plans
 - **Subscription Expiry Checker** - Check for expired subscriptions (cron)
+
+### Products (Day 15)
+- **List Products** - List products with search, filtering, and pagination
+- **Get Product** - Get product details by ID
+- **Create Product** - Create new product
+- **Update Product** - Update product
+- **Delete Product** - Delete product
+- **Upload Product Image** - Upload image to Supabase Storage
+- **List Product Variants** - List all variants for a product
+- **Create Product Variant** - Create new variant
+- **Update Product Variant** - Update variant
+- **Delete Product Variant** - Delete variant
+
+### Categories (Day 15)
+- **List Categories** - List categories with optional filtering
+- **Get Category** - Get category details by ID
+- **Create Category** - Create new category
+- **Update Category** - Update category
+- **Delete Category** - Delete category
 
 ### Domain Management (Day 11)
 - **Add Custom Domain** - Add a custom domain to tenant
@@ -206,11 +229,22 @@ pm.test("Response has expected data", function () {
 - ✅ Get Price Plans (`GET /api/admin/price-plans`)
 - ✅ Subscription Expiry Checker (`GET /api/admin/subscriptions/expiry-checker`)
 
-### Day 15+: Product Management (Coming Soon)
-- ⏳ Update Product
-- ⏳ Delete Product
-- ⏳ Get Product by ID
-- ⏳ Search Products
+### Day 15: Product Management ✅
+- ✅ List Products (`GET /api/products`) - With search, filtering, pagination
+- ✅ Get Product (`GET /api/products/[id]`)
+- ✅ Create Product (`POST /api/products`)
+- ✅ Update Product (`PUT /api/products/[id]`)
+- ✅ Delete Product (`DELETE /api/products/[id]`)
+- ✅ Upload Product Image (`POST /api/products/upload`)
+- ✅ List Product Variants (`GET /api/products/[id]/variants`)
+- ✅ Create Product Variant (`POST /api/products/[id]/variants`)
+- ✅ Update Product Variant (`PUT /api/products/[id]/variants/[variantId]`)
+- ✅ Delete Product Variant (`DELETE /api/products/[id]/variants/[variantId]`)
+- ✅ List Categories (`GET /api/categories`)
+- ✅ Get Category (`GET /api/categories/[id]`)
+- ✅ Create Category (`POST /api/categories`)
+- ✅ Update Category (`PUT /api/categories/[id]`)
+- ✅ Delete Category (`DELETE /api/categories/[id]`)
 
 ---
 

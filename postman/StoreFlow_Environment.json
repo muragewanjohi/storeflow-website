@@ -43,6 +43,30 @@
 			"value": "",
 			"type": "secret",
 			"enabled": true
+		},
+		{
+			"key": "product_id",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "variant_id",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "category_id",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "product_image_url",
+			"value": "",
+			"type": "default",
+			"enabled": true
 		}
 	],
 	"_postman_variable_scope": "environment",
