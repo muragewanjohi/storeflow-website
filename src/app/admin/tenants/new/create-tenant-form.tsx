@@ -6,25 +6,55 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+
+interface PricePlan {
+  id: string;
+  name: string;
+  price: number;
+  duration_months: number;
+  features: any;
+}
 
 export default function CreateTenantForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricePlans, setPricePlans] = useState<PricePlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     subdomain: '',
     adminEmail: '',
     adminPassword: '',
     adminName: '',
+    planId: '',
   });
+
+  // Fetch price plans on mount
+  useEffect(() => {
+    async function fetchPricePlans() {
+      try {
+        const response = await fetch('/api/admin/price-plans');
+        if (response.ok) {
+          const data = await response.json();
+          setPricePlans(data.pricePlans || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch price plans:', err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    }
+    fetchPricePlans();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -37,7 +67,10 @@ export default function CreateTenantForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          planId: formData.planId || undefined, // Send undefined instead of empty string
+        }),
       });
 
       const data = await response.json();
@@ -109,6 +142,65 @@ export default function CreateTenantForm() {
             <p className="text-xs text-muted-foreground">
               Only lowercase letters, numbers, and hyphens. Will be accessible at {formData.subdomain || 'subdomain'}.dukanest.com
             </p>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-4">Subscription Plan (Optional)</h3>
+            
+            {loadingPlans ? (
+              <p className="text-sm text-muted-foreground">Loading plans...</p>
+            ) : pricePlans.length > 0 ? (
+              <div className="space-y-3">
+                <Select
+                  value={formData.planId}
+                  onValueChange={(value) => setFormData({ ...formData, planId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a plan (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No Plan (Free Trial)</SelectItem>
+                    {pricePlans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} - ${Number(plan.price).toFixed(2)}/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.planId && (
+                  <div className="rounded-lg border p-4 bg-muted/50">
+                    {(() => {
+                      const selectedPlan = pricePlans.find(p => p.id === formData.planId);
+                      if (!selectedPlan) return null;
+                      return (
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold">{selectedPlan.name}</span>
+                            <Badge variant="secondary">
+                              ${Number(selectedPlan.price).toFixed(2)}/{selectedPlan.duration_months === 1 ? 'month' : `${selectedPlan.duration_months} months`}
+                            </Badge>
+                          </div>
+                          {selectedPlan.features && typeof selectedPlan.features === 'object' && (
+                            <p className="text-xs text-muted-foreground">
+                              {Object.keys(selectedPlan.features).length} features included
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+                {!formData.planId && (
+                  <p className="text-xs text-muted-foreground">
+                    Tenant can select a plan later from their dashboard.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No plans available. Tenant will be created without a subscription plan.
+              </p>
+            )}
           </div>
 
           <div className="border-t pt-4 mt-4">

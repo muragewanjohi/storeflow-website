@@ -9,6 +9,8 @@ import { requireAuth, requireRole } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateSubdomain } from '@/lib/subdomain-validation';
+import { sendWelcomeEmail } from '@/lib/email/sendgrid';
+import { addTenantDomain } from '@/lib/vercel-domains';
 import { z } from 'zod';
 
 // Validation schema for tenant creation
@@ -21,6 +23,7 @@ const createTenantSchema = z.object({
   adminEmail: z.string().email('Invalid email address'),
   adminPassword: z.string().min(8, 'Password must be at least 8 characters'),
   adminName: z.string().min(1, 'Admin name is required'),
+  planId: z.string().uuid().optional(), // Optional plan selection
 });
 
 /**
@@ -110,6 +113,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate plan and calculate expire_date if provided
+    let expireDate: Date | null = null;
+    if (validatedData.planId) {
+      const plan = await prisma.price_plans.findUnique({
+        where: { id: validatedData.planId },
+      });
+      if (!plan || plan.status !== 'active') {
+        return NextResponse.json(
+          { message: 'Invalid or inactive price plan' },
+          { status: 400 }
+        );
+      }
+      // Calculate expire_date based on plan duration
+      expireDate = new Date();
+      expireDate.setMonth(expireDate.getMonth() + plan.duration_months);
+    }
+
     // Create tenant in database first
     const tenant = await prisma.tenants.create({
       data: {
@@ -117,6 +137,8 @@ export async function POST(request: NextRequest) {
         subdomain: validatedData.subdomain,
         status: 'active',
         start_date: new Date(),
+        plan_id: validatedData.planId || null,
+        expire_date: expireDate,
       },
     });
 
@@ -156,24 +178,50 @@ export async function POST(request: NextRequest) {
     }
 
     // Update tenant with user_id
-    await prisma.tenants.update({
+    const updatedTenant = await prisma.tenants.update({
       where: { id: tenant.id },
       data: {
         user_id: authUser.user.id,
       },
     });
 
-    // TODO: Automatically create subdomain in Vercel (Day 13)
-    // This will be implemented when we have Vercel domain management ready
+    // Send welcome email to tenant admin (non-blocking)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    const loginUrl = `${baseUrl}/${validatedData.subdomain}/dashboard`;
+
+    sendWelcomeEmail({
+      to: validatedData.adminEmail,
+      tenantName: validatedData.name,
+      subdomain: validatedData.subdomain,
+      adminName: validatedData.adminName,
+      loginUrl,
+    }).catch((error) => {
+      // Log error but don't fail tenant creation
+      console.error('Failed to send welcome email:', error);
+    });
+
+    // Automatically add subdomain to Vercel (non-blocking)
+    const projectId = process.env.VERCEL_PROJECT_ID;
+    if (projectId) {
+      const subdomainUrl = `${validatedData.subdomain}.dukanest.com`;
+      addTenantDomain(subdomainUrl, projectId).catch((error) => {
+        // Log error but don't fail tenant creation
+        // Subdomain can be added manually later if needed
+        console.error(`Failed to add subdomain ${subdomainUrl} to Vercel:`, error);
+      });
+    } else {
+      console.warn('VERCEL_PROJECT_ID not set. Subdomain will not be added to Vercel automatically.');
+    }
 
     return NextResponse.json(
       {
         message: 'Tenant created successfully',
         tenant: {
-          id: tenant.id,
-          name: tenant.name,
-          subdomain: tenant.subdomain,
-          status: tenant.status,
+          id: updatedTenant.id,
+          name: updatedTenant.name,
+          subdomain: updatedTenant.subdomain,
+          status: updatedTenant.status,
         },
       },
       { status: 201 }

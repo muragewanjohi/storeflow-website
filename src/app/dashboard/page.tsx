@@ -7,14 +7,18 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import Link from 'next/link';
 import {
   CubeIcon,
   ShoppingCartIcon,
   UserGroupIcon,
   ArrowRightIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export default async function TenantDashboardPage() {
   // Redirect to login if not authenticated or not tenant admin/staff
@@ -25,6 +29,23 @@ export default async function TenantDashboardPage() {
   const tenant = await requireTenant();
   if (user.tenant_id !== tenant.id && user.role !== 'landlord') {
     redirect('/login');
+  }
+
+  // Check if tenant is newly created (within last 24 hours)
+  const isNewTenant = tenant.created_at && 
+    new Date(tenant.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000;
+
+  // Get tenant plan info if exists
+  let planInfo = null;
+  if (tenant.plan_id) {
+    planInfo = await prisma.price_plans.findUnique({
+      where: { id: tenant.plan_id },
+      select: {
+        name: true,
+        price: true,
+        duration_months: true,
+      },
+    });
   }
 
   const quickActions = [
@@ -59,6 +80,49 @@ export default async function TenantDashboardPage() {
           Welcome back, {user.email}. Here&apos;s what&apos;s happening with your store today.
         </p>
       </div>
+
+      {/* Welcome Message for New Tenants */}
+      {isNewTenant && (
+        <Card className="mb-8 border-primary/50 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <CheckCircleIcon className="h-5 w-5 text-primary" />
+              <CardTitle>Welcome to StoreFlow!</CardTitle>
+            </div>
+            <CardDescription>
+              Your store <strong>{tenant.name}</strong> has been successfully created.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm">
+                🎉 Congratulations! Your store is now live at{' '}
+                <strong>{tenant.subdomain}.dukanest.com</strong>
+              </p>
+              {planInfo ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Current Plan:</span>
+                  <Badge variant="secondary">
+                    {planInfo.name} - ${Number(planInfo.price).toFixed(2)}/{planInfo.duration_months === 1 ? 'month' : `${planInfo.duration_months} months`}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  💡 <strong>Tip:</strong> Select a subscription plan to unlock all features.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button asChild size="sm">
+                <Link href="/dashboard/settings">Configure Store</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/users">Invite Team Members</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">

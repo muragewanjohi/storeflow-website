@@ -1223,9 +1223,10 @@ vercel env add VERCEL_TOKEN
 - ⏳ Day 15: Products (`/api/products/*`)
 - ⏳ Day 18-19: Orders (`/api/orders/*`) + Email testing endpoints
 - ⏳ Day 20-21: Customers (`/api/customers/*`) + Email testing endpoints
-- ⏳ Day 22-23: Payments (`/api/payments/*`) + Email testing endpoints
-- ⏳ Day 24-25: Subscriptions (`/api/subscriptions/*`) + Email notifications
-- ⏳ Day 26-28: Content Management (`/api/pages/*`, `/api/blogs/*`, `/api/forms/*`)
+- ⏳ Day 21.5-22: Support Tickets (`/api/support/*`) + Email notifications
+- ⏳ Day 23-24: Payments (`/api/payments/*`) + Email testing endpoints
+- ⏳ Day 25-26: Subscriptions (`/api/subscriptions/*`) + Email notifications
+- ⏳ Day 27-29: Content Management (`/api/pages/*`, `/api/blogs/*`, `/api/forms/*`)
 
 **Email Testing:**
 - Create test endpoints to trigger emails (e.g., `/api/test/send-order-confirmation`)
@@ -1563,33 +1564,41 @@ vercel env add VERCEL_TOKEN
   
   **📄 Documentation:** See [`storeflow/docs/DAY_13_COMPLETION.md`](../storeflow/docs/DAY_13_COMPLETION.md) for complete Day 13 Morning summary
 
-- [ ] **Day 13 Afternoon (4h):** Tenant onboarding
-  - [ ] Create tenant setup wizard
-  - [ ] Implement plan selection
-  - [ ] Add payment integration for subscription
-  - [ ] Send welcome email to tenant admin
-  - [ ] Create initial tenant dashboard
-- [ ] **Day 13.5 (2-3h):** Vercel Domain Integration & Subdomain Creation ⭐ EARLY TESTING
-  - [ ] **Link domain to Vercel:**
-    - [ ] Add `dukanest.com` domain to Vercel project (via dashboard or API)
-    - [ ] Configure DNS records at Namecheap (update nameservers to Vercel)
-    - [ ] Set up wildcard DNS (`*.dukanest.com`) for subdomain support
-    - [ ] Verify DNS propagation and SSL certificate
-    - [ ] Test domain routing (both apex and www)
-  - [ ] **Implement automatic subdomain creation:**
-    - [ ] Update tenant creation API to call Vercel domain API
-    - [ ] Add subdomain to Vercel when tenant is created
-    - [ ] Verify subdomain SSL certificate provisioning
-    - [ ] Test tenant subdomain access (e.g., `teststore.dukanest.com`)
-  - [ ] **Subdomain management for updates/deletions:**
-    - [ ] Implement subdomain removal when tenant is deleted
-    - [ ] Add error handling for Vercel API failures
-    - [ ] Add retry logic for transient failures
-  - [ ] **Testing:**
-    - [ ] Create a test tenant and verify subdomain works
-    - [ ] Delete tenant and verify subdomain is removed
-    - [ ] Test with invalid/reserved subdomains
-    - [ ] Verify tenant isolation (different subdomains = different tenants)
+- [x] **Day 13 Afternoon (4h):** Tenant onboarding ✅ COMPLETE
+  - [x] Create tenant setup wizard (integrated into tenant creation form) ✅
+  - [x] Implement plan selection (with price plans API and UI) ✅
+  - [x] Add payment placeholder (note: full payment integration is Day 23-24) ✅
+  - [x] Send welcome email to tenant admin (SendGrid integration) ✅
+  - [x] Create initial tenant dashboard with welcome message ✅
+  
+  **📄 Documentation:** See [`storeflow/docs/DAY_13_AFTERNOON_COMPLETION.md`](../storeflow/docs/DAY_13_AFTERNOON_COMPLETION.md) for complete Day 13 Afternoon summary
+- [x] **Day 13.5 (2-3h):** Vercel Domain Integration & Subdomain Creation ⭐ EARLY TESTING ✅ COMPLETE
+  - [x] **Link domain to Vercel:** ✅
+    - [x] Add `dukanest.com` domain to Vercel project (via dashboard) ✅
+    - [x] Configure DNS records at Namecheap (using Vercel nameservers) ✅
+    - [x] Set up wildcard DNS (`*.dukanest.com`) for subdomain support ✅
+    - [x] Verify DNS propagation and SSL certificate ✅
+    - [x] Test domain routing (both apex and www) ✅
+  - [x] **Implement automatic subdomain creation:** ✅
+    - [x] Update tenant creation API to call Vercel domain API ✅
+    - [x] Add subdomain to Vercel when tenant is created ✅
+    - [x] Verify subdomain SSL certificate provisioning ✅
+    - [x] Test tenant subdomain access (`myduka.dukanest.com` working) ✅
+  - [x] **Subdomain management for updates/deletions:** ✅
+    - [x] Add error handling for Vercel API failures ✅
+    - [x] Create script for manual subdomain addition ✅
+    - [ ] Implement subdomain removal when tenant is deleted (optional - can be done later)
+    - [ ] Add retry logic for transient failures (optional - can be done later)
+  - [x] **Testing:** ✅
+    - [x] Create a test tenant and verify subdomain works (`myduka.dukanest.com`) ✅
+    - [x] Verify tenant isolation (different subdomains = different tenants) ✅
+    - [ ] Delete tenant and verify subdomain is removed (optional - can be done later)
+    - [ ] Test with invalid/reserved subdomains (optional - can be done later)
+  
+  **📄 Documentation:** 
+  - See [`storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md`](../storeflow/docs/VERCEL_DOMAIN_SETUP_GUIDE.md) for complete setup guide
+  - See [`storeflow/docs/FIX_SUBDOMAIN_404.md`](../storeflow/docs/FIX_SUBDOMAIN_404.md) for troubleshooting guide
+  - See [`storeflow/docs/VERCEL_SETUP_STATUS.md`](../storeflow/docs/VERCEL_SETUP_STATUS.md) for current status
   
   **📝 Note:** This is moved forward from Day 45-46 since domain is already purchased. Early integration allows testing the full multi-tenant flow during development.
 
@@ -1733,7 +1742,6 @@ vercel env add VERCEL_TOKEN
 - [ ] **Day 21 Afternoon (4h):** Customer communication
   - [ ] Implement email campaigns
   - [ ] Add customer notifications
-  - [ ] Create customer support system
   - [ ] Build customer feedback forms
   - [ ] Add review/rating system
 - [ ] **Postman Collection:** Update with customer endpoints (`/api/customers/*`)
@@ -1742,13 +1750,56 @@ vercel env add VERCEL_TOKEN
   - [ ] Add customer authentication endpoints
   - [ ] Add customer profile endpoints
 
+**Day 21.5-22: Support Ticket System (12 hours)**
+- [ ] **Day 21.5 Morning (4h):** Support ticket API & models
+  - [ ] Create support ticket CRUD API (`/api/support/tickets/*`)
+  - [ ] Implement support ticket messages API (`/api/support/tickets/[id]/messages`)
+  - [ ] Create support departments/categories API (`/api/support/departments`)
+  - [ ] Add ticket status management (open, in-progress, resolved, closed)
+  - [ ] Implement priority levels (low, medium, high, urgent)
+  - [ ] Add ticket assignment to staff members
+  - [ ] Create ticket search and filtering
+  - [ ] Add pagination for ticket lists
+- [ ] **Day 21.5 Afternoon (4h):** Support ticket email notifications
+  - [ ] **New Ticket Email** (to tenant admin) - Notification when customer creates ticket
+  - [ ] **Ticket Reply Email** (to customer) - Notification when admin replies
+  - [ ] **Ticket Reply Email** (to admin) - Notification when customer replies
+  - [ ] **Ticket Status Update Email** (to customer) - Notification when ticket status changes
+  - [ ] **Ticket Assigned Email** (to staff) - Notification when ticket is assigned
+  - [ ] Create branded email templates for support tickets
+- [ ] **Day 22 Morning (4h):** Support ticket admin dashboard
+  - [ ] Create `/dashboard/support/tickets` page (using Shadcn/ui components)
+  - [ ] Build ticket list with filters (Table, Select, Badge components)
+  - [ ] Implement ticket detail view with conversation thread (Card, ScrollArea components)
+  - [ ] Add ticket assignment UI (Select, Button components)
+  - [ ] Create ticket status update UI
+  - [ ] Add priority and department filters
+  - [ ] Implement ticket search functionality
+  - [ ] Create ticket statistics dashboard (open, in-progress, resolved counts)
+- [ ] **Day 22 Afternoon (4h):** Customer-facing support ticket UI
+  - [ ] Create `/support` page for customers to create tickets
+  - [ ] Build ticket creation form (department, priority, subject, description)
+  - [ ] Create `/support/tickets` page (customer's ticket list)
+  - [ ] Implement ticket detail view for customers
+  - [ ] Add reply functionality for customers
+  - [ ] Show ticket status and priority to customers
+  - [ ] Add file attachments support (optional - can use Supabase Storage)
+  - [ ] Create ticket history/timeline view
+- [ ] **Postman Collection:** Update with support ticket endpoints (`/api/support/*`)
+  - [ ] Add ticket CRUD endpoints (GET, POST, PUT, PATCH)
+  - [ ] Add ticket message endpoints (GET, POST)
+  - [ ] Add support department endpoints
+  - [ ] Add ticket assignment endpoints
+  - [ ] Add ticket status update endpoints
+  - [ ] Add ticket search/filter endpoints
+
 ---
 
 ## **Phase 2: Advanced Features (Weeks 4-6)**
 
 ### **Week 4: Payment & Subscriptions**
 
-**Day 22-23: Payment Gateway Integration (16 hours)**
+**Day 23-24: Payment Gateway Integration (16 hours)**
 - [ ] Pesapal integration (Primary - Kenya)
   - [ ] M-Pesa integration (via Pesapal)
   - [ ] Card payments (via Pesapal)
@@ -1767,7 +1818,7 @@ vercel env add VERCEL_TOKEN
   - [ ] Add webhook endpoints (for testing)
   - [ ] Add payment history endpoints
 
-**Day 24-25: Subscription Management (16 hours)**
+**Day 25-26: Subscription Management (16 hours)**
 - [ ] Landlord subscription plans
 - [ ] Tenant subscription to platform
 - [ ] Plan limits enforcement
@@ -1781,34 +1832,34 @@ vercel env add VERCEL_TOKEN
   - [ ] **Low Stock Alert** (to tenant admin) - Inventory warnings
   - [ ] **Plan Upgrade Confirmation** (to tenant admin) - Plan change confirmation
 
-**Day 26-28: Content Management (24 hours)**
-- [ ] **Day 26 Morning (4h):** Page builder foundation
+**Day 27-29: Content Management (24 hours)**
+- [ ] **Day 27 Morning (4h):** Page builder foundation
   - [ ] Page builder (for tenant stores)
   - [ ] Drag-and-drop page editor
   - [ ] Section templates (hero, features, testimonials, etc.)
   - [ ] Page preview functionality
-- [ ] **Day 26 Afternoon (4h):** Homepage customization
+- [ ] **Day 27 Afternoon (4h):** Homepage customization
   - [ ] Homepage template builder
   - [ ] Hero section customization
   - [ ] Featured products section
   - [ ] Custom sections/widgets
   - [ ] Homepage preview and publish
-- [ ] **Day 27 Morning (4h):** Blog management
+- [ ] **Day 28 Morning (4h):** Blog management
   - [ ] Blog post creation/editing
   - [ ] Blog categories and tags
   - [ ] Blog listing page
   - [ ] Blog detail page
-- [ ] **Day 27 Afternoon (4h):** Form builder
+- [ ] **Day 28 Afternoon (4h):** Form builder
   - [ ] Drag-and-drop form builder
   - [ ] Form field types (text, email, select, etc.)
   - [ ] Form submission handling
   - [ ] Form data management
-- [ ] **Day 28 Morning (4h):** Media library
+- [ ] **Day 29 Morning (4h):** Media library
   - [ ] Image upload and management
   - [ ] File organization (folders, tags)
   - [ ] Media gallery
   - [ ] Image optimization
-- [ ] **Day 28 Afternoon (4h):** SEO management
+- [ ] **Day 29 Afternoon (4h):** SEO management
   - [ ] SEO settings per page
   - [ ] Meta tags management
   - [ ] Sitemap generation
@@ -1818,79 +1869,79 @@ vercel env add VERCEL_TOKEN
 
 ### **Week 5: Frontend & UI**
 
-**Day 29-31: Tenant Storefront (24 hours)**
-- [ ] **Day 29 Morning (4h):** Storefront homepage and product listing
-  - [ ] Homepage with customizable sections (using theme from Day 34-35)
+**Day 30-32: Tenant Storefront (24 hours)**
+- [ ] **Day 30 Morning (4h):** Storefront homepage and product listing
+  - [ ] Homepage with customizable sections (using theme from Day 35-36)
   - [ ] Product listing page
   - [ ] Product filtering and sorting
   - [ ] Product search functionality
-- [ ] **Day 29 Afternoon (4h):** Product detail page
+- [ ] **Day 30 Afternoon (4h):** Product detail page
   - [ ] Product detail page with images
   - [ ] Product variants selection
   - [ ] Add to cart functionality
   - [ ] Related products section
-- [ ] **Day 30 Morning (4h):** Shopping cart
+- [ ] **Day 31 Morning (4h):** Shopping cart
   - [ ] Shopping cart page
   - [ ] Cart item management (add, remove, update quantity)
   - [ ] Cart summary with totals
   - [ ] Apply coupon/discount codes
-- [ ] **Day 30 Afternoon (4h):** Checkout flow
+- [ ] **Day 31 Afternoon (4h):** Checkout flow
   - [ ] Checkout page (multi-step form)
   - [ ] Shipping address form
   - [ ] Payment method selection
   - [ ] Order review and confirmation
-- [ ] **Day 31 Morning (4h):** Customer account pages
+- [ ] **Day 32 Morning (4h):** Customer account pages
   - [ ] Customer dashboard
   - [ ] Order history page
   - [ ] Order detail view
   - [ ] Account settings page
-- [ ] **Day 31 Afternoon (4h):** Storefront polish
+- [ ] **Day 32 Afternoon (4h):** Storefront polish
   - [ ] Responsive design for mobile
   - [ ] Loading states and skeletons
   - [ ] Error handling and empty states
   - [ ] SEO optimization for storefront pages
 
-**Day 32-33: Admin Dashboard (16 hours)**
-- [ ] **Day 32 Morning (4h):** Analytics dashboard foundation
+**Day 33-34: Admin Dashboard (16 hours)**
+- [ ] **Day 33 Morning (4h):** Analytics dashboard foundation
   - [ ] Create analytics dashboard layout (using Shadcn/ui components)
   - [ ] Implement data fetching for analytics
   - [ ] Add date range picker
   - [ ] Create dashboard widgets/charts
-- [ ] **Day 32 Afternoon (4h):** Sales and revenue reports
+- [ ] **Day 33 Afternoon (4h):** Sales and revenue reports
   - [ ] Sales reports with charts
   - [ ] Revenue metrics dashboard
   - [ ] Revenue by product/category
   - [ ] Revenue trends over time
-- [ ] **Day 33 Morning (4h):** Customer and inventory insights
+- [ ] **Day 34 Morning (4h):** Customer and inventory insights
   - [ ] Customer insights dashboard
   - [ ] Customer acquisition metrics
   - [ ] Inventory reports
   - [ ] Low stock alerts dashboard
-- [ ] **Day 33 Afternoon (4h):** Advanced analytics
+- [ ] **Day 34 Afternoon (4h):** Advanced analytics
   - [ ] Export reports (PDF, CSV)
   - [ ] Scheduled report generation
   - [ ] Custom date range analytics
   - [ ] Comparison reports (period over period)
 
-**Day 34-35: Theme System (16 hours)**
-- [ ] **Day 34 Morning (4h):** Theme structure and customization UI
+**Day 35-36: Theme System (16 hours)**
+- [ ] **Day 35 Morning (4h):** Theme structure and customization UI
   - [ ] Theme structure definition
   - [ ] Theme customization UI (using Shadcn/ui components)
   - [ ] Color picker for theme colors
   - [ ] Font selection interface
   - [ ] Layout options (sidebar position, header style, etc.)
-- [ ] **Day 34 Afternoon (4h):** Theme marketplace and installation
+- [ ] **Day 35 Afternoon (4h):** Theme marketplace and installation
   - [ ] Theme marketplace UI
   - [ ] Theme preview functionality
   - [ ] Theme installation system
   - [ ] Theme activation/deactivation
-- [ ] **Day 35 Morning (4h):** Advanced theme features
+- [ ] **Day 36 Morning (4h):** Advanced theme features
   - [ ] Custom CSS injection interface
   - [ ] Custom JavaScript injection
   - [ ] Theme export/import
   - [ ] Theme versioning
-- [ ] **Day 35 Afternoon (4h):** Homepage theme integration
-  - [ ] Integrate theme system with homepage builder (from Day 26)
+- [ ] **Day 36 Afternoon (4h):** Homepage theme integration
+  - [ ] Integrate theme system with homepage builder (from Day 27)
   - [ ] Theme-aware homepage sections
   - [ ] Preview homepage with different themes
   - [ ] Theme-specific homepage templates
@@ -1899,21 +1950,21 @@ vercel env add VERCEL_TOKEN
 
 ### **Week 6: Performance & Optimization**
 
-**Day 36-37: Performance Optimization (16 hours)**
+**Day 37-38: Performance Optimization (16 hours)**
 - [ ] Database query optimization
 - [ ] Add Redis caching layer
 - [ ] Implement CDN for static assets
 - [ ] Optimize images (Supabase Storage + transform)
 - [ ] Code splitting and lazy loading
 
-**Day 38-39: Background Jobs (16 hours)**
+**Day 39-40: Background Jobs (16 hours)**
 - [ ] Set up Vercel Cron Jobs
 - [ ] Subscription expiry checker
 - [ ] Payment reminders
 - [ ] Analytics aggregation
 - [ ] Data cleanup tasks
 
-**Day 40-42: Testing (24 hours)**
+**Day 41-43: Testing (24 hours)**
 - [ ] Unit tests for utilities
 - [ ] Integration tests for APIs
 - [ ] E2E tests with Playwright
@@ -1925,36 +1976,36 @@ vercel env add VERCEL_TOKEN
 
 ## **Phase 3: Launch Preparation (Week 7)**
 
-**Day 43-44: Documentation (16 hours)**
+**Day 44-45: Documentation (16 hours)**
 - [ ] API documentation
 - [ ] User guides
 - [ ] Admin documentation
 - [ ] Deployment guide
 - [ ] Troubleshooting guide
 
-**Day 45-46: Deployment (16 hours)**
-- [ ] **Day 45 Morning (4h):** Production Supabase setup
+**Day 46-47: Deployment (16 hours)**
+- [ ] **Day 46 Morning (4h):** Production Supabase setup
   - [ ] Production Supabase project creation
   - [ ] Database migration to production
   - [ ] RLS policies verification
   - [ ] Environment variables configuration
-- [ ] **Day 45 Afternoon (4h):** Vercel production deployment
+- [ ] **Day 46 Afternoon (4h):** Vercel production deployment
   - [ ] Vercel production deployment
   - [ ] Environment variables setup in Vercel
   - [ ] Build verification
   - [ ] Initial smoke tests
-- [ ] **Day 46 Morning (4h):** Production domain verification
+- [ ] **Day 47 Morning (4h):** Production domain verification
   - [ ] Verify domain (`dukanest.com`) configuration in production ✅ (Already configured in Day 13.5)
   - [ ] Verify wildcard DNS (`*.dukanest.com`) in production ✅ (Already configured in Day 13.5)
   - [ ] Test production subdomain routing for existing tenants
   - [ ] Verify SSL certificates for all tenant subdomains
-- [ ] **Day 46 Afternoon (4h):** Monitoring and final checks
+- [ ] **Day 47 Afternoon (4h):** Monitoring and final checks
   - [ ] Monitoring setup (Vercel Analytics, error tracking)
   - [ ] Performance monitoring configuration
   - [ ] Set up uptime monitoring
   - [ ] Configure error alerting
 
-**Day 47-49: Final Testing & Launch (24 hours)**
+**Day 48-50: Final Testing & Launch (24 hours)**
 - [ ] Production smoke tests
 - [ ] Load testing
 - [ ] Security review
