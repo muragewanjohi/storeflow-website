@@ -15,8 +15,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================
@@ -40,14 +41,16 @@ model admins {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model attribute_values {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id    String     @db.Uuid
-  attribute_id String     @db.Uuid
-  value        String     @db.VarChar(255)
-  color_code   String?    @db.VarChar(7)
-  created_at   DateTime?  @default(now()) @db.Timestamp(6)
-  attributes   attributes @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  tenants      tenants    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String                       @db.Uuid
+  attribute_id       String                       @db.Uuid
+  value              String                       @db.VarChar(255)
+  color_code         String?                      @db.VarChar(7)
+  image              String?                      @db.VarChar(255)
+  created_at         DateTime?                    @default(now()) @db.Timestamp(6)
+  attributes         attributes                   @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants            tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  variant_attributes product_variant_attributes[]
 
   @@index([attribute_id], map: "idx_attribute_values_attribute_id")
   @@index([tenant_id], map: "idx_attribute_values_tenant_id")
@@ -55,15 +58,16 @@ model attribute_values {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model attributes {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id        String             @db.Uuid
-  name             String             @db.VarChar(255)
-  slug             String?            @db.VarChar(255)
-  type             String?            @db.VarChar(50)
-  created_at       DateTime?          @default(now()) @db.Timestamp(6)
-  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
-  attribute_values attribute_values[]
-  tenants          tenants            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String                       @db.Uuid
+  name               String                       @db.VarChar(255)
+  slug               String?                      @db.VarChar(255)
+  type               String?                      @db.VarChar(50)
+  created_at         DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?                    @default(now()) @db.Timestamp(6)
+  attribute_values   attribute_values[]
+  variant_attributes product_variant_attributes[]
+  tenants            tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id], map: "idx_attributes_tenant_id")
 }
@@ -442,22 +446,43 @@ model product_reviews {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model product_variants {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id          String    @db.Uuid
-  product_id         String    @db.Uuid
-  attribute_id       String?   @db.Uuid
-  attribute_value_id String?   @db.Uuid
-  price              Decimal?  @db.Decimal(10, 2)
-  stock_quantity     Int?      @default(0)
-  sku                String?   @db.VarChar(100)
-  image              String?   @db.VarChar(255)
-  created_at         DateTime? @default(now()) @db.Timestamp(6)
-  updated_at         DateTime? @default(now()) @db.Timestamp(6)
-  products           products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  tenants            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String                       @db.Uuid
+  product_id         String                       @db.Uuid
+  attribute_id       String?                      @db.Uuid
+  attribute_value_id String?                      @db.Uuid
+  price              Decimal?                     @db.Decimal(10, 2)
+  stock_quantity     Int?                         @default(0)
+  sku                String?                      @db.VarChar(100)
+  image              String?                      @db.VarChar(255)
+  created_at         DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?                    @default(now()) @db.Timestamp(6)
+  products           products                     @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants            tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  variant_attributes product_variant_attributes[]
 
   @@index([product_id], map: "idx_product_variants_product_id")
   @@index([tenant_id], map: "idx_product_variants_tenant_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// Junction table to support multiple attributes per variant (e.g., Size=Small, Color=Red, Weight=200g)
+model product_variant_attributes {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String           @db.Uuid
+  variant_id         String           @db.Uuid
+  attribute_id       String           @db.Uuid
+  attribute_value_id String           @db.Uuid
+  created_at         DateTime?        @default(now()) @db.Timestamp(6)
+  attributes         attributes       @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  attribute_values   attribute_values @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_variants   product_variants @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants            tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([variant_id, attribute_id], map: "idx_variant_attributes_unique")
+  @@index([variant_id], map: "idx_variant_attributes_variant_id")
+  @@index([tenant_id], map: "idx_variant_attributes_tenant_id")
+  @@index([attribute_id], map: "idx_variant_attributes_attribute_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -578,22 +603,23 @@ model support_tickets {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
-  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                 String?                   @db.Uuid
-  subdomain               String                    @unique @db.VarChar(255)
-  custom_domain           String?                   @unique @db.VarChar(255)
-  name                    String                    @db.VarChar(255)
-  plan_id                 String?                   @db.Uuid
-  expire_date             DateTime?                 @db.Timestamp(6)
-  start_date              DateTime?                 @default(now()) @db.Timestamp(6)
-  renew_status            String?                   @db.VarChar(50)
-  status                  String?                   @default("active") @db.VarChar(50)
-  theme_slug              String?                   @db.VarChar(100)
-  data                    Json?                     @default("{}")
-  created_at              DateTime?                 @default(now()) @db.Timestamp(6)
-  updated_at              DateTime?                 @default(now()) @db.Timestamp(6)
+  id                      String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                 String?                      @db.Uuid
+  subdomain               String                       @unique @db.VarChar(255)
+  custom_domain           String?                      @unique @db.VarChar(255)
+  name                    String                       @db.VarChar(255)
+  plan_id                 String?                      @db.Uuid
+  expire_date             DateTime?                    @db.Timestamp(6)
+  start_date              DateTime?                    @default(now()) @db.Timestamp(6)
+  renew_status            String?                      @db.VarChar(50)
+  status                  String?                      @default("active") @db.VarChar(50)
+  theme_slug              String?                      @db.VarChar(100)
+  data                    Json?                        @default("{}")
+  created_at              DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?                    @default(now()) @db.Timestamp(6)
   attribute_values        attribute_values[]
   attributes              attributes[]
+  variant_attributes      product_variant_attributes[]
   blog_categories         blog_categories[]
   blogs                   blogs[]
   brands                  brands[]
@@ -617,7 +643,7 @@ model tenants {
   static_options          static_options[]
   support_ticket_messages support_ticket_messages[]
   support_tickets         support_tickets[]
-  price_plans             price_plans?              @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  price_plans             price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses user_delivery_addresses[]
   wallets                 wallets[]
 

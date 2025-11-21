@@ -20,7 +20,8 @@ import {
   CheckCircleIcon, 
   XCircleIcon, 
   ExclamationTriangleIcon,
-  TrashIcon 
+  TrashIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 
 interface Tenant {
@@ -334,8 +335,25 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
-          <CardDescription>Update tenant name and basic settings</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Basic Information</CardTitle>
+              <CardDescription>Update tenant name and basic settings</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              asChild
+            >
+              <a
+                href={`https://${subdomain}.dukanest.com/dashboard`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ArrowTopRightOnSquareIcon className="mr-2 h-4 w-4" />
+                Visit Store Dashboard
+              </a>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleUpdate} className="space-y-4">

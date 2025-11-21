@@ -14,11 +14,16 @@ import { type AuthUser } from '@/lib/auth/types';
 import {
   HomeIcon,
   CubeIcon,
+  FolderIcon,
   ShoppingCartIcon,
   UsersIcon,
   UserGroupIcon,
   Cog6ToothIcon,
   XMarkIcon,
+  Squares2X2Icon,
+  TagIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -29,17 +34,33 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
-const navigation = [
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+  group?: string;
+}
+
+const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Products', href: '/dashboard/products', icon: CubeIcon },
+  // Catalog group
+  { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Catalog' },
+  { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },
+  { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
+  // Other items
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
   { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
 ];
 
+// Catalog icon
+const CatalogIcon = Squares2X2Icon;
+
 export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externalMobileMenuOpen, setMobileMenuOpen: externalSetMobileMenuOpen, collapsed = false }: Readonly<SidebarProps>) {
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
+  const [catalogExpanded, setCatalogExpanded] = useState(true);
   const pathname = usePathname();
   
   // Use external state if provided, otherwise use internal state
@@ -53,6 +74,39 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     }
     return true;
   });
+
+  // Group navigation items, ensuring Dashboard is first, then Catalog, then others
+  const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
+  const catalogItems = filteredNavigation.filter((item) => item.group === 'Catalog');
+  const mainItems = filteredNavigation.filter((item) => !item.group && item.name !== 'Dashboard');
+  
+  // Build grouped navigation in the correct order using an array to maintain sequence
+  const orderedGroupedNavigation: Array<{ groupName: string; items: NavigationItem[] }> = [];
+  
+  // First: Dashboard (Main group)
+  if (dashboardItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [dashboardItem] });
+  }
+  
+  // Second: Catalog group
+  if (catalogItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Catalog', items: catalogItems });
+  }
+  
+  // Third: Other main items (add to existing Main group or create new)
+  if (mainItems.length > 0) {
+    const mainGroupIndex = orderedGroupedNavigation.findIndex((g) => g.groupName === 'Main');
+    if (mainGroupIndex !== -1) {
+      orderedGroupedNavigation[mainGroupIndex].items.push(...mainItems);
+    } else {
+      orderedGroupedNavigation.push({ groupName: 'Main', items: mainItems });
+    }
+  }
+
+  // Check if any catalog item is active
+  const isCatalogActive = filteredNavigation.some(
+    (item) => item.group === 'Catalog' && (pathname === item.href || pathname.startsWith(item.href + '/'))
+  );
 
   return (
     <>
@@ -81,28 +135,63 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
               <div className="mb-4">
                 <p className="px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Store Dashboard</p>
               </div>
-              <ul role="list" className="space-y-1">
-                {filteredNavigation.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              <ul role="list" className="space-y-6">
+                {orderedGroupedNavigation.map(({ groupName, items }) => {
+                  const isCatalogGroup = groupName === 'Catalog';
+                  const isExpanded = isCatalogGroup ? catalogExpanded : true;
+                  const isMainGroup = groupName === 'Main';
+                  
                   return (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                        }`}
-                      >
-                        <item.icon
-                          className={`h-5 w-5 shrink-0 ${
-                            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                    <li key={groupName}>
+                      {!isMainGroup && (
+                        <button
+                          type="button"
+                          onClick={() => isCatalogGroup && setCatalogExpanded(!catalogExpanded)}
+                          className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
+                            isCatalogGroup && isCatalogActive ? 'text-foreground' : ''
                           }`}
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </Link>
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCatalogGroup && (
+                              <CatalogIcon className="h-4 w-4" />
+                            )}
+                            <span>{groupName}</span>
+                          </div>
+                          {isCatalogGroup && (
+                            <ChevronDownIcon
+                              className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                            />
+                          )}
+                        </button>
+                      )}
+                      {isExpanded && (
+                        <ul role="list" className="space-y-1">
+                          {items.map((item) => {
+                            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                            return (
+                              <li key={item.name}>
+                                <Link
+                                  href={item.href}
+                                  onClick={() => setMobileMenuOpen(false)}
+                                  className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                                    isActive
+                                      ? 'bg-primary text-primary-foreground shadow-sm'
+                                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                  }`}
+                                >
+                                  <item.icon
+                                    className={`h-5 w-5 shrink-0 ${
+                                      isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                                    }`}
+                                    aria-hidden="true"
+                                  />
+                                  {item.name}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
@@ -129,30 +218,65 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Store Dashboard</p>
               </div>
             )}
-            <ul role="list" className="flex flex-1 flex-col gap-y-1">
-              {filteredNavigation.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            <ul role="list" className="flex flex-1 flex-col gap-y-4">
+              {orderedGroupedNavigation.map(({ groupName, items }) => {
+                const isCatalogGroup = groupName === 'Catalog';
+                const isExpanded = isCatalogGroup ? catalogExpanded : true;
+                const isMainGroup = groupName === 'Main';
+                
                 return (
-                  <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                        collapsed ? 'justify-center' : ''
-                      } ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
-                      title={collapsed ? item.name : undefined}
-                    >
-                      <item.icon
-                        className={`h-5 w-5 shrink-0 ${
-                          isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                  <li key={groupName}>
+                    {!collapsed && !isMainGroup && (
+                      <button
+                        type="button"
+                        onClick={() => isCatalogGroup && setCatalogExpanded(!catalogExpanded)}
+                        className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
+                          isCatalogGroup && isCatalogActive ? 'text-foreground' : ''
                         }`}
-                        aria-hidden="true"
-                      />
-                      {!collapsed && <span>{item.name}</span>}
-                    </Link>
+                      >
+                        <div className="flex items-center gap-2">
+                          {isCatalogGroup && (
+                            <CatalogIcon className="h-4 w-4" />
+                          )}
+                          <span>{groupName}</span>
+                        </div>
+                        {isCatalogGroup && (
+                          <ChevronDownIcon
+                            className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                          />
+                        )}
+                      </button>
+                    )}
+                    {isExpanded && (
+                      <ul role="list" className="flex flex-col gap-y-1">
+                        {items.map((item) => {
+                          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                          return (
+                            <li key={item.name}>
+                              <Link
+                                href={item.href}
+                                className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                                  collapsed ? 'justify-center' : ''
+                                } ${
+                                  isActive
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                }`}
+                                title={collapsed ? item.name : undefined}
+                              >
+                                <item.icon
+                                  className={`h-5 w-5 shrink-0 ${
+                                    isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                                {!collapsed && <span>{item.name}</span>}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </li>
                 );
               })}

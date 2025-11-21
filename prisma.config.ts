@@ -12,6 +12,7 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: env("DATABASE_URL"), // Pooled connection for queries
+    directUrl: env("DIRECT_URL"), // Direct connection for migrations
   },
 });

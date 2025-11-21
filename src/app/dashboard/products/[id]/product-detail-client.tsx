@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { generateVariantName } from '@/lib/products/variant-helpers';
 import {
   Table,
   TableBody,
@@ -40,6 +41,22 @@ interface Product {
   updated_at: string;
 }
 
+interface VariantAttribute {
+  id: string;
+  attribute_id: string;
+  attribute_value_id: string;
+  attributes: {
+    id: string;
+    name: string;
+    type: string | null;
+  };
+  attribute_values: {
+    id: string;
+    value: string;
+    color_code: string | null;
+  };
+}
+
 interface Variant {
   id: string;
   product_id: string;
@@ -47,6 +64,7 @@ interface Variant {
   price?: number | null;
   stock_quantity: number;
   image?: string | null;
+  variant_attributes?: VariantAttribute[];
   created_at: string;
   updated_at: string;
 }
@@ -156,29 +174,72 @@ export default function ProductDetailClient({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Variant</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead>Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {variants.map((variant) => (
-                      <TableRow key={variant.id}>
-                        <TableCell className="font-mono text-sm">{variant.sku}</TableCell>
-                        <TableCell>
-                          {variant.price
-                            ? formatPrice(variant.price)
-                            : formatPrice(product.price)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={variant.stock_quantity > 0 ? 'default' : 'destructive'}
-                          >
-                            {variant.stock_quantity}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {variants.map((variant) => {
+                      const variantName = variant.variant_attributes && variant.variant_attributes.length > 0
+                        ? generateVariantName(
+                            variant.variant_attributes.map((attr) => ({
+                              attribute_id: attr.attribute_id,
+                              attribute_value_id: attr.attribute_value_id,
+                              attribute_name: attr.attributes.name,
+                              attribute_value: attr.attribute_values.value,
+                            }))
+                          )
+                        : 'Default';
+
+                      return (
+                        <TableRow key={variant.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              {variant.image && (
+                                <img
+                                  src={variant.image}
+                                  alt={variantName}
+                                  className="h-12 w-12 rounded object-cover border"
+                                />
+                              )}
+                              <div className="space-y-1">
+                                <span className="font-medium">{variantName}</span>
+                                {variant.variant_attributes && variant.variant_attributes.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {variant.variant_attributes.map((attr) => (
+                                      <Badge key={attr.id} variant="outline" className="text-xs">
+                                        {attr.attributes.name}: {attr.attribute_values.value}
+                                        {attr.attribute_values.color_code && (
+                                          <span
+                                            className="ml-1 inline-block w-3 h-3 rounded border"
+                                            style={{ backgroundColor: attr.attribute_values.color_code }}
+                                          />
+                                        )}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{variant.sku || '—'}</TableCell>
+                          <TableCell>
+                            {variant.price
+                              ? formatPrice(variant.price)
+                              : formatPrice(product.price)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={variant.stock_quantity > 0 ? 'default' : 'destructive'}
+                            >
+                              {variant.stock_quantity}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

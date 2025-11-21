@@ -64,9 +64,12 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Get bucket name from environment variable or use default
+    const bucketName = process.env.NEXT_PUBLIC_STORAGE_BUCKET || 'product-images';
+
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('product-images') // Bucket name - you may need to create this in Supabase
+      .from(bucketName)
       .upload(filePath, buffer, {
         contentType: file.type,
         upsert: false,
@@ -74,6 +77,19 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Supabase upload error:', uploadError);
+      
+      // Provide helpful error message if bucket doesn't exist
+      if (uploadError.message?.includes('Bucket not found') || uploadError.statusCode === '404') {
+        return NextResponse.json(
+          { 
+            error: 'Storage bucket not found',
+            details: `The bucket "${bucketName}" does not exist in Supabase Storage. Please create it in your Supabase dashboard.`,
+            bucketName 
+          },
+          { status: 500 }
+        );
+      }
+      
       return NextResponse.json(
         { error: 'Failed to upload image', details: uploadError.message },
         { status: 500 }
@@ -82,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('product-images')
+      .from(bucketName)
       .getPublicUrl(filePath);
 
     return NextResponse.json({

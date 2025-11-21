@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 interface Tenant {
   id: string;
@@ -155,6 +155,21 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         variant="ghost"
                         size="icon"
                         asChild
+                        title="Visit Store Dashboard"
+                      >
+                        <a
+                          href={`https://${tenant.subdomain}.dukanest.com/dashboard`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                        </a>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        title="Edit Tenant"
                       >
                         <Link href={`/admin/tenants/${tenant.id}`}>
                           <PencilIcon className="h-4 w-4" />
@@ -165,6 +180,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         size="icon"
                         onClick={() => handleDelete(tenant.id)}
                         disabled={isDeleting === tenant.id}
+                        title="Delete Tenant"
                       >
                         <TrashIcon className="h-4 w-4 text-destructive" />
                       </Button>

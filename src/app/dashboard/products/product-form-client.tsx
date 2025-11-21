@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PhotoIcon } from '@heroicons/react/24/solid';
+import { generateVariantName } from '@/lib/products/variant-helpers';
 
 interface Product {
   id: string;
@@ -37,6 +38,19 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+}
+
+interface Attribute {
+  id: string;
+  name: string;
+  type: string | null;
+  attribute_values: AttributeValue[];
+}
+
+interface AttributeValue {
+  id: string;
+  value: string;
+  color_code: string | null;
 }
 
 interface ProductFormClientProps {
@@ -71,14 +85,37 @@ export default function ProductFormClient({
     price: string;
     stock_quantity: string;
     image: string;
+    attributes: Array<{ attribute_id: string; attribute_value_id: string }>;
     isNew?: boolean;
   }>>([]);
+
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [loadingAttributes, setLoadingAttributes] = useState(true);
 
   const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Fetch attributes on component mount
+  useEffect(() => {
+    const fetchAttributes = async () => {
+      try {
+        const response = await fetch('/api/attributes');
+        if (response.ok) {
+          const data = await response.json();
+          setAttributes(data.attributes || []);
+        }
+      } catch (error) {
+        console.error('Error fetching attributes:', error);
+      } finally {
+        setLoadingAttributes(false);
+      }
+    };
+
+    fetchAttributes();
+  }, []);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,17 +259,24 @@ export default function ProductFormClient({
       if (variants.length > 0) {
         for (const variant of variants) {
           try {
+            const variantPayload: any = {
+              sku: variant.sku || null,
+              price: variant.price ? parseFloat(variant.price) : null,
+              stock_quantity: parseInt(variant.stock_quantity, 10) || 0,
+              image: variant.image || null,
+            };
+
+            // Add attributes if any
+            if (variant.attributes && variant.attributes.length > 0) {
+              variantPayload.attributes = variant.attributes;
+            }
+
             await fetch(`/api/products/${productId}/variants`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                sku: variant.sku || null,
-                price: variant.price ? parseFloat(variant.price) : null,
-                stock_quantity: parseInt(variant.stock_quantity, 10) || 0,
-                image: variant.image || null,
-              }),
+              body: JSON.stringify(variantPayload),
             });
           } catch (err) {
             console.error('Error creating variant:', err);
@@ -427,6 +471,197 @@ export default function ProductFormClient({
                         <TrashIcon className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
+                    {/* Variant Attributes */}
+                    <div className="space-y-3">
+                      <Label>Attributes (e.g., Size, Color, Weight)</Label>
+                      {variant.attributes.map((attr, attrIndex) => {
+                        const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
+                        return (
+                          <div key={attrIndex} className="flex gap-2 items-end">
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor={`variant-attr-${index}-${attrIndex}`}>Attribute</Label>
+                              <Select
+                                value={attr.attribute_id}
+                                onValueChange={(value) => {
+                                  const newVariants = [...variants];
+                                  newVariants[index].attributes[attrIndex] = {
+                                    attribute_id: value,
+                                    attribute_value_id: '', // Reset value when attribute changes
+                                  };
+                                  setVariants(newVariants);
+                                }}
+                              >
+                                <SelectTrigger id={`variant-attr-${index}-${attrIndex}`}>
+                                  <SelectValue placeholder="Select attribute" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {attributes.map((attribute) => (
+                                    <SelectItem key={attribute.id} value={attribute.id}>
+                                      {attribute.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor={`variant-value-${index}-${attrIndex}`}>Value</Label>
+                              <Select
+                                value={attr.attribute_value_id}
+                                onValueChange={(value) => {
+                                  const newVariants = [...variants];
+                                  newVariants[index].attributes[attrIndex].attribute_value_id = value;
+                                  setVariants(newVariants);
+                                }}
+                                disabled={!selectedAttribute}
+                              >
+                                <SelectTrigger id={`variant-value-${index}-${attrIndex}`}>
+                                  <SelectValue placeholder="Select value" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {selectedAttribute?.attribute_values.map((val) => (
+                                    <SelectItem key={val.id} value={val.id}>
+                                      <div className="flex items-center gap-2">
+                                        {/* Show color code for color attributes, but variant image is separate */}
+                                        {val.color_code && (
+                                          <span
+                                            className="w-4 h-4 rounded border"
+                                            style={{ backgroundColor: val.color_code }}
+                                          />
+                                        )}
+                                        <span>{val.value}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const newVariants = [...variants];
+                                newVariants[index].attributes = newVariants[index].attributes.filter(
+                                  (_, i) => i !== attrIndex
+                                );
+                                setVariants(newVariants);
+                              }}
+                            >
+                              <XMarkIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newVariants = [...variants];
+                          newVariants[index].attributes.push({
+                            attribute_id: '',
+                            attribute_value_id: '',
+                          });
+                          setVariants(newVariants);
+                        }}
+                        disabled={loadingAttributes || attributes.length === 0}
+                      >
+                        <PlusIcon className="mr-2 h-3 w-3" />
+                        Add Attribute
+                      </Button>
+                      {variant.attributes.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Variant name: {generateVariantName(
+                            variant.attributes.map((attr) => {
+                              const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
+                              const selectedValue = selectedAttribute?.attribute_values.find(
+                                (v) => v.id === attr.attribute_value_id
+                              );
+                              return {
+                                attribute_id: attr.attribute_id,
+                                attribute_value_id: attr.attribute_value_id,
+                                attribute_name: selectedAttribute?.name,
+                                attribute_value: selectedValue?.value,
+                              };
+                            })
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Variant Image */}
+                    <div className="space-y-2">
+                      <Label>Variant Image</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Upload a product image for this specific variant (e.g., T-shirt in Red color)
+                      </p>
+                      {variant.image ? (
+                        <div className="relative">
+                          <img
+                            src={variant.image}
+                            alt="Variant preview"
+                            className="h-32 w-32 rounded-lg object-cover border"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute right-2 top-2"
+                            onClick={async () => {
+                              const newVariants = [...variants];
+                              newVariants[index].image = '';
+                              setVariants(newVariants);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          className="flex h-32 w-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50"
+                          onClick={async () => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = async (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (!file) return;
+
+                              setIsUploading(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append('file', file);
+
+                                const response = await fetch('/api/products/upload', {
+                                  method: 'POST',
+                                  body: formData,
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json();
+                                  throw new Error(data.error || 'Failed to upload image');
+                                }
+
+                                const data = await response.json();
+                                const newVariants = [...variants];
+                                newVariants[index].image = data.url;
+                                setVariants(newVariants);
+                              } catch (err: any) {
+                                setError(err.message || 'Failed to upload image');
+                              } finally {
+                                setIsUploading(false);
+                              }
+                            };
+                            input.click();
+                          }}
+                        >
+                          <PhotoIcon className="h-8 w-8 text-muted-foreground" />
+                          <p className="mt-2 text-xs text-muted-foreground">Upload</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Variant Details */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label htmlFor={`variant-sku-${index}`}>SKU</Label>
@@ -487,15 +722,37 @@ export default function ProductFormClient({
                         price: '',
                         stock_quantity: '0',
                         image: '',
+                        attributes: [],
                         isNew: true,
                       },
                     ]);
                   }}
                   className="w-full"
+                  disabled={loadingAttributes}
                 >
                   <PlusIcon className="mr-2 h-4 w-4" />
                   Add Variant
                 </Button>
+                {loadingAttributes && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Loading attributes...
+                  </p>
+                )}
+                {!loadingAttributes && attributes.length === 0 && (
+                  <div className="text-sm text-muted-foreground text-center space-y-2">
+                    <p>No attributes available. Create attributes first to add variant options.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      asChild
+                    >
+                      <Link href="/dashboard/settings/attributes">
+                        Go to Attributes Settings
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

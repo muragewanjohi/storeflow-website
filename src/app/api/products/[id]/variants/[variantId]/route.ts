@@ -12,9 +12,23 @@ import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 
+const variantAttributeSchema = z.object({
+  attribute_id: z.string().uuid(),
+  attribute_value_id: z.string().uuid(),
+});
+
+const updateAttributeValueSchema = z.object({
+  value: z.string().min(1).max(255).optional(),
+  color_code: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+  image: z.string().url().optional().nullable(),
+});
+
 const updateVariantSchema = z.object({
+  // Legacy single attribute (for backward compatibility)
   attribute_id: z.string().uuid().optional().nullable(),
   attribute_value_id: z.string().uuid().optional().nullable(),
+  // New: Multiple attributes array
+  attributes: z.array(variantAttributeSchema).optional(),
   price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   stock_quantity: z.number().int().min(0).optional(),
   sku: z.string().max(100).optional().nullable(),
@@ -56,17 +70,69 @@ export async function PUT(
       );
     }
 
-    const updateData: any = {};
-    if (validatedData.attribute_id !== undefined) updateData.attribute_id = validatedData.attribute_id;
-    if (validatedData.attribute_value_id !== undefined) updateData.attribute_value_id = validatedData.attribute_value_id;
-    if (validatedData.price !== undefined) updateData.price = validatedData.price;
-    if (validatedData.stock_quantity !== undefined) updateData.stock_quantity = validatedData.stock_quantity;
-    if (validatedData.sku !== undefined) updateData.sku = validatedData.sku;
-    if (validatedData.image !== undefined) updateData.image = validatedData.image;
+    // Update variant in a transaction
+    const updatedVariant = await prisma.$transaction(async (tx) => {
+      const updateData: any = {};
+      if (validatedData.attribute_id !== undefined) updateData.attribute_id = validatedData.attribute_id;
+      if (validatedData.attribute_value_id !== undefined) updateData.attribute_value_id = validatedData.attribute_value_id;
+      if (validatedData.price !== undefined) updateData.price = validatedData.price;
+      if (validatedData.stock_quantity !== undefined) updateData.stock_quantity = validatedData.stock_quantity;
+      if (validatedData.sku !== undefined) updateData.sku = validatedData.sku;
+      if (validatedData.image !== undefined) updateData.image = validatedData.image;
 
-    const updatedVariant = await prisma.product_variants.update({
-      where: { id: variantId },
-      data: updateData,
+      // Update variant
+      const variant = await tx.product_variants.update({
+        where: { id: variantId },
+        data: updateData,
+      });
+
+      // Update attributes if provided
+      if (validatedData.attributes !== undefined) {
+        // Delete existing variant attributes
+        await tx.product_variant_attributes.deleteMany({
+          where: {
+            variant_id: variantId,
+            tenant_id: tenant.id,
+          },
+        });
+
+        // Create new variant attributes
+        if (validatedData.attributes.length > 0) {
+          await tx.product_variant_attributes.createMany({
+            data: validatedData.attributes.map((attr) => ({
+              tenant_id: tenant.id,
+              variant_id: variantId,
+              attribute_id: attr.attribute_id,
+              attribute_value_id: attr.attribute_value_id,
+            })),
+          });
+        }
+      }
+
+      // Fetch complete variant with attributes
+      return await tx.product_variants.findUnique({
+        where: { id: variantId },
+        include: {
+          variant_attributes: {
+            include: {
+              attributes: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                },
+              },
+              attribute_values: {
+                select: {
+                  id: true,
+                  value: true,
+                  color_code: true,
+                },
+              },
+            },
+          },
+        },
+      });
     });
 
     return NextResponse.json({

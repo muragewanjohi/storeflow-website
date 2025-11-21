@@ -44,7 +44,20 @@ export default async function ProductDetailPage({
     if (response.ok) {
       const data = await response.json();
       product = data.product;
-      variants = data.product?.variants || [];
+      // Fetch variants with attributes separately
+      const variantsResponse = await fetch(`${baseUrl}/api/products/${id}/variants`, {
+        headers: {
+          'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+        },
+        cache: 'no-store',
+      });
+      
+      if (variantsResponse.ok) {
+        const variantsData = await variantsResponse.json();
+        variants = variantsData.variants || [];
+      } else {
+        variants = data.product?.variants || [];
+      }
     } else if (response.status === 404) {
       redirect('/dashboard/products');
     }

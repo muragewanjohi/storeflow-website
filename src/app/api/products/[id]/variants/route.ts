@@ -13,9 +13,17 @@ import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 import { generateSKU } from '@/lib/products/validation';
 
+const variantAttributeSchema = z.object({
+  attribute_id: z.string().uuid(),
+  attribute_value_id: z.string().uuid(),
+});
+
 const createVariantSchema = z.object({
+  // Legacy single attribute (for backward compatibility)
   attribute_id: z.string().uuid().optional().nullable(),
   attribute_value_id: z.string().uuid().optional().nullable(),
+  // New: Multiple attributes array
+  attributes: z.array(variantAttributeSchema).optional(),
   price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   stock_quantity: z.number().int().min(0).default(0).optional(),
   sku: z.string().max(100).optional().nullable(),
@@ -60,6 +68,26 @@ export async function GET(
       where: {
         product_id: id,
         tenant_id: tenant.id,
+      },
+      include: {
+        variant_attributes: {
+          include: {
+            attributes: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+              },
+            },
+            attribute_values: {
+              select: {
+                id: true,
+                value: true,
+                color_code: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         created_at: 'asc',
@@ -128,18 +156,73 @@ export async function POST(
       validatedData.sku = sku;
     }
 
-    // Create variant
-    const variant = await prisma.product_variants.create({
-      data: {
-        tenant_id: tenant.id,
-        product_id: id,
-        attribute_id: validatedData.attribute_id || null,
-        attribute_value_id: validatedData.attribute_value_id || null,
-        price: validatedData.price || null,
-        stock_quantity: validatedData.stock_quantity || 0,
-        sku: validatedData.sku || null,
-        image: validatedData.image || null,
-      },
+    // Determine which attributes to use
+    let attributesToCreate: Array<{ attribute_id: string; attribute_value_id: string }> = [];
+    
+    if (validatedData.attributes && validatedData.attributes.length > 0) {
+      // Use new multiple attributes format
+      attributesToCreate = validatedData.attributes;
+    } else if (validatedData.attribute_id && validatedData.attribute_value_id) {
+      // Use legacy single attribute format (for backward compatibility)
+      attributesToCreate = [{
+        attribute_id: validatedData.attribute_id,
+        attribute_value_id: validatedData.attribute_value_id,
+      }];
+    }
+
+    // Create variant with attributes in a transaction
+    const variant = await prisma.$transaction(async (tx) => {
+      // Create the variant
+      const newVariant = await tx.product_variants.create({
+        data: {
+          tenant_id: tenant.id,
+          product_id: id,
+          // Keep legacy fields for backward compatibility
+          attribute_id: validatedData.attribute_id || null,
+          attribute_value_id: validatedData.attribute_value_id || null,
+          price: validatedData.price || null,
+          stock_quantity: validatedData.stock_quantity || 0,
+          sku: validatedData.sku || null,
+          image: validatedData.image || null,
+        },
+      });
+
+      // Create variant attributes if provided
+      if (attributesToCreate.length > 0) {
+        await tx.product_variant_attributes.createMany({
+          data: attributesToCreate.map((attr) => ({
+            tenant_id: tenant.id,
+            variant_id: newVariant.id,
+            attribute_id: attr.attribute_id,
+            attribute_value_id: attr.attribute_value_id,
+          })),
+        });
+      }
+
+      // Fetch the complete variant with attributes
+      return await tx.product_variants.findUnique({
+        where: { id: newVariant.id },
+        include: {
+          variant_attributes: {
+            include: {
+              attributes: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                },
+              },
+              attribute_values: {
+                select: {
+                  id: true,
+                  value: true,
+                  color_code: true,
+                },
+              },
+            },
+          },
+        },
+      });
     });
 
     return NextResponse.json(
