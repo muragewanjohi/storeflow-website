@@ -1892,6 +1892,228 @@
 				}
 			],
 			"description": "Category management endpoints (Day 15)"
+		},
+		{
+			"name": "Inventory Management",
+			"item": [
+				{
+					"name": "Adjust Inventory",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has adjustment data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('adjustment');",
+									"    pm.expect(jsonData.adjustment).to.have.property('quantity_before');",
+									"    pm.expect(jsonData.adjustment).to.have.property('quantity_after');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"adjustment_type\": \"increase\",\n    \"quantity\": 10,\n    \"reason\": \"restock\",\n    \"notes\": \"Restocked inventory\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/inventory/adjust",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"inventory",
+								"adjust"
+							]
+						},
+						"description": "Adjust inventory for a product or variant.\n\n**Day 17:** Inventory & Stock Management\n\n**Body Parameters:**\n- product_id (optional): UUID of the product\n- variant_id (optional): UUID of the variant\n- adjustment_type (required): 'increase', 'decrease', 'set', 'sale', 'return', 'damage', 'transfer'\n- quantity (required): Quantity to adjust\n- reason (optional): Reason for adjustment\n- notes (optional): Additional notes\n\n**Note:** Either product_id or variant_id must be provided, but not both."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Inventory History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has history array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('history');",
+									"    pm.expect(jsonData.history).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/inventory/history?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"inventory",
+								"history"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page",
+									"disabled": true
+								},
+								{
+									"key": "product_id",
+									"value": "",
+									"description": "Filter by product ID",
+									"disabled": true
+								},
+								{
+									"key": "variant_id",
+									"value": "",
+									"description": "Filter by variant ID",
+									"disabled": true
+								},
+								{
+									"key": "adjustment_type",
+									"value": "",
+									"description": "Filter by adjustment type",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get inventory adjustment history.\n\n**Day 17:** Inventory & Stock Management\n\n**Query Parameters:**\n- page (optional): Page number (default: 1)\n- limit (optional): Items per page (default: 20)\n- product_id (optional): Filter by product UUID\n- variant_id (optional): Filter by variant UUID\n- adjustment_type (optional): Filter by type\n\n**Response:**\n- Array of inventory history records with pagination"
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Inventory Update",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has results\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('results');",
+									"    pm.expect(jsonData.results).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"updates\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"adjustment_type\": \"increase\",\n            \"quantity\": 10,\n            \"reason\": \"restock\"\n        },\n        {\n            \"variant_id\": \"{{variant_id}}\",\n            \"adjustment_type\": \"set\",\n            \"quantity\": 50,\n            \"reason\": \"correction\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/inventory/bulk",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"inventory",
+								"bulk"
+							]
+						},
+						"description": "Update inventory for multiple products/variants at once.\n\n**Day 17:** Inventory & Stock Management\n\n**Body Parameters:**\n- updates (required): Array of update objects\n  - product_id (optional): UUID of the product\n  - variant_id (optional): UUID of the variant\n  - adjustment_type (required): 'increase', 'decrease', 'set'\n  - quantity (required): Quantity to adjust\n  - reason (optional): Reason for adjustment\n\n**Response:**\n- Results array with success status for each update\n- Errors array if any updates failed"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Low Stock Alerts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has alerts data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('products');",
+									"    pm.expect(jsonData).to.have.property('variants');",
+									"    pm.expect(jsonData).to.have.property('total_alerts');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/inventory/alerts?threshold=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"inventory",
+								"alerts"
+							],
+							"query": [
+								{
+									"key": "threshold",
+									"value": "10",
+									"description": "Stock threshold (default: 10)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get products and variants with low stock.\n\n**Day 17:** Inventory & Stock Management\n\n**Query Parameters:**\n- threshold (optional): Stock threshold (default: 10)\n\n**Response:**\n- products: Array of products with low stock\n- variants: Array of variants with low stock\n- total_alerts: Total number of alerts\n- threshold: Threshold used for filtering"
+					},
+					"response": []
+				}
+			],
+			"description": "Inventory management endpoints (Day 17)"
 		}
 	],
 	"event": [

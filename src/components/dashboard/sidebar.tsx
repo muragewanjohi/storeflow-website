@@ -24,6 +24,7 @@ import {
   TagIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -49,6 +50,7 @@ const navigation: NavigationItem[] = [
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
   // Other items
+  { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },

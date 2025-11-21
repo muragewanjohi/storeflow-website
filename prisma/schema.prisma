@@ -460,6 +460,7 @@ model product_variants {
   products           products                     @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tenants            tenants                      @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   variant_attributes product_variant_attributes[]
+  inventory_history  inventory_history[]
 
   @@index([product_id], map: "idx_product_variants_product_id")
   @@index([tenant_id], map: "idx_product_variants_tenant_id")
@@ -529,11 +530,37 @@ model products {
   product_reviews    product_reviews[]
   product_variants   product_variants[]
   product_wishlists  product_wishlists[]
+  inventory_history  inventory_history[]
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([slug], map: "idx_products_slug")
   @@index([tenant_id], map: "idx_products_tenant_id")
   @@index([tenant_id, status], map: "idx_products_tenant_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// Inventory history log - tracks all stock adjustments
+model inventory_history {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String            @db.Uuid
+  product_id       String?           @db.Uuid
+  variant_id       String?           @db.Uuid
+  adjustment_type  String            @db.VarChar(50) // 'increase', 'decrease', 'set', 'sale', 'return', 'damage', 'transfer'
+  quantity_before  Int               @default(0)
+  quantity_after   Int               @default(0)
+  quantity_change  Int // Positive for increase, negative for decrease
+  reason           String?           @db.VarChar(255) // 'manual_adjustment', 'sale', 'return', 'damage', 'restock', etc.
+  notes            String?
+  adjusted_by      String?           @db.Uuid // User who made the adjustment
+  created_at       DateTime?         @default(now()) @db.Timestamp(6)
+  products         products?         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_variants product_variants? @relation(fields: [variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants          tenants           @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_inventory_history_tenant_id")
+  @@index([product_id], map: "idx_inventory_history_product_id")
+  @@index([variant_id], map: "idx_inventory_history_variant_id")
+  @@index([created_at], map: "idx_inventory_history_created_at")
 }
 
 model states {
@@ -646,6 +673,7 @@ model tenants {
   price_plans             price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses user_delivery_addresses[]
   wallets                 wallets[]
+  inventoryHistories      inventory_history[]
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
