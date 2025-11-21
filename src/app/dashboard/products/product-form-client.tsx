@@ -53,13 +53,38 @@ interface AttributeValue {
   color_code: string | null;
 }
 
+interface Variant {
+  id: string;
+  sku: string | null;
+  price: number | null;
+  stock_quantity: number;
+  image: string | null;
+  variant_attributes?: Array<{
+    id: string;
+    attribute_id: string;
+    attribute_value_id: string;
+    attributes: {
+      id: string;
+      name: string;
+      type: string | null;
+    };
+    attribute_values: {
+      id: string;
+      value: string;
+      color_code: string | null;
+    };
+  }>;
+}
+
 interface ProductFormClientProps {
   product?: Product;
+  variants?: Variant[];
   categories: Category[];
 }
 
 export default function ProductFormClient({
   product,
+  variants: initialVariants = [],
   categories,
 }: Readonly<ProductFormClientProps>) {
   const router = useRouter();
@@ -79,6 +104,7 @@ export default function ProductFormClient({
     image: product?.image || '',
   });
 
+  // Initialize variants from props if editing, or empty array if creating
   const [variants, setVariants] = useState<Array<{
     id?: string;
     sku: string;
@@ -87,7 +113,23 @@ export default function ProductFormClient({
     image: string;
     attributes: Array<{ attribute_id: string; attribute_value_id: string }>;
     isNew?: boolean;
-  }>>([]);
+  }>>(() => {
+    if (isEditing && initialVariants.length > 0) {
+      return initialVariants.map((variant) => ({
+        id: variant.id,
+        sku: variant.sku || '',
+        price: variant.price?.toString() || '',
+        stock_quantity: variant.stock_quantity.toString(),
+        image: variant.image || '',
+        attributes: variant.variant_attributes?.map((attr) => ({
+          attribute_id: attr.attribute_id,
+          attribute_value_id: attr.attribute_value_id,
+        })) || [],
+        isNew: false,
+      }));
+    }
+    return [];
+  });
 
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loadingAttributes, setLoadingAttributes] = useState(true);
@@ -255,7 +297,25 @@ export default function ProductFormClient({
       const data = await response.json();
       const productId = isEditing ? product.id : data.product.id;
 
-      // Create variants if any
+      // Track which existing variants should be deleted (if editing)
+      if (isEditing && initialVariants.length > 0) {
+        const currentVariantIds = new Set(variants.filter(v => v.id && !v.isNew).map(v => v.id));
+        const deletedVariants = initialVariants.filter(v => !currentVariantIds.has(v.id));
+        
+        // Delete removed variants
+        for (const deletedVariant of deletedVariants) {
+          try {
+            await fetch(`/api/products/${productId}/variants/${deletedVariant.id}`, {
+              method: 'DELETE',
+            });
+          } catch (err) {
+            console.error('Error deleting variant:', err);
+            // Continue even if deletion fails
+          }
+        }
+      }
+
+      // Handle variants: create new ones or update existing ones
       if (variants.length > 0) {
         for (const variant of variants) {
           try {
@@ -271,15 +331,27 @@ export default function ProductFormClient({
               variantPayload.attributes = variant.attributes;
             }
 
-            await fetch(`/api/products/${productId}/variants`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(variantPayload),
-            });
+            if (variant.id && !variant.isNew) {
+              // Update existing variant
+              await fetch(`/api/products/${productId}/variants/${variant.id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(variantPayload),
+              });
+            } else {
+              // Create new variant
+              await fetch(`/api/products/${productId}/variants`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(variantPayload),
+              });
+            }
           } catch (err) {
-            console.error('Error creating variant:', err);
+            console.error('Error saving variant:', err);
             // Continue with other variants even if one fails
           }
         }
@@ -293,8 +365,23 @@ export default function ProductFormClient({
     }
   };
 
+  // Calculate total variant stock
+  const totalVariantStock = variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity) || 0), 0);
+
   return (
-    <div>
+    <div className="relative">
+      {/* Loader Overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <p className="text-sm font-medium text-muted-foreground">
+              {isEditing ? 'Updating product...' : 'Creating product...'}
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div className="mb-6 flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/products">
@@ -318,7 +405,7 @@ export default function ProductFormClient({
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
@@ -439,6 +526,17 @@ export default function ProductFormClient({
                   />
                   {validationErrors.stock_quantity && (
                     <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
+                  )}
+                  {variants.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Product-level stock: {formData.stock_quantity || 0}. 
+                      Variant stock total: {variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity) || 0), 0)}.
+                      {parseInt(formData.stock_quantity) > 0 && (
+                        <span className="block mt-1 text-amber-600">
+                          Note: When variants exist, variant stock quantities are used for inventory tracking.
+                        </span>
+                      )}
+                    </p>
                   )}
                 </div>
               </CardContent>

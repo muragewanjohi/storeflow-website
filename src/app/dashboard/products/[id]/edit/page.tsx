@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import ProductFormClient from '../../product-form-client';
 
 export default async function EditProductPage({
@@ -28,47 +29,91 @@ export default async function EditProductPage({
 
   const { id } = await params;
 
-  // Fetch product and categories
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let product: any = null;
-  let categories: any[] = [];
-
+  // Fetch product, variants, and categories in parallel using direct database queries
   try {
-    // Fetch product
-    const productResponse = await fetch(`${baseUrl}/api/products/${id}`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
+    const [product, variants, categories] = await Promise.all([
+      // Fetch product
+      prisma.products.findFirst({
+        where: {
+          id,
+          tenant_id: tenant.id,
+        },
+      }),
+      // Fetch variants with attributes
+      prisma.product_variants.findMany({
+        where: {
+          product_id: id,
+          tenant_id: tenant.id,
+        },
+        include: {
+          variant_attributes: {
+            include: {
+              attributes: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                },
+              },
+              attribute_values: {
+                select: {
+                  id: true,
+                  value: true,
+                  color_code: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          created_at: 'asc',
+        },
+      }),
+      // Fetch categories
+      prisma.categories.findMany({
+        where: {
+          tenant_id: tenant.id,
+          parent_id: null, // Only top-level categories for dropdown
+        },
+        orderBy: {
+          name: 'asc',
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      }),
+    ]);
 
-    if (productResponse.ok) {
-      const data = await productResponse.json();
-      product = data.product;
-    } else if (productResponse.status === 404) {
+    if (!product) {
       redirect('/dashboard/products');
     }
 
-    // Fetch categories
-    const categoriesResponse = await fetch(`${baseUrl}/api/categories`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
+    // Transform Prisma types to component types
+    const productData = {
+      ...product,
+      slug: product.slug || '',
+      sku: product.sku || '',
+      price: Number(product.price),
+      sale_price: product.sale_price ? Number(product.sale_price) : null,
+    } as any;
 
-    if (categoriesResponse.ok) {
-      const data = await categoriesResponse.json();
-      categories = data.categories || [];
-    }
+    const variantsData = variants.map((v) => ({
+      ...v,
+      price: v.price ? Number(v.price) : null,
+      stock_quantity: v.stock_quantity ?? 0,
+    })) as any[];
+
+    const categoriesData = categories.map((c) => ({
+      ...c,
+      slug: c.slug || '',
+    })) as any[];
+
+    return <ProductFormClient product={productData} variants={variantsData} categories={categoriesData} />;
   } catch (error) {
-    console.error('Error fetching product or categories:', error);
-  }
-
-  if (!product) {
+    console.error('Error fetching product, variants, or categories:', error);
     redirect('/dashboard/products');
   }
-
-  return <ProductFormClient product={product} categories={categories} />;
 }
 

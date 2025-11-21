@@ -8,6 +8,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import ProductsListClient from './products-list-client';
 
 export default async function ProductsPage({
@@ -43,7 +44,8 @@ export default async function ProductsPage({
   if (status) queryParams.set('status', status);
   if (category_id) queryParams.set('category_id', category_id);
 
-  // Fetch products
+  // Use API route for products (handles complex filtering/pagination)
+  // but fetch categories directly for better performance
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const productsUrl = `${baseUrl}/api/products?${queryParams.toString()}`;
   
@@ -53,13 +55,32 @@ export default async function ProductsPage({
   let dbError: string | null = null;
 
   try {
-    // Fetch products
-    const productsResponse = await fetch(productsUrl, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
+    // Fetch products and categories in parallel
+    const [productsResponse, categoriesData] = await Promise.all([
+      fetch(productsUrl, {
+        headers: {
+          'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+        },
+        // Revalidate every 30 seconds for product list
+        next: { revalidate: 30 },
+      }),
+      // Fetch categories directly from database
+      prisma.categories.findMany({
+        where: {
+          tenant_id: tenant.id,
+          parent_id: null,
+        },
+        orderBy: {
+          name: 'asc',
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+        // Cache categories for 5 minutes
+      }),
+    ]);
 
     if (productsResponse.ok) {
       const productsData = await productsResponse.json();
@@ -72,18 +93,10 @@ export default async function ProductsPage({
       }
     }
 
-    // Fetch categories for filter dropdown
-    const categoriesResponse = await fetch(`${baseUrl}/api/categories`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
-
-    if (categoriesResponse.ok) {
-      const categoriesData = await categoriesResponse.json();
-      categories = categoriesData.categories || [];
-    }
+    categories = categoriesData.map((c) => ({
+      ...c,
+      slug: c.slug || '',
+    }));
   } catch (error) {
     console.error('Error fetching products or categories:', error);
     dbError = 'Failed to load products. Please try again later.';

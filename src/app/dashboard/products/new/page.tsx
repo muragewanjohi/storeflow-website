@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import ProductFormClient from '../product-form-client';
 
 export default async function CreateProductPage() {
@@ -22,25 +23,21 @@ export default async function CreateProductPage() {
     redirect('/login');
   }
 
-  // Fetch categories for dropdown
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let categories: any[] = [];
-
-  try {
-    const response = await fetch(`${baseUrl}/api/categories`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      categories = data.categories || [];
-    }
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-  }
+  // Fetch categories for dropdown using direct database query
+  const categories = await prisma.categories.findMany({
+    where: {
+      tenant_id: tenant.id,
+      parent_id: null, // Only top-level categories for dropdown
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  });
 
   return <ProductFormClient categories={categories} />;
 }
