@@ -33,9 +33,6 @@ export default async function BulkInventoryPage() {
         status: {
           in: ['active', 'draft'],
         },
-        product_variants: {
-          none: {},
-        },
       },
       select: {
         id: true,

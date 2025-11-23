@@ -25,8 +25,10 @@ import {
   ArrowTrendingDownIcon,
   CubeIcon,
   ClipboardDocumentListIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
+import { Input } from '@/components/ui/input';
 
 interface LowStockProduct {
   id: string;
@@ -79,10 +81,32 @@ interface InventoryStats {
   lowStockCount: number;
 }
 
+interface SearchProduct {
+  id: string;
+  name: string;
+  sku: string | null;
+  stock_quantity: number;
+}
+
+interface SearchVariant {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string | null;
+  variant_sku: string | null;
+  stock_quantity: number;
+  attributes: Array<{
+    name: string;
+    value: string;
+  }>;
+}
+
 interface InventoryDashboardClientProps {
   lowStockProducts: LowStockProduct[];
   lowStockVariants: LowStockVariant[];
   recentHistory: InventoryHistory[];
+  allProducts: SearchProduct[];
+  allVariants: SearchVariant[];
   stats: InventoryStats;
 }
 
@@ -90,8 +114,12 @@ export default function InventoryDashboardClient({
   lowStockProducts,
   lowStockVariants,
   recentHistory,
+  allProducts,
+  allVariants,
   stats,
 }: Readonly<InventoryDashboardClientProps>) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const getAdjustmentIcon = (type: string) => {
     switch (type) {
       case 'increase':
@@ -119,6 +147,55 @@ export default function InventoryDashboardClient({
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  // Filter products and variants based on search query
+  const filteredSearchProducts = searchQuery
+    ? allProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : [];
+
+  const filteredSearchVariants = searchQuery
+    ? allVariants.filter(
+        (v) =>
+          v.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (v.variant_sku && v.variant_sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (v.product_sku && v.product_sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          v.attributes.some(
+            (attr) =>
+              attr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              attr.value.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+      )
+    : [];
+
+  const hasSearchResults = filteredSearchProducts.length > 0 || filteredSearchVariants.length > 0;
+  const totalSearchResults = filteredSearchProducts.length + filteredSearchVariants.length;
+
+  // Filter low stock alerts based on search
+  const filteredLowStockProducts = searchQuery
+    ? lowStockProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : lowStockProducts;
+
+  const filteredLowStockVariants = searchQuery
+    ? lowStockVariants.filter(
+        (v) =>
+          v.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (v.variant_sku && v.variant_sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (v.product_sku && v.product_sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          v.attributes.some(
+            (attr) =>
+              attr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              attr.value.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+      )
+    : lowStockVariants;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -141,6 +218,128 @@ export default function InventoryDashboardClient({
           </Button>
         </div>
       </div>
+
+      {/* Search Bar */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search products or variants by name, SKU, or attribute..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSearchResults(e.target.value.length > 0);
+              }}
+              onFocus={() => {
+                if (searchQuery.length > 0) {
+                  setShowSearchResults(true);
+                }
+              }}
+              className="pl-10"
+            />
+            {searchQuery && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 px-2"
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowSearchResults(false);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Search Results Dropdown */}
+          {showSearchResults && searchQuery && (
+            <div className="mt-2 rounded-lg border bg-card shadow-lg">
+              {hasSearchResults ? (
+                <div className="max-h-96 overflow-y-auto">
+                  {filteredSearchProducts.length > 0 && (
+                    <div className="p-2">
+                      <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                        Products ({filteredSearchProducts.length})
+                      </div>
+                      {filteredSearchProducts.map((product) => (
+                        <Link
+                          key={product.id}
+                          href={`/dashboard/inventory/adjust?product_id=${product.id}`}
+                          className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setShowSearchResults(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              {product.sku && (
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {product.sku}
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant="secondary">Stock: {product.stock_quantity}</Badge>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {filteredSearchVariants.length > 0 && (
+                    <div className="p-2 border-t">
+                      <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                        Variants ({filteredSearchVariants.length})
+                      </div>
+                      {filteredSearchVariants.map((variant) => (
+                        <Link
+                          key={variant.id}
+                          href={`/dashboard/inventory/adjust?variant_id=${variant.id}`}
+                          className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setShowSearchResults(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{variant.product_name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {variant.attributes.map((a) => `${a.name}: ${a.value}`).join(', ')}
+                              </div>
+                              {(variant.variant_sku || variant.product_sku) && (
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {variant.variant_sku || variant.product_sku}
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant="secondary">Stock: {variant.stock_quantity}</Badge>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No products or variants found matching &quot;{searchQuery}&quot;
+                </div>
+              )}
+            </div>
+          )}
+
+          {searchQuery && totalSearchResults > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Found {totalSearchResults} result{totalSearchResults !== 1 ? 's' : ''} - Click to adjust stock
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -190,7 +389,7 @@ export default function InventoryDashboardClient({
       </div>
 
       {/* Low Stock Alerts */}
-      {(lowStockProducts.length > 0 || lowStockVariants.length > 0) && (
+      {(filteredLowStockProducts.length > 0 || filteredLowStockVariants.length > 0) && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -209,7 +408,7 @@ export default function InventoryDashboardClient({
             </div>
           </CardHeader>
           <CardContent>
-            {lowStockProducts.length > 0 && (
+            {filteredLowStockProducts.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-semibold mb-3">Products</h3>
                 <Table>
@@ -222,7 +421,7 @@ export default function InventoryDashboardClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lowStockProducts.map((product) => (
+                    {filteredLowStockProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -258,7 +457,7 @@ export default function InventoryDashboardClient({
               </div>
             )}
 
-            {lowStockVariants.length > 0 && (
+            {filteredLowStockVariants.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold mb-3">Variants</h3>
                 <Table>
@@ -272,7 +471,7 @@ export default function InventoryDashboardClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lowStockVariants.map((variant) => (
+                    {filteredLowStockVariants.map((variant) => (
                       <TableRow key={variant.id}>
                         <TableCell className="font-medium">{variant.product_name}</TableCell>
                         <TableCell>

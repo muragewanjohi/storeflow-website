@@ -26,7 +26,7 @@ export default async function InventoryPage() {
   }
 
   // Fetch inventory summary data in parallel
-  const [lowStockProducts, lowStockVariants, recentHistory] = await Promise.all([
+  const [lowStockProducts, lowStockVariants, recentHistory, allProducts, allVariants] = await Promise.all([
     // Get products with low stock (threshold: 10)
     prisma.products.findMany({
       where: {
@@ -123,6 +123,57 @@ export default async function InventoryPage() {
         created_at: 'desc',
       },
     }),
+    // Get all products for search (limited to 100 for performance)
+    prisma.products.findMany({
+      where: {
+        tenant_id: tenant.id,
+        status: {
+          in: ['active', 'draft'],
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        stock_quantity: true,
+      },
+      take: 100,
+      orderBy: {
+        name: 'asc',
+      },
+    }),
+    // Get all variants for search (limited to 200 for performance)
+    prisma.product_variants.findMany({
+      where: {
+        tenant_id: tenant.id,
+      },
+      include: {
+        products: {
+          select: {
+            name: true,
+            sku: true,
+          },
+        },
+        variant_attributes: {
+          include: {
+            attributes: {
+              select: {
+                name: true,
+              },
+            },
+            attribute_values: {
+              select: {
+                value: true,
+              },
+            },
+          },
+        },
+      },
+      take: 200,
+      orderBy: {
+        created_at: 'desc',
+      },
+    }),
   ]);
 
   // Get total inventory stats
@@ -177,6 +228,24 @@ export default async function InventoryPage() {
         quantity_before: h.quantity_before,
         quantity_after: h.quantity_after,
         quantity_change: h.quantity_change,
+      }))}
+      allProducts={allProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        stock_quantity: p.stock_quantity || 0,
+      }))}
+      allVariants={allVariants.map((v) => ({
+        id: v.id,
+        product_id: v.product_id,
+        product_name: v.products.name,
+        product_sku: v.products.sku,
+        variant_sku: v.sku,
+        stock_quantity: v.stock_quantity || 0,
+        attributes: v.variant_attributes.map((attr) => ({
+          name: attr.attributes.name,
+          value: attr.attribute_values.value,
+        })),
       }))}
       stats={{
         totalProducts,
