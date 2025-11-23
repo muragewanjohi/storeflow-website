@@ -202,7 +202,7 @@ export default function CategoriesListClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{categoryToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{categoryToDelete?.name}&quot;? This action cannot be undone.
               Products in this category will need to be reassigned.
             </AlertDialogDescription>
           </AlertDialogHeader>

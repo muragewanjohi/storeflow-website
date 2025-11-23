@@ -12,6 +12,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { createProductSchema, productQuerySchema, generateSlug, generateSKU } from '@/lib/products/validation';
 import { requireAuth } from '@/lib/auth/server';
+import { Prisma } from '@prisma/client';
 
 /**
  * GET /api/products
@@ -237,7 +238,7 @@ export async function POST(request: NextRequest) {
         category_id: validatedData.category_id || null,
         brand_id: validatedData.brand_id || null,
         created_by: user.id,
-        metadata: validatedData.metadata || {},
+        metadata: (validatedData.metadata || {}) as Prisma.InputJsonObject,
       },
       // Note: Direct category relation via category_id
       // For many-to-many, we'd need to join through product_categories

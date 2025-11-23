@@ -110,6 +110,7 @@ export default async function InventoryAlertsPage({
       lowStockProducts={lowStockProducts.map((p) => ({
         ...p,
         stock_quantity: p.stock_quantity || 0,
+        status: p.status || 'active',
       }))}
       lowStockVariants={lowStockVariants.map((v) => ({
         id: v.id,

@@ -37,7 +37,7 @@ interface Product {
 interface Category {
   id: string;
   name: string;
-  slug: string;
+  slug: string | null;
 }
 
 interface Attribute {

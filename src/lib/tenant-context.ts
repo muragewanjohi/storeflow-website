@@ -27,7 +27,7 @@ function createSupabaseClient() {
 }
 
 // Create client lazily to avoid errors during module initialization
-let supabaseClient: ReturnType<typeof createClient> | null = null;
+let supabaseClient: ReturnType<typeof createSupabaseClient> | null = null;
 
 function getSupabaseClient() {
   if (!supabaseClient) {

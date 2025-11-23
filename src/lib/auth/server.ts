@@ -69,7 +69,7 @@ export async function requireAuthOrRedirect(redirectTo?: string): Promise<AuthUs
     redirect(redirectTo || '/admin/login');
   }
   
-  return user;
+  return user as AuthUser;
 }
 
 /**

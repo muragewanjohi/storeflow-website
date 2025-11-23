@@ -23,7 +23,7 @@ export const createProductSchema = z.object({
   gallery: z.array(z.string().url()).default([]).optional(),
   category_id: z.string().uuid().optional().nullable(),
   brand_id: z.string().uuid().optional().nullable(),
-  metadata: z.record(z.any()).default({}).optional(),
+  metadata: z.record(z.string(), z.any()).default({}).optional(),
 });
 
 /**

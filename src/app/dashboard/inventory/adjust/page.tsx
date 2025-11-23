@@ -35,8 +35,8 @@ export default async function AdjustStockPage({
 
   let product = null;
   let variant = null;
-  let products = [];
-  let variants = [];
+  let products: any[] = [];
+  let variants: any[] = [];
 
   // Fetch product or variant if IDs are provided
   if (productId) {
@@ -177,9 +177,9 @@ export default async function AdjustStockPage({
         product_id: v.product_id,
         product_name: v.products.name,
         product_sku: v.products.sku,
-        variant_sku: v.sku,
+        variant_sku: v.sku || null,
         stock_quantity: v.stock_quantity || 0,
-        attributes: v.variant_attributes.map((attr) => ({
+        attributes: v.variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,

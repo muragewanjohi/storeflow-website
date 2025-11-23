@@ -79,6 +79,7 @@ interface InventoryStats {
   totalVariants: number;
   totalStock: number;
   lowStockCount: number;
+  threshold: number;
 }
 
 interface SearchProduct {
@@ -399,7 +400,7 @@ export default function InventoryDashboardClient({
                   Low Stock Alerts
                 </CardTitle>
                 <CardDescription>
-                  Products and variants with stock below threshold (10 units)
+                  Products and variants with stock below threshold ({stats.threshold} units)
                 </CardDescription>
               </div>
               <Button variant="outline" size="sm" asChild>

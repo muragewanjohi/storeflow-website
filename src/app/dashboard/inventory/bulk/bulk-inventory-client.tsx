@@ -164,7 +164,7 @@ export default function BulkInventoryClient({
 
       for (const update of data.updates) {
         let item: Product | Variant | undefined;
-        let type: 'product' | 'variant';
+        let type: 'product' | 'variant' | undefined;
 
         if (update.product_id) {
           item = products.find((p) => p.id === update.product_id);
@@ -174,7 +174,7 @@ export default function BulkInventoryClient({
           type = 'variant';
         }
 
-        if (item) {
+        if (item && type) {
           newItems.push({
             id: item.id,
             type,
@@ -499,9 +499,9 @@ export default function BulkInventoryClient({
                     <div className="rounded-md border p-4 bg-muted/50">
                       <p className="text-sm font-semibold mb-2">CSV Format:</p>
                       <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                        <li><strong>Type:</strong> "product" or "variant"</li>
+                        <li><strong>Type:</strong> &quot;product&quot; or &quot;variant&quot;</li>
                         <li><strong>SKU:</strong> Product/Variant SKU or ID</li>
-                        <li><strong>Adjustment Type:</strong> "increase", "decrease", or "set"</li>
+                        <li><strong>Adjustment Type:</strong> &quot;increase&quot;, &quot;decrease&quot;, or &quot;set&quot;</li>
                         <li><strong>Quantity:</strong> Number (required for increase/decrease, new stock for set)</li>
                         <li><strong>Reason:</strong> Optional (manual_adjustment, restock, damage, return, transfer, correction)</li>
                       </ul>

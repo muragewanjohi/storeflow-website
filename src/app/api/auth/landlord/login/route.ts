@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         { 
           error: 'Validation failed',
           message: 'Please check your input and try again',
-          details: error.errors.map(err => ({
+          details: error.issues.map(err => ({
             field: err.path.join('.'),
             message: err.message
           }))

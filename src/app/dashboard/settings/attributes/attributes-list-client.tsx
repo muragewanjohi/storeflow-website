@@ -191,7 +191,7 @@ export default function AttributesListClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Attribute</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{attributeToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{attributeToDelete?.name}&quot;? This action cannot be undone.
               All attribute values and variant associations will be removed.
             </AlertDialogDescription>
           </AlertDialogHeader>

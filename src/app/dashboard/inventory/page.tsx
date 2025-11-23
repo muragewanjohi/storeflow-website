@@ -10,6 +10,7 @@ import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
+import { getLowStockThreshold } from '@/lib/inventory/threshold';
 import InventoryDashboardClient from './inventory-dashboard-client';
 
 export default async function InventoryPage() {
@@ -25,9 +26,12 @@ export default async function InventoryPage() {
     redirect('/login');
   }
 
+  // Get low stock threshold from tenant settings (defaults to 10)
+  const threshold = await getLowStockThreshold(tenant.id);
+
   // Fetch inventory summary data in parallel
   const [lowStockProducts, lowStockVariants, recentHistory, allProducts, allVariants] = await Promise.all([
-    // Get products with low stock (threshold: 10)
+    // Get products with low stock
     prisma.products.findMany({
       where: {
         tenant_id: tenant.id,
@@ -37,7 +41,7 @@ export default async function InventoryPage() {
         OR: [
           {
             stock_quantity: {
-              lte: 10,
+              lte: threshold,
             },
           },
           {
@@ -65,7 +69,7 @@ export default async function InventoryPage() {
       where: {
         tenant_id: tenant.id,
         stock_quantity: {
-          lte: 10,
+          lte: threshold,
         },
       },
       include: {
@@ -228,6 +232,7 @@ export default async function InventoryPage() {
         quantity_before: h.quantity_before,
         quantity_after: h.quantity_after,
         quantity_change: h.quantity_change,
+        created_at: h.created_at instanceof Date ? h.created_at : h.created_at ? new Date(h.created_at) : new Date(),
       }))}
       allProducts={allProducts.map((p) => ({
         id: p.id,
@@ -252,6 +257,7 @@ export default async function InventoryPage() {
         totalVariants,
         totalStock: totalStockValue._sum.stock_quantity || 0,
         lowStockCount: lowStockProducts.length + lowStockVariants.length,
+        threshold,
       }}
     />
   );

@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 import { generateSKU } from '@/lib/products/validation';
+import type { Prisma } from '@prisma/client';
 
 const variantAttributeSchema = z.object({
   attribute_id: z.string().uuid(),
@@ -171,7 +172,7 @@ export async function POST(
     }
 
     // Create variant with attributes in a transaction
-    const variant = await prisma.$transaction(async (tx) => {
+    const variant = await (prisma.$transaction as any)(async (tx: Prisma.TransactionClient) => {
       // Create the variant
       const newVariant = await tx.product_variants.create({
         data: {

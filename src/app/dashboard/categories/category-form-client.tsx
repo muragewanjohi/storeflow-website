@@ -58,12 +58,12 @@ export default function CategoryFormClient({
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
 
       const response = await fetch('/api/products/upload', {
         method: 'POST',
-        body: formData,
+        body: uploadFormData,
       });
 
       if (!response.ok) {
@@ -72,7 +72,7 @@ export default function CategoryFormClient({
       }
 
       const data = await response.json();
-      setFormData({ ...formData, image: data.url });
+      setFormData((prev) => ({ ...prev, image: data.url }));
       setImagePreview(data.url);
     } catch (err: any) {
       setError(err.message || 'Failed to upload image');
@@ -199,7 +199,7 @@ export default function CategoryFormClient({
       └── Smartphones (sub-subcategory)`}
                     </pre>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Select a parent category to create a subcategory. Leave as "No parent" for top-level categories.
+                      Select a parent category to create a subcategory. Leave as &quot;No parent&quot; for top-level categories.
                     </p>
                   </div>
                 </div>

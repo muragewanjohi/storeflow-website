@@ -23,7 +23,7 @@ const updateUserSchema = z.object({
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
@@ -33,8 +33,10 @@ export async function GET(
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
+    const { id } = await params;
+
     // Get user
-    const { data: targetUser, error } = await adminClient.auth.admin.getUserById(params.id);
+    const { data: targetUser, error } = await adminClient.auth.admin.getUserById(id);
 
     if (error || !targetUser.user) {
       return NextResponse.json(
@@ -75,7 +77,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
@@ -88,8 +90,10 @@ export async function PUT(
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
+    const { id } = await params;
+
     // Get current user data
-    const { data: targetUser, error: getUserError } = await adminClient.auth.admin.getUserById(params.id);
+    const { data: targetUser, error: getUserError } = await adminClient.auth.admin.getUserById(id);
 
     if (getUserError || !targetUser.user) {
       return NextResponse.json(
@@ -114,7 +118,7 @@ export async function PUT(
     };
 
     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
-      params.id,
+      id,
       {
         user_metadata: updatedMetadata,
       }
@@ -136,7 +140,7 @@ export async function PUT(
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       );
     }
@@ -154,7 +158,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
@@ -164,8 +168,10 @@ export async function DELETE(
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
+    const { id } = await params;
+
     // Get user to verify
-    const { data: targetUser, error: getUserError } = await adminClient.auth.admin.getUserById(params.id);
+    const { data: targetUser, error: getUserError } = await adminClient.auth.admin.getUserById(id);
 
     if (getUserError || !targetUser.user) {
       return NextResponse.json(
@@ -191,7 +197,7 @@ export async function DELETE(
     }
 
     // Delete user
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(params.id);
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(id);
 
     if (deleteError) {
       throw deleteError;

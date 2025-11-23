@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
         parsedRows.push(validated);
       } catch (error) {
         let errorMessage = 'Invalid row format';
-        if (error instanceof z.ZodError && error.errors && error.errors.length > 0) {
-          errorMessage = error.errors[0].message;
+        if (error instanceof z.ZodError && error.issues && error.issues.length > 0) {
+          errorMessage = error.issues[0].message;
         } else if (error instanceof Error) {
           errorMessage = error.message;
         }

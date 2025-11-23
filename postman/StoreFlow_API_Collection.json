@@ -2114,6 +2114,630 @@
 				}
 			],
 			"description": "Inventory management endpoints (Day 17)"
+		},
+		{
+			"name": "Cart Management",
+			"item": [
+				{
+					"name": "Get Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has cart data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('cart');",
+									"    pm.expect(jsonData.cart).to.have.property('items');",
+									"    pm.expect(jsonData.cart).to.have.property('total');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cart",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cart"
+							]
+						},
+						"description": "Get current user's cart items.\n\n**Day 18:** Order Management\n\n**Note:** Requires authentication\n\n**Response:**\n- cart: Cart object with items, total, and item_count"
+					},
+					"response": []
+				},
+				{
+					"name": "Add to Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Item added successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('cart');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"variant_id\": null,\n    \"quantity\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cart",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cart"
+							]
+						},
+						"description": "Add item to cart.\n\n**Day 18:** Order Management\n\n**Required Fields:**\n- product_id: UUID of the product\n- quantity: Quantity to add (min: 1)\n\n**Optional Fields:**\n- variant_id: UUID of the variant (if product has variants)\n\n**Response:**\n- Updated cart object\n\n**Note:**\n- Checks stock availability\n- Updates quantity if item already exists in cart"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Cart Item",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Cart item updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('cart');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"variant_id\": null,\n    \"quantity\": 2\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cart",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cart"
+							]
+						},
+						"description": "Update cart item quantity.\n\n**Day 18:** Order Management\n\n**Required Fields:**\n- product_id: UUID of the product\n- quantity: New quantity (min: 1, removes item if 0)\n\n**Optional Fields:**\n- variant_id: UUID of the variant\n\n**Response:**\n- Updated cart object"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove from Cart",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Item removed successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('cart');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cart?product_id={{product_id}}&variant_id=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"cart"
+							],
+							"query": [
+								{
+									"key": "product_id",
+									"value": "{{product_id}}",
+									"description": "Product UUID (required)"
+								},
+								{
+									"key": "variant_id",
+									"value": "",
+									"description": "Variant UUID (optional)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Remove item from cart.\n\n**Day 18:** Order Management\n\n**Query Parameters:**\n- product_id (required): UUID of the product\n- variant_id (optional): UUID of the variant\n\n**Response:**\n- Updated cart object"
+					},
+					"response": []
+				}
+			],
+			"description": "Shopping cart management endpoints (Day 18)"
+		},
+		{
+			"name": "Checkout",
+			"item": [
+				{
+					"name": "Create Order (Checkout)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Order created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('order');",
+									"    pm.expect(jsonData.order).to.have.property('id');",
+									"    pm.expect(jsonData.order).to.have.property('order_number');",
+									"    ",
+									"    // Save order ID for other requests",
+									"    pm.environment.set('order_id', jsonData.order.id);",
+									"    pm.environment.set('order_number', jsonData.order.order_number);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"items\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"variant_id\": null,\n            \"quantity\": 1\n        }\n    ],\n    \"shipping_address\": {\n        \"name\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"phone\": \"+1234567890\",\n        \"address_line_1\": \"123 Main St\",\n        \"address_line_2\": \"Apt 4B\",\n        \"city\": \"New York\",\n        \"state\": \"NY\",\n        \"postal_code\": \"10001\",\n        \"country\": \"USA\"\n    },\n    \"billing_address\": {\n        \"name\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"phone\": \"+1234567890\",\n        \"address_line_1\": \"123 Main St\",\n        \"address_line_2\": \"Apt 4B\",\n        \"city\": \"New York\",\n        \"state\": \"NY\",\n        \"postal_code\": \"10001\",\n        \"country\": \"USA\"\n    },\n    \"payment_method\": \"pesapal\",\n    \"coupon_code\": null,\n    \"notes\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/checkout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"checkout"
+							]
+						},
+						"description": "Create order from cart (checkout).\n\n**Day 18:** Order Management\n\n**Required Fields:**\n- items: Array of cart items\n  - product_id: UUID of the product\n  - quantity: Quantity (min: 1)\n  - variant_id (optional): UUID of the variant\n- shipping_address: Shipping address object\n  - name, email, phone, address_line_1, city, state, postal_code, country (all required)\n  - address_line_2 (optional)\n- payment_method: 'pesapal', 'paypal', or 'cash_on_delivery'\n\n**Optional Fields:**\n- billing_address: Billing address (uses shipping_address if not provided)\n- coupon_code: Coupon code for discount\n- notes: Order notes\n\n**Actions:**\n- Validates stock availability\n- Creates order with unique order number\n- Updates inventory (decreases stock)\n- Clears cart\n- Sends order confirmation email to customer\n- Sends new order alert to tenant admin\n\n**Response:**\n- Order object with id, order_number, total_amount, status, payment_status"
+					},
+					"response": []
+				}
+			],
+			"description": "Checkout and order creation endpoints (Day 18)"
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "List Orders",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has orders array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('orders');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"    ",
+									"    // Save first order ID if available",
+									"    if (jsonData.orders && jsonData.orders.length > 0) {",
+									"        pm.environment.set('order_id', jsonData.orders[0].id);",
+									"        pm.environment.set('order_number', jsonData.orders[0].order_number);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number (default: 1)"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page (default: 20, max: 100)"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term (order number, customer name, email)",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "",
+									"description": "Filter by status (pending, processing, shipped, delivered, cancelled, refunded)",
+									"disabled": true
+								},
+								{
+									"key": "payment_status",
+									"value": "",
+									"description": "Filter by payment status (pending, paid, failed, refunded)",
+									"disabled": true
+								},
+								{
+									"key": "order_number",
+									"value": "",
+									"description": "Filter by order number",
+									"disabled": true
+								},
+								{
+									"key": "customer_email",
+									"value": "",
+									"description": "Filter by customer email",
+									"disabled": true
+								},
+								{
+									"key": "start_date",
+									"value": "",
+									"description": "Filter by start date (ISO string)",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "",
+									"description": "Filter by end date (ISO string)",
+									"disabled": true
+								},
+								{
+									"key": "sort_by",
+									"value": "created_at",
+									"description": "Sort field (created_at, total_amount, order_number)"
+								},
+								{
+									"key": "sort_order",
+									"value": "desc",
+									"description": "Sort order (asc, desc)"
+								}
+							]
+						},
+						"description": "List orders with filtering and pagination.\n\n**Day 18-19:** Order Management\n\n**Query Parameters:**\n- page: Page number (default: 1)\n- limit: Items per page (default: 20, max: 100)\n- search: Search term (searches order number, customer name, email)\n- status: Filter by order status\n- payment_status: Filter by payment status\n- order_number: Filter by order number\n- customer_email: Filter by customer email\n- start_date: Filter by start date (ISO string)\n- end_date: Filter by end date (ISO string)\n- sort_by: Sort field (created_at, total_amount, order_number)\n- sort_order: Sort order (asc, desc)\n\n**Response:**\n- orders: Array of order objects\n- pagination: Pagination metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has order data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('order');",
+									"    pm.expect(jsonData.order).to.have.property('id');",
+									"    pm.expect(jsonData.order).to.have.property('order_number');",
+									"    pm.expect(jsonData.order).to.have.property('items');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"description": "Get order details by ID.\n\n**Day 18-19:** Order Management\n\n**Path Parameters:**\n- order_id: UUID of the order\n\n**Response:**\n- Order object with items, shipping/billing addresses, and payment information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Order status updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('order');",
+									"    pm.expect(jsonData.order).to.have.property('status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"processing\",\n    \"notes\": \"Order is being processed\",\n    \"tracking_number\": null,\n    \"shipping_carrier\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"description": "Update order status.\n\n**Day 18-19:** Order Management\n\n**Path Parameters:**\n- order_id: UUID of the order\n\n**Body Parameters:**\n- status (required): New status (pending, processing, shipped, delivered)\n- notes (optional): Notes about the status update\n- tracking_number (optional): Tracking number (required when status is 'shipped')\n- shipping_carrier (optional): Shipping carrier name (e.g., UPS, FedEx)\n\n**Status Transitions:**\n- pending → processing, cancelled\n- processing → shipped, cancelled\n- shipped → delivered, cancelled\n- delivered → (final state)\n- cancelled → refunded\n\n**Email Notifications:**\n- Automatically sends email when status changes to 'shipped' or 'delivered'\n\n**Response:**\n- Updated order object"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Payment Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Payment status updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('order');",
+									"    pm.expect(jsonData.order).to.have.property('payment_status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_status\": \"paid\",\n    \"transaction_id\": \"TXN-123456\",\n    \"payment_gateway\": \"pesapal\",\n    \"notes\": \"Payment confirmed\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"description": "Update order payment status.\n\n**Day 18-19:** Order Management\n\n**Path Parameters:**\n- order_id: UUID of the order\n\n**Body Parameters:**\n- payment_status (required): New payment status (pending, paid, failed, refunded)\n- transaction_id (optional): Payment transaction ID\n- payment_gateway (optional): Payment gateway name\n- notes (optional): Notes about the payment\n\n**Response:**\n- Updated order object"
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Order cancelled successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('order');",
+									"    pm.expect(jsonData.order.status).to.eql('cancelled');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Customer requested cancellation\",\n    \"refund\": true,\n    \"notes\": \"Full refund processed\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}",
+								"cancel"
+							]
+						},
+						"description": "Cancel an order.\n\n**Day 18-19:** Order Management\n\n**Path Parameters:**\n- order_id: UUID of the order\n\n**Required Fields:**\n- reason: Cancellation reason (required, max 500 chars)\n\n**Optional Fields:**\n- refund: Whether to process refund (default: false)\n- notes: Additional notes\n\n**Actions:**\n- Validates order can be cancelled (cannot cancel delivered orders)\n- Restores inventory (increases stock)\n- Updates order status to 'cancelled'\n- Updates payment status to 'refunded' if refund is true\n- Sends cancellation email to customer\n\n**Response:**\n- Updated order object with cancelled status"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Order deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}"
+							]
+						},
+						"description": "Soft delete order (cancels the order).\n\n**Day 18-19:** Order Management\n\n**Path Parameters:**\n- order_id: UUID of the order\n\n**Note:** This is a soft delete that sets order status to 'cancelled'. Use the cancel endpoint for proper cancellation with refund handling.\n\n**Response:**\n- Success message"
+					},
+					"response": []
+				}
+			],
+			"description": "Order management endpoints (Day 18-19)"
 		}
 	],
 	"event": [

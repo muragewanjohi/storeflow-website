@@ -30,9 +30,18 @@ const domain = `${subdomain}.dukanest.com`;
 
 async function main() {
   try {
-    console.log(`Adding ${domain} to Vercel project ${projectId}...`);
-    
-    const result = await addTenantDomain(domain, projectId);
+    // TypeScript narrowing: projectId is guaranteed to be defined due to check above
+    if (!projectId) {
+      console.error('❌ Error: VERCEL_PROJECT_ID environment variable is required');
+      process.exit(1);
+    }
+
+    // Type assertion: we've already checked projectId is not undefined
+    const verifiedProjectId = projectId as string;
+
+    console.log(`Adding ${domain} to Vercel project ${verifiedProjectId}...`);
+
+    const result = await addTenantDomain(domain, verifiedProjectId);
     
     console.log('✅ Success!');
     console.log(`Domain ${domain} has been added to Vercel.`);

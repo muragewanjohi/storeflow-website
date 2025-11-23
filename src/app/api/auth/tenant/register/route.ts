@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
-    // Check if email already exists using admin client
+    // Check if email already exists by listing users and filtering
     try {
-      const { data: existingUser } = await adminClient.auth.admin.getUserByEmail(email);
-      if (existingUser?.user) {
+      const { data: { users } } = await adminClient.auth.admin.listUsers();
+      const existingUser = users.find((u) => u.email === email);
+      if (existingUser) {
         return NextResponse.json(
           { error: 'Email already registered' },
           { status: 400 }
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation failed', details: error.errors },
+        { error: 'Validation failed', details: error.issues },
         { status: 400 }
       );
     }

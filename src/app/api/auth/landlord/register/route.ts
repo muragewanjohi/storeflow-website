@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
 
     // Check if email already exists using admin client
     try {
-      const { data: existingUser } = await adminClient.auth.admin.getUserByEmail(email);
-      if (existingUser?.user) {
+      const { data: { users } } = await adminClient.auth.admin.listUsers();
+      const existingUser = users.find((u) => u.email === email);
+      if (existingUser) {
         return NextResponse.json(
           { error: 'Email already registered' },
           { status: 400 }
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
         { 
           error: 'Validation failed',
           message: 'Please check your input and try again',
-          details: error.errors.map(err => ({
+          details: error.issues.map(err => ({
             field: err.path.join('.'),
             message: err.message
           }))

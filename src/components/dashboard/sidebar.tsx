@@ -25,6 +25,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -51,6 +52,7 @@ const navigation: NavigationItem[] = [
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
   // Other items
   { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon },
+  { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, adminOnly: true },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },

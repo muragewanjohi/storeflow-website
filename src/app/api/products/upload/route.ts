@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       console.error('Supabase upload error:', uploadError);
       
       // Provide helpful error message if bucket doesn't exist
-      if (uploadError.message?.includes('Bucket not found') || uploadError.statusCode === '404') {
+      if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('404')) {
         return NextResponse.json(
           { 
             error: 'Storage bucket not found',

@@ -42,7 +42,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
   }
 
   // Fetch all available price plans for plan selection
-  const pricePlans = await prisma.price_plans.findMany({
+  const pricePlansData = await prisma.price_plans.findMany({
     where: {
       status: 'active',
     },
@@ -57,6 +57,23 @@ export default async function TenantSettingsPage({ params }: PageProps) {
       features: true,
     },
   });
+
+  // Convert Prisma Decimal to number for client component
+  const pricePlans = pricePlansData.map((plan) => ({
+    ...plan,
+    price: Number(plan.price),
+  }));
+
+  // Convert tenant price_plans Decimal to number
+  const tenantData = {
+    ...tenant,
+    price_plans: tenant.price_plans
+      ? {
+          ...tenant.price_plans,
+          price: Number(tenant.price_plans.price),
+        }
+      : null,
+  };
 
   return (
     <div>
@@ -79,7 +96,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
           Manage settings for {tenant.name}
         </p>
       </div>
-      <TenantSettingsClient tenant={tenant} pricePlans={pricePlans} />
+      <TenantSettingsClient tenant={tenantData} pricePlans={pricePlans} />
     </div>
   );
 }

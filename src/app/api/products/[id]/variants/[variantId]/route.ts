@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 
 const variantAttributeSchema = z.object({
   attribute_id: z.string().uuid(),
@@ -71,7 +72,7 @@ export async function PUT(
     }
 
     // Update variant in a transaction
-    const updatedVariant = await prisma.$transaction(async (tx) => {
+    const updatedVariant = await (prisma.$transaction as any)(async (tx: Prisma.TransactionClient) => {
       const updateData: any = {};
       if (validatedData.attribute_id !== undefined) updateData.attribute_id = validatedData.attribute_id;
       if (validatedData.attribute_value_id !== undefined) updateData.attribute_value_id = validatedData.attribute_value_id;

@@ -32,32 +32,47 @@ export async function sendEmail(options: EmailOptions) {
     return { success: true, skipped: true };
   }
 
-  try {
-    const msg: any = {
-      to: options.to,
-      from: {
-        email: options.from || process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-        name: options.fromName || process.env.SENDGRID_FROM_NAME || 'StoreFlow',
-      },
-    };
+  const defaultFromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
+  const defaultFromName = process.env.SENDGRID_FROM_NAME || 'StoreFlow';
+  
+  // Try sending with the provided from address first
+  let fromEmail = options.from || defaultFromEmail;
+  let fromName = options.fromName || defaultFromName;
+  let useFallback = false;
 
-    // Use template if provided
-    if (options.templateId) {
-      msg.templateId = options.templateId;
-      msg.dynamicTemplateData = options.dynamicTemplateData || {};
-    } else {
-      // Use plain HTML/text
-      msg.subject = options.subject || 'Notification from StoreFlow';
-      if (options.html) {
-        msg.html = options.html;
-      }
-      if (options.text) {
-        msg.text = options.text;
-      }
+  // If using a custom from address that's not the default, we'll try it first
+  // and fall back to default if it fails due to sender identity verification
+  if (options.from && options.from !== defaultFromEmail) {
+    useFallback = true;
+  }
+
+  // Build message object
+  const msg: any = {
+    to: options.to,
+    from: {
+      email: fromEmail,
+      name: fromName,
+    },
+  };
+
+  // Use template if provided
+  if (options.templateId) {
+    msg.templateId = options.templateId;
+    msg.dynamicTemplateData = options.dynamicTemplateData || {};
+  } else {
+    // Use plain HTML/text
+    msg.subject = options.subject || 'Notification from StoreFlow';
+    if (options.html) {
+      msg.html = options.html;
     }
+    if (options.text) {
+      msg.text = options.text;
+    }
+  }
 
+  try {
     await sgMail.send(msg);
-    console.log(`Email sent successfully to ${options.to}`);
+    console.log(`Email sent successfully to ${options.to} from ${fromEmail}`);
     return { success: true };
   } catch (error: any) {
     console.error('SendGrid error:', error);
@@ -65,6 +80,40 @@ export async function sendEmail(options: EmailOptions) {
     // Log detailed error if available
     if (error.response) {
       console.error('SendGrid response error:', error.response.body);
+    }
+
+    // If the error is due to sender identity verification and we have a fallback, retry with default
+    if (useFallback && error.response?.body?.errors) {
+      const senderIdentityError = error.response.body.errors.find(
+        (e: any) => e.message?.includes('verified Sender Identity') || e.field === 'from'
+      );
+
+      if (senderIdentityError) {
+        console.warn(
+          `Sender identity not verified for ${fromEmail}. Falling back to default: ${defaultFromEmail}`
+        );
+        
+        // Retry with default verified email
+        try {
+          const fallbackMsg: any = {
+            ...msg,
+            from: {
+              email: defaultFromEmail,
+              name: fromName, // Keep the tenant name for branding
+            },
+          };
+
+          await sgMail.send(fallbackMsg);
+          console.log(`Email sent successfully to ${options.to} using fallback address ${defaultFromEmail}`);
+          return { success: true, usedFallback: true };
+        } catch (fallbackError: any) {
+          console.error('SendGrid fallback error:', fallbackError);
+          return { 
+            success: false, 
+            error: fallbackError.message || 'Failed to send email even with fallback' 
+          };
+        }
+      }
     }
     
     return { 
