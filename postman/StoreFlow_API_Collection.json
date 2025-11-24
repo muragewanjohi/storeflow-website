@@ -961,7 +961,7 @@
 								"subscription"
 							]
 						},
-						"description": "Update tenant subscription (landlord only).\n\n**Day 14:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Required Fields:**\n- plan_id: UUID of the new price plan\n\n**Optional Fields:**\n- action: 'upgrade', 'downgrade', or 'renew' (default: 'upgrade')\n\n**Actions:**\n- Upgrade/Downgrade: Starts immediately with new plan duration\n- Renew: Extends from current expiration date\n\n**Response:**\n- Updated tenant object\n- New expiration date"
+						"description": "Update tenant subscription (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Required Fields:**\n- plan_id: UUID of the new price plan\n\n**Optional Fields:**\n- action: 'upgrade', 'downgrade', or 'renew' (default: 'upgrade')\n\n**Actions:**\n- Upgrade/Downgrade: Starts immediately with new plan duration\n- Renew: Extends from current expiration date\n\n**Response:**\n- Updated tenant object\n- New expiration date"
 					},
 					"response": []
 				},
@@ -1002,7 +1002,7 @@
 								"billing"
 							]
 						},
-						"description": "Get tenant billing history (landlord only).\n\n**Day 14:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Response:**\n- Billing history array\n- Current plan information\n- Subscription status\n- Expiration date"
+						"description": "Get tenant billing history (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Path Parameters:**\n- tenant_id: UUID of the tenant\n\n**Response:**\n- Billing history array\n- Current plan information\n- Subscription status\n- Expiration date"
 					},
 					"response": []
 				},
@@ -1046,7 +1046,197 @@
 								"price-plans"
 							]
 						},
-						"description": "List all active price plans (landlord only).\n\n**Day 13-14:** Tenant Management\n\n**Response:**\n- Array of active price plans with id, name, price, duration_months, features"
+						"description": "List all price plans (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Query Parameters:**\n- status: 'active' | 'inactive' | 'all' (default: 'active')\n\n**Response:**\n- Array of price plans with id, name, price, duration_months, features, status"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Price Plan",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Price plan created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('pricePlan');",
+									"    pm.expect(jsonData.pricePlan).to.have.property('id');",
+									"    ",
+									"    // Save plan ID for future requests",
+									"    pm.environment.set('plan_id', jsonData.pricePlan.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Premium Plan\",\n    \"price\": 99.99,\n    \"duration_months\": 1,\n    \"features\": {\n        \"max_products\": 1000,\n        \"max_orders\": -1,\n        \"max_storage_mb\": 5000,\n        \"max_customers\": -1,\n        \"max_pages\": 50,\n        \"max_blogs\": 100\n    },\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/price-plans",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"price-plans"
+							]
+						},
+						"description": "Create a new price plan (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Required Fields:**\n- name: Plan name (max 255 chars)\n- price: Price (positive number)\n- duration_months: Duration in months (positive integer)\n\n**Optional Fields:**\n- features: JSON object with plan limits (e.g., max_products, max_orders, max_storage_mb)\n  - Use -1 for unlimited\n- status: 'active' or 'inactive' (default: 'active')\n\n**Response:**\n- Created price plan object"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Price Plan",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has price plan\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('pricePlan');",
+									"    pm.expect(jsonData.pricePlan).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/price-plans/{{plan_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"price-plans",
+								"{{plan_id}}"
+							]
+						},
+						"description": "Get a specific price plan by ID (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Path Parameters:**\n- plan_id: UUID of the price plan\n\n**Response:**\n- Price plan object with all details"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Price Plan",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Price plan updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('pricePlan');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Premium Plan Updated\",\n    \"price\": 129.99,\n    \"features\": {\n        \"max_products\": 2000,\n        \"max_orders\": -1\n    },\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/price-plans/{{plan_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"price-plans",
+								"{{plan_id}}"
+							]
+						},
+						"description": "Update a price plan (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Path Parameters:**\n- plan_id: UUID of the price plan\n\n**Optional Fields:**\n- name: Plan name\n- price: Price\n- duration_months: Duration in months\n- features: JSON object with plan limits\n- status: 'active' or 'inactive'\n\n**Response:**\n- Updated price plan object"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Price Plan",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Price plan deleted successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/price-plans/{{plan_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"price-plans",
+								"{{plan_id}}"
+							]
+						},
+						"description": "Delete a price plan (landlord only).\n\n**Day 25-26:** Subscription Management\n\n**Path Parameters:**\n- plan_id: UUID of the price plan\n\n**Note:**\n- If plan is in use by tenants, it will be soft-deleted (status set to 'inactive')\n- If no tenants are using it, it will be permanently deleted\n\n**Response:**\n- Success message"
 					},
 					"response": []
 				},
@@ -1093,12 +1283,59 @@
 								"expiry-checker"
 							]
 						},
-						"description": "Check for expired subscriptions and apply grace period logic.\n\n**Day 14:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs, not manually\n\n**Actions:**\n- Finds tenants with expired subscriptions\n- Applies grace period (default: 7 days)\n- Updates tenant status (expired/suspended)\n\n**Response:**\n- Results object with checked, expired, gracePeriod, suspended counts"
+						"description": "Check for expired subscriptions and apply grace period logic.\n\n**Day 25-26:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs, not manually\n\n**Actions:**\n- Finds tenants with expired subscriptions\n- Applies grace period (default: 7 days)\n- Updates tenant status (expired/suspended)\n- Sends subscription expired email notifications\n\n**Response:**\n- Results object with checked, expired, gracePeriod, suspended counts"
+					},
+					"response": []
+				},
+				{
+					"name": "Payment Reminders",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Payment reminders processed\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData).to.have.property('results');",
+									"    pm.expect(jsonData.results).to.have.property('checked');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cron_secret_token}}",
+								"description": "CRON_SECRET_TOKEN for authentication"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/subscriptions/payment-reminders",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"subscriptions",
+								"payment-reminders"
+							]
+						},
+						"description": "Send payment reminder emails to tenants with upcoming or overdue payments.\n\n**Day 25-26:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs (daily or weekly), not manually\n\n**Actions:**\n- Finds tenants with subscriptions expiring in 7 days\n- Sends renewal reminder emails (7 days before expiry)\n- Sends payment due reminder emails\n\n**Response:**\n- Results object with checked, renewal_reminders_sent, payment_reminders_sent, errors"
 					},
 					"response": []
 				}
 			],
-			"description": "Admin tenant management endpoints for landlords (Day 14)"
+			"description": "Admin tenant management endpoints for landlords (Day 13-14, 25-26)"
 		},
 		{
 			"name": "Products",
@@ -2373,7 +2610,7 @@
 								"checkout"
 							]
 						},
-						"description": "Create order from cart (checkout).\n\n**Day 18:** Order Management\n\n**Required Fields:**\n- items: Array of cart items\n  - product_id: UUID of the product\n  - quantity: Quantity (min: 1)\n  - variant_id (optional): UUID of the variant\n- shipping_address: Shipping address object\n  - name, email, phone, address_line_1, city, state, postal_code, country (all required)\n  - address_line_2 (optional)\n- payment_method: 'pesapal', 'paypal', or 'cash_on_delivery'\n\n**Optional Fields:**\n- billing_address: Billing address (uses shipping_address if not provided)\n- coupon_code: Coupon code for discount\n- notes: Order notes\n\n**Actions:**\n- Validates stock availability\n- Creates order with unique order number\n- Updates inventory (decreases stock)\n- Clears cart\n- Sends order confirmation email to customer\n- Sends new order alert to tenant admin\n\n**Response:**\n- Order object with id, order_number, total_amount, status, payment_status"
+						"description": "Create order from cart (checkout).\n\n**Day 18:** Order Management\n**Day 25-26:** Plan limits enforced - checks order limit before creating order\n\n**Required Fields:**\n- items: Array of cart items\n  - product_id: UUID of the product\n  - quantity: Quantity (min: 1)\n  - variant_id (optional): UUID of the variant\n- shipping_address: Shipping address object\n  - name, email, phone, address_line_1, city, state, postal_code, country (all required)\n  - address_line_2 (optional)\n- payment_method: 'pesapal', 'paypal', or 'cash_on_delivery'\n\n**Optional Fields:**\n- billing_address: Billing address (uses shipping_address if not provided)\n- coupon_code: Coupon code for discount\n- notes: Order notes\n\n**Actions:**\n- Validates stock availability\n- Creates order with unique order number\n- Updates inventory (decreases stock)\n- Clears cart\n- Sends order confirmation email to customer\n- Sends new order alert to tenant admin\n\n**Response:**\n- Order object with id, order_number, total_amount, status, payment_status"
 					},
 					"response": []
 				}

@@ -59,7 +59,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     // Contact Email
     contactEmail: tenant.contact_email || '',
     
-    // Store Details (store_name is read-only from tenants table)
+    // Store Details (store_name and store_domain are read-only from tenants table)
     store_description: initialSettings.store_description || '',
     store_address: initialSettings.store_address || '',
     store_city: initialSettings.store_city || '',
@@ -67,6 +67,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     store_country: initialSettings.store_country || '',
     store_postal_code: initialSettings.store_postal_code || '',
     store_phone: initialSettings.store_phone || '',
+    store_logo: initialSettings.store_logo || '',
     
     // Currency Settings
     currency_code: initialSettings.currency_code || 'USD',
@@ -153,6 +154,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         store_country: formData.store_country || null,
         store_postal_code: formData.store_postal_code || null,
         store_phone: formData.store_phone || null,
+        store_logo: formData.store_logo || null,
         
         // Currency Settings
         currency_code: formData.currency_code,
@@ -283,17 +285,57 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="store_name">Store Name</Label>
+                <Input
+                  id="store_name"
+                  value={tenant.name}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Store name is managed in your tenant profile. Contact support to change it.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store_domain">Store Domain</Label>
+                <Input
+                  id="store_domain"
+                  value={initialSettings.store_domain || `${tenant.subdomain}.dukanest.com`}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your store domain. Custom domains can be configured through support.
+                </p>
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="store_name">Store Name</Label>
-              <Input
-                id="store_name"
-                value={tenant.name}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                Store name is managed in your tenant profile. Contact support to change it.
-              </p>
+              <Label htmlFor="store_logo">Store Logo</Label>
+              <div className="flex items-center gap-4">
+                {formData.store_logo && (
+                  <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+                    <img
+                      src={formData.store_logo}
+                      alt="Store logo"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <Input
+                    id="store_logo"
+                    type="url"
+                    value={formData.store_logo}
+                    onChange={(e) => setFormData({ ...formData, store_logo: e.target.value })}
+                    placeholder="https://example.com/logo.png"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the URL of your store logo image. You can upload images via the Products section.
+                  </p>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

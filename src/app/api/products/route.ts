@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma/client';
 import { createProductSchema, productQuerySchema, generateSlug, generateSKU } from '@/lib/products/validation';
 import { requireAuth } from '@/lib/auth/server';
 import { Prisma } from '@prisma/client';
+import { canCreateProduct } from '@/lib/subscriptions/limits';
 
 /**
  * GET /api/products
@@ -198,6 +199,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'A product with this slug already exists' },
         { status: 400 }
+      );
+    }
+
+    // Check plan limits before creating product
+    const limitCheck = await canCreateProduct(tenant);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: limitCheck.reason || 'Product limit reached' },
+        { status: 403 }
       );
     }
 

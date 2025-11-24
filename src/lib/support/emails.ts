@@ -7,7 +7,7 @@
 import { sendEmail } from '@/lib/email/sendgrid';
 import type { support_tickets } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
-import { getTenantEmailAddress } from '@/lib/orders/emails';
+import { getTenantContactEmail } from '@/lib/orders/emails';
 
 /**
  * Get tenant admin email for support notifications
@@ -53,7 +53,7 @@ export async function sendNewTicketEmail({
 }) {
   try {
     const adminEmail = await getTenantAdminEmail(tenant);
-    const tenantEmail = await getTenantEmailAddress(tenant);
+    const tenantEmail = getTenantContactEmail(tenant);
     const customerName = customer?.name || customer?.email || 'Customer';
     const priorityLabels: Record<string, string> = {
       low: 'Low',
@@ -160,7 +160,7 @@ export async function sendTicketReplyEmail({
   customer: { id: string; name: string | null; email: string | null } | null;
 }) {
   try {
-    const tenantEmail = await getTenantEmailAddress(tenant);
+    const tenantEmail = getTenantContactEmail(tenant);
     
     // If customer replied, notify admin
     if (isFromCustomer) {
@@ -294,7 +294,7 @@ export async function sendTicketStatusUpdateEmail({
       return;
     }
 
-    const tenantEmail = await getTenantEmailAddress(tenant);
+    const tenantEmail = getTenantContactEmail(tenant);
     const statusLabels: Record<string, string> = {
       open: 'Open',
       in_progress: 'In Progress',
@@ -379,7 +379,7 @@ export async function sendTicketAssignedEmail({
   staffName?: string;
 }) {
   try {
-    const tenantEmail = await getTenantEmailAddress(tenant);
+    const tenantEmail = getTenantContactEmail(tenant);
     const customerName = ticket.customers?.name || ticket.customers?.email || 'Customer';
 
     const html = `

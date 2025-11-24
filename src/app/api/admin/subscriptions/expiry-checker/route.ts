@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
 
 // Grace period in days (default: 7 days)
 const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '7');
@@ -82,6 +83,14 @@ export async function GET(request: NextRequest) {
             });
             results.expired++;
             results.gracePeriod++;
+            
+            // Send expired email notification (only once when status changes)
+            sendSubscriptionExpiredEmail({
+              tenant: tenant as any,
+              plan: tenant.price_plans,
+            }).catch((error) => {
+              console.error(`Error sending expired email to tenant ${tenant.id}:`, error);
+            });
           }
         } else {
           // Past grace period - suspend tenant

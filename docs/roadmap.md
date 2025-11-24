@@ -1223,9 +1223,9 @@ vercel env add VERCEL_TOKEN
 - ⏳ Day 15: Products (`/api/products/*`)
 - ✅ Day 18-19: Orders (`/api/orders/*`) + Email testing endpoints
 - ✅ Day 20-21: Customers (`/api/customers/*`) + Email testing endpoints
-- ⏳ Day 21.5-22: Support Tickets (`/api/support/*`) + Email notifications
+- ✅ Day 21.5-22: Support Tickets (`/api/support/*`) + Email notifications
 - ⏳ Day 23-24: Payments (`/api/payments/*`) + Email testing endpoints
-- ⏳ Day 25-26: Subscriptions (`/api/subscriptions/*`) + Email notifications
+- ✅ Day 25-26: Subscriptions (`/api/subscriptions/*`, `/api/admin/price-plans/*`) + Email notifications
 - ⏳ Day 27-29: Content Management (`/api/pages/*`, `/api/blogs/*`, `/api/forms/*`)
 
 **Email Testing:**
@@ -1744,48 +1744,48 @@ vercel env add VERCEL_TOKEN
   - [x] Add customer authentication endpoints ✅
   - [x] Add customer profile endpoints ✅
 
-**Day 21.5-22: Support Ticket System (12 hours)**
-- [ ] **Day 21.5 Morning (4h):** Support ticket API & models
-  - [ ] Create support ticket CRUD API (`/api/support/tickets/*`)
-  - [ ] Implement support ticket messages API (`/api/support/tickets/[id]/messages`)
-  - [ ] Create support departments/categories API (`/api/support/departments`)
-  - [ ] Add ticket status management (open, in-progress, resolved, closed)
-  - [ ] Implement priority levels (low, medium, high, urgent)
-  - [ ] Add ticket assignment to staff members
-  - [ ] Create ticket search and filtering
-  - [ ] Add pagination for ticket lists
-- [ ] **Day 21.5 Afternoon (4h):** Support ticket email notifications
-  - [ ] **New Ticket Email** (to tenant admin) - Notification when customer creates ticket
-  - [ ] **Ticket Reply Email** (to customer) - Notification when admin replies
-  - [ ] **Ticket Reply Email** (to admin) - Notification when customer replies
-  - [ ] **Ticket Status Update Email** (to customer) - Notification when ticket status changes
-  - [ ] **Ticket Assigned Email** (to staff) - Notification when ticket is assigned
-  - [ ] Create branded email templates for support tickets
-- [ ] **Day 22 Morning (4h):** Support ticket admin dashboard
-  - [ ] Create `/dashboard/support/tickets` page (using Shadcn/ui components)
-  - [ ] Build ticket list with filters (Table, Select, Badge components)
-  - [ ] Implement ticket detail view with conversation thread (Card, ScrollArea components)
-  - [ ] Add ticket assignment UI (Select, Button components)
-  - [ ] Create ticket status update UI
-  - [ ] Add priority and department filters
-  - [ ] Implement ticket search functionality
-  - [ ] Create ticket statistics dashboard (open, in-progress, resolved counts)
-- [ ] **Day 22 Afternoon (4h):** Customer-facing support ticket UI
-  - [ ] Create `/support` page for customers to create tickets
-  - [ ] Build ticket creation form (department, priority, subject, description)
-  - [ ] Create `/support/tickets` page (customer's ticket list)
-  - [ ] Implement ticket detail view for customers
-  - [ ] Add reply functionality for customers
-  - [ ] Show ticket status and priority to customers
-  - [ ] Add file attachments support (optional - can use Supabase Storage)
-  - [ ] Create ticket history/timeline view
-- [ ] **Postman Collection:** Update with support ticket endpoints (`/api/support/*`)
-  - [ ] Add ticket CRUD endpoints (GET, POST, PUT, PATCH)
-  - [ ] Add ticket message endpoints (GET, POST)
-  - [ ] Add support department endpoints
-  - [ ] Add ticket assignment endpoints
-  - [ ] Add ticket status update endpoints
-  - [ ] Add ticket search/filter endpoints
+**Day 21.5-22: Support Ticket System (12 hours)** ✅ COMPLETE
+- [x] **Day 21.5 Morning (4h):** Support ticket API & models ✅ COMPLETE
+  - [x] Create support ticket CRUD API (`/api/support/tickets/*`) ✅
+  - [x] Implement support ticket messages API (`/api/support/tickets/[id]/messages`) ✅
+  - [x] Create support departments/categories API (`/api/support/departments`) ✅
+  - [x] Add ticket status management (open, in-progress, resolved, closed) ✅
+  - [x] Implement priority levels (low, medium, high, urgent) ✅
+  - [x] Add ticket assignment to staff members ✅
+  - [x] Create ticket search and filtering ✅
+  - [x] Add pagination for ticket lists ✅
+- [x] **Day 21.5 Afternoon (4h):** Support ticket email notifications ✅ COMPLETE
+  - [x] **New Ticket Email** (to tenant admin) - Notification when customer creates ticket ✅
+  - [x] **Ticket Reply Email** (to customer) - Notification when admin replies ✅
+  - [x] **Ticket Reply Email** (to admin) - Notification when customer replies ✅
+  - [x] **Ticket Status Update Email** (to customer) - Notification when ticket status changes ✅
+  - [x] **Ticket Assigned Email** (to staff) - Notification when ticket is assigned ✅
+  - [x] Create branded email templates for support tickets ✅
+- [x] **Day 22 Morning (4h):** Support ticket admin dashboard ✅ COMPLETE
+  - [x] Create `/dashboard/support/tickets` page (using Shadcn/ui components) ✅
+  - [x] Build ticket list with filters (Table, Select, Badge components) ✅
+  - [x] Implement ticket detail view with conversation thread (Card, ScrollArea components) ✅
+  - [x] Add ticket assignment UI (Select, Button components) ✅
+  - [x] Create ticket status update UI ✅
+  - [x] Add priority and department filters ✅
+  - [x] Implement ticket search functionality ✅
+  - [x] Create ticket statistics dashboard (open, in-progress, resolved counts) ✅
+- [x] **Day 22 Afternoon (4h):** Customer-facing support ticket UI ✅ COMPLETE
+  - [x] Create `/support` page for customers to create tickets ✅
+  - [x] Build ticket creation form (department, priority, subject, description) ✅
+  - [x] Create `/support/tickets` page (customer's ticket list) ✅
+  - [x] Implement ticket detail view for customers ✅
+  - [x] Add reply functionality for customers ✅
+  - [x] Show ticket status and priority to customers ✅
+  - [x] Add file attachments support (optional - can use Supabase Storage) ✅
+  - [x] Create ticket history/timeline view ✅
+- [x] **Postman Collection:** Update with support ticket endpoints (`/api/support/*`) ✅ COMPLETE
+  - [x] Add ticket CRUD endpoints (GET, POST, PUT, PATCH) ✅
+  - [x] Add ticket message endpoints (GET, POST) ✅
+  - [x] Add support department endpoints ✅
+  - [x] Add ticket assignment endpoints ✅
+  - [x] Add ticket status update endpoints ✅
+  - [x] Add ticket search/filter endpoints ✅
 
 ---
 
@@ -1812,19 +1812,37 @@ vercel env add VERCEL_TOKEN
   - [ ] Add webhook endpoints (for testing)
   - [ ] Add payment history endpoints
 
-**Day 25-26: Subscription Management (16 hours)**
-- [ ] Landlord subscription plans
-- [ ] Tenant subscription to platform
-- [ ] Plan limits enforcement
-- [ ] Billing cycle management
-- [ ] Payment reminders
-- [ ] **Subscription email notifications:**
-  - [ ] **Subscription Renewal Reminder** (to tenant admin) - 7 days before expiry
-  - [ ] **Subscription Expired** (to tenant admin) - Account expiration notice
-  - [ ] **Subscription Activated** (to tenant admin) - Confirmation of successful subscription
-  - [ ] **Payment Due Reminder** (to tenant admin) - Invoice reminder
-  - [ ] **Low Stock Alert** (to tenant admin) - Inventory warnings
-  - [ ] **Plan Upgrade Confirmation** (to tenant admin) - Plan change confirmation
+**Day 25-26: Subscription Management (16 hours)** ✅ COMPLETE
+- [x] Landlord subscription plans ✅
+  - [x] Price plans CRUD API (GET, POST, PUT, DELETE) ✅
+  - [x] Price plan validation schemas ✅
+- [x] Tenant subscription to platform ✅
+  - [x] Subscription change API (upgrade, downgrade, renew) ✅
+  - [x] Billing history API ✅
+  - [x] Subscription expiry checker (cron job) ✅
+- [x] Plan limits enforcement ✅
+  - [x] Plan limits utilities (products, orders, pages, blogs, customers, storage) ✅
+  - [x] Products API enforces limits ✅
+  - [x] Orders API (checkout) enforces limits ✅
+- [x] Billing cycle management ✅
+  - [x] Subscription renewal logic ✅
+  - [x] Grace period handling (7 days) ✅
+  - [x] Tenant subscription UI page ✅
+- [x] Payment reminders ✅
+  - [x] Payment reminders API (cron job) ✅
+  - [x] Sends renewal reminders (7 days before expiry) ✅
+  - [x] Sends payment due reminders ✅
+- [x] **Subscription email notifications:** ✅
+  - [x] **Subscription Renewal Reminder** (to tenant admin) - 7 days before expiry ✅
+  - [x] **Subscription Expired** (to tenant admin) - Account expiration notice ✅
+  - [x] **Subscription Activated** (to tenant admin) - Confirmation of successful subscription ✅
+  - [x] **Payment Due Reminder** (to tenant admin) - Invoice reminder ✅
+  - [x] **Plan Upgrade Confirmation** (to tenant admin) - Plan change confirmation ✅
+  - [x] **Note:** Low Stock Alert is part of inventory management (Day 17) ✅
+- [x] **Postman Collection:** Updated with subscription endpoints ✅
+  - [x] Price plans CRUD endpoints ✅
+  - [x] Subscription management endpoints ✅
+  - [x] Payment reminders endpoint ✅
 
 **Day 27-29: Content Management (24 hours)**
 - [ ] **Day 27 Morning (4h):** Page builder foundation

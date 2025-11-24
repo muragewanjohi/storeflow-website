@@ -27,7 +27,7 @@ import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 
 const settingsUpdateSchema = z.object({
-  // Store Details (store_name is stored in tenants table, not here)
+  // Store Details (store_name and custom_domain are stored in tenants table, not here)
   store_description: z.string().optional().nullable(),
   store_address: z.string().optional().nullable(),
   store_city: z.string().optional().nullable(),
@@ -35,6 +35,7 @@ const settingsUpdateSchema = z.object({
   store_country: z.string().optional().nullable(),
   store_postal_code: z.string().optional().nullable(),
   store_phone: z.string().optional().nullable(),
+  store_logo: z.string().optional().nullable(),
   
   // Currency Settings
   currency_code: z.string().max(10).optional(),
@@ -77,8 +78,9 @@ export async function GET(request: NextRequest) {
 
     // Get all settings from static_options
     const settings = await getStaticOptions(tenant.id, [
-      // Store Details (store_name comes from tenants table)
+      // Store Details (store_name and custom_domain come from tenants table)
       'store_description',
+      'store_logo',
       'store_address',
       'store_city',
       'store_state',
@@ -177,8 +179,9 @@ export async function GET(request: NextRequest) {
       result.dynamic_rate_per_km = parseFloat(result.dynamic_rate_per_km);
     }
 
-    // Add store name from tenants table
+    // Add store name and domain from tenants table
     result.store_name = tenant.name;
+    result.store_domain = tenant.custom_domain || `${tenant.subdomain}.dukanest.com`;
 
     // Get countries for dropdown
     const countries = await prisma.countries.findMany({
@@ -248,6 +251,9 @@ export async function PUT(request: NextRequest) {
     }
     if (validatedData.store_phone !== undefined) {
       optionsToSave.store_phone = validatedData.store_phone || null;
+    }
+    if (validatedData.store_logo !== undefined) {
+      optionsToSave.store_logo = validatedData.store_logo || null;
     }
 
     // Currency Settings

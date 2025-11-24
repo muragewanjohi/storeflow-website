@@ -14,7 +14,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * Get tenant contact email address for customer inquiries
  * Uses the tenant's contact_email field if set, otherwise falls back to support email
  */
-function getTenantContactEmail(tenant: Tenant): string {
+export function getTenantContactEmail(tenant: Tenant): string {
   // First priority: use the contact_email field from the tenant record
   if (tenant.contact_email) {
     return tenant.contact_email;

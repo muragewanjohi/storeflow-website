@@ -153,7 +153,7 @@ export default function CreateTicketClient({
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Contact Support</h1>
         <p className="text-muted-foreground mt-2">
-          Create a support ticket and we'll get back to you as soon as possible.
+          Create a support ticket and we&apos;ll get back to you as soon as possible.
         </p>
       </div>
 

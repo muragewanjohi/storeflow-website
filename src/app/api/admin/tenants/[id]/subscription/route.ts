@@ -7,13 +7,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireRole } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
-import { z } from 'zod';
-
-// Validation schema for subscription changes
-const changeSubscriptionSchema = z.object({
-  plan_id: z.string().uuid(),
-  action: z.enum(['upgrade', 'downgrade', 'renew']).optional(),
-});
+import { changeSubscriptionSchema } from '@/lib/subscriptions/validation';
+import {
+  sendSubscriptionActivatedEmail,
+  sendPlanUpgradeConfirmationEmail,
+} from '@/lib/subscriptions/emails';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -112,6 +110,40 @@ export async function PUT(
 
     // Log subscription change (you can create a payment_logs entry here)
     // For now, we'll just return success
+
+    // Send email notifications
+    const oldPlan = tenant.price_plans;
+    const newPlan = updatedTenant.price_plans;
+
+    // Send activation email if this is a new subscription or renewal
+    if (action === 'renew' || !oldPlan) {
+      sendSubscriptionActivatedEmail({
+        tenant: updatedTenant as any,
+        plan: newPlan,
+        expireDate: updatedTenant.expire_date || new Date(),
+      }).catch((error) => {
+        console.error('Error sending subscription activated email:', error);
+      });
+    }
+
+    // Send upgrade confirmation if upgrading
+    if (action === 'upgrade' && oldPlan && newPlan) {
+      sendPlanUpgradeConfirmationEmail({
+        tenant: updatedTenant as any,
+        oldPlan: {
+          name: oldPlan.name,
+          price: Number(oldPlan.price),
+        },
+        newPlan: {
+          name: newPlan.name,
+          price: Number(newPlan.price),
+          duration_months: newPlan.duration_months,
+        },
+        expireDate: updatedTenant.expire_date || new Date(),
+      }).catch((error) => {
+        console.error('Error sending plan upgrade confirmation email:', error);
+      });
+    }
 
     return NextResponse.json(
       {

@@ -27,6 +27,7 @@ import {
   ClipboardDocumentListIcon,
   AdjustmentsHorizontalIcon,
   ChatBubbleLeftRightIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -56,6 +57,7 @@ const navigation: NavigationItem[] = [
   { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, adminOnly: true },
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
+  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
   { name: 'Support Tickets', href: '/dashboard/support/tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },

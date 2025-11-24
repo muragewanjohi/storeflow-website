@@ -28,7 +28,7 @@ export default async function TenantSettingsPage() {
   let settings: Record<string, string | null> = {};
   try {
     settings = await getStaticOptions(tenant.id, [
-      // Store Details (store_name comes from tenants table)
+      // Store Details (store_name and custom_domain come from tenants table)
       'store_description',
       'store_address',
       'store_city',
@@ -36,6 +36,7 @@ export default async function TenantSettingsPage() {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'store_logo',
       
       // Currency Settings
       'currency_code',
@@ -96,8 +97,9 @@ export default async function TenantSettingsPage() {
 
   // Set defaults and format
   const formattedSettings: Record<string, any> = {
-    // Store Details (store_name comes from tenants table)
+    // Store Details (store_name and custom_domain come from tenants table)
     store_name: tenant.name,
+    store_domain: tenant.custom_domain || `${tenant.subdomain}.dukanest.com`,
     store_description: settings.store_description || '',
     store_address: settings.store_address || '',
     store_city: settings.store_city || '',
@@ -105,6 +107,7 @@ export default async function TenantSettingsPage() {
     store_country: settings.store_country || '',
     store_postal_code: settings.store_postal_code || '',
     store_phone: settings.store_phone || '',
+    store_logo: settings.store_logo || '',
     
     // Currency Settings
     currency_code: settings.currency_code || 'USD',

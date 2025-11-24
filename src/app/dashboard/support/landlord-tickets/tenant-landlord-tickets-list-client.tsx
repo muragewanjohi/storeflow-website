@@ -157,7 +157,7 @@ export default function TenantLandlordTicketsListClient({
         <div>
           <h1 className="text-3xl font-bold">Support Tickets to Platform</h1>
           <p className="text-muted-foreground mt-2">
-            View and manage tickets you've created for platform support
+            View and manage tickets you&apos;ve created for platform support
           </p>
         </div>
         <Link href="/dashboard/support/landlord-tickets/new">

@@ -399,6 +399,7 @@ model price_plans {
   name            String    @db.VarChar(255)
   price           Decimal   @db.Decimal(10, 2)
   duration_months Int
+  trial_days      Int?      @default(0) // Trial period in days (0 = no trial)
   features        Json?     @default("{}")
   status          String?   @default("active") @db.VarChar(50)
   created_at      DateTime? @default(now()) @db.Timestamp(6)

@@ -12,6 +12,7 @@ import { checkoutSchema } from '@/lib/orders/validation';
 import { generateOrderNumber, calculateOrderTotal } from '@/lib/orders/utils';
 import { getCart, clearCart, generateCartId } from '@/lib/orders/cart';
 import { sendOrderPlacedEmail, sendNewOrderAlertEmail } from '@/lib/orders/emails';
+import { canCreateOrder } from '@/lib/subscriptions/limits';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -23,6 +24,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     const validatedData = checkoutSchema.parse(body);
+
+    // Check plan limits before creating order
+    const limitCheck = await canCreateOrder(tenant);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: limitCheck.reason || 'Order limit reached' },
+        { status: 403 }
+      );
+    }
 
     // Get cart items (for now, we'll use the items from the request)
     // In production, you might want to fetch from cart storage

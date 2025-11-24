@@ -127,8 +127,15 @@ export async function POST(request: NextRequest) {
         );
       }
       // Calculate expire_date based on plan duration
+      // If plan has trial_days, use trial period; otherwise use plan duration
       expireDate = new Date();
-      expireDate.setMonth(expireDate.getMonth() + plan.duration_months);
+      if (plan.trial_days && plan.trial_days > 0) {
+        // Trial period: add trial days
+        expireDate.setDate(expireDate.getDate() + plan.trial_days);
+      } else {
+        // Regular subscription: add plan duration months
+        expireDate.setMonth(expireDate.getMonth() + plan.duration_months);
+      }
     }
 
     // Create tenant in database first
