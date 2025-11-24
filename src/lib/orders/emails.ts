@@ -36,6 +36,24 @@ function getVerifiedSenderEmail(): string {
   return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
 }
 
+/**
+ * Get sender name for SendGrid emails
+ * Uses tenant name, with fallback to formatted subdomain
+ */
+function getSenderName(tenant: Tenant): string {
+  if (tenant.name && tenant.name.trim()) {
+    return tenant.name;
+  }
+  // Fallback: format subdomain as store name (e.g., "teststore" -> "Test Store")
+  if (tenant.subdomain) {
+    return tenant.subdomain
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+  return 'Store';
+}
+
 interface OrderWithItems extends orders {
   order_products: Array<{
     id: string;
@@ -178,7 +196,7 @@ ${tenant.name}
   return sendEmail({
     to: customerEmail,
     from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: tenant.name || 'Store',
+    fromName: getSenderName(tenant),
     subject: `Order Confirmation - ${order.order_number}`,
     html,
     text,
@@ -320,7 +338,7 @@ Please process this order as soon as possible.
   return sendEmail({
     to: adminEmail,
     from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: tenant.name || 'Store',
+    fromName: getSenderName(tenant),
     subject: `New Order Alert - ${order.order_number}`,
     html,
     text,
@@ -335,11 +353,13 @@ export async function sendOrderShippedEmail({
   tenant,
   trackingNumber,
   shippingCarrier,
+  notes,
 }: {
   order: OrderWithItems;
   tenant: Tenant;
   trackingNumber?: string;
   shippingCarrier?: string;
+  notes?: string | null;
 }) {
   const customerEmail = order.email;
   const customerName = order.name || 'Customer';
@@ -379,6 +399,13 @@ export async function sendOrderShippedEmail({
           </div>
           ` : ''}
           
+          ${notes ? `
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h2 style="margin-top: 0; color: #10b981;">Additional Information</h2>
+            <p>${notes}</p>
+          </div>
+          ` : ''}
+          
           <div style="text-align: center; margin: 30px 0;">
             <a href="${orderUrl}" style="background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
               Track Your Order
@@ -401,7 +428,7 @@ export async function sendOrderShippedEmail({
   return sendEmail({
     to: customerEmail,
     from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: tenant.name || 'Store',
+    fromName: getSenderName(tenant),
     subject: `Your Order Has Shipped - ${order.order_number}`,
     html,
   });
@@ -471,9 +498,294 @@ export async function sendOrderDeliveredEmail({
   return sendEmail({
     to: customerEmail,
     from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: tenant.name || 'Store',
+    fromName: getSenderName(tenant),
     subject: `Order Delivered - ${order.order_number}`,
     html,
+  });
+}
+
+/**
+ * Send order status update email to customer
+ */
+export async function sendOrderStatusUpdateEmail({
+  order,
+  tenant,
+  oldStatus,
+  newStatus,
+  notes,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  oldStatus: string | null;
+  newStatus: string;
+  notes?: string | null;
+}) {
+  const customerEmail = order.email;
+  const customerName = order.name || 'Customer';
+
+  if (!customerEmail) {
+    console.warn('No customer email for order', order.order_number);
+    return { success: false, error: 'No customer email' };
+  }
+
+  // Don't send email if status hasn't actually changed
+  if (oldStatus === newStatus) {
+    return { success: true, skipped: true };
+  }
+
+  // Skip emails for statuses that have dedicated email functions
+  if (newStatus === 'shipped' || newStatus === 'delivered' || newStatus === 'cancelled') {
+    return { success: true, skipped: true };
+  }
+
+  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
+
+  const statusLabels: Record<string, string> = {
+    pending: 'Pending',
+    processing: 'Processing',
+    on_hold: 'On Hold',
+    completed: 'Completed',
+    refunded: 'Refunded',
+  };
+
+  const statusColor: Record<string, string> = {
+    pending: '#f59e0b',
+    processing: '#3b82f6',
+    on_hold: '#ef4444',
+    completed: '#10b981',
+    refunded: '#6b7280',
+  };
+
+  const statusLabel = statusLabels[newStatus] || newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+  const statusBgColor = statusColor[newStatus] || '#667eea';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Order Status Update - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, ${statusBgColor} 0%, ${statusBgColor}dd 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Order Status Updated</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello ${customerName},</p>
+          
+          <p>We wanted to let you know that your order <strong>${order.order_number}</strong> status has been updated.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${statusBgColor};">
+            <h2 style="margin-top: 0; color: ${statusBgColor};">Order Status</h2>
+            <p><strong>Previous Status:</strong> ${oldStatus ? (statusLabels[oldStatus] || oldStatus) : 'N/A'}</p>
+            <p><strong>Current Status:</strong> <strong style="color: ${statusBgColor};">${statusLabel}</strong></p>
+            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: ${statusBgColor}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            If you have any questions about your order, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
+          </p>
+          
+          <p style="color: #666; font-size: 14px;">
+            Best regards,<br>
+            ${tenant.name}
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Order Status Update - ${order.order_number}
+
+Hello ${customerName},
+
+We wanted to let you know that your order ${order.order_number} status has been updated.
+
+Order Status:
+- Previous Status: ${oldStatus || 'N/A'}
+- Current Status: ${statusLabel}
+${notes ? `- Notes: ${notes}` : ''}
+
+View your order: ${orderUrl}
+
+If you have any questions about your order, please contact us at ${contactEmail}.
+
+Best regards,
+${tenant.name}
+  `;
+
+  return sendEmail({
+    to: customerEmail,
+    from: getVerifiedSenderEmail(),
+    fromName: getSenderName(tenant),
+    subject: `Order Status Update - ${order.order_number}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send payment status update email to customer
+ */
+export async function sendPaymentStatusUpdateEmail({
+  order,
+  tenant,
+  oldPaymentStatus,
+  newPaymentStatus,
+  notes,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  oldPaymentStatus: string | null;
+  newPaymentStatus: string;
+  notes?: string | null;
+}) {
+  const customerEmail = order.email;
+  const customerName = order.name || 'Customer';
+
+  if (!customerEmail) {
+    console.warn('No customer email for order', order.order_number);
+    return { success: false, error: 'No customer email' };
+  }
+
+  // Don't send email if payment status hasn't actually changed
+  if (oldPaymentStatus === newPaymentStatus) {
+    return { success: true, skipped: true };
+  }
+
+  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
+
+  const paymentStatusLabels: Record<string, string> = {
+    pending: 'Pending',
+    paid: 'Paid',
+    failed: 'Failed',
+    refunded: 'Refunded',
+  };
+
+  const paymentStatusColor: Record<string, string> = {
+    pending: '#f59e0b',
+    paid: '#10b981',
+    failed: '#ef4444',
+    refunded: '#6b7280',
+  };
+
+  const paymentLabel = paymentStatusLabels[newPaymentStatus] || newPaymentStatus.charAt(0).toUpperCase() + newPaymentStatus.slice(1);
+  const paymentBgColor = paymentStatusColor[newPaymentStatus] || '#667eea';
+
+  let statusMessage = '';
+  let statusIcon = '';
+  
+  if (newPaymentStatus === 'paid') {
+    statusMessage = 'Your payment has been confirmed!';
+    statusIcon = '✅';
+  } else if (newPaymentStatus === 'failed') {
+    statusMessage = 'Unfortunately, your payment could not be processed.';
+    statusIcon = '❌';
+  } else if (newPaymentStatus === 'refunded') {
+    statusMessage = 'Your payment has been refunded.';
+    statusIcon = '💰';
+  } else if (newPaymentStatus === 'pending') {
+    statusMessage = 'Your payment is pending confirmation.';
+    statusIcon = '⏳';
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Payment Status Update - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, ${paymentBgColor} 0%, ${paymentBgColor}dd 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Payment Status Update ${statusIcon}</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello ${customerName},</p>
+          
+          <p>${statusMessage}</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${paymentBgColor};">
+            <h2 style="margin-top: 0; color: ${paymentBgColor};">Payment Information</h2>
+            <p><strong>Order Number:</strong> ${order.order_number}</p>
+            <p><strong>Previous Payment Status:</strong> ${oldPaymentStatus ? (paymentStatusLabels[oldPaymentStatus] || oldPaymentStatus) : 'N/A'}</p>
+            <p><strong>Current Payment Status:</strong> <strong style="color: ${paymentBgColor};">${paymentLabel}</strong></p>
+            ${order.transaction_id ? `<p><strong>Transaction ID:</strong> ${order.transaction_id}</p>` : ''}
+            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+          </div>
+          
+          ${newPaymentStatus === 'failed' ? `
+          <div style="background: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+            <p style="margin: 0; color: #991b1b;"><strong>What to do next:</strong></p>
+            <p style="margin: 5px 0 0 0; color: #991b1b;">Please try again or contact us if you need assistance with your payment.</p>
+          </div>
+          ` : ''}
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: ${paymentBgColor}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            If you have any questions about your payment, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
+          </p>
+          
+          <p style="color: #666; font-size: 14px;">
+            Best regards,<br>
+            ${tenant.name}
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Payment Status Update - ${order.order_number}
+
+Hello ${customerName},
+
+${statusMessage}
+
+Payment Information:
+- Order Number: ${order.order_number}
+- Previous Payment Status: ${oldPaymentStatus || 'N/A'}
+- Current Payment Status: ${paymentLabel}
+${order.transaction_id ? `- Transaction ID: ${order.transaction_id}` : ''}
+${notes ? `- Notes: ${notes}` : ''}
+
+${newPaymentStatus === 'failed' ? '\nWhat to do next: Please try again or contact us if you need assistance with your payment.\n' : ''}
+
+View your order: ${orderUrl}
+
+If you have any questions about your payment, please contact us at ${contactEmail}.
+
+Best regards,
+${tenant.name}
+  `;
+
+  return sendEmail({
+    to: customerEmail,
+    from: getVerifiedSenderEmail(),
+    fromName: getSenderName(tenant),
+    subject: `Payment Status Update - ${order.order_number}`,
+    html,
+    text,
   });
 }
 
@@ -558,7 +870,7 @@ export async function sendOrderCancelledEmail({
   return sendEmail({
     to: customerEmail,
     from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: tenant.name || 'Store',
+    fromName: getSenderName(tenant),
     subject: `Order Cancelled - ${order.order_number}`,
     html,
   });

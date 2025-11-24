@@ -16,6 +16,7 @@ import {
   UsersIcon,
   Cog6ToothIcon,
   XMarkIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
   { name: 'Tenants', href: '/admin/tenants', icon: BuildingOfficeIcon },
+  { name: 'Support Tickets', href: '/admin/support/tickets', icon: ChatBubbleLeftRightIcon },
   { name: 'Users', href: '/admin/users', icon: UsersIcon },
   { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
 ];

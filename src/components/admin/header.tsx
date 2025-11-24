@@ -16,7 +16,6 @@ import {
   Bars3Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  Cog6ToothIcon,
   MoonIcon,
   SunIcon,
 } from '@heroicons/react/24/outline';
@@ -30,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import AdminNotifications from './notifications';
 
 interface HeaderProps {
   user: AuthUser;
@@ -111,13 +111,8 @@ export default function AdminHeader({
       )}
 
       <div className="flex flex-1 items-center justify-end gap-2">
-        {/* Settings button */}
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/admin/settings">
-            <span className="sr-only">Settings</span>
-            <Cog6ToothIcon className="h-5 w-5" aria-hidden="true" />
-          </Link>
-        </Button>
+        {/* Notifications */}
+        <AdminNotifications />
 
         {/* Theme toggle */}
         <Button

@@ -6,9 +6,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,10 @@ function getNotificationIcon(type: Notification['type']): string {
       return '❌';
     case 'low_stock':
       return '⚠️';
+    case 'new_support_ticket':
+      return '🎫';
+    case 'support_ticket_reply':
+      return '💬';
     default:
       return '🔔';
   }
@@ -82,13 +86,44 @@ function getNotificationColor(type: Notification['type']): string {
       return 'text-red-600';
     case 'low_stock':
       return 'text-orange-600';
+    case 'new_support_ticket':
+      return 'text-purple-600';
+    case 'support_ticket_reply':
+      return 'text-indigo-600';
     default:
       return 'text-gray-600';
   }
 }
 
+// Get read notification IDs from localStorage
+function getReadNotificationIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  const stored = localStorage.getItem('read_notifications');
+  return stored ? new Set(JSON.parse(stored)) : new Set();
+}
+
+// Save read notification IDs to localStorage
+function saveReadNotificationIds(ids: Set<string>) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('read_notifications', JSON.stringify(Array.from(ids)));
+}
+
+// Mark all current notifications as read
+function markAllNotificationsAsRead(notificationIds: string[]) {
+  const readIds = getReadNotificationIds();
+  notificationIds.forEach(id => readIds.add(id));
+  saveReadNotificationIds(readIds);
+}
+
 export default function Notifications() {
   const [open, setOpen] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  // Load read IDs from localStorage on mount and when data changes
+  useEffect(() => {
+    setReadIds(getReadNotificationIds());
+  }, []);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['notifications'],
@@ -97,8 +132,40 @@ export default function Notifications() {
     refetchInterval: 1000 * 60, // Refetch every minute
   });
 
-  const unreadCount = data?.unread_count || 0;
-  const notifications = data?.notifications || [];
+  // Update readIds when data changes
+  useEffect(() => {
+    setReadIds(getReadNotificationIds());
+  }, [data]);
+
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/notifications/clear', {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to clear notifications');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      // Mark all current notifications as read in localStorage
+      if (data?.notifications) {
+        const notificationIds = data.notifications.map(n => n.id);
+        markAllNotificationsAsRead(notificationIds);
+        // Update state immediately
+        const newReadIds = getReadNotificationIds();
+        setReadIds(newReadIds);
+      }
+    },
+  });
+
+  // Filter out read notifications
+  const filteredNotifications = useMemo(() => {
+    return data?.notifications?.filter(n => !readIds.has(n.id)) || [];
+  }, [data?.notifications, readIds]);
+  
+  const unreadCount = filteredNotifications.length;
+  const notifications = filteredNotifications;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -154,7 +221,17 @@ export default function Notifications() {
                   asChild
                   className="flex flex-col items-start px-4 py-3 cursor-pointer hover:bg-accent"
                 >
-                  <Link href={notification.link} onClick={() => setOpen(false)}>
+                  <Link
+                    href={notification.link}
+                    onClick={() => {
+                      // Mark notification as read when clicked
+                      const newReadIds = new Set(readIds);
+                      newReadIds.add(notification.id);
+                      saveReadNotificationIds(newReadIds);
+                      setReadIds(newReadIds);
+                      setOpen(false);
+                    }}
+                  >
                     <div className="flex w-full items-start gap-3">
                       <span className="text-xl mt-0.5">
                         {getNotificationIcon(notification.type)}
@@ -166,7 +243,7 @@ export default function Notifications() {
                           >
                             {notification.title}
                           </p>
-                          {!notification.read && (
+                          {!readIds.has(notification.id) && (
                             <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                           )}
                         </div>
@@ -187,15 +264,29 @@ export default function Notifications() {
         {notifications.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link
-                href="/dashboard/orders?status=pending"
-                className="w-full text-center text-sm"
-                onClick={() => setOpen(false)}
+            <div className="flex flex-col gap-1 p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-center text-sm"
+                onClick={() => {
+                  clearAllMutation.mutate();
+                  setOpen(false);
+                }}
+                disabled={clearAllMutation.isPending}
               >
-                View all orders
-              </Link>
-            </DropdownMenuItem>
+                {clearAllMutation.isPending ? 'Clearing...' : 'Clear All'}
+              </Button>
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/dashboard/orders?status=pending"
+                  className="w-full text-center text-sm"
+                  onClick={() => setOpen(false)}
+                >
+                  View all orders
+                </Link>
+              </DropdownMenuItem>
+            </div>
           </>
         )}
       </DropdownMenuContent>

@@ -2,7 +2,13 @@
  * Notification Types
  */
 
-export type NotificationType = 'new_order' | 'pending_payment' | 'failed_payment' | 'low_stock';
+export type NotificationType = 
+  | 'new_order' 
+  | 'pending_payment' 
+  | 'failed_payment' 
+  | 'low_stock'
+  | 'new_support_ticket'
+  | 'support_ticket_reply';
 
 export interface Notification {
   id: string;

@@ -2738,6 +2738,859 @@
 				}
 			],
 			"description": "Order management endpoints (Day 18-19)"
+		},
+		{
+			"name": "Support Tickets",
+			"item": [
+				{
+					"name": "List Support Tickets",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tickets data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('tickets');",
+									"    pm.expect(jsonData.tickets).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets?page=1&limit=20&status=open&priority=medium",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term (subject, description)",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "open",
+									"description": "Filter by status (open, in_progress, resolved, closed)"
+								},
+								{
+									"key": "priority",
+									"value": "medium",
+									"description": "Filter by priority (low, medium, high, urgent)"
+								},
+								{
+									"key": "department_id",
+									"value": "",
+									"description": "Filter by department ID",
+									"disabled": true
+								},
+								{
+									"key": "user_id",
+									"value": "",
+									"description": "Filter by user/customer ID",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List support tickets with filtering and pagination.\n\n**Day 21.5:** Support Ticket System\n\n**Query Parameters:**\n- page: Page number (default: 1)\n- limit: Items per page (default: 20, max: 100)\n- search: Search term (searches subject and description)\n- status: Filter by status (open, in_progress, resolved, closed)\n- priority: Filter by priority (low, medium, high, urgent)\n- department_id: Filter by department ID\n- user_id: Filter by user/customer ID\n- sort_by: Sort field (created_at, updated_at, priority, status)\n- sort_order: Sort order (asc, desc)\n\n**Response:**\n- tickets: Array of ticket objects with customer info and message count\n- pagination: Pagination metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Ticket created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"    pm.expect(jsonData.ticket).to.have.property('id');",
+									"    ",
+									"    // Store ticket ID for use in other requests",
+									"    pm.environment.set('ticket_id', jsonData.ticket.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"subject\": \"Product not working as expected\",\n    \"description\": \"I received my order but the product is not functioning properly. Please help.\",\n    \"priority\": \"high\",\n    \"department_id\": null\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets"
+							]
+						},
+						"description": "Create a new support ticket.\n\n**Day 21.5:** Support Ticket System\n\n**Required Fields:**\n- subject: Ticket subject (required, max 255 chars)\n- description: Ticket description (required, max 5000 chars)\n\n**Optional Fields:**\n- priority: Priority level (low, medium, high, urgent) - default: medium\n- department_id: Department UUID (optional)\n\n**Actions:**\n- Creates ticket with status 'open'\n- Associates ticket with authenticated customer\n- Sends email notification to tenant admin\n\n**Response:**\n- Ticket object with id, subject, description, status, priority"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has ticket data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"    pm.expect(jsonData.ticket).to.have.property('id');",
+									"    pm.expect(jsonData.ticket).to.have.property('support_ticket_messages');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets/{{ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets",
+								"{{ticket_id}}"
+							]
+						},
+						"description": "Get support ticket details by ID.\n\n**Day 21.5:** Support Ticket System\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Response:**\n- Ticket object with customer info and all messages"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Ticket updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"in_progress\",\n    \"priority\": \"high\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets/{{ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets",
+								"{{ticket_id}}"
+							]
+						},
+						"description": "Update support ticket (status, priority, assignment).\n\n**Day 21.5:** Support Ticket System\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Body Parameters (all optional):**\n- status: New status (open, in_progress, resolved, closed)\n- priority: New priority (low, medium, high, urgent)\n- department_id: Assign to department\n- subject: Update subject\n- description: Update description\n\n**Email Notifications:**\n- Sends email to customer when status changes\n- Sends email to assigned staff when ticket is assigned\n\n**Response:**\n- Updated ticket object"
+					},
+					"response": []
+				},
+				{
+					"name": "Close Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Ticket closed successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData.ticket.status).to.eql('closed');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets/{{ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets",
+								"{{ticket_id}}"
+							]
+						},
+						"description": "Close support ticket (soft delete).\n\n**Day 21.5:** Support Ticket System\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Actions:**\n- Sets ticket status to 'closed'\n- Updates updated_at timestamp\n\n**Response:**\n- Success message and updated ticket object"
+					},
+					"response": []
+				},
+				{
+					"name": "List Ticket Messages",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has messages data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('messages');",
+									"    pm.expect(jsonData.messages).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets/{{ticket_id}}/messages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets",
+								"{{ticket_id}}",
+								"messages"
+							]
+						},
+						"description": "List all messages for a support ticket.\n\n**Day 21.5:** Support Ticket System\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Response:**\n- messages: Array of message objects (ordered by created_at ascending)"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Ticket Message",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Message created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"Thank you for your response. I have tried the suggested solution but it still doesn't work.\",\n    \"attachments\": []\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/support/tickets/{{ticket_id}}/messages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"tickets",
+								"{{ticket_id}}",
+								"messages"
+							]
+						},
+						"description": "Add a message/reply to a support ticket.\n\n**Day 21.5:** Support Ticket System\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Required Fields:**\n- message: Message content (required, max 5000 chars)\n\n**Optional Fields:**\n- attachments: Array of attachment URLs (optional)\n\n**Actions:**\n- Creates message associated with authenticated user\n- Updates ticket's updated_at timestamp\n- If ticket was 'resolved', changes status to 'in_progress'\n- Sends email notification:\n  - To admin if customer replied\n  - To customer if admin replied\n\n**Response:**\n- Message object with id, message, attachments, user_id, created_at"
+					},
+					"response": []
+				},
+				{
+					"name": "List Support Departments",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has departments data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('departments');",
+									"    pm.expect(jsonData.departments).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/support/departments",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"departments"
+							]
+						},
+						"description": "List support departments.\n\n**Day 21.5:** Support Ticket System\n\n**Response:**\n- departments: Array of department objects (id, name, description, email)\n\n**Note:** Currently returns default departments. In a full implementation, departments would be stored in a database table or tenant metadata."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Support Department",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Department created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('department');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Technical Support\",\n    \"description\": \"Handles technical issues and troubleshooting\",\n    \"email\": \"tech@example.com\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/support/departments",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"support",
+								"departments"
+							]
+						},
+						"description": "Create a new support department.\n\n**Day 21.5:** Support Ticket System\n\n**Required Fields:**\n- name: Department name (required, max 255 chars)\n\n**Optional Fields:**\n- description: Department description (max 1000 chars)\n- email: Department email address\n\n**Note:** This is a placeholder implementation. In a full implementation, departments would be stored in a database table.\n\n**Response:**\n- Department object with id, name, description, email"
+					},
+					"response": []
+				}
+			],
+			"description": "Support ticket management endpoints (Day 21.5-22)"
+		},
+		{
+			"name": "Landlord Support Tickets",
+			"item": [
+				{
+					"name": "List Landlord Support Tickets",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has tickets data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('tickets');",
+									"    pm.expect(jsonData.tickets).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets?page=1&limit=20&status=open&priority=medium",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term (subject, description)",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "open",
+									"description": "Filter by status (open, in_progress, resolved, closed)"
+								},
+								{
+									"key": "priority",
+									"value": "medium",
+									"description": "Filter by priority (low, medium, high, urgent)"
+								},
+								{
+									"key": "category",
+									"value": "",
+									"description": "Filter by category (billing, technical, feature_request, bug_report, account, other)",
+									"disabled": true
+								},
+								{
+									"key": "tenant_id",
+									"value": "",
+									"description": "Filter by tenant ID",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List landlord support tickets with filtering and pagination.\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin only\n\n**Query Parameters:**\n- page: Page number (default: 1)\n- limit: Items per page (default: 20, max: 100)\n- search: Search term (searches subject and description)\n- status: Filter by status (open, in_progress, resolved, closed)\n- priority: Filter by priority (low, medium, high, urgent)\n- category: Filter by category (billing, technical, feature_request, bug_report, account, other)\n- tenant_id: Filter by tenant ID\n- sort_by: Sort field (created_at, updated_at, priority, status)\n- sort_order: Sort order (asc, desc)\n\n**Response:**\n- tickets: Array of ticket objects with tenant info and message count\n- pagination: Pagination metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Landlord Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Ticket created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"    pm.expect(jsonData.ticket).to.have.property('id');",
+									"    ",
+									"    // Store ticket ID for use in other requests",
+									"    pm.environment.set('landlord_ticket_id', jsonData.ticket.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"subject\": \"Billing question about subscription renewal\",\n    \"description\": \"I have a question about my upcoming subscription renewal. Can you clarify the pricing?\",\n    \"priority\": \"medium\",\n    \"category\": \"billing\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets"
+							]
+						},
+						"description": "Create a new landlord support ticket (from tenant to landlord).\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Tenant admin/staff (creates ticket) or Landlord (for testing)\n\n**Required Fields:**\n- subject: Ticket subject (required, max 255 chars)\n- description: Ticket description (required, max 5000 chars)\n\n**Optional Fields:**\n- priority: Priority level (low, medium, high, urgent) - default: medium\n- category: Category (billing, technical, feature_request, bug_report, account, other) - default: other\n\n**Actions:**\n- Creates ticket with status 'open'\n- Associates ticket with authenticated tenant\n- Sends email notification to landlord admin\n\n**Response:**\n- Ticket object with id, subject, description, status, priority, category"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Landlord Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has ticket data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"    pm.expect(jsonData.ticket).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets/{{landlord_ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets",
+								"{{landlord_ticket_id}}"
+							]
+						},
+						"description": "Get landlord support ticket details by ID.\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin only\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Response:**\n- Ticket object with tenant info and all messages"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Landlord Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Ticket updated successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('ticket');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"in_progress\",\n    \"priority\": \"high\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets/{{landlord_ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets",
+								"{{landlord_ticket_id}}"
+							]
+						},
+						"description": "Update landlord support ticket (status, priority).\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin only\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Body Parameters (all optional):**\n- status: New status (open, in_progress, resolved, closed)\n- priority: New priority (low, medium, high, urgent)\n- category: Update category\n- subject: Update subject\n- description: Update description\n\n**Email Notifications:**\n- Sends email to tenant when status changes\n\n**Response:**\n- Updated ticket object"
+					},
+					"response": []
+				},
+				{
+					"name": "Close Landlord Support Ticket",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Ticket closed successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData.ticket.status).to.eql('closed');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets/{{landlord_ticket_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets",
+								"{{landlord_ticket_id}}"
+							]
+						},
+						"description": "Close landlord support ticket (soft delete).\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin only\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Actions:**\n- Sets ticket status to 'closed'\n- Updates updated_at timestamp\n\n**Response:**\n- Success message and updated ticket object"
+					},
+					"response": []
+				},
+				{
+					"name": "List Landlord Ticket Messages",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has messages data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('messages');",
+									"    pm.expect(jsonData.messages).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets/{{landlord_ticket_id}}/messages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets",
+								"{{landlord_ticket_id}}",
+								"messages"
+							]
+						},
+						"description": "List all messages for a landlord support ticket.\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin only\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Response:**\n- messages: Array of message objects (ordered by created_at ascending)"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Landlord Ticket Message",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Message created successfully\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success', true);",
+									"    pm.expect(jsonData).to.have.property('message');",
+									"    pm.expect(jsonData.message).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"Thank you for your inquiry. We are looking into this issue and will get back to you shortly.\",\n    \"attachments\": []\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/support/tickets/{{landlord_ticket_id}}/messages",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"support",
+								"tickets",
+								"{{landlord_ticket_id}}",
+								"messages"
+							]
+						},
+						"description": "Add a message/reply to a landlord support ticket.\n\n**Day 21.5-22:** Landlord Support Ticket System\n\n**Access:** Landlord/admin (reply to tenant) or Tenant admin (reply to landlord)\n\n**Path Parameters:**\n- ticket_id: UUID of the ticket\n\n**Required Fields:**\n- message: Message content (required, max 5000 chars)\n\n**Optional Fields:**\n- attachments: Array of attachment URLs (optional)\n\n**Actions:**\n- Creates message associated with authenticated user\n- Updates ticket's updated_at timestamp\n- If ticket was 'resolved', changes status to 'in_progress'\n- Sends email notification:\n  - To tenant if landlord replied\n  - To landlord if tenant replied\n\n**Response:**\n- Message object with id, message, attachments, user_id, created_at"
+					},
+					"response": []
+				}
+			],
+			"description": "Landlord support ticket management endpoints (Day 21.5-22). Tickets from tenants to the landlord/platform admin."
 		}
 	],
 	"event": [

@@ -260,23 +260,22 @@ model customers {
 }
 
 model landlord_users {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name               String    @db.VarChar(255)
-  email              String    @unique @db.VarChar(255)
-  password           String    @db.VarChar(255)
-  username           String?   @unique @db.VarChar(255)
-  email_verified     Boolean?  @default(false)
-  email_verify_token String?   @db.VarChar(255)
-  mobile             String?   @db.VarChar(20)
-  company            String?   @db.VarChar(255)
-  address            String?
-  city               String?   @db.VarChar(100)
-  state              String?   @db.VarChar(100)
-  country            String?   @db.VarChar(100)
-  image              String?   @db.VarChar(255)
-  created_at         DateTime? @default(now()) @db.Timestamp(6)
-  updated_at         DateTime? @default(now()) @db.Timestamp(6)
-
+  id                           String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                         String                        @db.VarChar(255)
+  email                        String                        @unique @db.VarChar(255)
+  password                     String                        @db.VarChar(255)
+  username                     String?                       @unique @db.VarChar(255)
+  email_verified               Boolean?                      @default(false)
+  email_verify_token           String?                       @db.VarChar(255)
+  mobile                       String?                       @db.VarChar(20)
+  company                      String?                       @db.VarChar(255)
+  address                      String?
+  city                         String?                       @db.VarChar(100)
+  state                        String?                       @db.VarChar(100)
+  country                      String?                       @db.VarChar(100)
+  image                        String?                       @db.VarChar(255)
+  created_at                   DateTime?                     @default(now()) @db.Timestamp(6)
+  updated_at                   DateTime?                     @default(now()) @db.Timestamp(6)
   @@index([email], map: "idx_landlord_users_email")
 }
 
@@ -671,6 +670,7 @@ model tenants {
   static_options          static_options[]
   support_ticket_messages support_ticket_messages[]
   support_tickets         support_tickets[]
+  landlord_support_tickets landlord_support_tickets[]
   price_plans             price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses user_delivery_addresses[]
   wallets                 wallets[]
@@ -764,4 +764,47 @@ model wallets {
   @@unique([tenant_id, user_id])
   @@index([tenant_id], map: "idx_wallets_tenant_id")
   @@index([user_id], map: "idx_wallets_user_id")
+}
+
+/// Landlord Support Tickets
+/// Tickets created by tenants to contact the landlord/platform admin
+/// Note: user_id can reference Supabase auth.users (for tenant admins) or landlord_users (for landlord admins)
+model landlord_support_tickets {
+  id                            String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                     String                            @db.Uuid
+  user_id                       String?                           @db.Uuid
+  subject                       String                            @db.VarChar(255)
+  description                   String                            @db.Text
+  status                        String?                           @default("open") @db.VarChar(50)
+  priority                      String?                           @default("medium") @db.VarChar(50)
+  category                      String?                           @db.VarChar(50)
+  created_at                    DateTime?                          @default(now()) @db.Timestamp(6)
+  updated_at                    DateTime?                          @default(now()) @db.Timestamp(6)
+  landlord_support_ticket_messages landlord_support_ticket_messages[]
+  tenants                       tenants                            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // Note: user_id can be from Supabase auth.users (tenant admins) or landlord_users (landlord admins)
+  // No foreign key constraint to allow flexibility
+
+  @@index([status], map: "idx_landlord_tickets_status")
+  @@index([tenant_id], map: "idx_landlord_tickets_tenant_id")
+  @@index([user_id], map: "idx_landlord_tickets_user_id")
+  @@index([category], map: "idx_landlord_tickets_category")
+}
+
+/// Landlord Support Ticket Messages
+/// Messages/replies in landlord support tickets
+/// Note: user_id can reference Supabase auth.users (for tenant admins) or landlord_users (for landlord admins)
+model landlord_support_ticket_messages {
+  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id             String                    @db.Uuid
+  user_id               String?                   @db.Uuid
+  message               String                    @db.Text
+  attachments           Json?                     @default("[]")
+  created_at            DateTime?                 @default(now()) @db.Timestamp(6)
+  landlord_support_tickets landlord_support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // Note: user_id can be from Supabase auth.users (tenant admins) or landlord_users (landlord admins)
+  // No foreign key constraint to allow flexibility
+
+  @@index([ticket_id], map: "idx_landlord_messages_ticket_id")
+  @@index([user_id], map: "idx_landlord_messages_user_id")
 }

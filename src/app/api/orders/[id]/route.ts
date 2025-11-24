@@ -12,7 +12,12 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { orderStatusUpdateSchema, orderPaymentStatusUpdateSchema } from '@/lib/orders/validation';
 import { isValidStatusTransition } from '@/lib/orders/utils';
-import { sendOrderShippedEmail, sendOrderDeliveredEmail } from '@/lib/orders/emails';
+import { 
+  sendOrderShippedEmail, 
+  sendOrderDeliveredEmail,
+  sendOrderStatusUpdateEmail,
+  sendPaymentStatusUpdateEmail 
+} from '@/lib/orders/emails';
 
 /**
  * GET /api/orders/[id] - Get order details
@@ -180,6 +185,7 @@ export async function PUT(
           tenant,
           trackingNumber: body.tracking_number,
           shippingCarrier: body.shipping_carrier,
+          notes: notes || order.message || null,
         }).catch((error) => {
           console.error('Error sending shipped email:', error);
         });
@@ -189,6 +195,17 @@ export async function PUT(
           tenant,
         }).catch((error) => {
           console.error('Error sending delivered email:', error);
+        });
+      } else {
+        // Send status update email for other status changes
+        sendOrderStatusUpdateEmail({
+          order: order as any,
+          tenant,
+          oldStatus: existingOrder.status,
+          newStatus: status,
+          notes: notes || undefined,
+        }).catch((error) => {
+          console.error('Error sending status update email:', error);
         });
       }
 
@@ -220,9 +237,33 @@ export async function PUT(
           payment_gateway: payment_gateway || existingOrder.payment_gateway,
           message: notes || existingOrder.message,
         },
+        include: {
+          order_products: {
+            include: {
+              products: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+          },
+        },
       });
 
-      // Send email notification for payment status changes (async)
+      // Send email notification to customer for payment status changes (async)
+      sendPaymentStatusUpdateEmail({
+        order: order as any,
+        tenant,
+        oldPaymentStatus: existingOrder.payment_status,
+        newPaymentStatus: payment_status,
+        notes: notes || undefined,
+      }).catch((error) => {
+        console.error('Error sending payment status update email:', error);
+      });
+
+      // Send notification to tenant admin for failed/pending payments (async)
       if (payment_status === 'failed' || (payment_status === 'pending' && existingOrder.payment_status !== 'pending')) {
         (async () => {
           const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
