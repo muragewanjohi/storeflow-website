@@ -41,9 +41,11 @@ export interface Tenant {
   subdomain: string;
   custom_domain?: string | null;
   name: string;
+  contact_email?: string | null;
   status: string;
   plan_id?: string | null;
   expire_date?: Date | null;
+  user_id?: string | null;
   settings?: Record<string, any>;
   created_at: Date;
   updated_at: Date;

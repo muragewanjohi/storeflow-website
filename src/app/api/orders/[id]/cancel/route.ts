@@ -113,11 +113,13 @@ export async function POST(
     });
 
     // Send cancellation email (async)
+    // Only include refund information if payment was actually made
+    const wasPaymentMade = order.payment_status === 'paid';
     sendOrderCancelledEmail({
       order: updatedOrder as any,
       tenant,
       reason,
-      refundAmount: refund ? Number(order.total_amount) : undefined,
+      refundAmount: refund && wasPaymentMade ? Number(order.total_amount) : undefined,
     }).catch((error) => {
       console.error('Error sending cancellation email:', error);
       // Don't fail the cancellation if email fails

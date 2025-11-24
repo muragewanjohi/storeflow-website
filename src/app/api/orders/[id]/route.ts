@@ -222,6 +222,33 @@ export async function PUT(
         },
       });
 
+      // Send email notification for payment status changes (async)
+      if (payment_status === 'failed' || (payment_status === 'pending' && existingOrder.payment_status !== 'pending')) {
+        (async () => {
+          const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+          await sendImmediateNotificationEmail({
+            tenant,
+            notification: {
+              id: `payment-${payment_status}-${order.id}`,
+              type: payment_status === 'failed' ? 'failed_payment' : 'pending_payment',
+              title: payment_status === 'failed' ? 'Failed Payment' : 'Pending Payment',
+              message: payment_status === 'failed'
+                ? `Payment failed for order ${order.order_number}`
+                : `Order ${order.order_number} is awaiting payment`,
+              link: `/dashboard/orders/${order.id}`,
+              created_at: new Date(),
+              read: false,
+              metadata: {
+                order_id: order.id,
+                order_number: order.order_number,
+              },
+            },
+          }).catch((error) => {
+            console.error('Error sending payment notification email:', error);
+          });
+        })();
+      }
+
       return NextResponse.json({
         success: true,
         order: {

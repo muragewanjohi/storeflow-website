@@ -35,6 +35,7 @@ export default function CreateTenantForm() {
     adminEmail: '',
     adminPassword: '',
     adminName: '',
+    contactEmail: '',
     planId: '',
   });
 
@@ -246,6 +247,26 @@ export default function CreateTenantForm() {
                   Minimum 8 characters
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-4">Contact Email</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">Support/Contact Email *</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                placeholder="support@example.com"
+                value={formData.contactEmail}
+                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This email will be used for customer inquiries, order notifications, and support. 
+                It can be different from your admin login email. Customers will see this email in order confirmations and can contact you directly.
+              </p>
             </div>
           </div>
         </CardContent>

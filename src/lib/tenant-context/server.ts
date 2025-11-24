@@ -34,8 +34,14 @@ export async function getTenant(): Promise<Tenant | null> {
     
     if (tenantId) {
       // Tenant already resolved by middleware
-      // We could fetch full tenant details if needed
-      // For now, return basic info from headers
+      // Fetch full tenant details to ensure we have all fields (including user_id)
+      // This is important for features like email sending that need the admin email
+      const fullTenant = await getTenantFromRequest(hostname, false); // Don't use cache to get fresh data
+      if (fullTenant) {
+        return fullTenant;
+      }
+      
+      // Fallback: return basic info from headers if fetch fails
       return {
         id: tenantId,
         subdomain: headersList.get('x-tenant-subdomain') || '',

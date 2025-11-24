@@ -635,6 +635,7 @@ model tenants {
   subdomain               String                       @unique @db.VarChar(255)
   custom_domain           String?                      @unique @db.VarChar(255)
   name                    String                       @db.VarChar(255)
+  contact_email           String?                      @db.VarChar(255)
   plan_id                 String?                      @db.Uuid
   expire_date             DateTime?                    @db.Timestamp(6)
   start_date              DateTime?                    @default(now()) @db.Timestamp(6)

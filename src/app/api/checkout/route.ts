@@ -211,6 +211,29 @@ export async function POST(request: NextRequest) {
         order,
         tenant,
       }),
+      // Send immediate notification email for new orders
+      (async () => {
+        const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+        await sendImmediateNotificationEmail({
+          tenant,
+          notification: {
+            id: `order-${order.id}`,
+            type: 'new_order',
+            title: 'New Order',
+            message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)}`,
+            link: `/dashboard/orders/${order.id}`,
+            created_at: order.created_at || new Date(),
+            read: false,
+            metadata: {
+              order_id: order.id,
+              order_number: order.order_number,
+              amount: Number(order.total_amount),
+            },
+          },
+        }).catch((error) => {
+          console.error('Error sending notification email:', error);
+        });
+      })(),
     ]).catch((error) => {
       console.error('Error sending order emails:', error);
       // Don't fail the order creation if emails fail

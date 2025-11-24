@@ -8,27 +8,32 @@ import { sendEmail } from '@/lib/email/sendgrid';
 import { prisma } from '@/lib/prisma/client';
 import type { orders } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
- * Get tenant-specific email address
- * Uses custom domain if available, otherwise uses subdomain
- * 
- * Note: For SendGrid to send emails from tenant-specific domains, those domains
- * must be verified in SendGrid. This includes:
- * - Adding the domain in SendGrid dashboard
- * - Verifying domain ownership via DNS records
- * - Setting up SPF, DKIM, and DMARC records
- * 
- * For subdomains (*.dukanest.com), you can verify the parent domain (dukanest.com)
- * and use subdomain authentication for individual subdomains.
+ * Get tenant contact email address for customer inquiries
+ * Uses the tenant's contact_email field if set, otherwise falls back to support email
  */
-function getTenantEmailAddress(tenant: Tenant): string {
-  if (tenant.custom_domain) {
-    // Use custom domain if available (e.g., noreply@tenantstore.com)
-    return `noreply@${tenant.custom_domain}`;
+function getTenantContactEmail(tenant: Tenant): string {
+  // First priority: use the contact_email field from the tenant record
+  if (tenant.contact_email) {
+    return tenant.contact_email;
   }
-  // Fallback to subdomain (e.g., noreply@tenantstore.dukanest.com)
-  return `noreply@${tenant.subdomain}.dukanest.com`;
+
+  // Fallback to support email using store's domain
+  if (tenant.custom_domain) {
+    return `support@${tenant.custom_domain}`;
+  }
+  return `support@${tenant.subdomain}.dukanest.com`;
+}
+
+/**
+ * Get verified sender email address for SendGrid
+ * Always returns a verified sender address (noreply@dukanest.com)
+ * This is used for the 'from' field in emails
+ */
+function getVerifiedSenderEmail(): string {
+  return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
 }
 
 interface OrderWithItems extends orders {
@@ -69,6 +74,7 @@ export async function sendOrderPlacedEmail({
   const totalAmount = Number(order.total_amount);
   const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
   const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
 
   const html = `
     <!DOCTYPE html>
@@ -130,7 +136,7 @@ export async function sendOrderPlacedEmail({
           </div>
           
           <p style="color: #666; font-size: 14px; margin-top: 30px;">
-            If you have any questions about your order, please contact us at <a href="mailto:${getTenantEmailAddress(tenant)}">${getTenantEmailAddress(tenant)}</a>
+            If you have any questions about your order, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
           </p>
           
           <p style="color: #666; font-size: 14px;">
@@ -163,7 +169,7 @@ Total: $${totalAmount.toFixed(2)}
 
 View your order: ${orderUrl}
 
-If you have any questions about your order, please contact us at ${getTenantEmailAddress(tenant)}.
+If you have any questions about your order, please contact us at ${contactEmail}.
 
 Best regards,
 ${tenant.name}
@@ -171,7 +177,7 @@ ${tenant.name}
 
   return sendEmail({
     to: customerEmail,
-    from: getTenantEmailAddress(tenant),
+    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
     fromName: tenant.name || 'Store',
     subject: `Order Confirmation - ${order.order_number}`,
     html,
@@ -189,9 +195,22 @@ export async function sendNewOrderAlertEmail({
   order: OrderWithItems;
   tenant: Tenant;
 }) {
-  // Get tenant admin email (you might want to fetch from users table)
-  // For now, we'll use a placeholder
-  const adminEmail = `${tenant.subdomain}@dukanest.com`; // TODO: Fetch actual admin email
+  // Get tenant admin email from Supabase Auth for notifications
+  // Use contact_email if available, otherwise get admin email
+  let adminEmail: string;
+  if (tenant.contact_email) {
+    adminEmail = tenant.contact_email;
+  } else if (tenant.user_id) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: user } = await adminClient.auth.admin.getUserById(tenant.user_id);
+      adminEmail = user?.user?.email || `${tenant.subdomain}@dukanest.com`;
+    } catch {
+      adminEmail = `${tenant.subdomain}@dukanest.com`;
+    }
+  } else {
+    adminEmail = `${tenant.subdomain}@dukanest.com`;
+  }
 
   const orderItems = order.order_products.map((item) => ({
     name: item.products?.name || 'Unknown Product',
@@ -300,7 +319,7 @@ Please process this order as soon as possible.
 
   return sendEmail({
     to: adminEmail,
-    from: getTenantEmailAddress(tenant),
+    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
     fromName: tenant.name || 'Store',
     subject: `New Order Alert - ${order.order_number}`,
     html,
@@ -332,6 +351,7 @@ export async function sendOrderShippedEmail({
 
   const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
   const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
 
   const html = `
     <!DOCTYPE html>
@@ -366,7 +386,7 @@ export async function sendOrderShippedEmail({
           </div>
           
           <p style="color: #666; font-size: 14px; margin-top: 30px;">
-            If you have any questions, please contact us at <a href="mailto:${getTenantEmailAddress(tenant)}">${getTenantEmailAddress(tenant)}</a>
+            If you have any questions, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
           </p>
           
           <p style="color: #666; font-size: 14px;">
@@ -380,7 +400,7 @@ export async function sendOrderShippedEmail({
 
   return sendEmail({
     to: customerEmail,
-    from: getTenantEmailAddress(tenant),
+    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
     fromName: tenant.name || 'Store',
     subject: `Your Order Has Shipped - ${order.order_number}`,
     html,
@@ -407,6 +427,7 @@ export async function sendOrderDeliveredEmail({
 
   const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
   const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
 
   const html = `
     <!DOCTYPE html>
@@ -426,7 +447,7 @@ export async function sendOrderDeliveredEmail({
           
           <p>Your order <strong>${order.order_number}</strong> has been delivered successfully!</p>
           
-          <p>We hope you're happy with your purchase. If you have any questions or concerns, please don't hesitate to contact us at <a href="mailto:${getTenantEmailAddress(tenant)}">${getTenantEmailAddress(tenant)}</a>.</p>
+          <p>We hope you're happy with your purchase. If you have any questions or concerns, please don't hesitate to contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>.</p>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="${orderUrl}" style="background: #3b82f6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
@@ -449,7 +470,7 @@ export async function sendOrderDeliveredEmail({
 
   return sendEmail({
     to: customerEmail,
-    from: getTenantEmailAddress(tenant),
+    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
     fromName: tenant.name || 'Store',
     subject: `Order Delivered - ${order.order_number}`,
     html,
@@ -480,6 +501,7 @@ export async function sendOrderCancelledEmail({
 
   const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
   const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
 
   const html = `
     <!DOCTYPE html>
@@ -521,7 +543,7 @@ export async function sendOrderCancelledEmail({
           </div>
           
           <p style="color: #666; font-size: 14px; margin-top: 30px;">
-            If you have any questions, please contact us at <a href="mailto:${getTenantEmailAddress(tenant)}">${getTenantEmailAddress(tenant)}</a>
+            If you have any questions, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
           </p>
           
           <p style="color: #666; font-size: 14px;">
@@ -535,7 +557,7 @@ export async function sendOrderCancelledEmail({
 
   return sendEmail({
     to: customerEmail,
-    from: getTenantEmailAddress(tenant),
+    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
     fromName: tenant.name || 'Store',
     subject: `Order Cancelled - ${order.order_number}`,
     html,

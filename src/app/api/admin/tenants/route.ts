@@ -23,6 +23,7 @@ const createTenantSchema = z.object({
   adminEmail: z.string().email('Invalid email address'),
   adminPassword: z.string().min(8, 'Password must be at least 8 characters'),
   adminName: z.string().min(1, 'Admin name is required'),
+  contactEmail: z.string().email('Invalid contact email address'),
   planId: z.string().uuid().optional(), // Optional plan selection
 });
 
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         subdomain: validatedData.subdomain,
+        contact_email: validatedData.contactEmail,
         status: 'active',
         start_date: new Date(),
         plan_id: validatedData.planId || null,
