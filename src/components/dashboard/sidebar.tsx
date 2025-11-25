@@ -28,6 +28,9 @@ import {
   AdjustmentsHorizontalIcon,
   ChatBubbleLeftRightIcon,
   CreditCardIcon,
+  DocumentTextIcon,
+  NewspaperIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -44,6 +47,7 @@ interface NavigationItem {
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
   group?: string;
+  submenu?: boolean; // Indicates this is a submenu item (indented under parent)
 }
 
 const navigation: NavigationItem[] = [
@@ -52,6 +56,12 @@ const navigation: NavigationItem[] = [
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Catalog' },
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
+  // Content group
+  { name: 'Pages', href: '/dashboard/pages', icon: DocumentTextIcon, group: 'Content' },
+  { name: 'Blogs', href: '/dashboard/blogs', icon: NewspaperIcon, group: 'Content' },
+  { name: 'Blog Categories', href: '/dashboard/blogs/categories', icon: TagIcon, group: 'Content', submenu: true },
+  { name: 'Forms', href: '/dashboard/forms', icon: ClipboardDocumentListIcon, group: 'Content' },
+  { name: 'Media Library', href: '/dashboard/media', icon: PhotoIcon, group: 'Content' },
   // Other items
   { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon },
   { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, adminOnly: true },
@@ -70,6 +80,7 @@ const CatalogIcon = Squares2X2Icon;
 export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externalMobileMenuOpen, setMobileMenuOpen: externalSetMobileMenuOpen, collapsed = false }: Readonly<SidebarProps>) {
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
   const [catalogExpanded, setCatalogExpanded] = useState(true);
+  const [contentExpanded, setContentExpanded] = useState(true);
   const [supportExpanded, setSupportExpanded] = useState(true);
   const pathname = usePathname();
   
@@ -85,9 +96,10 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     return true;
   });
 
-  // Group navigation items, ensuring Dashboard is first, then Catalog, then Support, then others
+  // Group navigation items, ensuring Dashboard is first, then Catalog, then Content, then Support, then others
   const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
   const catalogItems = filteredNavigation.filter((item) => item.group === 'Catalog');
+  const contentItems = filteredNavigation.filter((item) => item.group === 'Content');
   const supportItems = filteredNavigation.filter((item) => item.group === 'Support');
   const mainItems = filteredNavigation.filter((item) => !item.group && item.name !== 'Dashboard');
   
@@ -104,7 +116,12 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     orderedGroupedNavigation.push({ groupName: 'Catalog', items: catalogItems });
   }
   
-  // Third: Support group
+  // Third: Content group
+  if (contentItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Content', items: contentItems });
+  }
+  
+  // Fourth: Support group
   if (supportItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Support', items: supportItems });
   }
@@ -122,6 +139,11 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   // Check if any catalog item is active
   const isCatalogActive = filteredNavigation.some(
     (item) => item.group === 'Catalog' && (pathname === item.href || pathname.startsWith(item.href + '/'))
+  );
+
+  // Check if any content item is active
+  const isContentActive = filteredNavigation.some(
+    (item) => item.group === 'Content' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
   // Check if any support item is active
@@ -159,8 +181,9 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
               <ul role="list" className="space-y-6">
                 {orderedGroupedNavigation.map(({ groupName, items }) => {
                   const isCatalogGroup = groupName === 'Catalog';
+                  const isContentGroup = groupName === 'Content';
                   const isSupportGroup = groupName === 'Support';
-                  const isExpanded = isCatalogGroup ? catalogExpanded : (isSupportGroup ? supportExpanded : true);
+                  const isExpanded = isCatalogGroup ? catalogExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true));
                   const isMainGroup = groupName === 'Main';
                   
                   return (
@@ -171,24 +194,29 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           onClick={() => {
                             if (isCatalogGroup) {
                               setCatalogExpanded(!catalogExpanded);
+                            } else if (isContentGroup) {
+                              setContentExpanded(!contentExpanded);
                             } else if (isSupportGroup) {
                               setSupportExpanded(!supportExpanded);
                             }
                           }}
                           className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                            (isCatalogGroup && isCatalogActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                            (isCatalogGroup && isCatalogActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             {isCatalogGroup && (
                               <CatalogIcon className="h-4 w-4" />
                             )}
+                            {isContentGroup && (
+                              <DocumentTextIcon className="h-4 w-4" />
+                            )}
                             {isSupportGroup && (
                               <ChatBubbleLeftRightIcon className="h-4 w-4" />
                             )}
                             <span>{groupName}</span>
                           </div>
-                          {(isCatalogGroup || isSupportGroup) && (
+                          {(isCatalogGroup || isContentGroup || isSupportGroup) && (
                             <ChevronDownIcon
                               className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                             />
@@ -203,11 +231,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
                             return (
-                              <li key={item.name}>
+                              <li key={item.href}>
                                 <Link
                                   href={item.href}
                                   onClick={() => setMobileMenuOpen(false)}
-                                  className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                                  className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                    item.submenu ? 'px-6' : 'px-3'
+                                  } ${
                                     isActive
                                       ? 'bg-primary text-primary-foreground shadow-sm'
                                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -255,8 +285,9 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
             <ul role="list" className="flex flex-1 flex-col gap-y-4">
               {orderedGroupedNavigation.map(({ groupName, items }) => {
                 const isCatalogGroup = groupName === 'Catalog';
+                const isContentGroup = groupName === 'Content';
                 const isSupportGroup = groupName === 'Support';
-                const isExpanded = isCatalogGroup ? catalogExpanded : (isSupportGroup ? supportExpanded : true);
+                const isExpanded = isCatalogGroup ? catalogExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true));
                 const isMainGroup = groupName === 'Main';
                 
                 return (
@@ -267,24 +298,29 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                         onClick={() => {
                           if (isCatalogGroup) {
                             setCatalogExpanded(!catalogExpanded);
+                          } else if (isContentGroup) {
+                            setContentExpanded(!contentExpanded);
                           } else if (isSupportGroup) {
                             setSupportExpanded(!supportExpanded);
                           }
                         }}
                         className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                          (isCatalogGroup && isCatalogActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                          (isCatalogGroup && isCatalogActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           {isCatalogGroup && (
                             <CatalogIcon className="h-4 w-4" />
                           )}
+                          {isContentGroup && (
+                            <DocumentTextIcon className="h-4 w-4" />
+                          )}
                           {isSupportGroup && (
                             <ChatBubbleLeftRightIcon className="h-4 w-4" />
                           )}
                           <span>{groupName}</span>
                         </div>
-                        {(isCatalogGroup || isSupportGroup) && (
+                        {(isCatalogGroup || isContentGroup || isSupportGroup) && (
                           <ChevronDownIcon
                             className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                           />
@@ -299,10 +335,12 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             ? pathname === item.href
                             : pathname === item.href || pathname.startsWith(item.href + '/');
                           return (
-                            <li key={item.name}>
+                            <li key={item.href}>
                               <Link
                                 href={item.href}
-                                className={`group flex gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                                className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                  item.submenu ? 'px-6' : 'px-3'
+                                } ${
                                   collapsed ? 'justify-center' : ''
                                 } ${
                                   isActive

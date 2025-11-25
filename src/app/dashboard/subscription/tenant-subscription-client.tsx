@@ -147,7 +147,7 @@ export default function TenantSubscriptionClient({
   });
 
   // Calculate renewal date (same as expire_date for now)
-  const renewalDate = tenant.expire_date;
+  const renewalDate = tenant.expire_date ?? null;
   const daysUntilRenewal = getDaysUntil(renewalDate);
   const isExpiringSoon = daysUntilRenewal > 0 && daysUntilRenewal <= 7;
 
@@ -160,11 +160,28 @@ export default function TenantSubscriptionClient({
     setUpgradeSuccess(null);
 
     try {
-      // Note: In a real implementation, this would redirect to payment gateway
-      // For now, we'll just show a message
-      setUpgradeSuccess('Upgrade request received. Please contact support to complete the upgrade.');
+      const response = await fetch('/api/dashboard/subscription/activate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ plan_id: planId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to activate subscription');
+      }
+
+      const data = await response.json();
+      setUpgradeSuccess(data.message || 'Subscription activated successfully!');
+      
+      // Refresh the page after a short delay to show the success message
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (error) {
-      setUpgradeError('Failed to process upgrade request');
+      setUpgradeError(error instanceof Error ? error.message : 'Failed to activate subscription');
     } finally {
       setIsUpgrading(false);
     }
@@ -204,7 +221,7 @@ export default function TenantSubscriptionClient({
                     ? 'Trial Expires'
                     : 'Renewal Date'}
                 </p>
-                <p className="text-xl font-bold flex items-center gap-2">
+                <div className="text-xl font-bold flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" />
                   {formatDateShort(renewalDate)}
                   {isExpiringSoon && (
@@ -217,7 +234,7 @@ export default function TenantSubscriptionClient({
                       Trial
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Status</p>
@@ -338,12 +355,12 @@ export default function TenantSubscriptionClient({
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-1">Started</p>
                       <p className="font-semibold">
-                        {formatDate(tenant.start_date || tenant.created_at)}
+                        {formatDate(tenant.created_at)}
                       </p>
                     </div>
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-1">Expires</p>
-                      <p className="font-semibold">{formatDate(tenant.expire_date)}</p>
+                      <p className="font-semibold">{formatDate(tenant.expire_date ?? null)}</p>
                     </div>
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-1">Days Until Renewal</p>

@@ -131,7 +131,7 @@ export async function POST(
     // Send email notification
     sendLandlordTicketReplyEmail({
       ticket,
-      tenant: ticket.tenants,
+      tenant: ticket.tenants as any,
       message: validatedData.message,
       isFromTenant,
     }).catch((error) => {

@@ -260,22 +260,23 @@ model customers {
 }
 
 model landlord_users {
-  id                           String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                         String                        @db.VarChar(255)
-  email                        String                        @unique @db.VarChar(255)
-  password                     String                        @db.VarChar(255)
-  username                     String?                       @unique @db.VarChar(255)
-  email_verified               Boolean?                      @default(false)
-  email_verify_token           String?                       @db.VarChar(255)
-  mobile                       String?                       @db.VarChar(20)
-  company                      String?                       @db.VarChar(255)
-  address                      String?
-  city                         String?                       @db.VarChar(100)
-  state                        String?                       @db.VarChar(100)
-  country                      String?                       @db.VarChar(100)
-  image                        String?                       @db.VarChar(255)
-  created_at                   DateTime?                     @default(now()) @db.Timestamp(6)
-  updated_at                   DateTime?                     @default(now()) @db.Timestamp(6)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String    @db.VarChar(255)
+  email              String    @unique @db.VarChar(255)
+  password           String    @db.VarChar(255)
+  username           String?   @unique @db.VarChar(255)
+  email_verified     Boolean?  @default(false)
+  email_verify_token String?   @db.VarChar(255)
+  mobile             String?   @db.VarChar(20)
+  company            String?   @db.VarChar(255)
+  address            String?
+  city               String?   @db.VarChar(100)
+  state              String?   @db.VarChar(100)
+  country            String?   @db.VarChar(100)
+  image              String?   @db.VarChar(255)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+
   @@index([email], map: "idx_landlord_users_email")
 }
 
@@ -294,6 +295,9 @@ model media_uploads {
   tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([tenant_id], map: "idx_media_uploads_tenant_id")
+  @@index([tenant_id, created_at], map: "idx_media_uploads_tenant_created")
+  @@index([title], map: "idx_media_uploads_title")
+  @@index([path], map: "idx_media_uploads_path")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -362,6 +366,7 @@ model pages {
   title            String    @db.VarChar(255)
   slug             String?   @unique @db.VarChar(255)
   content          String?
+  banner_image     String?   @db.VarChar(255)
   meta_title       String?   @db.VarChar(255)
   meta_description String?
   meta_tags        String?
@@ -373,6 +378,47 @@ model pages {
   @@index([slug], map: "idx_pages_slug")
   @@index([tenant_id], map: "idx_pages_tenant_id")
   @@index([tenant_id, status], map: "idx_pages_tenant_status")
+  @@index([tenant_id, created_at], map: "idx_pages_tenant_created")
+  @@index([title], map: "idx_pages_title")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model form_builders {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String             @db.Uuid
+  title            String             @db.VarChar(255)
+  slug             String?            @db.VarChar(255)
+  description      String?
+  email            String?            @db.VarChar(255)
+  button_text      String?            @default("Submit") @db.VarChar(100)
+  fields           Json?              @default("[]")
+  success_message  String?
+  status           String?            @default("active") @db.VarChar(50)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(6)
+  tenants          tenants            @relation("FormBuildersToTenants", fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  form_submissions form_submissions[] @relation("FormSubmissionsToFormBuilders")
+
+  @@unique([tenant_id, slug], map: "idx_form_builders_tenant_slug")
+  @@index([tenant_id], map: "idx_form_builders_tenant_id")
+  @@index([tenant_id, status], map: "idx_form_builders_tenant_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model form_submissions {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id     String        @db.Uuid
+  form_id       String        @db.Uuid
+  data          Json?         @default("{}")
+  ip_address    String?       @db.VarChar(45)
+  user_agent    String?
+  created_at    DateTime?     @default(now()) @db.Timestamp(6)
+  tenants       tenants       @relation("FormSubmissionsToTenants", fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  form_builders form_builders @relation("FormSubmissionsToFormBuilders", fields: [form_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_form_submissions_tenant_id")
+  @@index([form_id], map: "idx_form_submissions_form_id")
+  @@index([tenant_id, form_id], map: "idx_form_submissions_tenant_form")
 }
 
 model payment_logs {
@@ -630,52 +676,54 @@ model support_tickets {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
-  id                      String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                 String?                      @db.Uuid
-  subdomain               String                       @unique @db.VarChar(255)
-  custom_domain           String?                      @unique @db.VarChar(255)
-  name                    String                       @db.VarChar(255)
-  contact_email           String?                      @db.VarChar(255)
-  plan_id                 String?                      @db.Uuid
-  expire_date             DateTime?                    @db.Timestamp(6)
-  start_date              DateTime?                    @default(now()) @db.Timestamp(6)
-  renew_status            String?                      @db.VarChar(50)
-  status                  String?                      @default("active") @db.VarChar(50)
-  theme_slug              String?                      @db.VarChar(100)
-  data                    Json?                        @default("{}")
-  created_at              DateTime?                    @default(now()) @db.Timestamp(6)
-  updated_at              DateTime?                    @default(now()) @db.Timestamp(6)
-  attribute_values        attribute_values[]
-  attributes              attributes[]
-  variant_attributes      product_variant_attributes[]
-  blog_categories         blog_categories[]
-  blogs                   blogs[]
-  brands                  brands[]
-  cart_items              cart_items[]
-  categories              categories[]
-  cities                  cities[]
-  countries               countries[]
-  coupons                 coupons[]
-  customers               customers[]
-  media_uploads           media_uploads[]
-  order_products          order_products[]
-  orders                  orders[]
-  pages                   pages[]
-  payment_logs            payment_logs[]
-  product_categories      product_categories[]
-  product_reviews         product_reviews[]
-  product_variants        product_variants[]
-  product_wishlists       product_wishlists[]
-  products                products[]
-  states                  states[]
-  static_options          static_options[]
-  support_ticket_messages support_ticket_messages[]
-  support_tickets         support_tickets[]
+  id                       String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                  String?                      @db.Uuid
+  subdomain                String                       @unique @db.VarChar(255)
+  custom_domain            String?                      @unique @db.VarChar(255)
+  name                     String                       @db.VarChar(255)
+  contact_email            String?                      @db.VarChar(255)
+  plan_id                  String?                      @db.Uuid
+  expire_date              DateTime?                    @db.Timestamp(6)
+  start_date               DateTime?                    @default(now()) @db.Timestamp(6)
+  renew_status             String?                      @db.VarChar(50)
+  status                   String?                      @default("active") @db.VarChar(50)
+  theme_slug               String?                      @db.VarChar(100)
+  data                     Json?                        @default("{}")
+  created_at               DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at               DateTime?                    @default(now()) @db.Timestamp(6)
+  attribute_values         attribute_values[]
+  attributes               attributes[]
+  variant_attributes       product_variant_attributes[]
+  blog_categories          blog_categories[]
+  blogs                    blogs[]
+  brands                   brands[]
+  cart_items               cart_items[]
+  categories               categories[]
+  cities                   cities[]
+  countries                countries[]
+  coupons                  coupons[]
+  customers                customers[]
+  form_builders            form_builders[]            @relation("FormBuildersToTenants")
+  form_submissions         form_submissions[]        @relation("FormSubmissionsToTenants")
+  media_uploads            media_uploads[]
+  order_products           order_products[]
+  orders                   orders[]
+  pages                    pages[]
+  payment_logs             payment_logs[]
+  product_categories       product_categories[]
+  product_reviews          product_reviews[]
+  product_variants         product_variants[]
+  product_wishlists        product_wishlists[]
+  products                 products[]
+  states                   states[]
+  static_options           static_options[]
+  support_ticket_messages  support_ticket_messages[]
+  support_tickets          support_tickets[]
   landlord_support_tickets landlord_support_tickets[]
-  price_plans             price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user_delivery_addresses user_delivery_addresses[]
-  wallets                 wallets[]
-  inventoryHistories      inventory_history[]
+  price_plans              price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user_delivery_addresses  user_delivery_addresses[]
+  wallets                  wallets[]
+  inventoryHistories       inventory_history[]
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
@@ -771,18 +819,18 @@ model wallets {
 /// Tickets created by tenants to contact the landlord/platform admin
 /// Note: user_id can reference Supabase auth.users (for tenant admins) or landlord_users (for landlord admins)
 model landlord_support_tickets {
-  id                            String                            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id                     String                            @db.Uuid
-  user_id                       String?                           @db.Uuid
-  subject                       String                            @db.VarChar(255)
-  description                   String                            @db.Text
-  status                        String?                           @default("open") @db.VarChar(50)
-  priority                      String?                           @default("medium") @db.VarChar(50)
-  category                      String?                           @db.VarChar(50)
-  created_at                    DateTime?                          @default(now()) @db.Timestamp(6)
-  updated_at                    DateTime?                          @default(now()) @db.Timestamp(6)
+  id                               String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                        String                             @db.Uuid
+  user_id                          String?                            @db.Uuid
+  subject                          String                             @db.VarChar(255)
+  description                      String                             @db.Text
+  status                           String?                            @default("open") @db.VarChar(50)
+  priority                         String?                            @default("medium") @db.VarChar(50)
+  category                         String?                            @db.VarChar(50)
+  created_at                       DateTime?                          @default(now()) @db.Timestamp(6)
+  updated_at                       DateTime?                          @default(now()) @db.Timestamp(6)
   landlord_support_ticket_messages landlord_support_ticket_messages[]
-  tenants                       tenants                            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants                          tenants                            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   // Note: user_id can be from Supabase auth.users (tenant admins) or landlord_users (landlord admins)
   // No foreign key constraint to allow flexibility
 
@@ -796,12 +844,12 @@ model landlord_support_tickets {
 /// Messages/replies in landlord support tickets
 /// Note: user_id can reference Supabase auth.users (for tenant admins) or landlord_users (for landlord admins)
 model landlord_support_ticket_messages {
-  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ticket_id             String                    @db.Uuid
-  user_id               String?                   @db.Uuid
-  message               String                    @db.Text
-  attachments           Json?                     @default("[]")
-  created_at            DateTime?                 @default(now()) @db.Timestamp(6)
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id                String                   @db.Uuid
+  user_id                  String?                  @db.Uuid
+  message                  String                   @db.Text
+  attachments              Json?                    @default("[]")
+  created_at               DateTime?                @default(now()) @db.Timestamp(6)
   landlord_support_tickets landlord_support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   // Note: user_id can be from Supabase auth.users (tenant admins) or landlord_users (landlord admins)
   // No foreign key constraint to allow flexibility

@@ -1844,38 +1844,63 @@ vercel env add VERCEL_TOKEN
   - [x] Subscription management endpoints ✅
   - [x] Payment reminders endpoint ✅
 
-**Day 27-29: Content Management (24 hours)**
-- [ ] **Day 27 Morning (4h):** Page builder foundation
-  - [ ] Page builder (for tenant stores)
-  - [ ] Drag-and-drop page editor
-  - [ ] Section templates (hero, features, testimonials, etc.)
-  - [ ] Page preview functionality
-- [ ] **Day 27 Afternoon (4h):** Homepage customization
-  - [ ] Homepage template builder
-  - [ ] Hero section customization
-  - [ ] Featured products section
-  - [ ] Custom sections/widgets
-  - [ ] Homepage preview and publish
-- [ ] **Day 28 Morning (4h):** Blog management
-  - [ ] Blog post creation/editing
-  - [ ] Blog categories and tags
-  - [ ] Blog listing page
-  - [ ] Blog detail page
-- [ ] **Day 28 Afternoon (4h):** Form builder
-  - [ ] Drag-and-drop form builder
-  - [ ] Form field types (text, email, select, etc.)
-  - [ ] Form submission handling
-  - [ ] Form data management
-- [ ] **Day 29 Morning (4h):** Media library
-  - [ ] Image upload and management
-  - [ ] File organization (folders, tags)
-  - [ ] Media gallery
-  - [ ] Image optimization
-- [ ] **Day 29 Afternoon (4h):** SEO management
-  - [ ] SEO settings per page
-  - [ ] Meta tags management
-  - [ ] Sitemap generation
-  - [ ] Robots.txt configuration
+**Day 27-29: Content Management (16-20 hours)** ⭐ **UPDATED: Using Custom CMS with Existing Schema**
+
+**📄 Analysis:** See [`CMS_OPTIONS_ANALYSIS.md`](CMS_OPTIONS_ANALYSIS.md) for detailed comparison. **Recommendation: Build custom CMS using existing `pages` and `blogs` tables** (saves 20-30 hours vs. third-party integration).
+
+- [ ] **Day 27 Morning (4h):** Pages Management ✅ Using Existing Schema
+  - [ ] Create `/dashboard/pages` page (list pages)
+  - [ ] Create `/dashboard/pages/new` page (create page form)
+  - [ ] Create `/dashboard/pages/[id]/edit` page (edit page form)
+  - [ ] Integrate rich text editor (`@tiptap/react` or `react-quill`)
+  - [ ] Add SEO fields (meta_title, meta_description, meta_tags)
+  - [ ] Implement status management (draft/published)
+  - [ ] Add slug generation and validation
+- [ ] **Day 27 Afternoon (4h):** Blogs Management ✅ Using Existing Schema
+  - [ ] Create `/dashboard/blogs` page (list blog posts)
+  - [ ] Create `/dashboard/blogs/new` page (create blog form)
+  - [ ] Create `/dashboard/blogs/[id]/edit` page (edit blog form)
+  - [ ] Integrate rich text editor
+  - [ ] Create blog categories management (`/dashboard/blogs/categories`)
+  - [ ] Add featured image upload (Supabase Storage)
+  - [ ] Implement excerpt field
+  - [ ] Add SEO fields
+- [ ] **Day 28 Morning (4h):** Media Library
+  - [ ] Create `/dashboard/media` page (media gallery)
+  - [ ] Implement image upload to Supabase Storage
+  - [ ] Add image preview and selection
+  - [ ] Create media upload API endpoint
+  - [ ] Add image optimization (optional - can use Supabase transforms)
+  - [ ] Implement basic file organization (optional)
+- [ ] **Day 28 Afternoon (4h):** Simple Page Builder (Section-Based)
+  - [ ] Create section templates (hero, features, products, testimonials)
+  - [ ] Build simple page builder UI (section selection)
+  - [ ] Store page content as JSON in `content` field
+  - [ ] Implement section preview
+  - [ ] Add homepage customization (special page type)
+  - [ ] **Alternative:** Use `react-page` library for drag-and-drop (if needed)
+- [ ] **Day 29 Morning (4h):** Form Builder (Simple)
+  - [ ] Create form builder UI (using `react-form-builder2` or custom)
+  - [ ] Add form field types (text, email, select, textarea, etc.)
+  - [ ] Store form definitions in database (new `forms` table or JSON)
+  - [ ] Create form submission API endpoint
+  - [ ] Build form submissions management UI
+- [ ] **Day 29 Afternoon (4h):** SEO & Content Tools
+  - [ ] Add SEO preview component (shows how page appears in search)
+  - [ ] Implement sitemap generation (`/sitemap.xml` per tenant)
+  - [ ] Create robots.txt generation (per tenant)
+  - [ ] Add meta tags preview
+  - [ ] Implement content search (optional)
+- [ ] **Postman Collection:** Update with content management endpoints
+  - [ ] Add pages CRUD endpoints (`/api/pages/*`)
+  - [ ] Add blogs CRUD endpoints (`/api/blogs/*`)
+  - [ ] Add blog categories endpoints (`/api/blogs/categories/*`)
+  - [ ] Add media upload endpoints (`/api/media/*`)
+  - [ ] Add forms endpoints (`/api/forms/*`)
+  
+  **📄 Documentation:** 
+  - See [`CMS_OPTIONS_ANALYSIS.md`](CMS_OPTIONS_ANALYSIS.md) for why custom CMS was chosen over third-party solutions
+  - **Key Advantage:** Uses existing `pages` and `blogs` tables with `tenant_id` - no schema changes needed!
 
 ---
 

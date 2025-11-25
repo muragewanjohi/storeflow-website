@@ -38,7 +38,7 @@ export async function GET(
             id: true,
             name: true,
             email: true,
-            phone: true,
+            mobile: true,
           },
         },
         support_ticket_messages: {

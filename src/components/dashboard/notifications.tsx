@@ -54,7 +54,7 @@ function formatTimeAgo(date: Date | string): string {
     return `${diffInDays}d ago`;
   }
 
-  return date.toLocaleDateString();
+  return dateObj.toLocaleDateString();
 }
 
 function getNotificationIcon(type: Notification['type']): string {

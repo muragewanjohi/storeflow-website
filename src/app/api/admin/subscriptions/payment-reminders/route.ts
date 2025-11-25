@@ -79,7 +79,13 @@ export async function GET(request: NextRequest) {
           await sendSubscriptionRenewalReminderEmail({
             tenant: tenant as any,
             expireDate: tenant.expire_date,
-            plan: tenant.price_plans,
+            plan: tenant.price_plans
+              ? {
+                  name: tenant.price_plans.name,
+                  price: Number(tenant.price_plans.price),
+                  duration_months: tenant.price_plans.duration_months,
+                }
+              : null,
           });
           results.renewal_reminders_sent++;
         }
@@ -88,7 +94,13 @@ export async function GET(request: NextRequest) {
         if (daysUntilExpiry <= 7) {
           await sendPaymentDueReminderEmail({
             tenant: tenant as any,
-            plan: tenant.price_plans,
+            plan: tenant.price_plans
+              ? {
+                  name: tenant.price_plans.name,
+                  price: Number(tenant.price_plans.price),
+                  duration_months: tenant.price_plans.duration_months,
+                }
+              : null,
             amount: Number(tenant.price_plans.price),
             dueDate: tenant.expire_date,
           });

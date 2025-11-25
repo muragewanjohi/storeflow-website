@@ -45,7 +45,7 @@ export default async function TicketDetailPage({
             id: true,
             name: true,
             email: true,
-            phone: true,
+            mobile: true,
           },
         },
         support_ticket_messages: {

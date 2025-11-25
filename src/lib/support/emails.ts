@@ -18,22 +18,8 @@ async function getTenantAdminEmail(tenant: Tenant): Promise<string> {
     return tenant.contact_email;
   }
 
-  // Fallback to tenant admin user email
-  const { prisma } = await import('@/lib/prisma/client');
-  const adminUser = await prisma.users.findFirst({
-    where: {
-      tenant_id: tenant.id,
-      role: 'tenant_admin',
-    },
-    select: {
-      email: true,
-    },
-  });
-
-  if (adminUser?.email) {
-    return adminUser.email;
-  }
-
+  // Note: Tenant admins are stored in Supabase auth, not in Prisma
+  // We can't query them directly, so we use the tenant's contact_email as fallback
   // Final fallback
   return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
 }

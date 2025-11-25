@@ -87,7 +87,13 @@ export async function GET(request: NextRequest) {
             // Send expired email notification (only once when status changes)
             sendSubscriptionExpiredEmail({
               tenant: tenant as any,
-              plan: tenant.price_plans,
+              plan: tenant.price_plans
+                ? {
+                    name: tenant.price_plans.name,
+                    price: Number(tenant.price_plans.price),
+                    duration_months: tenant.price_plans.duration_months,
+                  }
+                : null,
             }).catch((error) => {
               console.error(`Error sending expired email to tenant ${tenant.id}:`, error);
             });

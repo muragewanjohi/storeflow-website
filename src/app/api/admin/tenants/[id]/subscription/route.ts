@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth, requireRole } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { changeSubscriptionSchema } from '@/lib/subscriptions/validation';
@@ -113,13 +114,19 @@ export async function PUT(
 
     // Send email notifications
     const oldPlan = tenant.price_plans;
-    const newPlan = updatedTenant.price_plans;
+    const updatedPlan = updatedTenant.price_plans;
 
     // Send activation email if this is a new subscription or renewal
     if (action === 'renew' || !oldPlan) {
       sendSubscriptionActivatedEmail({
         tenant: updatedTenant as any,
-        plan: newPlan,
+        plan: updatedPlan
+          ? {
+              name: updatedPlan.name,
+              price: Number(updatedPlan.price),
+              duration_months: updatedPlan.duration_months,
+            }
+          : null,
         expireDate: updatedTenant.expire_date || new Date(),
       }).catch((error) => {
         console.error('Error sending subscription activated email:', error);
@@ -127,7 +134,7 @@ export async function PUT(
     }
 
     // Send upgrade confirmation if upgrading
-    if (action === 'upgrade' && oldPlan && newPlan) {
+    if (action === 'upgrade' && oldPlan && updatedPlan) {
       sendPlanUpgradeConfirmationEmail({
         tenant: updatedTenant as any,
         oldPlan: {
@@ -135,9 +142,9 @@ export async function PUT(
           price: Number(oldPlan.price),
         },
         newPlan: {
-          name: newPlan.name,
-          price: Number(newPlan.price),
-          duration_months: newPlan.duration_months,
+          name: updatedPlan.name,
+          price: Number(updatedPlan.price),
+          duration_months: updatedPlan.duration_months,
         },
         expireDate: updatedTenant.expire_date || new Date(),
       }).catch((error) => {

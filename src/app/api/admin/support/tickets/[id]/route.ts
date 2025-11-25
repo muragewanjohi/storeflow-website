@@ -174,7 +174,7 @@ export async function PUT(
     if (validatedData.status && validatedData.status !== oldStatus) {
       sendLandlordTicketStatusUpdateEmail({
         ticket,
-        tenant: ticket.tenants,
+        tenant: ticket.tenants as any,
         oldStatus,
         newStatus: validatedData.status,
       }).catch((error) => {

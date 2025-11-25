@@ -160,6 +160,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // For tenant admins, tenant must exist
+    if (!tenant) {
+      return NextResponse.json(
+        { error: 'Tenant not found. Tenant admins must belong to a tenant.' },
+        { status: 404 }
+      );
+    }
+
     const ticket = await prisma.landlord_support_tickets.create({
       data: {
         tenant_id: tenant.id,
@@ -185,7 +193,7 @@ export async function POST(request: NextRequest) {
     // Send email notification to landlord admin
     sendNewLandlordTicketEmail({
       ticket,
-      tenant,
+      tenant: tenant as any,
     }).catch((error) => {
       console.error('Error sending new landlord ticket email:', error);
     });

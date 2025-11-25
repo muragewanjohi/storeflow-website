@@ -551,11 +551,11 @@ export async function GET(request: NextRequest) {
       ...lowStockVariants.map((v) => ({
         id: v.id,
         name: `${v.products.name} (Variant)`,
-        stock: v.stock_quantity,
+        stock: v.stock_quantity || 0,
         isVariant: true,
       })),
     ]
-      .sort((a, b) => a.stock - b.stock)
+      .sort((a, b) => (a.stock || 0) - (b.stock || 0))
       .slice(0, 10);
 
     for (const item of allLowStock) {
