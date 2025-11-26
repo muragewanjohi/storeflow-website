@@ -63,24 +63,42 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send welcome email (async, don't wait)
-    (async () => {
-      try {
-        const { sendCustomerWelcomeEmail } = await import('@/lib/customers/emails');
-        await sendCustomerWelcomeEmail({
-          customer: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-          },
-          tenant,
-          verificationToken: emailVerifyToken,
-        });
-      } catch (error) {
-        console.error('Error sending welcome email:', error);
-        // Don't fail customer creation if email fails
-      }
-    })();
+            // Send welcome email (async, don't wait)
+            (async () => {
+              try {
+                const { sendCustomerWelcomeEmail } = await import('@/lib/customers/emails');
+                await sendCustomerWelcomeEmail({
+                  customer: {
+                    id: customer.id,
+                    name: customer.name,
+                    email: customer.email,
+                  },
+                  tenant,
+                  verificationToken: emailVerifyToken,
+                });
+              } catch (error) {
+                console.error('Error sending welcome email:', error);
+                // Don't fail customer creation if email fails
+              }
+            })();
+
+            // Link guest orders to customer account (if guest orders exist)
+            // This happens in the background - don't wait for it
+            (async () => {
+              try {
+                const { linkGuestOrdersToCustomer } = await import('@/lib/orders/link-guest-orders');
+                const linkedCount = await linkGuestOrdersToCustomer(
+                  customer.id,
+                  customer.email,
+                  tenant.id
+                );
+                if (linkedCount > 0) {
+                  console.log(`Linked ${linkedCount} guest order(s) to customer account`);
+                }
+              } catch (err) {
+                console.error('Failed to link guest orders:', err); // Log error but don't block registration
+              }
+            })();
 
     return NextResponse.json(
       {

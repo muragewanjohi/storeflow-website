@@ -65,6 +65,9 @@ export async function POST(
     }
 
     // Restore inventory (increase stock)
+    // Track which products have variants so we can sync product-level stock
+    const productsWithVariants = new Set<string>();
+    
     for (const item of order.order_products) {
       if (item.variant_id) {
         // Restore variant stock
@@ -76,8 +79,11 @@ export async function POST(
             },
           },
         });
+        if (item.product_id) {
+          productsWithVariants.add(item.product_id);
+        }
       } else if (item.product_id) {
-        // Restore product stock
+        // Restore product stock (only when no variants exist)
         await prisma.products.update({
           where: { id: item.product_id },
           data: {
@@ -87,6 +93,12 @@ export async function POST(
           },
         });
       }
+    }
+
+    // Sync product-level stock for products with variants
+    const { syncProductStockFromVariants } = await import('@/lib/inventory/sync-product-stock');
+    for (const productId of productsWithVariants) {
+      await syncProductStockFromVariants(productId, tenant.id);
     }
 
     // Update order status

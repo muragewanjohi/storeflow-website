@@ -43,6 +43,13 @@ export default async function EditPagePage({
     status: (page.status || 'draft') as 'draft' | 'published' | 'archived',
   };
 
-  return <PageFormClient page={pageWithDefaults} />;
+  // Get base URL for SEO preview
+  const baseUrl = tenant.custom_domain
+    ? `https://${tenant.custom_domain}`
+    : tenant.subdomain
+    ? `https://${tenant.subdomain}.dukanest.com`
+    : 'https://example.com';
+
+  return <PageFormClient page={pageWithDefaults} baseUrl={baseUrl} />;
 }
 

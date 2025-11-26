@@ -4,7 +4,7 @@
  * Email templates and functions for customer-related notifications
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendCustomerEmail } from '@/lib/email/service';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
 
@@ -90,12 +90,11 @@ export async function sendCustomerWelcomeEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customer.email,
-    from: tenantEmail,
-    fromName: tenant.name || 'Store',
     subject: `Welcome to ${tenant.name}!`,
     html,
+    tenant,
   });
 }
 
@@ -166,12 +165,11 @@ export async function sendCustomerPasswordResetEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customer.email,
-    from: tenantEmail,
-    fromName: tenant.name || 'Store',
     subject: `Reset Your Password - ${tenant.name}`,
     html,
+    tenant,
   });
 }
 
@@ -236,12 +234,11 @@ export async function sendCustomerEmailVerificationEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customer.email,
-    from: tenantEmail,
-    fromName: tenant.name || 'Store',
     subject: `Verify Your Email - ${tenant.name}`,
     html,
+    tenant,
   });
 }
 

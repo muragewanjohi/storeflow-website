@@ -11,6 +11,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import InventoryHistoryClient from './inventory-history-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InventoryHistoryPage({
   searchParams,
 }: {

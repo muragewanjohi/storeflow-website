@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     const results = [];
     const errors = [];
+    const productsToSync = new Set<string>();
 
     // Process each update
     for (const update of validatedData.updates) {
@@ -170,11 +171,26 @@ export async function POST(request: NextRequest) {
             quantity_after: quantityAfter,
             success: true,
           });
+
+          // Track product for syncing if variant belongs to a product
+          if (variant.product_id) {
+            productsToSync.add(variant.product_id);
+          }
         }
       } catch (error) {
         errors.push({
           update,
           error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    // Sync product-level stock for all products with variants
+    if (productsToSync.size > 0) {
+      const { syncProductStockFromVariants } = await import('@/lib/inventory/sync-product-stock');
+      for (const productId of productsToSync) {
+        await syncProductStockFromVariants(productId, tenant.id).catch((err) => {
+          console.error(`Error syncing product stock for ${productId}:`, err);
         });
       }
     }

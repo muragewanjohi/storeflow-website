@@ -134,6 +134,12 @@ export async function POST(request: NextRequest) {
         where: { id: validatedData.variant_id },
         data: { stock_quantity: quantityAfter },
       });
+
+      // Sync product-level stock if this variant belongs to a product
+      if (validatedData.product_id) {
+        const { syncProductStockFromVariants } = await import('@/lib/inventory/sync-product-stock');
+        await syncProductStockFromVariants(validatedData.product_id, tenant.id);
+      }
     }
 
     // Create inventory history record

@@ -13,6 +13,8 @@ import { prisma } from '@/lib/prisma/client';
 import { getLowStockThreshold } from '@/lib/inventory/threshold';
 import InventoryDashboardClient from './inventory-dashboard-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InventoryPage() {
   // Require authentication and tenant_admin or tenant_staff role
   const user = await requireAuthOrRedirect('/login');

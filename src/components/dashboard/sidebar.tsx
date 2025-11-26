@@ -31,6 +31,7 @@ import {
   DocumentTextIcon,
   NewspaperIcon,
   PhotoIcon,
+  ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -52,6 +53,7 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon },
   // Catalog group
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Catalog' },
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },

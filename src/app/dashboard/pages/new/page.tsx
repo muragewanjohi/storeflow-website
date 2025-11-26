@@ -18,6 +18,13 @@ export default async function NewPagePage() {
     return null;
   }
 
-  return <PageFormClient />;
+  // Get base URL for SEO preview
+  const baseUrl = tenant.custom_domain
+    ? `https://${tenant.custom_domain}`
+    : tenant.subdomain
+    ? `https://${tenant.subdomain}.dukanest.com`
+    : 'https://example.com';
+
+  return <PageFormClient baseUrl={baseUrl} />;
 }
 

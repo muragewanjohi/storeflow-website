@@ -5,7 +5,7 @@
  * Implements best practices: digest emails, rate limiting, and user preferences
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendAdminEmail } from '@/lib/email/service';
 import type { Tenant } from '@/lib/tenant-context';
 import type { Notification, NotificationType } from './types';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -169,12 +169,12 @@ export async function sendImmediateNotificationEmail({
   const subject = getNotificationSubject(notification);
   const html = generateImmediateNotificationEmail(notification, tenant, dashboardUrl);
 
-  const result = await sendEmail({
+  // Use unified email service - automatically handles verified sender
+  const result = await sendAdminEmail({
     to: tenantEmail,
-    from: tenantEmail,
-    fromName: tenant.name || 'Store',
     subject,
     html,
+    tenant,
   });
 
   if (result.success) {
@@ -221,12 +221,12 @@ export async function sendNotificationDigestEmail({
   const html = generateDigestEmail(digestNotifications, tenant, dashboardUrl);
   const subject = `Daily Digest - ${digestNotifications.length} Notification${digestNotifications.length > 1 ? 's' : ''}`;
 
-  const result = await sendEmail({
+  // Use unified email service - automatically handles verified sender
+  const result = await sendAdminEmail({
     to: tenantEmail,
-    from: tenantEmail,
-    fromName: tenant.name || 'Store',
     subject,
     html,
+    tenant,
   });
 
   if (result.success) {

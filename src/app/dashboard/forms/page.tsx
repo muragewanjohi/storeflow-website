@@ -8,6 +8,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import FormsListClient from './forms-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function FormsPage() {
   const user = await requireAuthOrRedirect('/login');
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/login');

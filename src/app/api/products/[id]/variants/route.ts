@@ -226,6 +226,13 @@ export async function POST(
       });
     });
 
+    // Sync product-level stock after creating variant
+    // Product-level stock should equal sum of all variant stocks
+    const { syncProductStockFromVariants } = await import('@/lib/inventory/sync-product-stock');
+    await syncProductStockFromVariants(id, tenant.id).catch((err) => {
+      console.error('Error syncing product stock after variant creation:', err);
+    });
+
     return NextResponse.json(
       { variant },
       { status: 201 }

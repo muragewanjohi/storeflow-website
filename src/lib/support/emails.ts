@@ -4,7 +4,7 @@
  * Email templates and functions for support ticket-related notifications
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendCustomerEmail, sendAdminEmail } from '@/lib/email/service';
 import type { support_tickets } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { getTenantContactEmail } from '@/lib/orders/emails';
@@ -23,6 +23,9 @@ async function getTenantAdminEmail(tenant: Tenant): Promise<string> {
   // Final fallback
   return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
 }
+
+// Note: tenantEmail usage has been replaced with unified email service
+// The service automatically handles reply-to addresses
 
 /**
  * Send email notification when a new ticket is created
@@ -115,12 +118,11 @@ export async function sendNewTicketEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendAdminEmail({
       to: adminEmail,
-      from: tenantEmail,
-      fromName: tenant.name || 'Store',
       subject: `New Support Ticket: ${ticket.subject || 'No Subject'}`,
       html,
+      tenant,
     });
   } catch (error) {
     console.error('Error sending new ticket email:', error);
@@ -190,12 +192,11 @@ export async function sendTicketReplyEmail({
         </html>
       `;
 
-      return sendEmail({
+      return sendAdminEmail({
         to: adminEmail,
-        from: tenantEmail,
-        fromName: tenant.name || 'Store',
         subject: `New Reply: ${ticket.subject || 'Support Ticket'}`,
         html,
+        tenant,
       });
     } else {
       // Admin replied, notify customer
@@ -243,12 +244,11 @@ export async function sendTicketReplyEmail({
         </html>
       `;
 
-      return sendEmail({
+      return sendCustomerEmail({
         to: customer.email,
-        from: tenantEmail,
-        fromName: tenant.name || 'Store',
         subject: `Reply to Your Support Ticket: ${ticket.subject || 'Support Request'}`,
         html,
+        tenant,
       });
     }
   } catch (error) {
@@ -336,12 +336,11 @@ export async function sendTicketStatusUpdateEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendCustomerEmail({
       to: customer.email,
-      from: tenantEmail,
-      fromName: tenant.name || 'Store',
       subject: `Support Ticket Status Updated: ${ticket.subject || 'Support Request'}`,
       html,
+      tenant,
     });
   } catch (error) {
     console.error('Error sending ticket status update email:', error);
@@ -423,12 +422,11 @@ export async function sendTicketAssignedEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendAdminEmail({
       to: staffEmail,
-      from: tenantEmail,
-      fromName: tenant.name || 'Store',
       subject: `Support Ticket Assigned: ${ticket.subject || 'No Subject'}`,
       html,
+      tenant,
     });
   } catch (error) {
     console.error('Error sending ticket assigned email:', error);

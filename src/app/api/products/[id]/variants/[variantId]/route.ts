@@ -87,6 +87,29 @@ export async function PUT(
         data: updateData,
       });
 
+      // Sync product-level stock when variant stock is updated
+      // Product-level stock should equal sum of all variant stocks
+      if (updateData.stock_quantity !== undefined) {
+        const variantStocks = await tx.product_variants.aggregate({
+          where: {
+            product_id: id,
+            tenant_id: tenant.id,
+          },
+          _sum: {
+            stock_quantity: true,
+          },
+        });
+
+        const totalVariantStock = variantStocks._sum.stock_quantity || 0;
+
+        await tx.products.update({
+          where: { id },
+          data: {
+            stock_quantity: totalVariantStock,
+          },
+        });
+      }
+
       // Update attributes if provided
       if (validatedData.attributes !== undefined) {
         // Delete existing variant attributes
@@ -186,6 +209,13 @@ export async function DELETE(
 
     await prisma.product_variants.delete({
       where: { id: variantId },
+    });
+
+    // Sync product-level stock after deleting variant
+    // Product-level stock should equal sum of all variant stocks
+    const { syncProductStockFromVariants } = await import('@/lib/inventory/sync-product-stock');
+    await syncProductStockFromVariants(id, tenant.id).catch((err) => {
+      console.error('Error syncing product stock after variant deletion:', err);
     });
 
     return NextResponse.json({

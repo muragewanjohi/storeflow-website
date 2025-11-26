@@ -238,9 +238,12 @@ export default function ProductFormClient({
       }
     }
 
-    const stockQuantity = parseInt(formData.stock_quantity, 10);
-    if (isNaN(stockQuantity) || stockQuantity < 0) {
-      errors.stock_quantity = 'Stock quantity must be a non-negative number';
+    // Only validate product-level stock if no variants exist
+    if (variants.length === 0) {
+      const stockQuantity = parseInt(formData.stock_quantity, 10);
+      if (isNaN(stockQuantity) || stockQuantity < 0) {
+        errors.stock_quantity = 'Stock quantity must be a non-negative number';
+      }
     }
 
     setValidationErrors(errors);
@@ -265,7 +268,11 @@ export default function ProductFormClient({
         short_description: formData.short_description.trim() || null,
         description: formData.description.trim() || null,
         price: parseFloat(formData.price),
-        stock_quantity: parseInt(formData.stock_quantity, 10),
+        // When variants exist, product-level stock is calculated from variants (set to 0 or sum)
+        // When no variants exist, use the product-level stock
+        stock_quantity: variants.length > 0 
+          ? totalVariantStock // Use calculated total when variants exist
+          : parseInt(formData.stock_quantity, 10), // Use product-level stock when no variants
         status: formData.status,
         category_id: formData.category_id === 'none' || !formData.category_id ? null : formData.category_id,
       };
@@ -367,6 +374,10 @@ export default function ProductFormClient({
 
   // Calculate total variant stock
   const totalVariantStock = variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity) || 0), 0);
+  
+  // When variants exist, product-level stock should be calculated from variants (read-only)
+  // When no variants exist, product-level stock is editable
+  const hasVariants = variants.length > 0;
 
   return (
     <div className="relative">
@@ -515,27 +526,38 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="stock_quantity">Stock Quantity</Label>
+                  <Label htmlFor="stock_quantity">
+                    Stock Quantity
+                    {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
+                  </Label>
                   <Input
                     id="stock_quantity"
                     type="number"
                     min="0"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                    value={hasVariants ? totalVariantStock.toString() : formData.stock_quantity}
+                    onChange={(e) => {
+                      if (!hasVariants) {
+                        setFormData({ ...formData, stock_quantity: e.target.value });
+                      }
+                    }}
                     placeholder="0"
+                    disabled={hasVariants}
+                    className={hasVariants ? 'bg-muted cursor-not-allowed' : ''}
                   />
                   {validationErrors.stock_quantity && (
                     <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
                   )}
-                  {variants.length > 0 && (
+                  {hasVariants ? (
                     <p className="text-xs text-muted-foreground">
-                      Product-level stock: {formData.stock_quantity || 0}. 
-                      Variant stock total: {variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity) || 0), 0)}.
-                      {parseInt(formData.stock_quantity) > 0 && (
-                        <span className="block mt-1 text-amber-600">
-                          Note: When variants exist, variant stock quantities are used for inventory tracking.
-                        </span>
-                      )}
+                      Total stock: {totalVariantStock} units (sum of all variant stocks).
+                      <span className="block mt-1 text-blue-600">
+                        When variants exist, only variant stock quantities are used for inventory tracking. 
+                        Edit stock in the Variants section below.
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Set the stock quantity for this product. Add variants below to manage stock per variant.
                     </p>
                   )}
                 </div>

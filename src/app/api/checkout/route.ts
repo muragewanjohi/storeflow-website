@@ -9,10 +9,11 @@ import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { checkoutSchema } from '@/lib/orders/validation';
-import { generateOrderNumber, calculateOrderTotal } from '@/lib/orders/utils';
-import { getCart, clearCart, generateCartId } from '@/lib/orders/cart';
+import { generateOrderNumber } from '@/lib/orders/utils';
+import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import { sendOrderPlacedEmail, sendNewOrderAlertEmail } from '@/lib/orders/emails';
 import { canCreateOrder } from '@/lib/subscriptions/limits';
+import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -34,8 +35,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get cart items (for now, we'll use the items from the request)
-    // In production, you might want to fetch from cart storage
+    // Get or create customer record
+    const customerId = await getOrCreateCustomer(user, tenant.id);
+
+    // Get cart items from the request (validated)
     const cartItems = validatedData.items;
 
     // Validate all items exist and have sufficient stock
@@ -136,11 +139,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create order
+    // For guest orders, user_id will be null (order tracked by email + order_number)
     const order = await prisma.orders.create({
       data: {
         tenant_id: tenant.id,
         order_number: orderNumber,
-        user_id: user.id,
+        user_id: customerId, // null for guest orders
         name: validatedData.shipping_address.name,
         email: validatedData.shipping_address.email,
         phone: validatedData.shipping_address.phone,
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
             tenant_id: tenant.id,
             product_id: item.product_id,
             variant_id: item.variant_id,
-            user_id: user.id,
+            user_id: customerId, // null for guest orders
             quantity: item.quantity,
             price: item.price,
             total: item.total,
@@ -181,6 +185,9 @@ export async function POST(request: NextRequest) {
     });
 
     // Update inventory (decrease stock)
+    // Track which products have variants so we can sync product-level stock
+    const productsWithVariants = new Set<string>();
+    
     for (const item of orderItems) {
       if (item.variant_id) {
         // Update variant stock
@@ -192,8 +199,10 @@ export async function POST(request: NextRequest) {
             },
           },
         });
+        // Mark this product as having variants (for later sync)
+        productsWithVariants.add(item.product_id);
       } else {
-        // Update product stock
+        // Update product stock (only when no variants exist)
         await prisma.products.update({
           where: { id: item.product_id },
           data: {
@@ -205,9 +214,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Clear cart
-    const cartId = generateCartId(user.id);
-    clearCart(cartId);
+    // Sync product-level stock for products with variants
+    // Product-level stock should equal the sum of all variant stocks
+    for (const productId of productsWithVariants) {
+      await syncProductStockFromVariants(productId, tenant.id);
+    }
+
+    // Clear cart items from database (only if authenticated)
+    if (customerId) {
+      await prisma.cart_items.deleteMany({
+        where: {
+          tenant_id: tenant.id,
+          user_id: customerId,
+        },
+      });
+    } else {
+      // For guest checkout, clear cart by session_id if available
+      // This would require passing session_id from client
+      // For now, guest cart will remain until session expires
+    }
+    
+    // Dispatch cart updated event (for header cart count)
+    // This will be handled by the client-side event listener
 
     // Send email notifications (async, don't wait)
     Promise.all([

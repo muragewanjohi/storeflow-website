@@ -7,6 +7,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import CategoryFormClient from '../category-form-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CreateCategoryPage() {
   const user = await requireAuthOrRedirect('/login');
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/login');

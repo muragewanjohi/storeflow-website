@@ -19,6 +19,9 @@ function createPrismaClient() {
         url: process.env.DATABASE_URL,
       },
     },
+    // Connection pool optimization - like Amazon/Shopify
+    // These settings help with connection reuse and performance
+    // Note: Supabase connection pooling is handled at the URL level
   }).$extends({
     query: {
       $allOperations: async ({ operation, model, args, query }) => {

@@ -19,6 +19,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import RichTextEditor from '@/components/content/rich-text-editor';
 import ImageUploadField from '@/components/content/image-upload-field';
 import PageBuilder from '@/components/content/page-builder/page-builder';
+import SEOPreview from '@/components/content/seo-preview';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Page {
@@ -35,9 +36,10 @@ interface Page {
 
 interface PageFormClientProps {
   page?: Page;
+  baseUrl?: string;
 }
 
-export default function PageFormClient({ page }: Readonly<PageFormClientProps>) {
+export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClientProps>) {
   const router = useRouter();
   const isEditing = !!page;
 
@@ -323,6 +325,14 @@ export default function PageFormClient({ page }: Readonly<PageFormClientProps>) 
               </div>
             </CardContent>
           </Card>
+
+          {/* SEO Preview */}
+          <SEOPreview
+            title={formData.meta_title || formData.title}
+            description={formData.meta_description}
+            slug={formData.slug}
+            baseUrl={baseUrl || 'https://example.com'}
+          />
 
           {/* Form Actions */}
           <Card>

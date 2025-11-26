@@ -4,7 +4,7 @@
  * Email templates and functions for order-related notifications
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendCustomerEmail, sendAdminEmail } from '@/lib/email/service';
 import { prisma } from '@/lib/prisma/client';
 import type { orders } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
@@ -27,32 +27,8 @@ export function getTenantContactEmail(tenant: Tenant): string {
   return `support@${tenant.subdomain}.dukanest.com`;
 }
 
-/**
- * Get verified sender email address for SendGrid
- * Always returns a verified sender address (noreply@dukanest.com)
- * This is used for the 'from' field in emails
- */
-function getVerifiedSenderEmail(): string {
-  return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
-}
-
-/**
- * Get sender name for SendGrid emails
- * Uses tenant name, with fallback to formatted subdomain
- */
-function getSenderName(tenant: Tenant): string {
-  if (tenant.name && tenant.name.trim()) {
-    return tenant.name;
-  }
-  // Fallback: format subdomain as store name (e.g., "teststore" -> "Test Store")
-  if (tenant.subdomain) {
-    return tenant.subdomain
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-  return 'Store';
-}
+// Note: getVerifiedSenderEmail() and getSenderName() have been moved to @/lib/email/service
+// They are now handled by the unified email service
 
 interface OrderWithItems extends orders {
   order_products: Array<{
@@ -193,13 +169,12 @@ Best regards,
 ${tenant.name}
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: getSenderName(tenant),
     subject: `Order Confirmation - ${order.order_number}`,
     html,
     text,
+    tenant,
   });
 }
 
@@ -335,13 +310,12 @@ View order in dashboard: ${dashboardUrl}
 Please process this order as soon as possible.
   `;
 
-  return sendEmail({
+  return sendAdminEmail({
     to: adminEmail,
-    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: getSenderName(tenant),
     subject: `New Order Alert - ${order.order_number}`,
     html,
     text,
+    tenant,
   });
 }
 
@@ -425,12 +399,11 @@ export async function sendOrderShippedEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: getSenderName(tenant),
     subject: `Your Order Has Shipped - ${order.order_number}`,
     html,
+    tenant,
   });
 }
 
@@ -495,12 +468,11 @@ export async function sendOrderDeliveredEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: getSenderName(tenant),
     subject: `Order Delivered - ${order.order_number}`,
     html,
+    tenant,
   });
 }
 
@@ -625,13 +597,12 @@ Best regards,
 ${tenant.name}
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(),
-    fromName: getSenderName(tenant),
     subject: `Order Status Update - ${order.order_number}`,
     html,
     text,
+    tenant,
   });
 }
 
@@ -779,13 +750,12 @@ Best regards,
 ${tenant.name}
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(),
-    fromName: getSenderName(tenant),
     subject: `Payment Status Update - ${order.order_number}`,
     html,
     text,
+    tenant,
   });
 }
 
@@ -867,12 +837,11 @@ export async function sendOrderCancelledEmail({
     </html>
   `;
 
-  return sendEmail({
+  return sendCustomerEmail({
     to: customerEmail,
-    from: getVerifiedSenderEmail(), // Use verified sender for 'from' field
-    fromName: getSenderName(tenant),
     subject: `Order Cancelled - ${order.order_number}`,
     html,
+    tenant,
   });
 }
 

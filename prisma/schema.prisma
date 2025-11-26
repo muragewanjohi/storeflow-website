@@ -144,6 +144,8 @@ model cart_items {
   @@index([session_id], map: "idx_cart_items_session_id")
   @@index([tenant_id], map: "idx_cart_items_tenant_id")
   @@index([user_id], map: "idx_cart_items_user_id")
+  @@index([tenant_id, user_id], map: "idx_cart_items_tenant_user")
+  @@index([product_id], map: "idx_cart_items_product_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -257,6 +259,7 @@ model customers {
   @@unique([tenant_id, email])
   @@index([email], map: "idx_customers_email")
   @@index([tenant_id], map: "idx_customers_tenant_id")
+  @@index([tenant_id, email], map: "idx_customers_tenant_email")
 }
 
 model landlord_users {
@@ -582,6 +585,7 @@ model products {
   @@index([slug], map: "idx_products_slug")
   @@index([tenant_id], map: "idx_products_tenant_id")
   @@index([tenant_id, status], map: "idx_products_tenant_status")
+  @@index([tenant_id, slug, status], map: "idx_products_tenant_slug_status")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

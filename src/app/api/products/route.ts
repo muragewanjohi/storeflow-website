@@ -61,13 +61,47 @@ export async function GET(request: NextRequest) {
       tenant_id: tenant.id,
     };
 
-    // Search filter
+    // Search filter - Use full-text search for better performance and ranking
+    let useFullTextSearch = false;
+    let searchProductIds: string[] = [];
+    
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { sku: { contains: search, mode: 'insensitive' } },
-      ];
+      try {
+        // Use PostgreSQL full-text search with ranking
+        // Cast tenant.id to UUID explicitly to avoid type mismatch
+        const searchResults = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM products
+          WHERE 
+            tenant_id = ${tenant.id}::uuid
+            AND status = 'active'
+            AND search_vector @@ plainto_tsquery('english', ${search})
+          ORDER BY ts_rank(search_vector, plainto_tsquery('english', ${search})) DESC
+          LIMIT 1000
+        `;
+
+        if (searchResults && searchResults.length > 0) {
+          searchProductIds = searchResults.map(r => r.id);
+          useFullTextSearch = true;
+          where.id = { in: searchProductIds };
+        } else {
+          // Fallback to ILIKE if full-text search returns no results
+          // Use OR to search across name, description, and SKU
+          where.OR = [
+            { name: { contains: search.trim(), mode: 'insensitive' } },
+            { description: { contains: search.trim(), mode: 'insensitive' } },
+            { sku: { contains: search.trim(), mode: 'insensitive' } },
+          ];
+        }
+      } catch (error) {
+        // If full-text search fails (e.g., search_vector column doesn't exist), fallback to ILIKE
+        console.warn('Full-text search not available, using ILIKE:', error);
+        where.OR = [
+          { name: { contains: search.trim(), mode: 'insensitive' } },
+          { description: { contains: search.trim(), mode: 'insensitive' } },
+          { sku: { contains: search.trim(), mode: 'insensitive' } },
+        ];
+      }
     }
 
     // Status filter
@@ -115,19 +149,32 @@ export async function GET(request: NextRequest) {
     orderBy[sort_by] = sort_order;
 
     // Fetch products with pagination
-    const [products, total] = await Promise.all([
-      prisma.products.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy,
-        include: {
-          // Note: Direct category relation via category_id
-          // For many-to-many, we'd need to join through product_categories
-        },
-      }),
-      prisma.products.count({ where }),
-    ]);
+    let products = await prisma.products.findMany({
+      where,
+      skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
+      take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
+      orderBy,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        image: true,
+        stock_quantity: true,
+        category_id: true,
+      },
+    });
+
+    // If using full-text search, sort by relevance (order in searchProductIds)
+    if (useFullTextSearch && searchProductIds.length > 0) {
+      const productMap = new Map(products.map(p => [p.id, p]));
+      products = searchProductIds
+        .map(id => productMap.get(id))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined)
+        .slice(skip, skip + limitNum);
+    }
+
+    const total = await prisma.products.count({ where });
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limitNum);

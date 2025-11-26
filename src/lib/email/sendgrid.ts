@@ -18,6 +18,7 @@ export interface EmailOptions {
   subject?: string;
   html?: string;
   text?: string;
+  replyTo?: string; // Add reply-to support
   templateId?: string;
   dynamicTemplateData?: Record<string, any>;
 }
@@ -54,6 +55,11 @@ export async function sendEmail(options: EmailOptions) {
       name: fromName,
     },
   };
+
+  // Add reply-to if provided
+  if (options.replyTo) {
+    msg.replyTo = options.replyTo;
+  }
 
   // Use template if provided
   if (options.templateId) {

@@ -59,6 +59,46 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
+    // Also store customer email in a cookie for session lookup
+    // TODO: In production, use a proper session table or JWT tokens
+    cookieStore.set('customer_email', customer.email, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: expiresAt,
+      path: '/',
+    });
+
+    // Merge guest cart into user cart (if guest cart exists)
+    // This happens in the background - don't wait for it
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/cart/merge`, {
+      method: 'POST',
+      headers: {
+        'Cookie': request.headers.get('cookie') || '',
+      },
+    }).catch(err => {
+      // Silently fail - cart merge is not critical for login
+      console.error('Failed to merge cart:', err);
+    });
+
+    // Link guest orders to customer account (if guest orders exist)
+    // This happens in the background - don't wait for it
+    (async () => {
+      try {
+        const { linkGuestOrdersToCustomer } = await import('@/lib/orders/link-guest-orders');
+        const linkedCount = await linkGuestOrdersToCustomer(
+          customer.id,
+          customer.email,
+          tenant.id
+        );
+        if (linkedCount > 0) {
+          console.log(`Linked ${linkedCount} guest order(s) to customer account`);
+        }
+      } catch (err) {
+        console.error('Failed to link guest orders:', err); // Log error but don't block login
+      }
+    })();
+
     return NextResponse.json({
       success: true,
       customer: {

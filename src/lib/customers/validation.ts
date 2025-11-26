@@ -30,16 +30,15 @@ export const customerLoginSchema = z.object({
  * Customer update schema
  */
 export const customerUpdateSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  email: z.string().email().optional(),
-  username: z.string().optional().nullable(),
-  mobile: z.string().optional().nullable(),
-  company: z.string().optional().nullable(),
+  name: z.string().min(1).max(255),
+  username: z.string().max(255).optional().nullable(),
+  mobile: z.string().max(20).optional().nullable(),
+  company: z.string().max(255).optional().nullable(),
   address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  state: z.string().optional().nullable(),
-  country: z.string().optional().nullable(),
-  postal_code: z.string().optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  postal_code: z.string().max(20).optional().nullable(),
   image: z.string().optional().nullable(),
 });
 

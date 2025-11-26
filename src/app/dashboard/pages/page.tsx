@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import PagesListClient from './pages-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PagesPage({
   searchParams,
 }: {

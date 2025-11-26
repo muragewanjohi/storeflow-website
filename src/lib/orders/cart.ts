@@ -13,6 +13,7 @@ interface CartItem {
   name: string;
   image?: string | null;
   sku?: string | null;
+  slug?: string | null;
 }
 
 interface Cart {

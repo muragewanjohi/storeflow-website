@@ -8,27 +8,131 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth/server';
+import { requireAuth, getUser } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { addToCartSchema, updateCartItemSchema } from '@/lib/orders/validation';
-import { getCart, addToCart, updateCartItem, removeFromCart, generateCartId } from '@/lib/orders/cart';
+import { getOrCreateCustomer } from '@/lib/customers/get-customer';
+import { getOrCreateSessionId, getSessionId } from '@/lib/cart/session';
 
 /**
  * GET /api/cart - Get cart items
+ * 
+ * Supports both authenticated users and guest users (via session_id)
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth();
     const tenant = await requireTenant();
     
-    const cartId = generateCartId(user.id);
-    const cart = getCart(cartId);
-
-    return NextResponse.json({
-      success: true,
-      cart,
+    // Try to get authenticated user
+    const user = await getUser();
+    let customerId: string | null = null;
+    let sessionId: string | null = null;
+    
+    if (user) {
+      // Authenticated user - use customer ID
+      customerId = await getOrCreateCustomer(user, tenant.id);
+    } else {
+      // Guest user - use session ID
+      sessionId = await getOrCreateSessionId();
+    }
+    
+    // Fetch cart items from database
+    // Use select instead of include for better performance
+    const cartItems = await prisma.cart_items.findMany({
+      where: {
+        tenant_id: tenant.id,
+        user_id: customerId,
+      },
+      select: {
+        id: true,
+        product_id: true,
+        variant_id: true,
+        quantity: true,
+        products: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            sale_price: true,
+            image: true,
+            sku: true,
+            slug: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
     });
+
+    // Fetch variant prices for items with variants
+    const variantIds = cartItems
+      .filter(item => item.variant_id)
+      .map(item => item.variant_id) as string[];
+
+    const variants = variantIds.length > 0
+      ? await prisma.product_variants.findMany({
+          where: {
+            id: { in: variantIds },
+            tenant_id: tenant.id,
+          },
+          select: {
+            id: true,
+            price: true,
+          },
+        })
+      : [];
+
+    const variantPriceMap = new Map(
+      variants.map(v => [v.id, v.price ? Number(v.price) : null])
+    );
+
+    // Build cart response with product details
+    const items = cartItems.map((item) => {
+      const product = item.products;
+      if (!product) {
+        return null;
+      }
+
+      // Get price (variant price if variant_id exists, otherwise product price)
+      let price = Number(product.sale_price || product.price);
+      if (item.variant_id) {
+        const variantPrice = variantPriceMap.get(item.variant_id);
+        if (variantPrice !== null && variantPrice !== undefined) {
+          price = variantPrice;
+        }
+      }
+
+      return {
+        product_id: item.product_id!,
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+        price,
+        name: product.name,
+        image: product.image,
+        sku: product.sku,
+        slug: product.slug,
+      };
+    }).filter(Boolean) as any[];
+
+    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
+
+    const response = NextResponse.json({
+      success: true,
+      cart: {
+        items,
+        total,
+        item_count,
+      },
+    });
+    
+    // Cache cart data for 5 seconds (stale-while-revalidate)
+    // This reduces load on database for repeated requests
+    response.headers.set('Cache-Control', 'private, s-maxage=5, stale-while-revalidate=10');
+    
+    return response;
   } catch (error: any) {
     console.error('Error fetching cart:', error);
     return NextResponse.json(
@@ -47,6 +151,9 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     
+    // Get or create customer record
+    const customerId = await getOrCreateCustomer(user, tenant.id);
+    
     const { product_id, variant_id, quantity } = addToCartSchema.parse(body);
 
     // Fetch product details
@@ -62,6 +169,7 @@ export async function POST(request: NextRequest) {
         sale_price: true,
         image: true,
         sku: true,
+        slug: true,
       },
     });
 
@@ -118,20 +226,115 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const cartId = generateCartId(user.id);
-    const cart = addToCart(cartId, {
-      product_id,
-      variant_id: variant_id || null,
-      quantity,
-      price: finalPrice,
-      name: product.name,
-      image: product.image,
-      sku: finalSku,
+    // Check if cart item already exists
+    const existingItem = await prisma.cart_items.findFirst({
+      where: {
+        tenant_id: tenant.id,
+        user_id: customerId,
+        product_id,
+        variant_id: variant_id || null,
+      },
     });
+
+    if (existingItem) {
+      // Update quantity
+      await prisma.cart_items.update({
+        where: { id: existingItem.id },
+        data: {
+          quantity: existingItem.quantity + quantity,
+          updated_at: new Date(),
+        },
+      });
+    } else {
+      // Create new cart item
+      await prisma.cart_items.create({
+        data: {
+          tenant_id: tenant.id,
+          user_id: customerId,
+          product_id,
+          variant_id: variant_id || null,
+          quantity,
+        },
+      });
+    }
+
+    // Fetch updated cart
+    const cartItems = await prisma.cart_items.findMany({
+      where: {
+        tenant_id: tenant.id,
+        user_id: customerId,
+      },
+      include: {
+        products: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            sale_price: true,
+            image: true,
+            sku: true,
+            slug: true,
+          },
+        },
+      },
+    });
+
+    // Fetch variant prices
+    const variantIds = cartItems
+      .filter(item => item.variant_id)
+      .map(item => item.variant_id) as string[];
+
+    const variants = variantIds.length > 0
+      ? await prisma.product_variants.findMany({
+          where: {
+            id: { in: variantIds },
+            tenant_id: tenant.id,
+          },
+          select: {
+            id: true,
+            price: true,
+          },
+        })
+      : [];
+
+    const variantPriceMap = new Map(
+      variants.map(v => [v.id, v.price ? Number(v.price) : null])
+    );
+
+    const items = cartItems.map((item) => {
+      const product = item.products;
+      if (!product) return null;
+
+      let price = Number(product.sale_price || product.price);
+      if (item.variant_id) {
+        const variantPrice = variantPriceMap.get(item.variant_id);
+        if (variantPrice !== null && variantPrice !== undefined) {
+          price = variantPrice;
+        }
+      }
+
+      return {
+        product_id: item.product_id!,
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+        price,
+        name: product.name,
+        image: product.image,
+        sku: product.sku,
+        slug: product.slug,
+      };
+    }).filter(Boolean) as any[];
+
+    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
 
     return NextResponse.json({
       success: true,
-      cart,
+      cart: {
+        items,
+        total,
+        item_count,
+      },
     });
   } catch (error: any) {
     console.error('Error adding to cart:', error);
@@ -157,6 +360,9 @@ export async function PUT(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     
+    // Get or create customer record
+    const customerId = await getOrCreateCustomer(user, tenant.id);
+    
     const { product_id, variant_id, quantity } = body;
 
     if (!product_id) {
@@ -165,12 +371,47 @@ export async function PUT(request: NextRequest) {
 
     const { quantity: validatedQuantity } = updateCartItemSchema.parse({ quantity });
 
-    const cartId = generateCartId(user.id);
-    const cart = updateCartItem(cartId, product_id, variant_id || null, validatedQuantity);
+    // Find cart item
+    const cartItem = await prisma.cart_items.findFirst({
+      where: {
+        tenant_id: tenant.id,
+        user_id: customerId,
+        product_id,
+        variant_id: variant_id || null,
+      },
+    });
 
+    if (!cartItem) {
+      return NextResponse.json({ error: 'Cart item not found' }, { status: 404 });
+    }
+
+    if (validatedQuantity <= 0) {
+      // Remove item
+      await prisma.cart_items.delete({
+        where: { id: cartItem.id },
+      });
+    } else {
+      // Update quantity
+      await prisma.cart_items.update({
+        where: { id: cartItem.id },
+        data: {
+          quantity: validatedQuantity,
+          updated_at: new Date(),
+        },
+      });
+    }
+
+    // Return minimal response - client already has optimistic updates
+    // This avoids expensive full cart refetch
     return NextResponse.json({
       success: true,
-      cart,
+      message: 'Cart updated successfully',
+      // Return minimal data for client to sync if needed
+      updated: {
+        product_id,
+        variant_id: variant_id || null,
+        quantity: validatedQuantity <= 0 ? 0 : validatedQuantity,
+      },
     });
   } catch (error: any) {
     console.error('Error updating cart:', error);
@@ -196,6 +437,9 @@ export async function DELETE(request: NextRequest) {
     const tenant = await requireTenant();
     const { searchParams } = new URL(request.url);
     
+    // Get or create customer record
+    const customerId = await getOrCreateCustomer(user, tenant.id);
+    
     const product_id = searchParams.get('product_id');
     const variant_id = searchParams.get('variant_id');
 
@@ -203,12 +447,31 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
 
-    const cartId = generateCartId(user.id);
-    const cart = removeFromCart(cartId, product_id, variant_id || null);
+    // Find and delete cart item
+    const cartItem = await prisma.cart_items.findFirst({
+      where: {
+        tenant_id: tenant.id,
+        user_id: customerId,
+        product_id,
+        variant_id: variant_id || null,
+      },
+    });
 
+    if (cartItem) {
+      await prisma.cart_items.delete({
+        where: { id: cartItem.id },
+      });
+    }
+
+    // Return minimal response - client already has optimistic updates
+    // This avoids expensive full cart refetch
     return NextResponse.json({
       success: true,
-      cart,
+      message: 'Item removed successfully',
+      removed: {
+        product_id,
+        variant_id: variant_id || null,
+      },
     });
   } catch (error: any) {
     console.error('Error removing from cart:', error);

@@ -20,11 +20,14 @@ async function createPricingPlans() {
           in: ['Basic Plan', 'Pro Plan', 'Enterprise Plan'],
         },
       },
+      select: {
+        name: true,
+      },
     });
 
     if (existingPlans.length > 0) {
       console.log('Pricing plans already exist. Skipping creation.');
-      console.log('Existing plans:', existingPlans.map(p => p.name));
+      console.log('Existing plans:', existingPlans.map((p) => p.name));
       return;
     }
 

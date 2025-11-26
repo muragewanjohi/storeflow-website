@@ -1,143 +1,118 @@
-# Performance Optimizations
+# Performance Optimizations - Amazon/Shopify Techniques
 
-## Issues Identified from Logs
+This document outlines the performance optimizations implemented to achieve fast page loads similar to Amazon and Shopify.
 
-1. **Connection Pool Exhaustion**: "connection limit: 9" causing timeouts
-2. **Slow Query Times**: 2-3 second response times for simple queries
-3. **Multiple Sequential HTTP Requests**: Server components making HTTP calls to their own API routes
-4. **No Caching**: All requests using `cache: 'no-store'`
-5. **Inefficient Data Fetching**: Multiple parallel requests for the same data
+## Key Techniques Implemented
 
-## Optimizations Applied
+### 1. **ISR (Incremental Static Regeneration)**
+- Product pages are cached and regenerated in the background every 60 seconds
+- First request: Fast (cached)
+- Subsequent requests: Instant (served from cache)
+- Background: Regenerates stale pages automatically
 
-### 1. Direct Database Queries in Server Components
-
-**Before:**
+**Implementation:**
 ```typescript
-// Making HTTP request to own API
-const response = await fetch(`${baseUrl}/api/products/${id}`, {
-  cache: 'no-store',
-});
+export const revalidate = 60; // Revalidate every 60 seconds
 ```
 
-**After:**
-```typescript
-// Direct database query
-const product = await prisma.products.findFirst({
-  where: { id, tenant_id: tenant.id },
-});
+### 2. **Parallel Data Fetching**
+- Fetch multiple data sources simultaneously using `Promise.all()`
+- Reduces total wait time from sequential to parallel execution
+- Product data and related products fetched in parallel
+
+**Before:** Sequential (2s + 1s = 3s total)
+**After:** Parallel (max(2s, 1s) = 2s total)
+
+### 3. **Database Query Optimization**
+- Composite indexes on frequently queried columns
+- `select` instead of `include` for better performance
+- Only fetch required fields
+
+**Index Added:**
+```sql
+CREATE INDEX idx_products_tenant_slug_status 
+ON products(tenant_id, slug, status) 
+WHERE status = 'active';
 ```
 
-**Benefits:**
-- Eliminates HTTP overhead
-- Reduces connection pool usage
-- Faster response times (no network round-trip)
+### 4. **Image Optimization**
+- Next.js Image component with automatic optimization
+- AVIF and WebP formats for better compression
+- Responsive image sizes
+- CDN caching (Supabase Storage)
 
-### 2. Parallel Query Execution
+### 5. **Response Caching**
+- API endpoints return proper cache headers
+- Browser and CDN caching reduces server load
+- Stale-while-revalidate for better UX
 
-**Before:**
-```typescript
-const product = await fetch(...);
-const variants = await fetch(...);
-const categories = await fetch(...);
-```
+### 6. **Reduced API Calls**
+- Header component optimized to reduce redundant calls
+- Debounced requests
+- Event-driven updates instead of polling
 
-**After:**
-```typescript
-const [product, variants, categories] = await Promise.all([
-  prisma.products.findFirst(...),
-  prisma.product_variants.findMany(...),
-  prisma.categories.findMany(...),
-]);
-```
+### 7. **Code Splitting**
+- Automatic code splitting by Next.js
+- Only load JavaScript needed for current page
+- Lazy loading for non-critical components
 
-**Benefits:**
-- Reduces total load time from sum to max of individual queries
-- Better connection pool utilization
+## Performance Metrics
 
-### 3. Next.js Caching with Revalidation
+### Target Metrics (Amazon/Shopify Level)
+- **LCP (Largest Contentful Paint):** < 2.5s (Good)
+- **FID (First Input Delay):** < 100ms (Good)
+- **CLS (Cumulative Layout Shift):** < 0.1 (Good)
+- **TTFB (Time to First Byte):** < 600ms (Good)
+- **Speed Index:** < 3.4s (Good)
 
-**Before:**
-```typescript
-cache: 'no-store' // Always hits database
-```
+### Current Optimizations Applied
+1. ✅ ISR for product pages (60s revalidation)
+2. ✅ Parallel data fetching
+3. ✅ Database composite indexes
+4. ✅ Image optimization (Next.js Image)
+5. ✅ Response caching headers
+6. ✅ Reduced API calls in header
+7. ✅ Query optimization (select vs include)
 
-**After:**
-```typescript
-next: { revalidate: 30 } // Cache for 30 seconds
-```
+## Additional Optimizations to Consider
 
-**Benefits:**
-- Reduces database load
-- Faster page loads for cached data
-- Automatic revalidation ensures data freshness
+### For Production (Future)
+1. **CDN for Static Assets**
+   - Use Vercel Edge Network or Cloudflare
+   - Cache static assets globally
 
-### 4. Prisma Query Optimization
+2. **Database Read Replicas**
+   - Use Supabase read replicas for product queries
+   - Reduces load on primary database
 
-**Added:**
-- Slow query logging (warns if query > 1 second)
-- Proper select statements (only fetch needed fields)
-- Indexed queries (using tenant_id, parent_id, etc.)
+3. **Redis Caching Layer**
+   - Cache frequently accessed products
+   - Reduce database queries
 
-### 5. Connection Pool Configuration
+4. **Edge Functions**
+   - Run API routes closer to users
+   - Reduce latency
 
-**Note:** Supabase pooled connections have a default limit. For better performance:
+5. **Prefetching**
+   - Prefetch product pages on hover
+   - Preload critical resources
 
-1. **Use Direct Queries**: Server components now query database directly
-2. **Reduce Concurrent Connections**: Parallel queries use single connection pool
-3. **Connection Reuse**: Prisma Client reuses connections efficiently
-
-## Files Modified
-
-1. `src/lib/prisma/client.ts` - Added slow query logging
-2. `src/app/dashboard/products/[id]/edit/page.tsx` - Direct database queries, parallel execution
-3. `src/app/dashboard/products/new/page.tsx` - Direct database query
-4. `src/app/dashboard/products/page.tsx` - Parallel queries, caching
-
-## Expected Performance Improvements
-
-- **Edit Page Load Time**: ~3-5 seconds → ~1-2 seconds (50-60% faster)
-- **Connection Pool Usage**: Reduced by ~40% (fewer HTTP requests)
-- **Database Load**: Reduced by ~30% (caching + direct queries)
-- **Page Load Time**: ~2-3 seconds → ~1-1.5 seconds (40-50% faster)
+6. **Service Worker**
+   - Cache API responses
+   - Offline support
 
 ## Monitoring
 
-Watch for:
-- Slow query warnings in console (queries > 1 second)
-- Connection pool timeout errors
-- Response times in browser DevTools
+Monitor these metrics:
+- Page load times
+- API response times
+- Database query times
+- Cache hit rates
+- Core Web Vitals
 
-## Additional Recommendations
+## References
 
-1. **Add Database Indexes**: Ensure indexes on frequently queried fields
-   - `products.tenant_id`
-   - `products.category_id`
-   - `categories.tenant_id`
-   - `categories.parent_id`
-
-2. **Consider Redis Caching**: For frequently accessed data (categories, attributes)
-
-3. **Implement Request Deduplication**: Use React Query or similar for client-side caching
-
-4. **Monitor Connection Pool**: Consider upgrading Supabase plan if connection limits are hit frequently
-
-## Connection Pool Configuration
-
-For Supabase, the connection pool limit is managed by Supabase, not Prisma. To optimize:
-
-1. **Use Pooled Connection** (`DATABASE_URL` with port 6543) for queries
-2. **Use Direct Connection** (`DIRECT_URL` with port 5432) only for migrations
-3. **Reduce Concurrent Requests**: Use parallel queries instead of sequential
-4. **Reuse Connections**: Prisma Client automatically reuses connections
-
-## Testing
-
-After these changes, you should see:
-- Faster page loads
-- Fewer connection pool errors
-- Reduced database query times
-- Better overall responsiveness
-
-Monitor the logs for slow query warnings and adjust as needed.
-
+- [Next.js ISR Documentation](https://nextjs.org/docs/app/building-your-application/data-fetching/incremental-static-regeneration)
+- [Web.dev Performance](https://web.dev/performance/)
+- [Amazon Performance Best Practices](https://aws.amazon.com/blogs/networking-and-content-delivery/amazon-cloudfront-best-practices/)
+- [Shopify Performance](https://www.shopify.com/partners/blog/shopify-performance)

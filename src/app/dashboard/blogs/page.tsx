@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import BlogsListClient from './blogs-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function BlogsPage({
   searchParams,
 }: {

@@ -156,12 +156,24 @@ export async function PUT(
         );
       }
 
+      // Prepare order_details update (for tracking info)
+      const orderDetails = existingOrder.order_details as any || {};
+      if (body.tracking_number || body.shipping_carrier) {
+        if (body.tracking_number) {
+          orderDetails.tracking_number = body.tracking_number;
+        }
+        if (body.shipping_carrier) {
+          orderDetails.shipping_carrier = body.shipping_carrier;
+        }
+      }
+
       // Update order
       const order = await prisma.orders.update({
         where: { id },
         data: {
           status,
           message: notes || existingOrder.message,
+          ...(Object.keys(orderDetails).length > 0 ? { order_details: orderDetails } : {}),
         },
         include: {
           order_products: {

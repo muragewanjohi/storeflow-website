@@ -5,7 +5,7 @@
  * These are tickets from tenants to the landlord/platform admin
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendPlatformEmail, sendAdminEmail } from '@/lib/email/service';
 import type { Tenant } from '@/lib/tenant-context';
 
 /**
@@ -49,7 +49,6 @@ export async function sendNewLandlordTicketEmail({
 }) {
   try {
     const adminEmail = await getLandlordAdminEmail();
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
     const priorityLabels: Record<string, string> = {
       low: 'Low',
       medium: 'Medium',
@@ -143,10 +142,8 @@ export async function sendNewLandlordTicketEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: adminEmail,
-      from: fromEmail,
-      fromName: 'StoreFlow Platform',
       subject: `New Support Ticket from ${tenant.name || tenant.subdomain}: ${ticket.subject || 'No Subject'}`,
       html,
     });
@@ -172,8 +169,6 @@ export async function sendLandlordTicketReplyEmail({
   isFromTenant: boolean;
 }) {
   try {
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
-    
     // If tenant replied, notify landlord
     if (isFromTenant) {
       const adminEmail = await getLandlordAdminEmail();
@@ -216,10 +211,8 @@ export async function sendLandlordTicketReplyEmail({
         </html>
       `;
 
-      return sendEmail({
+      return sendPlatformEmail({
         to: adminEmail,
-        from: fromEmail,
-        fromName: 'StoreFlow Platform',
         subject: `New Reply: ${ticket.subject || 'Support Ticket'}`,
         html,
       });
@@ -269,10 +262,9 @@ export async function sendLandlordTicketReplyEmail({
         </html>
       `;
 
-      return sendEmail({
-        to: tenant.contact_email,
-        from: fromEmail,
-        fromName: 'StoreFlow Platform',
+      const adminEmail = await getLandlordAdminEmail();
+      return sendPlatformEmail({
+        to: tenant.contact_email || adminEmail,
         subject: `Reply to Your Support Ticket: ${ticket.subject || 'Support Request'}`,
         html,
       });
@@ -304,7 +296,6 @@ export async function sendLandlordTicketStatusUpdateEmail({
       return;
     }
 
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
     const statusLabels: Record<string, string> = {
       open: 'Open',
       in_progress: 'In Progress',
@@ -360,10 +351,9 @@ export async function sendLandlordTicketStatusUpdateEmail({
       </html>
     `;
 
-    return sendEmail({
-      to: tenant.contact_email,
-      from: fromEmail,
-      fromName: 'StoreFlow Platform',
+    const adminEmail = await getLandlordAdminEmail();
+    return sendPlatformEmail({
+      to: tenant.contact_email || adminEmail,
       subject: `Support Ticket Status Updated: ${ticket.subject || 'Support Request'}`,
       html,
     });

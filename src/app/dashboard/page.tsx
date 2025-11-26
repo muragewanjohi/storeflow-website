@@ -20,6 +20,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TenantDashboardPage() {
   // Redirect to login if not authenticated or not tenant admin/staff
   const user = await requireAuthOrRedirect('/login');

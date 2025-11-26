@@ -136,25 +136,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // If email is being updated, check for duplicates
-    if (validatedData.email && validatedData.email !== existingCustomer.email) {
-      const duplicateCustomer = await prisma.customers.findFirst({
-        where: {
-          tenant_id: tenant.id,
-          email: validatedData.email,
-          id: { not: id },
-        },
-      });
-
-      if (duplicateCustomer) {
-        return NextResponse.json(
-          { error: 'Customer with this email already exists' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Update customer
+    // Update customer (email is not updatable via this endpoint)
     const customer = await prisma.customers.update({
       where: { id },
       data: validatedData,

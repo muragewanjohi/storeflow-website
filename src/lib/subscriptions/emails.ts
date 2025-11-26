@@ -4,7 +4,7 @@
  * Email templates and functions for subscription-related notifications
  */
 
-import { sendEmail } from '@/lib/email/sendgrid';
+import { sendPlatformEmail } from '@/lib/email/service';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
 import { prisma } from '@/lib/prisma/client';
@@ -74,10 +74,8 @@ export async function sendSubscriptionRenewalReminderEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: tenantEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-      fromName: 'StoreFlow Platform',
       subject: `Subscription Renewal Reminder - Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`,
       html,
     });
@@ -148,10 +146,8 @@ export async function sendSubscriptionExpiredEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: tenantEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-      fromName: 'StoreFlow Platform',
       subject: 'Subscription Expired - Renew Now',
       html,
     });
@@ -227,10 +223,8 @@ export async function sendSubscriptionActivatedEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: tenantEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-      fromName: 'StoreFlow Platform',
       subject: `Subscription Activated - ${plan?.name || 'Welcome'}`,
       html,
     });
@@ -304,10 +298,8 @@ export async function sendPaymentDueReminderEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: tenantEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-      fromName: 'StoreFlow Platform',
       subject: `Payment Due Reminder - $${amount.toFixed(2)}`,
       html,
     });
@@ -385,10 +377,8 @@ export async function sendPlanUpgradeConfirmationEmail({
       </html>
     `;
 
-    return sendEmail({
+    return sendPlatformEmail({
       to: tenantEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com',
-      fromName: 'StoreFlow Platform',
       subject: `Plan Upgraded to ${newPlan?.name || 'New Plan'}`,
       html,
     });
