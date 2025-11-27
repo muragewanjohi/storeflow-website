@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import CreateLandlordTicketClient from './create-landlord-ticket-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CreateLandlordTicketPage() {
   // Require authentication and tenant_admin or tenant_staff role
   const user = await requireAuthOrRedirect('/login');

@@ -11,6 +11,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import CustomersListClient from './customers-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CustomersPage({
   searchParams,
 }: {

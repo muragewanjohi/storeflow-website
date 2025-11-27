@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server'
 import { prisma } from '@/lib/prisma/client';
 import PricePlansListClient from './price-plans-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PricePlansPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');

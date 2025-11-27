@@ -8,6 +8,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import AccountSettingsClient from './account-settings-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AccountSettingsPage() {
   const tenant = await requireTenant();
   const customer = await getCurrentCustomer();

@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import AttributesListClient from './attributes-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AttributesPage() {
   const user = await requireAuthOrRedirect('/login');
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/login');

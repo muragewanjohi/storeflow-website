@@ -10,6 +10,8 @@ import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server'
 import { prisma } from '@/lib/prisma/client';
 import LandlordTicketsListClient from './landlord-tickets-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function LandlordSupportTicketsPage({
   searchParams,
 }: {

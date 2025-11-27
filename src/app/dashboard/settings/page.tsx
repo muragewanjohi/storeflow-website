@@ -11,6 +11,8 @@ import { getStaticOptions } from '@/lib/settings/static-options';
 import { prisma } from '@/lib/prisma/client';
 import TenantSettingsClient from './tenant-settings-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TenantSettingsPage() {
   // Require authentication and tenant_admin role
   const user = await requireAuthOrRedirect('/login');

@@ -10,6 +10,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import CreateTicketClient from './create-ticket-client';
 import { prisma } from '@/lib/prisma/client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SupportPage() {
   // Require customer authentication
   const user = await requireAuthOrRedirect('/login');

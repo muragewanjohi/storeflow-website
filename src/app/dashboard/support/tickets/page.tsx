@@ -11,6 +11,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import TicketsListClient from './tickets-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function SupportTicketsPage({
   searchParams,
 }: {

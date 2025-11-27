@@ -8,6 +8,8 @@ import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server';
 import CreatePlanForm from './create-plan-form';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CreatePricePlanPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');

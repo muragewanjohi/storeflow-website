@@ -10,6 +10,8 @@ import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { prisma } from '@/lib/prisma/client';
 import OrdersListClient from './orders-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AccountOrdersPage() {
   const tenant = await requireTenant();
   const customer = await getCurrentCustomer();

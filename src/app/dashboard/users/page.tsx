@@ -11,6 +11,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import UsersListClient from './users-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function UsersPage() {
   // Require authentication and tenant_admin or landlord role
   const user = await requireAuthOrRedirect('/login');

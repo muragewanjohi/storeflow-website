@@ -12,6 +12,8 @@ import OrdersListClient from './orders-list-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 
+export const dynamic = 'force-dynamic';
+
 export default async function OrdersPage() {
   const tenant = await requireTenant();
 

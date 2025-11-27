@@ -9,6 +9,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import BlogFormClient from '../blog-form-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewBlogPage() {
   const user = await requireAuthOrRedirect('/login');
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/login');

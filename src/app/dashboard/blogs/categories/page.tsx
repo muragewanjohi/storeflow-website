@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma/client';
 import { requireTenant } from '@/lib/tenant-context/server';
 import CategoriesListClient from './categories-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function BlogCategoriesPage() {
   const tenant = await requireTenant();
 

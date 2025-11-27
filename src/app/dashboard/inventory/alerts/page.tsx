@@ -12,6 +12,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import InventoryAlertsClient from './inventory-alerts-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InventoryAlertsPage({
   searchParams,
 }: {

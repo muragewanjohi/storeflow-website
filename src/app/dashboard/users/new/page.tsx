@@ -9,6 +9,8 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import CreateUserForm from './create-user-form';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CreateUserPage() {
   // Require authentication and tenant_admin or landlord role
   const user = await requireAuthOrRedirect('/login');

@@ -8,6 +8,8 @@ import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server';
 import AdminLayoutClient from '@/components/admin/layout-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminLayout({
   children,
 }: {

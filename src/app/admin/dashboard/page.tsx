@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { BuildingOfficeIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboardPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');

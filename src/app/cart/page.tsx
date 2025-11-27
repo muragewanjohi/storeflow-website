@@ -13,6 +13,8 @@ import CartClient from './cart-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CartPage() {
   const tenant = await requireTenant();
 

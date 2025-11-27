@@ -12,6 +12,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { getLowStockThreshold } from '@/lib/inventory/threshold';
 import InventorySettingsClient from './inventory-settings-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InventorySettingsPage() {
   // Require authentication and tenant_admin or tenant_staff role
   const user = await requireAuthOrRedirect('/login');

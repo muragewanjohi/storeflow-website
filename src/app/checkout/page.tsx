@@ -12,6 +12,8 @@ import CheckoutClient from './checkout-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CheckoutPage() {
   const tenant = await requireTenant();
 

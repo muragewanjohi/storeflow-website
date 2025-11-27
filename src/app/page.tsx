@@ -16,6 +16,8 @@ import StorefrontFooter from '@/components/storefront/footer';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await requireTenant();
   return generateStorefrontMetadata({

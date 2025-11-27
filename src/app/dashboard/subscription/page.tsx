@@ -10,6 +10,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import TenantSubscriptionClient from './tenant-subscription-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TenantSubscriptionPage() {
   // Require authentication and tenant_admin or tenant_staff role
   const user = await requireAuthOrRedirect('/login');

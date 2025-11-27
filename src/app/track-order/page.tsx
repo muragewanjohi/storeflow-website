@@ -10,6 +10,8 @@ import TrackOrderClient from './track-order-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TrackOrderPage() {
   const tenant = await requireTenant();
 
