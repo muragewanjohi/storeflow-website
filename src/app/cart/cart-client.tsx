@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ShoppingCartIcon, TrashIcon, PlusIcon, MinusIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface CartItem {
   product_id: string;
@@ -39,6 +40,7 @@ interface CartClientProps {
 
 export default function CartClient({ isAuthenticated = false }: Readonly<CartClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -224,12 +226,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
 
   if (loading) {
     return (
@@ -316,7 +313,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                         <p className="text-sm text-muted-foreground mb-2">SKU: {item.sku}</p>
                       )}
                       <div className="flex items-baseline gap-2 mb-3">
-                        <p className="text-lg font-bold">{formatPrice(item.price)}</p>
+                        <p className="text-lg font-bold">{formatCurrency(item.price)}</p>
                         <span className="text-sm text-muted-foreground">each</span>
                       </div>
 
@@ -360,11 +357,11 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                     <div className="text-right flex-shrink-0 min-w-[120px]">
                       <p className="text-sm text-muted-foreground mb-1">Item Total</p>
                       <p className={`text-2xl font-bold transition-colors ${isUpdating ? 'text-muted-foreground' : ''}`}>
-                        {formatPrice(item.price * item.quantity)}
+                        {formatCurrency(item.price * item.quantity)}
                       </p>
                       {item.quantity > 1 && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {item.quantity} × {formatPrice(item.price)}
+                          {item.quantity} × {formatCurrency(item.price)}
                         </p>
                       )}
                     </div>
@@ -406,17 +403,17 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+                  <span>{formatCurrency(subtotal)}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount</span>
-                    <span>-{formatPrice(discount)}</span>
+                    <span>-{formatCurrency(discount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>Total</span>
-                  <span>{formatPrice(total)}</span>
+                  <span>{formatCurrency(total)}</span>
                 </div>
               </div>
 

@@ -195,6 +195,7 @@ export interface TenantThemeCustomizations {
   typography?: Partial<ThemeTypography>;
   layouts?: Partial<ThemeLayout>;
   customCss?: string;
+  customJs?: string;
   logo?: string;
   favicon?: string;
   metaTitle?: string;

@@ -111,6 +111,39 @@ export function ThemeProvider({
     }
   }, [tenantCustomizations?.customCss]);
 
+  // Inject custom JavaScript if provided
+  useEffect(() => {
+    if (tenantCustomizations?.customJs && typeof document !== 'undefined') {
+      const scriptId = 'tenant-custom-js';
+      let scriptElement = document.getElementById(scriptId) as HTMLScriptElement;
+      
+      if (!scriptElement) {
+        scriptElement = document.createElement('script');
+        scriptElement.id = scriptId;
+        scriptElement.type = 'text/javascript';
+        document.body.appendChild(scriptElement);
+      }
+      
+      // Execute the JavaScript code
+      try {
+        // Remove old script content if it exists
+        scriptElement.textContent = '';
+        // Add new script content
+        scriptElement.textContent = tenantCustomizations.customJs;
+      } catch (error) {
+        console.error('Error executing custom JavaScript:', error);
+      }
+      
+      // Cleanup on unmount
+      return () => {
+        const element = document.getElementById(scriptId);
+        if (element) {
+          element.remove();
+        }
+      };
+    }
+  }, [tenantCustomizations?.customJs]);
+
   const value: ThemeContextValue = {
     config: mergedConfig,
     colors: mergedConfig.colors,

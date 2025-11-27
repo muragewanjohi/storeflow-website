@@ -23,6 +23,7 @@ import {
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface DateRange {
   from: Date | undefined;
@@ -92,6 +93,7 @@ interface InventoryData {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export default function AnalyticsDashboardClient() {
+  const { formatCurrency: formatCurrencyFromHook, currency } = useCurrency();
   const [dateRange, setDateRange] = useState<DateRange>({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
     to: new Date(),
@@ -155,11 +157,15 @@ export default function AnalyticsDashboardClient() {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+  // Using formatCurrency from useCurrency hook
+  const formatCurrency = (amount: number) => formatCurrencyFromHook(amount);
+  
+  // Format for chart axis labels (shorter format)
+  const formatAxisCurrency = (value: number) => {
+    if (currency.symbolPosition === 'left') {
+      return `${currency.symbol}${value.toLocaleString()}`;
+    }
+    return `${value.toLocaleString()}${currency.symbol}`;
   };
 
   const handleExport = async () => {
@@ -255,7 +261,7 @@ export default function AnalyticsDashboardClient() {
               {overview ? formatCurrency(overview.overview.totalRevenue) : '-'}
             </div>
             <p className="text-xs text-muted-foreground">
-              {overview?.thisMonth.revenue ? `$${overview.thisMonth.revenue.toFixed(2)} this month` : 'All time'}
+              {overview?.thisMonth.revenue ? `${formatCurrency(overview.thisMonth.revenue)} this month` : 'All time'}
             </p>
           </CardContent>
         </Card>
@@ -331,7 +337,7 @@ export default function AnalyticsDashboardClient() {
                         dataKey="date" 
                         tickFormatter={(value) => format(new Date(value), 'MMM dd')}
                       />
-                      <YAxis tickFormatter={(value) => `$${value}`} />
+                      <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip 
                         formatter={(value: number) => formatCurrency(value)}
                         labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
@@ -372,7 +378,7 @@ export default function AnalyticsDashboardClient() {
                         height={100}
                         tick={{ fontSize: 12 }}
                       />
-                      <YAxis tickFormatter={(value) => `$${value}`} />
+                      <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend />
                       <Bar dataKey="revenue" fill="#0088FE" name="Revenue" />
@@ -426,7 +432,7 @@ export default function AnalyticsDashboardClient() {
                         dataKey="date" 
                         tickFormatter={(value) => format(new Date(value), 'MMM dd')}
                       />
-                      <YAxis tickFormatter={(value) => `$${value}`} />
+                      <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip 
                         formatter={(value: number) => formatCurrency(value)}
                         labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
@@ -782,7 +788,7 @@ export default function AnalyticsDashboardClient() {
                         height={100}
                         tick={{ fontSize: 12 }}
                       />
-                      <YAxis tickFormatter={(value) => `$${value}`} />
+                      <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend />
                       <Bar dataKey="value" fill="#FF8042" name="Inventory Value" />

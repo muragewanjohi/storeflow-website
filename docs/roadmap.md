@@ -1963,34 +1963,51 @@ vercel env add VERCEL_TOKEN
   - [x] Custom date range analytics
   - [x] Comparison reports (period over period)
 
-**Day 35-36: Theme System (16 hours)**
-- [ ] **Day 35 Morning (4h):** Theme structure and customization UI
-  - [ ] Theme structure definition
-  - [ ] Theme customization UI (using Shadcn/ui components)
-  - [ ] Color picker for theme colors
-  - [ ] Font selection interface
-  - [ ] Layout options (sidebar position, header style, etc.)
-- [ ] **Day 35 Afternoon (4h):** Theme marketplace and installation
-  - [ ] Theme marketplace UI
-  - [ ] Theme preview functionality
-  - [ ] Theme installation system
-  - [ ] Theme activation/deactivation
-- [ ] **Day 36 Morning (4h):** Advanced theme features
-  - [ ] Custom CSS injection interface
-  - [ ] Custom JavaScript injection
-  - [ ] Theme export/import
-  - [ ] Theme versioning
-- [ ] **Day 36 Afternoon (4h):** Homepage theme integration
-  - [ ] Integrate theme system with homepage builder (from Day 27)
-  - [ ] Theme-aware homepage sections
-  - [ ] Preview homepage with different themes
-  - [ ] Theme-specific homepage templates
+**Day 35-36: Theme System (16 hours)** ✅ COMPLETE
+- [x] **Day 35 Morning (4h):** Theme structure and customization UI ✅ COMPLETE
+  - [x] Theme structure definition ✅
+  - [x] Theme customization UI (using Shadcn/ui components) ✅
+  - [x] Color picker for theme colors ✅
+  - [x] Font selection interface ✅
+  - [x] Layout options (sidebar position, header style, etc.) ✅
+- [x] **Day 35 Afternoon (4h):** Theme marketplace and installation ✅ COMPLETE
+  - [x] Theme marketplace UI ✅
+  - [x] Theme preview functionality ✅ (Live preview page with theme applied)
+  - [x] Theme installation system ✅
+  - [x] Theme activation/deactivation ✅
+- [x] **Day 36 Morning (4h):** Advanced theme features ✅ COMPLETE
+  - [x] Custom CSS injection interface ✅ (Already implemented in Day 35 - verified and enhanced)
+  - [x] Custom JavaScript injection interface ✅
+  - [x] Theme export/import functionality ✅
+  - [x] Theme versioning system ✅
+- [x] **Day 36 Afternoon (4h):** Homepage builder theme integration ✅ COMPLETE
+  - [x] Integrate theme system with existing page builder (from Day 28) ✅
+  - [x] Make homepage sections theme-aware (apply theme colors, fonts to sections) ✅
+  - [x] Update section templates to use theme CSS variables (hero, features, products, testimonials) ✅
+  - [x] Add theme selector to page builder preview (preview sections with different themes) ✅
+  - [x] Ensure homepage builder sections respect theme customizations (colors, fonts, layouts) ✅
+  - [x] **Note:** This integrates themes with the existing page builder. Day 37 will create a new theme template system with completely different structures per theme (electronics layout, fashion layout, etc.) ✅
 
 ---
 
-### **Week 6: Performance & Optimization**
+### **Week 6: Theme Templates & Performance**
 
-**Day 37-38: Performance Optimization (16 hours)**
+**Day 37: Theme Templates with Demo Content (8 hours)**
+- [ ] **Day 37 Morning (4h):** Research and implement theme template system
+  - [ ] Research popular theme preview approaches (Shopify Theme Store, WordPress themes, etc.)
+  - [ ] Study how platforms show full site previews with industry-specific content
+  - [ ] Design theme template architecture (different layouts per theme)
+  - [ ] Create theme template components system (header variants, product grid layouts, hero sections)
+  - [ ] Implement theme-specific layout components (Modern theme: electronics-focused, HexFashion: fashion-focused)
+- [ ] **Day 37 Afternoon (4h):** Demo content and preview system
+  - [ ] Create demo content database/seeding system (electronics products, fashion products, etc.)
+  - [ ] Build industry-specific demo stores (electronics store for Modern theme, fashion store for HexFashion theme)
+  - [ ] Implement full site preview with real images and content
+  - [ ] Create theme preview page that shows complete storefront (not just colors)
+  - [ ] Add theme-specific homepage templates with demo content
+  - [ ] Implement preview navigation (users can browse products, see cart, etc. in preview)
+
+**Day 38: Performance Optimization (8 hours)**
 - [ ] Database query optimization
 - [ ] Add Redis caching layer
 - [ ] Implement CDN for static assets

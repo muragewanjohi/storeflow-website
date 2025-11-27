@@ -44,27 +44,56 @@ function HeroSectionComponent({
   section: Extract<PageSection, { type: 'hero' }>; 
   isPreview: boolean;
 }) {
+  // Use theme CSS variables for colors
+  const backgroundColor = section.background_color || 'var(--color-background, transparent)';
+  const textColor = 'var(--color-text, currentColor)';
+  const headingFont = 'var(--font-heading, inherit)';
+  const bodyFont = 'var(--font-body, inherit)';
+
   return (
     <section
       className="relative py-16 md:py-24"
-      style={{ backgroundColor: section.background_color || 'transparent' }}
+      style={{ 
+        backgroundColor,
+        color: textColor,
+        fontFamily: bodyFont,
+      }}
     >
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div>
             {section.title && (
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">{section.title}</h1>
+              <h1 
+                className="text-4xl md:text-5xl font-bold mb-4"
+                style={{ 
+                  fontFamily: headingFont,
+                  color: 'var(--color-primary, currentColor)',
+                }}
+              >
+                {section.title}
+              </h1>
             )}
             {section.subtitle && (
-              <h2 className="text-2xl md:text-3xl text-muted-foreground mb-4">
+              <h2 
+                className="text-2xl md:text-3xl text-muted-foreground mb-4"
+                style={{ fontFamily: headingFont }}
+              >
                 {section.subtitle}
               </h2>
             )}
             {section.description && (
-              <p className="text-lg text-muted-foreground mb-6">{section.description}</p>
+              <p className="text-lg text-muted-foreground mb-6" style={{ fontFamily: bodyFont }}>
+                {section.description}
+              </p>
             )}
             {section.cta_text && section.cta_link && (
-              <Button asChild>
+              <Button 
+                asChild
+                style={{ 
+                  backgroundColor: 'var(--color-primary, hsl(var(--primary)))',
+                  color: 'var(--color-text, hsl(var(--primary-foreground)))',
+                }}
+              >
                 <a href={section.cta_link}>{section.cta_text}</a>
               </Button>
             )}
@@ -93,15 +122,27 @@ function FeaturesSectionComponent({
 }) {
   const columns = section.columns || 3;
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
+  const headingFont = 'var(--font-heading, inherit)';
+  const bodyFont = 'var(--font-body, inherit)';
 
   return (
-    <section className="py-16">
-      <div className="container mx-auto px-4">
+    <section className="py-16" style={{ fontFamily: bodyFont }}>
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
-          <h2 className="text-3xl font-bold text-center mb-4">{section.title}</h2>
+          <h2 
+            className="text-3xl font-bold text-center mb-4"
+            style={{ 
+              fontFamily: headingFont,
+              color: 'var(--color-primary, currentColor)',
+            }}
+          >
+            {section.title}
+          </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12">{section.subtitle}</p>
+          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+            {section.subtitle}
+          </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
           {section.features.map((feature) => (
@@ -141,15 +182,27 @@ function ProductsSectionComponent({
 }) {
   const columns = section.columns || 4;
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4';
+  const headingFont = 'var(--font-heading, inherit)';
+  const bodyFont = 'var(--font-body, inherit)';
 
   return (
-    <section className="py-16">
-      <div className="container mx-auto px-4">
+    <section className="py-16" style={{ fontFamily: bodyFont }}>
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
-          <h2 className="text-3xl font-bold text-center mb-4">{section.title}</h2>
+          <h2 
+            className="text-3xl font-bold text-center mb-4"
+            style={{ 
+              fontFamily: headingFont,
+              color: 'var(--color-primary, currentColor)',
+            }}
+          >
+            {section.title}
+          </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12">{section.subtitle}</p>
+          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+            {section.subtitle}
+          </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
           {isPreview && (
@@ -178,15 +231,27 @@ function TestimonialsSectionComponent({
 }) {
   const columns = section.columns || 3;
   const gridCols = columns === 1 ? 'md:grid-cols-1' : columns === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3';
+  const headingFont = 'var(--font-heading, inherit)';
+  const bodyFont = 'var(--font-body, inherit)';
 
   return (
-    <section className="py-16 bg-muted/50">
-      <div className="container mx-auto px-4">
+    <section className="py-16 bg-muted/50" style={{ fontFamily: bodyFont }}>
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
-          <h2 className="text-3xl font-bold text-center mb-4">{section.title}</h2>
+          <h2 
+            className="text-3xl font-bold text-center mb-4"
+            style={{ 
+              fontFamily: headingFont,
+              color: 'var(--color-primary, currentColor)',
+            }}
+          >
+            {section.title}
+          </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12">{section.subtitle}</p>
+          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+            {section.subtitle}
+          </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
           {section.testimonials.map((testimonial) => (
@@ -239,14 +304,20 @@ function TextSectionComponent({
   section: Extract<PageSection, { type: 'text' }>; 
   isPreview: boolean;
 }) {
+  const bodyFont = 'var(--font-body, inherit)';
+
   return (
     <section
       className="py-16"
-      style={{ backgroundColor: section.background_color || 'transparent' }}
+      style={{ 
+        backgroundColor: section.background_color || 'var(--color-background, transparent)',
+        fontFamily: bodyFont,
+      }}
     >
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <div
           className="prose prose-lg max-w-none"
+          style={{ color: 'var(--color-text, currentColor)' }}
           dangerouslySetInnerHTML={{ __html: section.content }}
         />
       </div>
@@ -262,7 +333,7 @@ function ImageSectionComponent({
   isPreview: boolean;
 }) {
   return (
-    <section className={`py-8 ${section.full_width ? '' : 'container mx-auto px-4'}`}>
+    <section className={`py-8 ${section.full_width ? '' : 'container mx-auto px-4'}`} style={{ maxWidth: section.full_width ? '100%' : 'var(--container-max-width, 1200px)' }}>
       <div className={section.full_width ? '' : 'max-w-4xl mx-auto'}>
         <div className="relative rounded-lg overflow-hidden">
           <img

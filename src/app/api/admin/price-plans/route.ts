@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         price: validatedData.price,
         duration_months: validatedData.duration_months,
         trial_days: validatedData.trial_days || 0,
-        features: validatedData.features || {},
+        features: (validatedData.features || {}) as any,
         status: validatedData.status,
       },
     });

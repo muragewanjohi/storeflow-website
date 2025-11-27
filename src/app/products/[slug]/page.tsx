@@ -66,7 +66,7 @@ export default async function ProductDetailPage({
           stock_quantity: true,
           sku: true,
           image: true,
-          variant_attributes: {
+          product_variant_attributes: {
             select: {
               id: true,
               attribute_id: true,
@@ -105,9 +105,12 @@ export default async function ProductDetailPage({
       ...product,
       price: Number(product.price),
       sale_price: product.sale_price ? Number(product.sale_price) : null,
+      // stock_quantity is already synced with variant totals in the database
       product_variants: product.product_variants.map((variant) => ({
         ...variant,
         price: variant.price ? Number(variant.price) : null,
+        // Rename product_variant_attributes to variant_attributes for client compatibility
+        variant_attributes: variant.product_variant_attributes,
       })),
     }),
     // Fetch related products in parallel
@@ -147,6 +150,7 @@ export default async function ProductDetailPage({
   const finalPrice = product.sale_price ? Number(product.sale_price) : Number(product.price);
 
   // Generate structured data for SEO
+  // stock_quantity is already synced with variant totals in the database
   const structuredData = generateProductStructuredData({
     tenant,
     product: {

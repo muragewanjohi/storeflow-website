@@ -46,7 +46,7 @@ export default async function EditProductPage({
           tenant_id: tenant.id,
         },
         include: {
-          variant_attributes: {
+          product_variant_attributes: {
             include: {
               attributes: {
                 select: {
@@ -103,6 +103,8 @@ export default async function EditProductPage({
       ...v,
       price: v.price ? Number(v.price) : null,
       stock_quantity: v.stock_quantity ?? 0,
+      // Rename product_variant_attributes to variant_attributes for client compatibility
+      variant_attributes: v.product_variant_attributes,
     })) as any[];
 
     const categoriesData = categories.map((c) => ({

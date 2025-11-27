@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Image from 'next/image';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -31,12 +32,10 @@ export default function HomepageClient({
   featuredProducts,
   tenantName,
 }: Readonly<HomepageClientProps>) {
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  const { formatCurrency } = useCurrency();
+  
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   return (
     <div className="min-h-screen">

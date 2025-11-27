@@ -13,6 +13,7 @@ import { PageBuilderData } from '@/lib/content/page-builder-types';
 import HomepageClient from './homepage-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 import type { Metadata } from 'next';
 
@@ -107,6 +108,9 @@ export default async function HomePage() {
         <HomepageClient featuredProducts={featuredProducts} tenantName={tenant.name} />
       </main>
       <StorefrontFooter />
+      <ThemeProviderWrapper>
+        <></>
+      </ThemeProviderWrapper>
     </div>
   );
 }

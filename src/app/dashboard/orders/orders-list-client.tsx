@@ -27,6 +27,7 @@ import { EyeIcon, MagnifyingGlassIcon, CheckIcon } from '@heroicons/react/24/out
 import { formatOrderStatus, formatPaymentStatus } from '@/lib/orders/utils';
 import { Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Order {
   id: string;
@@ -76,6 +77,7 @@ export default function OrdersListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { formatCurrency } = useCurrency();
   
   const [search, setSearch] = useState(currentSearchParams.search);
   const [status, setStatus] = useState(currentSearchParams.status || 'all');
@@ -512,7 +514,7 @@ export default function OrdersListClient({
                           </div>
                         </TableCell>
                         <TableCell>{order.item_count}</TableCell>
-                        <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                        <TableCell>{formatCurrency(order.total_amount)}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(order.status)}>
                             {formatOrderStatus(order.status || 'pending')}

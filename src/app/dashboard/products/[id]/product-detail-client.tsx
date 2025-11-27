@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -79,13 +80,10 @@ export default function ProductDetailClient({
   variants,
 }: Readonly<ProductDetailClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

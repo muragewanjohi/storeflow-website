@@ -56,6 +56,7 @@ export async function GET(
       );
     }
 
+    // stock_quantity is already synced with variant totals in the database
     return NextResponse.json({ product });
   } catch (error) {
     console.error('Error fetching product:', error);
@@ -95,7 +96,12 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // Validate request body
+    // Log the incoming body for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Product update body:', JSON.stringify(body, null, 2));
+    }
+
+    // Validate request body (strips unknown fields)
     const validatedData = updateProductSchema.parse(body);
 
     // Check if product exists and belongs to tenant

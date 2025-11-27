@@ -32,6 +32,7 @@ import {
   NewspaperIcon,
   PhotoIcon,
   ArrowTrendingUpIcon,
+  PaintBrushIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -64,6 +65,7 @@ const navigation: NavigationItem[] = [
   { name: 'Blog Categories', href: '/dashboard/blogs/categories', icon: TagIcon, group: 'Content', submenu: true },
   { name: 'Forms', href: '/dashboard/forms', icon: ClipboardDocumentListIcon, group: 'Content' },
   { name: 'Media Library', href: '/dashboard/media', icon: PhotoIcon, group: 'Content' },
+  { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, group: 'Content', adminOnly: true },
   // Other items
   { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon },
   { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, adminOnly: true },

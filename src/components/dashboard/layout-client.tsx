@@ -11,6 +11,7 @@ import { type Tenant } from '@/lib/tenant-context';
 import { type AuthUser } from '@/lib/auth/types';
 import DashboardSidebar from './sidebar';
 import DashboardHeader from './header';
+import { CurrencyProvider } from '@/lib/currency/currency-context';
 
 interface LayoutClientProps {
   user: AuthUser;
@@ -23,29 +24,31 @@ export default function DashboardLayoutClient({ user, tenant, children }: Readon
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardSidebar 
-        user={user} 
-        tenant={tenant} 
-        mobileMenuOpen={mobileMenuOpen} 
-        setMobileMenuOpen={setMobileMenuOpen}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}>
-        <DashboardHeader 
+    <CurrencyProvider>
+      <div className="min-h-screen bg-background">
+        <DashboardSidebar 
           user={user} 
           tenant={tenant} 
-          onMobileMenuClick={() => setMobileMenuOpen(true)}
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          sidebarCollapsed={sidebarCollapsed}
+          mobileMenuOpen={mobileMenuOpen} 
+          setMobileMenuOpen={setMobileMenuOpen}
+          collapsed={sidebarCollapsed}
         />
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
+        <div className={sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}>
+          <DashboardHeader 
+            user={user} 
+            tenant={tenant} 
+            onMobileMenuClick={() => setMobileMenuOpen(true)}
+            onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <main className="py-6">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </CurrencyProvider>
   );
 }
 

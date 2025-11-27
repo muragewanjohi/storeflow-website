@@ -72,7 +72,7 @@ export default async function AdjustStockPage({
             image: true,
           },
         },
-        variant_attributes: {
+        product_variant_attributes: {
           include: {
             attributes: {
               select: {
@@ -128,7 +128,7 @@ export default async function AdjustStockPage({
               image: true,
             },
           },
-          variant_attributes: {
+          product_variant_attributes: {
             include: {
               attributes: {
                 select: {
@@ -164,7 +164,7 @@ export default async function AdjustStockPage({
         product_sku: variant.products.sku,
         variant_sku: variant.sku,
         stock_quantity: variant.stock_quantity || 0,
-        attributes: variant.variant_attributes.map((attr) => ({
+        attributes: variant.product_variant_attributes.map((attr) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,
@@ -181,7 +181,7 @@ export default async function AdjustStockPage({
         product_sku: v.products.sku,
         variant_sku: v.sku || null,
         stock_quantity: v.stock_quantity || 0,
-        attributes: v.variant_attributes.map((attr: any) => ({
+        attributes: v.product_variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,

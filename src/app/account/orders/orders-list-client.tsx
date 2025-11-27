@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface OrderProduct {
   id: string;
@@ -47,13 +48,10 @@ interface OrdersListClientProps {
 
 export default function OrdersListClient({ initialOrders }: Readonly<OrdersListClientProps>) {
   const [orders] = useState<Order[]>(initialOrders);
+  const { formatCurrency } = useCurrency();
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   const getStatusColor = (status: string | null) => {
     switch (status?.toLowerCase()) {

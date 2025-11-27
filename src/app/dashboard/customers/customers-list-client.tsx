@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { EyeIcon, MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Customer {
   id: string;
@@ -75,6 +76,7 @@ export default function CustomersListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { formatCurrency } = useCurrency();
 
   const [search, setSearch] = useState(currentSearchParams.search);
   const [email, setEmail] = useState(currentSearchParams.email);
@@ -294,7 +296,7 @@ export default function CustomersListClient({
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            ${customer.stats.total_spent.toFixed(2)}
+                            {formatCurrency(customer.stats.total_spent)}
                           </div>
                         </TableCell>
                         <TableCell>

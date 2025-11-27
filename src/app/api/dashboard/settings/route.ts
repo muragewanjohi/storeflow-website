@@ -25,6 +25,7 @@ import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { cache } from '@/lib/cache/simple-cache';
 
 const settingsUpdateSchema = z.object({
   // Store Details (store_name and custom_domain are stored in tenants table, not here)
@@ -326,6 +327,9 @@ export async function PUT(request: NextRequest) {
 
     // Save all options
     await setStaticOptions(tenant.id, optionsToSave);
+
+    // Clear currency cache so changes take effect immediately
+    cache.delete(`${tenant.id}:currency`);
 
     return NextResponse.json({
       message: 'Settings updated successfully',

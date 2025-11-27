@@ -20,6 +20,7 @@ import {
   ArrowPathIcon 
 } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface DashboardData {
   customer: {
@@ -48,6 +49,7 @@ interface AccountDashboardClientProps {
 
 export default function AccountDashboardClient({ data }: Readonly<AccountDashboardClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [isLinking, setIsLinking] = useState(false);
   const [hasCheckedOrders, setHasCheckedOrders] = useState(false);
 
@@ -86,12 +88,8 @@ export default function AccountDashboardClient({ data }: Readonly<AccountDashboa
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   const getStatusBadgeColor = (status: string | null) => {
     if (!status) return 'bg-gray-100 text-gray-800';

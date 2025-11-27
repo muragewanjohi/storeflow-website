@@ -137,7 +137,7 @@ export async function PUT(
       return await tx.product_variants.findUnique({
         where: { id: variantId },
         include: {
-          variant_attributes: {
+          product_variant_attributes: {
             include: {
               attributes: {
                 select: {

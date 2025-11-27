@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -59,6 +60,7 @@ export default function ProductsListingClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { formatCurrency } = useCurrency();
 
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
@@ -146,12 +148,7 @@ export default function ProductsListingClient({
     setDebouncedSearch(search);
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -255,7 +252,7 @@ export default function ProductsListingClient({
                     </div>
                     <div className="p-4">
                       <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                      <p className="text-lg font-bold">{formatPrice(product.price)}</p>
+                      <p className="text-lg font-bold">{formatCurrency(product.price)}</p>
                        {product.stock_quantity !== null && product.stock_quantity > 0 && (
                          <p className="text-sm text-muted-foreground mt-1">
                            {product.stock_quantity} in stock

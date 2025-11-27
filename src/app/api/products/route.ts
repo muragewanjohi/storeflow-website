@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
         slug: true,
         price: true,
         image: true,
-        stock_quantity: true,
+        stock_quantity: true, // Already synced with variant totals
         category_id: true,
       },
     });

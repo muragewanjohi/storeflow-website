@@ -37,6 +37,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatOrderStatus, formatPaymentStatus } from '@/lib/orders/utils';
 import { Loader2 } from 'lucide-react';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface OrderItem {
   id: string;
@@ -83,6 +84,7 @@ export default function OrderDetailClient({
 }: Readonly<OrderDetailClientProps>) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { formatCurrency } = useCurrency();
   const [order, setOrder] = useState<Order | null>(initialOrder);
   const [newStatus, setNewStatus] = useState<string>(order?.status || 'pending');
   const [newPaymentStatus, setNewPaymentStatus] = useState<string>(order?.payment_status || 'pending');
@@ -393,8 +395,8 @@ export default function OrderDetailClient({
                       <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">${item.total.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</p>
+                      <p className="font-medium">{formatCurrency(item.total)}</p>
+                      <p className="text-sm text-muted-foreground">{formatCurrency(item.price)} each</p>
                     </div>
                   </div>
                 ))}
@@ -402,12 +404,12 @@ export default function OrderDetailClient({
               <Separator className="my-4" />
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold">Total</span>
-                <span className="text-2xl font-bold">${order.total_amount.toFixed(2)}</span>
+                <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
               </div>
               {order.coupon_discounted && (
                 <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
                   <span>Coupon Discount ({order.coupon})</span>
-                  <span>-${order.coupon_discounted.toFixed(2)}</span>
+                  <span>-{formatCurrency(order.coupon_discounted)}</span>
                 </div>
               )}
             </CardContent>

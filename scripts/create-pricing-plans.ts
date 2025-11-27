@@ -27,7 +27,7 @@ async function createPricingPlans() {
 
     if (existingPlans.length > 0) {
       console.log('Pricing plans already exist. Skipping creation.');
-      console.log('Existing plans:', existingPlans.map((p) => p.name));
+      console.log('Existing plans:', existingPlans.map((p: { name: string }) => p.name));
       return;
     }
 

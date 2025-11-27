@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatOrderStatus, formatPaymentStatus } from '@/lib/orders/utils';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Customer {
   id: string;
@@ -94,6 +95,7 @@ export default function CustomerDetailClient({
   error,
 }: Readonly<CustomerDetailClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
 
   const getInitials = (name: string) => {
     return name
@@ -173,7 +175,7 @@ export default function CustomerDetailClient({
             <CardDescription>Total Spent</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${customer.stats.total_spent.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(customer.stats.total_spent)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -348,7 +350,7 @@ export default function CustomerDetailClient({
                             {new Date(order.created_at).toLocaleDateString()}
                           </TableCell>
                           <TableCell>{order.item_count} item(s)</TableCell>
-                          <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                          <TableCell>{formatCurrency(order.total_amount)}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
                               {formatOrderStatus(order.status || 'pending')}

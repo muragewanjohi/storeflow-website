@@ -16,6 +16,9 @@ import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon } from '@heroi
 import { PageSection, PageBuilderData, SectionType } from '@/lib/content/page-builder-types';
 import { SectionRenderer } from './section-templates';
 import { SectionEditor } from './section-editor';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { Label } from '@/components/ui/label';
 
 interface PageBuilderProps {
   value: string; // JSON string of PageBuilderData
@@ -39,6 +42,27 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
   const [data, setData] = useState<PageBuilderData>(parseData());
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
+
+  // Fetch available themes for preview
+  const { data: themesData } = useQuery({
+    queryKey: ['themes'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes');
+      if (!response.ok) return { themes: [] };
+      return await response.json();
+    },
+  });
+
+  // Fetch current theme
+  const { data: currentThemeData } = useQuery({
+    queryKey: ['current-theme'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes/current');
+      if (!response.ok) return null;
+      return await response.json();
+    },
+  });
 
   // Update parent when data changes
   const updateData = (newData: PageBuilderData) => {
@@ -134,20 +158,49 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
 
       {previewMode ? (
         // Preview Mode
-        <div className="border rounded-lg p-4 bg-background">
-          {data.sections.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <p>No sections added yet. Add sections to build your page.</p>
-            </div>
-          ) : (
-            <div className="space-y-0">
-              {data.sections
-                .sort((a, b) => a.order - b.order)
-                .map((section) => (
-                  <SectionRenderer key={section.id} section={section} isPreview={true} />
-                ))}
-            </div>
-          )}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="preview-theme" className="text-sm font-medium">
+                  Preview with Theme:
+                </Label>
+                <Select
+                  value={previewThemeId || currentThemeData?.theme?.id || ''}
+                  onValueChange={setPreviewThemeId}
+                >
+                  <SelectTrigger id="preview-theme" className="w-[250px]">
+                    <SelectValue placeholder="Select a theme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {themesData?.themes?.map((theme: any) => (
+                      <SelectItem key={theme.id} value={theme.id}>
+                        {theme.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Preview how sections look with different themes
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <div className="border rounded-lg p-4 bg-background">
+            {data.sections.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                <p>No sections added yet. Add sections to build your page.</p>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {data.sections
+                  .sort((a, b) => a.order - b.order)
+                  .map((section) => (
+                    <SectionRenderer key={section.id} section={section} isPreview={true} />
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         // Edit Mode

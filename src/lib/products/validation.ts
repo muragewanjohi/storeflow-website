@@ -27,9 +27,9 @@ export const createProductSchema = z.object({
 });
 
 /**
- * Product update schema (all fields optional)
+ * Product update schema (all fields optional, strips unknown fields)
  */
-export const updateProductSchema = createProductSchema.partial();
+export const updateProductSchema = createProductSchema.partial().strip();
 
 /**
  * Product query/filter schema

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircleIcon, TruckIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface OrderProduct {
   id: string;
@@ -55,13 +56,10 @@ export default function OrderConfirmationClient({
   showConfirmation = false 
 }: Readonly<OrderConfirmationClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   // Extract tracking information from order_details JSON
   const trackingNumber = order.order_details?.tracking_number || null;

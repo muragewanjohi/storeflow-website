@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
             image: true,
           },
         },
-        variant_attributes: {
+        product_variant_attributes: {
           include: {
             attributes: {
               select: {
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       product_sku: variant.products.sku,
       variant_sku: variant.sku,
       stock_quantity: variant.stock_quantity,
-      attributes: variant.variant_attributes.map((attr) => ({
+      attributes: variant.product_variant_attributes.map((attr) => ({
         name: attr.attributes.name,
         value: attr.attribute_values.value,
         color_code: attr.attribute_values.color_code,

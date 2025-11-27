@@ -13,6 +13,7 @@ import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
@@ -81,7 +82,7 @@ export default async function ProductsPage({
           slug: true,
           price: true,
           image: true,
-          stock_quantity: true,
+          stock_quantity: true, // Already synced with variant totals
           category_id: true,
         },
       }),
@@ -145,6 +146,9 @@ export default async function ProductsPage({
           </Suspense>
         </main>
         <StorefrontFooter />
+        <ThemeProviderWrapper>
+          <></>
+        </ThemeProviderWrapper>
       </div>
     );
   } catch (error) {

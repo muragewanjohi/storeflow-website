@@ -117,13 +117,21 @@ export async function PUT(
       }
     }
 
-    // Update plan
+    // Update plan - construct data object explicitly to handle JSON types
+    const updateData: any = {
+      updated_at: new Date(),
+    };
+    
+    if (validatedData.name !== undefined) updateData.name = validatedData.name;
+    if (validatedData.price !== undefined) updateData.price = validatedData.price;
+    if (validatedData.duration_months !== undefined) updateData.duration_months = validatedData.duration_months;
+    if (validatedData.trial_days !== undefined) updateData.trial_days = validatedData.trial_days;
+    if (validatedData.features !== undefined) updateData.features = validatedData.features as any;
+    if (validatedData.status !== undefined) updateData.status = validatedData.status;
+
     const updatedPlan = await prisma.price_plans.update({
       where: { id },
-      data: {
-        ...validatedData,
-        updated_at: new Date(),
-      },
+      data: updateData,
     });
 
     return NextResponse.json(

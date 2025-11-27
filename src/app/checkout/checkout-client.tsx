@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Image from 'next/image';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface CartItem {
   product_id: string;
@@ -58,6 +59,7 @@ interface CheckoutClientProps {
 
 export default function CheckoutClient({ isAuthenticated = false }: Readonly<CheckoutClientProps>) {
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -232,12 +234,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   if (loading) {
     return (

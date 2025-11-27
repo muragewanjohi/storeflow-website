@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCurrency } from '@/lib/currency/currency-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,6 +95,7 @@ export default function ProductsListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { formatCurrency } = useCurrency();
   
   const [search, setSearch] = useState(currentSearchParams.search);
   const [status, setStatus] = useState(currentSearchParams.status || 'all');
@@ -202,12 +204,8 @@ export default function ProductsListClient({
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   const goToPage = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());

@@ -71,7 +71,7 @@ export async function GET(
         tenant_id: tenant.id,
       },
       include: {
-        variant_attributes: {
+        product_variant_attributes: {
           include: {
             attributes: {
               select: {
@@ -204,7 +204,7 @@ export async function POST(
       return await tx.product_variants.findUnique({
         where: { id: newVariant.id },
         include: {
-          variant_attributes: {
+          product_variant_attributes: {
             include: {
               attributes: {
                 select: {

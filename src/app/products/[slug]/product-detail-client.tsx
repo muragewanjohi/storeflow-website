@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface ProductVariant {
   id: string;
@@ -73,17 +74,14 @@ export default function ProductDetailClient({
   product,
   relatedProducts,
 }: Readonly<ProductDetailClientProps>) {
+  const { formatCurrency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(product.image);
   const [hasInteractedWithQuantity, setHasInteractedWithQuantity] = useState(false);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  };
+  // Using formatCurrency from useCurrency hook
+  const formatPrice = (price: number) => formatCurrency(price);
 
   // Get selected variant
   const selectedVariantData = selectedVariant
