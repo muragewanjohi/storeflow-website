@@ -57,10 +57,10 @@ export default async function AccountOrdersPage() {
   });
 
   // Convert Decimal to number
-  const ordersData = orders.map((order) => ({
+  const ordersData = orders.map((order: typeof orders[0]) => ({
     ...order,
     total_amount: Number(order.total_amount),
-    order_products: order.order_products.map((op) => ({
+    order_products: order.order_products.map((op: typeof order.order_products[0]) => ({
       ...op,
       price: Number(op.price),
       total: Number(op.total),
