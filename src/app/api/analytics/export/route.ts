@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
         });
 
         // Get orders for these customers
-        const customerIds = customers.map(c => c.id);
+        const customerIds = customers.map((c: any) => c.id);
         const orders = await prisma.orders.findMany({
           where: {
             tenant_id: tenant.id,
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
         });
 
         // Get categories for products
-        const categoryIds = [...new Set(products.map(p => p.category_id).filter(Boolean))] as string[];
+        const categoryIds = [...new Set(products.map((p: any) => p.category_id).filter(Boolean))] as string[];
         const categories = categoryIds.length > 0
           ? await prisma.categories.findMany({
               where: {
@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
             })
           : [];
 
-        const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+        const categoryMap = new Map(categories.map((c: any) => [c.id, c.name]));
 
         data = products.map((product: any) => ({
           Product: product.name,

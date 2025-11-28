@@ -285,7 +285,7 @@ export default function InventoryAlertsClient({
                     <TableCell className="font-medium">{variant.product_name}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {variant.attributes.map((attr, idx) => (
+                        {variant.attributes.map((attr: any, idx: any) => (
                           <Badge key={idx} variant="outline" className="text-xs">
                             {attr.name}: {attr.value}
                             {attr.color_code && (

@@ -171,7 +171,7 @@ export default function CreateTenantForm() {
                 {formData.planId && (
                   <div className="rounded-lg border p-4 bg-muted/50">
                     {(() => {
-                      const selectedPlan = pricePlans.find(p => p.id === formData.planId);
+                      const selectedPlan = pricePlans.find((p: any) => p.id === formData.planId);
                       if (!selectedPlan) return null;
                       return (
                         <>

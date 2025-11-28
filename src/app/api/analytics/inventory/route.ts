@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     }, 0);
 
     // Fetch categories for products
-    const categoryIds = [...new Set(inventoryByCategory.map(p => p.category_id).filter(Boolean))] as string[];
+    const categoryIds = [...new Set(inventoryByCategory.map((p: any) => p.category_id).filter(Boolean))] as string[];
     const categories = categoryIds.length > 0
       ? await prisma.categories.findMany({
           where: {
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+    const categoryMap = new Map<string, string>(categories.map((c: any) => [c.id, c.name]));
 
     // Group inventory by category
     const inventoryByCategoryMap: Record<string, { name: string; quantity: number; value: number }> = {};
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
         id,
         ...data,
       }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a: any, b: any) => b.value - a.value);
 
     return NextResponse.json({
       success: true,

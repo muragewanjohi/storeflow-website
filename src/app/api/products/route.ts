@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         `;
 
         if (searchResults && searchResults.length > 0) {
-          searchProductIds = searchResults.map(r => r.id);
+          searchProductIds = searchResults.map((r: any) => r.id);
           useFullTextSearch = true;
           where.id = { in: searchProductIds };
         } else {
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 
     // If using full-text search, sort by relevance (order in searchProductIds)
     if (useFullTextSearch && searchProductIds.length > 0) {
-      const productMap = new Map(products.map(p => [p.id, p]));
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
       products = searchProductIds
         .map(id => productMap.get(id))
         .filter((p): p is NonNullable<typeof p> => p !== undefined)

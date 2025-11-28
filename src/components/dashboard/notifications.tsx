@@ -150,7 +150,7 @@ export default function Notifications() {
     onSuccess: () => {
       // Mark all current notifications as read in localStorage
       if (data?.notifications) {
-        const notificationIds = data.notifications.map(n => n.id);
+        const notificationIds = data.notifications.map((n: any) => n.id);
         markAllNotificationsAsRead(notificationIds);
         // Update state immediately
         const newReadIds = getReadNotificationIds();

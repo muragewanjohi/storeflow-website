@@ -281,8 +281,8 @@ export async function POST(request: NextRequest) {
 
     // Fetch variant prices
     const variantIds = cartItems
-      .filter(item => item.variant_id)
-      .map(item => item.variant_id) as string[];
+      .filter((item: any) => item.variant_id)
+      .map((item: any) => item.variant_id) as string[];
 
     const variants = variantIds.length > 0
       ? await prisma.product_variants.findMany({
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
       : [];
 
     const variantPriceMap = new Map(
-      variants.map(v => [v.id, v.price ? Number(v.price) : null])
+      variants.map((v: any) => [v.id, v.price ? Number(v.price) : null])
     );
 
     const items = cartItems.map((item: typeof cartItems[0]) => {

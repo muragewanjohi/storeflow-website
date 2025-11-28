@@ -5,7 +5,7 @@
  */
 
 import { sendCustomerEmail, sendAdminEmail } from '@/lib/email/service';
-import type { support_tickets } from '@prisma/client';
+import type { support_tickets as SupportTicketType } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 
@@ -36,7 +36,7 @@ export async function sendNewTicketEmail({
   tenant,
   customer,
 }: {
-  ticket: support_tickets & { customers?: { id: string; name: string | null; email: string | null } | null };
+  ticket: SupportTicketType & { customers?: { id: string; name: string | null; email: string | null } | null };
   tenant: Tenant;
   customer: { id: string; name: string | null; email: string | null } | null;
 }) {
@@ -141,7 +141,7 @@ export async function sendTicketReplyEmail({
   isFromCustomer,
   customer,
 }: {
-  ticket: support_tickets & { customers?: { id: string; name: string | null; email: string | null } | null };
+  ticket: SupportTicketType & { customers?: { id: string; name: string | null; email: string | null } | null };
   tenant: Tenant;
   message: string;
   isFromCustomer: boolean;
@@ -268,7 +268,7 @@ export async function sendTicketStatusUpdateEmail({
   oldStatus,
   newStatus,
 }: {
-  ticket: support_tickets & { customers?: { id: string; name: string | null; email: string | null } | null };
+  ticket: SupportTicketType & { customers?: { id: string; name: string | null; email: string | null } | null };
   tenant: Tenant;
   customer: { id: string; name: string | null; email: string | null } | null;
   oldStatus: string | null;
@@ -358,7 +358,7 @@ export async function sendTicketAssignedEmail({
   staffEmail,
   staffName,
 }: {
-  ticket: support_tickets & { customers?: { id: string; name: string | null; email: string | null } | null };
+  ticket: SupportTicketType & { customers?: { id: string; name: string | null; email: string | null } | null };
   tenant: Tenant;
   staffEmail: string;
   staffName?: string;

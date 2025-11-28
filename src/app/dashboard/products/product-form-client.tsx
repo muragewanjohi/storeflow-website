@@ -306,7 +306,7 @@ export default function ProductFormClient({
 
       // Track which existing variants should be deleted (if editing)
       if (isEditing && initialVariants.length > 0) {
-        const currentVariantIds = new Set(variants.filter(v => v.id && !v.isNew).map(v => v.id));
+        const currentVariantIds = new Set(variants.filter(v => v.id && !v.isNew).map((v: any) => v.id));
         const deletedVariants = initialVariants.filter(v => !currentVariantIds.has(v.id));
         
         // Delete removed variants
@@ -573,7 +573,7 @@ export default function ProductFormClient({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {variants.map((variant, index) => (
+                {variants.map((variant: any, index: any) => (
                   <div
                     key={index}
                     className="rounded-lg border p-4 space-y-4"
@@ -594,7 +594,7 @@ export default function ProductFormClient({
                     {/* Variant Attributes */}
                     <div className="space-y-3">
                       <Label>Attributes (e.g., Size, Color, Weight)</Label>
-                      {variant.attributes.map((attr, attrIndex) => {
+                      {variant.attributes.map((attr: any, attrIndex: any) => {
                         const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
                         return (
                           <div key={attrIndex} className="flex gap-2 items-end">

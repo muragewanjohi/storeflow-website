@@ -100,7 +100,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
   // Update currency symbol when currency code changes
   useEffect(() => {
-    const currency = CURRENCIES.find(c => c.code === formData.currency_code);
+    const currency = CURRENCIES.find((c: any) => c.code === formData.currency_code);
     if (currency) {
       setFormData(prev => ({ ...prev, currency_symbol: currency.symbol }));
     }

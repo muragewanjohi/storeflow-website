@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Sort by date
-    notifications.sort((a, b) => {
+    notifications.sort((a: any, b: any) => {
       const dateA = a.created_at instanceof Date ? a.created_at.getTime() : new Date(a.created_at).getTime();
       const dateB = b.created_at instanceof Date ? b.created_at.getTime() : new Date(b.created_at).getTime();
       return dateB - dateA;

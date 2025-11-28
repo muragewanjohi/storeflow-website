@@ -6,7 +6,7 @@
 
 import { sendCustomerEmail, sendAdminEmail } from '@/lib/email/service';
 import { prisma } from '@/lib/prisma/client';
-import type { orders } from '@prisma/client';
+import type { orders as OrdersType, order_products as OrderProductsType, Prisma } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -30,16 +30,23 @@ export function getTenantContactEmail(tenant: Tenant): string {
 // Note: getVerifiedSenderEmail() and getSenderName() have been moved to @/lib/email/service
 // They are now handled by the unified email service
 
-interface OrderWithItems extends orders {
-  order_products: Array<{
-    id: string;
-    quantity: number;
-    price: any;
-    total: any;
+interface OrderWithItems extends OrdersType {
+  id: string;
+  order_number: string;
+  total_amount: Prisma.Decimal;
+  status: string | null;
+  payment_status: string | null;
+  transaction_id: string | null;
+  created_at: Date | null;
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  order_products: Array<OrderProductsType & {
     products: {
       id: string;
       name: string;
       image: string | null;
+      slug: string | null;
     } | null;
   }>;
 }

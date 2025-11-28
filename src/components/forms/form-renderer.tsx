@@ -167,7 +167,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
   }
 
   // Sort fields by order
-  const sortedFields = [...form.fields].sort((a, b) => a.order - b.order);
+  const sortedFields = [...form.fields].sort((a: any, b: any) => a.order - b.order);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -211,7 +211,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
                   <SelectValue placeholder={field.placeholder || 'Select an option'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {field.options?.map((option, index) => (
+                  {field.options?.map((option: any, index: any) => (
                     <SelectItem key={index} value={option}>
                       {option}
                     </SelectItem>
@@ -225,7 +225,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
                 required={field.required}
                 disabled={isPending}
               >
-                {field.options?.map((option, index) => (
+                {field.options?.map((option: any, index: any) => (
                   <div key={index} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`${field.name}-${index}`} />
                     <Label htmlFor={`${field.name}-${index}`} className="cursor-pointer font-normal">
@@ -236,7 +236,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
               </RadioGroup>
             ) : field.type === 'checkbox' ? (
               <div className="space-y-2">
-                {field.options?.map((option, index) => (
+                {field.options?.map((option: any, index: any) => (
                   <div key={index} className="flex items-center space-x-2">
                     <Checkbox
                       id={`${field.name}-${index}`}

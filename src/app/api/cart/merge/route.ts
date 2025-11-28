@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     });
     
     // Create a map of user's existing cart items by product_id + variant_id
-    const userCartMap = new Map(
-      userCartItems.map(item => [
+    const userCartMap = new Map<string, typeof userCartItems[0]>(
+      userCartItems.map((item: any) => [
         `${item.product_id}-${item.variant_id || 'base'}`,
         item,
       ])

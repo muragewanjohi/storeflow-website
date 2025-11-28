@@ -380,7 +380,7 @@ export default function FormBuilderClient({ form }: Readonly<FormBuilderClientPr
               </div>
             ) : (
               <div className="space-y-4">
-                {fields.map((field, index) => (
+                {fields.map((field: any, index: any) => (
                   <Card key={field.id} className="relative">
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between mb-4">
@@ -459,7 +459,7 @@ export default function FormBuilderClient({ form }: Readonly<FormBuilderClientPr
                       {(field.type === 'select' || field.type === 'radio' || field.type === 'checkbox') && (
                         <div className="mt-4 space-y-2">
                           <Label>Options</Label>
-                          {field.options?.map((option, optIndex) => (
+                          {field.options?.map((option: any, optIndex: any) => (
                             <div key={optIndex} className="flex gap-2">
                               <Input
                                 value={option}
@@ -476,7 +476,7 @@ export default function FormBuilderClient({ form }: Readonly<FormBuilderClientPr
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  const newOptions = field.options?.filter((_, i) => i !== optIndex) || [];
+                                  const newOptions = field.options?.filter((_: any, i: any) => i !== optIndex) || [];
                                   updateField(field.id, { options: newOptions });
                                 }}
                                 disabled={isPending}

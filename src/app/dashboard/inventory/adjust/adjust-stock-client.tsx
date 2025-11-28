@@ -316,7 +316,7 @@ export default function AdjustStockClient({
                         <div className="text-sm text-muted-foreground font-mono">{itemSku}</div>
                         {variant && variant.attributes.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {variant.attributes.map((attr, idx) => (
+                            {variant.attributes.map((attr: any, idx: any) => (
                               <Badge key={idx} variant="outline" className="text-xs">
                                 {attr.name}: {attr.value}
                                 {attr.color_code && (

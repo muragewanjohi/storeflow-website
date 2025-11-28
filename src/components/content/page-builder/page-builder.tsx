@@ -194,7 +194,7 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
             ) : (
               <div className="space-y-0">
                 {data.sections
-                  .sort((a, b) => a.order - b.order)
+                  .sort((a: any, b: any) => a.order - b.order)
                   .map((section: any) => (
                     <SectionRenderer key={section.id} section={section} isPreview={true} />
                   ))}
@@ -295,8 +295,8 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
             ) : (
               <div className="space-y-2">
                 {data.sections
-                  .sort((a, b) => a.order - b.order)
-                  .map((section, index) => (
+                  .sort((a: any, b: any) => a.order - b.order)
+                  .map((section: any, index: any) => (
                     <Card
                       key={section.id}
                       className={`cursor-pointer transition-colors ${

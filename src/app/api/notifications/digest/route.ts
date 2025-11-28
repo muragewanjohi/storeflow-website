@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         isVariant: true,
       })),
     ]
-      .sort((a, b) => (a.stock || 0) - (b.stock || 0))
+      .sort((a: any, b: any) => (a.stock || 0) - (b.stock || 0))
       .slice(0, 20);
 
     for (const item of allLowStock) {

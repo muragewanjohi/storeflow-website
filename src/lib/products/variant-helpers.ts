@@ -21,7 +21,7 @@ export function generateVariantName(attributes: VariantAttribute[]): string {
   }
 
   // Sort attributes by name for consistent ordering
-  const sorted = [...attributes].sort((a, b) => {
+  const sorted = [...attributes].sort((a: any, b: any) => {
     const nameA = a.attribute_name || '';
     const nameB = b.attribute_name || '';
     return nameA.localeCompare(nameB);

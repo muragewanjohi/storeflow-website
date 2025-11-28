@@ -210,7 +210,7 @@ export default function ProductDetailClient({
           {/* Thumbnail Gallery */}
           {allImages.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
-              {allImages.map((img, index) => (
+              {allImages.map((img: any, index: any) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(img)}
@@ -287,11 +287,11 @@ export default function ProductDetailClient({
               <div className="space-y-3">
                 {product.product_variants.map((variant: any) => {
                   const variantImage = variant.image || 
-                    variant.variant_attributes.find(va => va.attribute_values.image)?.attribute_values.image ||
+                    variant.variant_attributes.find((va: any) => va.attribute_values.image)?.attribute_values.image ||
                     product.image;
                   
                   const variantDetails = variant.variant_attributes
-                    .map(va => `${va.attributes.name}: ${va.attribute_values.value}`)
+                    .map((va: any) => `${va.attributes.name}: ${va.attribute_values.value}`)
                     .join(', ');
 
                   return (

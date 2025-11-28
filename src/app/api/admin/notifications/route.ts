@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Sort all notifications by created_at (most recent first)
-    notifications.sort((a, b) => {
+    notifications.sort((a: any, b: any) => {
       const dateA = typeof a.created_at === 'string' ? new Date(a.created_at).getTime() : a.created_at.getTime();
       const dateB = typeof b.created_at === 'string' ? new Date(b.created_at).getTime() : b.created_at.getTime();
       return dateB - dateA;

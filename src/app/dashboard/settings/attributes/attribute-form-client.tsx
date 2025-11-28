@@ -241,7 +241,7 @@ export default function AttributeFormClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {values.map((val, index) => (
+                  {values.map((val: any, index: any) => (
                     <TableRow key={index}>
                       <TableCell>
                         <Input

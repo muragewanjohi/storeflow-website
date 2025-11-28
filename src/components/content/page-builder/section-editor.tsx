@@ -193,7 +193,7 @@ function FeaturesSectionEditor({
               Add Feature
             </Button>
           </div>
-          {section.features.map((feature, index) => (
+          {section.features.map((feature: any, index: any) => (
             <Card key={feature.id}>
               <CardHeader>
                 <CardTitle className="text-sm">Feature {index + 1}</CardTitle>
@@ -402,7 +402,7 @@ function TestimonialsSectionEditor({
               Add Testimonial
             </Button>
           </div>
-          {section.testimonials.map((testimonial, index) => (
+          {section.testimonials.map((testimonial: any, index: any) => (
             <Card key={testimonial.id}>
               <CardHeader>
                 <CardTitle className="text-sm">Testimonial {index + 1}</CardTitle>

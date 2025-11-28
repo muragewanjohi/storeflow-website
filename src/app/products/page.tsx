@@ -118,7 +118,7 @@ export default async function ProductsPage({
               <div className="space-y-6">
                 <div className="h-8 bg-muted rounded animate-pulse w-1/4" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {Array.from({ length: 8 }).map((_, i) => (
+                  {Array.from({ length: 8 }).map((_: any, i: any) => (
                     <div key={i} className="border rounded-lg overflow-hidden">
                       <div className="aspect-square w-full bg-muted animate-pulse" />
                       <div className="p-4 space-y-2">

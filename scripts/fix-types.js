@@ -40,6 +40,16 @@ function fixFile(filePath) {
     return match;
   });
 
+  // Fix .map((param1, param2) => patterns - two parameters
+  const mapTwoParamPattern = /\.map\(\(([a-z_][a-z0-9_]*),\s*([a-z_][a-z0-9_]*)\)\s*=>/g;
+  content = content.replace(mapTwoParamPattern, (match, p1, p2) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.map((${p1}: any, ${p2}: any) =>`;
+    }
+    return match;
+  });
+
   // Fix .reduce((sum, item) => patterns  
   const reducePattern = /\.reduce\(\(([a-z_][a-z0-9_]*),\s*([a-z_][a-z0-9_]*)\)\s*=>/g;
   content = content.replace(reducePattern, (match, p1, p2) => {
@@ -66,6 +76,56 @@ function fixFile(filePath) {
     if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
       modified = true;
       return `.filter((${param}: any) =>`;
+    }
+    return match;
+  });
+
+  // Fix .find((item) => patterns
+  const findPattern = /\.find\(([a-z_][a-z0-9_]*)\s*=>/g;
+  content = content.replace(findPattern, (match, param) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.find((${param}: any) =>`;
+    }
+    return match;
+  });
+
+  // Fix .sort((a, b) => patterns
+  const sortPattern = /\.sort\(\(([a-z_][a-z0-9_]*),\s*([a-z_][a-z0-9_]*)\)\s*=>/g;
+  content = content.replace(sortPattern, (match, p1, p2) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.sort((${p1}: any, ${p2}: any) =>`;
+    }
+    return match;
+  });
+
+  // Fix .reduce((sum, order) => patterns
+  const reduceTwoParamPattern = /\.reduce\(\(([a-z_][a-z0-9_]*),\s*([a-z_][a-z0-9_]*)\)\s*=>/g;
+  content = content.replace(reduceTwoParamPattern, (match, p1, p2) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.reduce((${p1}: any, ${p2}: any) =>`;
+    }
+    return match;
+  });
+
+  // Fix .map(c => patterns (single char parameter)
+  const mapSingleCharPattern = /\.map\(([a-z])\s*=>/g;
+  content = content.replace(mapSingleCharPattern, (match, param) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.map((${param}: any) =>`;
+    }
+    return match;
+  });
+
+  // Fix .map((c, p) => patterns (two single char parameters)
+  const mapTwoSingleCharPattern = /\.map\(\(([a-z]),\s*([a-z])\)\s*=>/g;
+  content = content.replace(mapTwoSingleCharPattern, (match, p1, p2) => {
+    if (!match.includes(': any') && !match.includes(': typeof') && !match.includes(':')) {
+      modified = true;
+      return `.map((${p1}: any, ${p2}: any) =>`;
     }
     return match;
   });

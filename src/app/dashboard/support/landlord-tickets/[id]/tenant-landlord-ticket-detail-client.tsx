@@ -313,7 +313,7 @@ export default function TenantLandlordTicketDetailClient({
                 <div className="mt-3 space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Attachments:</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {message.attachments.map((url, idx) => {
+                    {message.attachments.map((url: any, idx: any) => {
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || url.includes('image');
                       return (
                         <div key={idx} className="relative">

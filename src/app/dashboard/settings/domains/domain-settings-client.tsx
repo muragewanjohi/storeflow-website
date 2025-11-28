@@ -188,7 +188,7 @@ export function DomainSettingsClient() {
                 <p className="text-sm font-medium text-yellow-800 mb-2">
                   Configuration Issue
                 </p>
-                {domainInfo.configurationIssue.map((issue, idx) => (
+                {domainInfo.configurationIssue.map((issue: any, idx: any) => (
                   <p key={idx} className="text-sm text-yellow-700">
                     {issue.message}
                   </p>
@@ -231,7 +231,7 @@ export function DomainSettingsClient() {
                     <div>
                       <p className="font-medium mb-1">Nameservers:</p>
                       <ul className="list-disc list-inside font-mono text-xs">
-                        {dnsConfig.intendedNameservers.map((ns, idx) => (
+                        {dnsConfig.intendedNameservers.map((ns: any, idx: any) => (
                           <li key={idx}>{ns}</li>
                         ))}
                       </ul>

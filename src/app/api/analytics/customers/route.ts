@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
         // Get customer details for top customers
         const topCustomerIds = Array.from(customerMap.entries())
-          .sort((a, b) => b[1].totalRevenue - a[1].totalRevenue)
+          .sort((a: any, b: any) => b[1].totalRevenue - a[1].totalRevenue)
           .slice(0, 10)
           .map(([id]) => id);
 
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
           orderCount,
         };
       })
-      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
       .slice(0, 10);
 
     // Calculate customer lifetime value

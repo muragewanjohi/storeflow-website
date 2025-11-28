@@ -259,7 +259,7 @@ function TestimonialsSectionComponent({
               <CardContent className="pt-6">
                 {testimonial.rating && (
                   <div className="flex gap-1 mb-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
+                    {Array.from({ length: 5 }).map((_: any, i: any) => (
                       <span key={i} className={i < testimonial.rating! ? 'text-yellow-400' : 'text-gray-300'}>
                         ★
                       </span>

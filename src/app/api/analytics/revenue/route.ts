@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         date,
         revenue,
       }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
 
     // Calculate total revenue for period
     const totalRevenue = orders.reduce((sum: any, order: any) => sum + Number(order.total_amount), 0);

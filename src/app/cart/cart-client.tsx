@@ -79,7 +79,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     if (!cart) return;
 
     const itemKey = `${productId}-${variantId || 'base'}`;
-    const item = cart.items.find(i => `${i.product_id}-${i.variant_id || 'base'}` === itemKey);
+    const item = cart.items.find((i: any) => `${i.product_id}-${i.variant_id || 'base'}` === itemKey);
     
     if (!item) return;
 
@@ -151,7 +151,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     if (!cart) return;
 
     const itemKey = `${productId}-${variantId || 'base'}`;
-    const item = cart.items.find(i => `${i.product_id}-${i.variant_id || 'base'}` === itemKey);
+    const item = cart.items.find((i: any) => `${i.product_id}-${i.variant_id || 'base'}` === itemKey);
     
     if (!item) return;
 
@@ -233,7 +233,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="h-8 bg-muted rounded animate-pulse w-1/4 mb-6" />
-          {Array.from({ length: 3 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_: any, i: any) => (
             <div key={i} className="flex gap-4 p-4 border rounded-lg">
               <div className="w-20 h-20 bg-muted rounded animate-pulse flex-shrink-0" />
               <div className="flex-1 space-y-2">

@@ -478,7 +478,7 @@ export default function AnalyticsDashboardClient() {
                         outerRadius={100}
                         label={({ name, revenue }: any) => `${name}: ${formatCurrency(revenue)}`}
                       >
-                        {sales.byCategory.map((entry, index) => (
+                        {sales.byCategory.map((entry: any, index: any) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -503,7 +503,7 @@ export default function AnalyticsDashboardClient() {
                 {sales?.byProduct && sales.byProduct.length > 0 ? (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      {sales.byProduct.slice(0, 10).map((product, index) => (
+                      {sales.byProduct.slice(0, 10).map((product: any, index: any) => (
                         <div key={product.id} className="flex items-center justify-between p-2 border rounded">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>
@@ -634,7 +634,7 @@ export default function AnalyticsDashboardClient() {
               <CardContent>
                 {customers?.topCustomers && customers.topCustomers.length > 0 ? (
                   <div className="space-y-2">
-                    {customers.topCustomers.map((customer, index) => (
+                    {customers.topCustomers.map((customer: any, index: any) => (
                       <div key={customer.id} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-muted-foreground">#{index + 1}</span>

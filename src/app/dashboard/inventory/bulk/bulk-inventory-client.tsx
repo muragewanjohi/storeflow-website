@@ -487,7 +487,7 @@ export default function BulkInventoryClient({
                           CSV Import Warnings ({csvErrors.length})
                         </p>
                         <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {csvErrors.map((err, idx) => (
+                          {csvErrors.map((err: any, idx: any) => (
                             <p key={idx} className="text-xs text-amber-700">
                               Row {err.row}: {err.error} {err.sku ? `(SKU: ${err.sku})` : ''}
                             </p>
@@ -675,7 +675,7 @@ export default function BulkInventoryClient({
                   <CardDescription>Configure adjustments for each item</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {items.map((item, index) => (
+                  {items.map((item: any, index: any) => (
                     <div key={`${item.type}-${item.id}`} className="rounded-lg border p-4 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">

@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+    const categoryMap = new Map(categories.map((c: any) => [c.id, c.name]));
 
     // Calculate sales by category
     const salesByCategory: Record<string, { name: string; quantity: number; revenue: number }> = {};
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         id,
         ...data,
       }))
-      .sort((a, b) => b.revenue - a.revenue)
+      .sort((a: any, b: any) => b.revenue - a.revenue)
       .slice(0, 10); // Top 10 products
 
     const topCategories = Object.entries(salesByCategory)
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         id,
         ...data,
       }))
-      .sort((a, b) => b.revenue - a.revenue);
+      .sort((a: any, b: any) => b.revenue - a.revenue);
 
     // Calculate total sales
     const totalSales = orderProducts.reduce((sum: any, op: any) => sum + op.quantity, 0);

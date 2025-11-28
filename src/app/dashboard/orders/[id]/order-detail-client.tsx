@@ -423,7 +423,7 @@ export default function OrderDetailClient({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {timeline.map((step, index) => {
+                {timeline.map((step: any, index: any) => {
                   const Icon = step.icon;
                   return (
                     <div key={step.status} className="flex items-start gap-4">
