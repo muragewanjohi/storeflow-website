@@ -115,7 +115,7 @@ export default async function AccountDashboardPage() {
       totalSpent,
       pendingOrders,
     },
-    recentOrders: recentOrders.map((order) => ({
+    recentOrders: recentOrders.map((order: typeof recentOrders[0]) => ({
       ...order,
       total_amount: Number(order.total_amount),
     })),
