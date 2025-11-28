@@ -76,7 +76,7 @@ export default async function OrderDetailPage({
           })
         : [];
 
-      const variantMap = new Map(variants.map((v: any) => [v.id, v]));
+      const variantMap = new Map<string, { id: string; sku: string | null }>(variants.map((v: any) => [v.id, v]));
 
       order = {
         id: orderData.id,

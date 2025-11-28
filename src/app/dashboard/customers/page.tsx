@@ -120,7 +120,7 @@ export default async function CustomersPage({
         ]);
 
         const totalSpent = paidOrders.reduce(
-          (sum, order) => sum + Number(order.total_amount),
+          (sum: any, order: any) => sum + Number(order.total_amount),
           0
         );
 

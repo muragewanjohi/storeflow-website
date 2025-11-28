@@ -45,7 +45,7 @@ export async function linkGuestOrdersToCustomer(
   }
 
   // Update all matching orders to link them to the customer account
-  const orderIds = matchingOrders.map(order => order.id);
+  const orderIds = matchingOrders.map((order: any) => order.id);
   
   await prisma.orders.updateMany({
     where: {

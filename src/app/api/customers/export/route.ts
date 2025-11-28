@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
         ]);
 
         const totalSpent = paidOrders.reduce(
-          (sum, order) => sum + Number(order.total_amount),
+          (sum: any, order: any) => sum + Number(order.total_amount),
           0
         );
 

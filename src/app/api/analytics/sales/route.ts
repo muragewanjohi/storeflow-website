@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-    const categoryMap = new Map(categories.map((c: any) => [c.id, c.name]));
+    const categoryMap = new Map<string, string>(categories.map((c: any) => [c.id, c.name]));
 
     // Calculate sales by category
     const salesByCategory: Record<string, { name: string; quantity: number; revenue: number }> = {};

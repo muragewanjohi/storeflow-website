@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
 
     // Get public URLs for each file
     const mediaFiles = await Promise.all(
-      mediaRecords.map(async (record) => {
+      mediaRecords.map(async (record: any) => {
         if (!record.path) {
           return null;
         }

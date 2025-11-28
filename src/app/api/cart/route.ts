@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
         })
       : [];
 
-    const variantPriceMap = new Map(
+    const variantPriceMap = new Map<string, number | null>(
       variants.map((v: any) => [v.id, v.price ? Number(v.price) : null])
     );
 

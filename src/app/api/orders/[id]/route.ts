@@ -74,7 +74,7 @@ export async function GET(
         })
       : [];
 
-    const variantMap = new Map(variants.map((v: any) => [v.id, v]));
+    const variantMap = new Map<string, { id: string; sku: string | null }>(variants.map((v: any) => [v.id, v]));
 
     return NextResponse.json({
       success: true,
