@@ -159,7 +159,7 @@ export default function OrdersListClient({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedOrders(new Set(initialOrders.map((order) => order.id)));
+      setSelectedOrders(new Set(initialOrders.map((order: any) => order.id)));
     } else {
       setSelectedOrders(new Set());
     }
@@ -184,10 +184,10 @@ export default function OrdersListClient({
       
       if (bulkAction === 'export') {
         // Export selected orders as CSV
-        const selectedOrdersData = initialOrders.filter((order) => orderIds.includes(order.id));
+        const selectedOrdersData = initialOrders.filter((order: any) => orderIds.includes(order.id));
         const csvContent = [
           ['Order Number', 'Customer', 'Email', 'Total', 'Status', 'Payment Status', 'Date'].join(','),
-          ...selectedOrdersData.map((order) =>
+          ...selectedOrdersData.map((order: any) =>
             [
               order.order_number,
               order.name || '',
@@ -498,7 +498,7 @@ export default function OrdersListClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {initialOrders.map((order) => (
+                    {initialOrders.map((order: any) => (
                       <TableRow key={order.id}>
                         <TableCell>
                           <Checkbox

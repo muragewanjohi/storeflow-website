@@ -115,7 +115,7 @@ export default function FormsListClient() {
       }
 
       // Remove form from list
-      setForms((prev) => prev.filter((f) => f.id !== formToDelete.id));
+      setForms((prev) => prev.filter((f: any) => f.id !== formToDelete.id));
       setFormToDelete(null);
       router.refresh();
     } catch (err) {
@@ -230,7 +230,7 @@ export default function FormsListClient() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {forms.map((form) => (
+                  {forms.map((form: any) => (
                     <TableRow key={form.id}>
                       <TableCell className="font-medium">
                         <div>{form.title}</div>

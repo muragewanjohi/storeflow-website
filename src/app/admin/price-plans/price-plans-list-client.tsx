@@ -132,7 +132,7 @@ export default function PricePlansListClient({ pricePlans }: Readonly<PricePlans
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pricePlans.map((plan) => (
+              {pricePlans.map((plan: any) => (
                 <TableRow key={plan.id}>
                   <TableCell className="font-medium">{plan.name}</TableCell>
                   <TableCell>{formatPrice(plan.price)}</TableCell>

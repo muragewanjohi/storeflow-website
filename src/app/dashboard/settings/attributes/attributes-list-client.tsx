@@ -133,7 +133,7 @@ export default function AttributesListClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attributes.map((attribute) => (
+                {attributes.map((attribute: any) => (
                   <TableRow key={attribute.id}>
                     <TableCell className="font-medium">{attribute.name}</TableCell>
                     <TableCell>
@@ -145,7 +145,7 @@ export default function AttributesListClient({
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {attribute.attribute_values.map((val) => (
+                        {attribute.attribute_values.map((val: any) => (
                           <Badge key={val.id} variant="secondary" className="text-xs">
                             {val.color_code && (
                               <span

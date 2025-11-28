@@ -308,7 +308,7 @@ export default function PagesListClient({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {displayPages.map((page) => (
+                      {displayPages.map((page: any) => (
                         <TableRow key={page.id}>
                           <TableCell className="font-medium">
                             {page.title}

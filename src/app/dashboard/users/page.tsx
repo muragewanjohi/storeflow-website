@@ -44,13 +44,13 @@ export default async function UsersPage() {
   }
 
   // Filter users by tenant_id
-  const tenantUsers = (usersData?.users || []).filter((u) => {
+  const tenantUsers = (usersData?.users || []).filter((u: any) => {
     const userTenantId = u.user_metadata?.tenant_id;
     return userTenantId === tenant.id;
   });
 
   // Map to user objects with role
-  const users = tenantUsers.map((u) => ({
+  const users = tenantUsers.map((u: any) => ({
     id: u.id,
     email: u.email || '',
     name: u.user_metadata?.name || '',

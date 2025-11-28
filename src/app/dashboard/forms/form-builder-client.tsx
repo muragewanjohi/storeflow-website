@@ -129,11 +129,11 @@ export default function FormBuilderClient({ form }: Readonly<FormBuilderClientPr
   };
 
   const updateField = (id: string, updates: Partial<FormField>) => {
-    setFields(fields.map((field) => (field.id === id ? { ...field, ...updates } : field)));
+    setFields(fields.map((field: any) => (field.id === id ? { ...field, ...updates } : field)));
   };
 
   const deleteField = (id: string) => {
-    setFields(fields.filter((field) => field.id !== id));
+    setFields(fields.filter((field: any) => field.id !== id));
   };
 
   const moveField = (index: number, direction: 'up' | 'down') => {
@@ -188,7 +188,7 @@ export default function FormBuilderClient({ form }: Readonly<FormBuilderClientPr
           },
           body: JSON.stringify({
             ...formData,
-            fields: fields.map((f) => ({
+            fields: fields.map((f: any) => ({
               ...f,
               name: f.name || generateSlug(f.label),
             })),

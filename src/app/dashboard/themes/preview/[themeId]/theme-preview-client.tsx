@@ -3,20 +3,23 @@
 /**
  * Theme Preview Client Component
  * 
- * Renders a preview of the storefront with the selected theme
+ * Renders a full site preview of the storefront with the selected theme and demo content
+ * Day 37: Theme Templates with Demo Content
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
-import StorefrontHeader from '@/components/storefront/header';
-import StorefrontFooter from '@/components/storefront/footer';
+import { getThemeTemplate } from '@/lib/themes/theme-registry';
+import { loadThemeHeader, loadThemeFooter, loadThemeHero, loadThemeProductGrid } from '@/lib/themes/theme-loader';
+import { useQuery } from '@tanstack/react-query';
 
 interface Theme {
   id: string;
   title: string;
+  slug: string;
   colors: Record<string, unknown> | null;
   typography: Record<string, unknown> | null;
 }
@@ -37,6 +40,26 @@ export default function ThemePreviewClient({
   customizations,
 }: ThemePreviewClientProps) {
   const router = useRouter();
+  const [currentPage, setCurrentPage] = useState<'home' | 'products' | 'product-detail'>('home');
+  
+  // Get theme template
+  const template = getThemeTemplate(theme.slug);
+  
+  // Load theme-specific components (these are dynamic imports that return component constructors)
+  const ThemeHeader = loadThemeHeader(theme.slug);
+  const ThemeFooter = loadThemeFooter(theme.slug);
+  const ThemeHero = loadThemeHero(theme.slug);
+  const ThemeProductGrid = loadThemeProductGrid(theme.slug);
+  
+  // Fetch demo content
+  const { data: demoContent, isLoading: isLoadingDemo } = useQuery({
+    queryKey: ['theme-demo-content', theme.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/themes/${theme.id}/demo-content`);
+      if (!response.ok) throw new Error('Failed to fetch demo content');
+      return await response.json();
+    },
+  });
 
   // Apply theme styles
   useEffect(() => {
@@ -76,7 +99,7 @@ export default function ThemePreviewClient({
 
     return () => {
       // Cleanup on unmount
-      Object.keys(colors).forEach((key) => {
+      Object.keys(colors).forEach((key: any) => {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         root.style.removeProperty(`--color-${cssKey}`);
       });
@@ -112,76 +135,129 @@ export default function ThemePreviewClient({
         </div>
       </div>
 
-      {/* Preview Content - Mock Storefront */}
+      {/* Preview Content - Full Site with Theme Components */}
       <div className="min-h-screen flex flex-col">
-        <StorefrontHeader />
+        <ThemeHeader />
         
         <main className="flex-1">
-          {/* Hero Section */}
-          <section className="bg-gradient-to-r from-primary/10 to-secondary/10 py-20">
-            <div className="container mx-auto px-4 text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                Welcome to Our Store
-              </h1>
-              <p className="text-xl text-muted-foreground mb-8" style={{ fontFamily: 'var(--font-body, inherit)' }}>
-                Discover amazing products with {theme.title}
-              </p>
-              <Button size="lg">Shop Now</Button>
-            </div>
-          </section>
+          {currentPage === 'home' && (
+            <>
+              {/* Hero Section with Theme Component */}
+              {ThemeHero && (
+                <ThemeHero
+                  title={template?.industry === 'electronics' 
+                    ? 'Latest Technology at Your Fingertips'
+                    : template?.industry === 'fashion'
+                    ? 'Timeless Fashion, Modern Style'
+                    : 'Welcome to Our Store'}
+                  subtitle={template?.industry === 'electronics'
+                    ? 'Discover cutting-edge electronics and gadgets for your digital lifestyle'
+                    : template?.industry === 'fashion'
+                    ? 'Discover our curated collection of elegant pieces designed for the modern wardrobe'
+                    : 'Discover amazing products'}
+                  ctaText="Shop Now"
+                  ctaLink="#"
+                />
+              )}
 
-          {/* Featured Products Section */}
-          <section className="py-16">
-            <div className="container mx-auto px-4">
-              <h2 className="text-3xl font-bold mb-8 text-center" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
-                Featured Products
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[1, 2, 3, 4].map((i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <div className="aspect-square bg-muted" />
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold mb-2">Product {i}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">Sample product description</p>
-                      <p className="text-lg font-bold">${(i * 10).toFixed(2)}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
+              {/* Featured Products Section with Theme Product Grid */}
+              <section className="py-16">
+                <div className="container mx-auto px-4">
+                  <h2 className="text-3xl font-bold mb-8 text-center" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
+                    Featured Products
+                  </h2>
+                  {isLoadingDemo ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {[1, 2, 3, 4].map((i: any) => (
+                        <Card key={i} className="overflow-hidden">
+                          <div className="aspect-square bg-muted animate-pulse" />
+                          <CardContent className="p-4">
+                            <div className="h-4 bg-muted rounded animate-pulse mb-2" />
+                            <div className="h-4 bg-muted rounded animate-pulse w-2/3" />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : demoContent?.products && ThemeProductGrid ? (
+                    <ThemeProductGrid
+                      products={demoContent.products.slice(0, 8).map((p: any) => ({
+                        id: p.sku,
+                        name: p.name,
+                        slug: p.sku.toLowerCase().replace(/\s+/g, '-'),
+                        price: p.price,
+                        compareAtPrice: p.compareAtPrice,
+                        image: p.image,
+                        stock_quantity: p.stock_quantity,
+                        metadata: p.metadata,
+                      }))}
+                      columns={4}
+                    />
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {[1, 2, 3, 4].map((i: any) => (
+                        <Card key={i} className="overflow-hidden">
+                          <div className="aspect-square bg-muted" />
+                          <CardContent className="p-4">
+                            <h3 className="font-semibold mb-2">Product {i}</h3>
+                            <p className="text-sm text-muted-foreground mb-2">Sample product description</p>
+                            <p className="text-lg font-bold">${(i * 10).toFixed(2)}</p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="text-center mt-8">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage('products')}
+                    >
+                      View All Products
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
 
-          {/* Features Section */}
-          <section className="py-16 bg-muted/50">
-            <div className="container mx-auto px-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="text-center">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-2xl">🚚</span>
-                  </div>
-                  <h3 className="font-semibold mb-2">Free Shipping</h3>
-                  <p className="text-sm text-muted-foreground">On orders over $50</p>
+          {currentPage === 'products' && (
+            <section className="py-16">
+              <div className="container mx-auto px-4">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-3xl font-bold">All Products</h2>
+                  <Button variant="ghost" onClick={() => setCurrentPage('home')}>
+                    Back to Home
+                  </Button>
                 </div>
-                <div className="text-center">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-2xl">↩️</span>
+                {isLoadingDemo ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i: any) => (
+                      <Card key={i} className="overflow-hidden">
+                        <div className="aspect-square bg-muted animate-pulse" />
+                      </Card>
+                    ))}
                   </div>
-                  <h3 className="font-semibold mb-2">Easy Returns</h3>
-                  <p className="text-sm text-muted-foreground">30-day return policy</p>
-                </div>
-                <div className="text-center">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-2xl">🔒</span>
-                  </div>
-                  <h3 className="font-semibold mb-2">Secure Payment</h3>
-                  <p className="text-sm text-muted-foreground">100% secure checkout</p>
-                </div>
+                ) : demoContent?.products && ThemeProductGrid ? (
+                  <ThemeProductGrid
+                    products={demoContent.products.map((p: any) => ({
+                      id: p.sku,
+                      name: p.name,
+                      slug: p.sku.toLowerCase().replace(/\s+/g, '-'),
+                      price: p.price,
+                      compareAtPrice: p.compareAtPrice,
+                      image: p.image,
+                      stock_quantity: p.stock_quantity,
+                      metadata: p.metadata,
+                    }))}
+                    columns={4}
+                  />
+                ) : null}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
         </main>
 
-        <StorefrontFooter />
+        <ThemeFooter />
       </div>
     </div>
   );

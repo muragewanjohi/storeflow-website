@@ -197,7 +197,7 @@ export default function AccountDashboardClient({ data }: Readonly<AccountDashboa
             </div>
           ) : (
             <div className="space-y-4">
-              {data.recentOrders.map((order) => (
+              {data.recentOrders.map((order: any) => (
                 <div
                   key={order.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"

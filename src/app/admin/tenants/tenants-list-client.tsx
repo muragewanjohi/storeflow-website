@@ -121,7 +121,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tenants.map((tenant) => (
+              {tenants.map((tenant: any) => (
                 <TableRow key={tenant.id}>
                   <TableCell className="font-medium">{tenant.name}</TableCell>
                   <TableCell>

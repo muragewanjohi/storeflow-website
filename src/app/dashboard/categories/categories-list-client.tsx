@@ -182,10 +182,10 @@ export default function CategoriesListClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => {
+                {categories.map((category: any) => {
                   const rows = [renderCategoryRow(category, 0)];
                   if (category.other_categories && category.other_categories.length > 0) {
-                    category.other_categories.forEach((child) => {
+                    category.other_categories.forEach((child: any) => {
                       rows.push(renderCategoryRow(child, 1));
                     });
                   }

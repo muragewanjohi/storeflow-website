@@ -212,44 +212,44 @@ export default async function InventoryPage() {
 
   return (
     <InventoryDashboardClient
-      lowStockProducts={lowStockProducts.map((p) => ({
+      lowStockProducts={lowStockProducts.map((p: any) => ({
         ...p,
         stock_quantity: p.stock_quantity || 0,
       }))}
-      lowStockVariants={lowStockVariants.map((v) => ({
+      lowStockVariants={lowStockVariants.map((v: any) => ({
         id: v.id,
         product_id: v.product_id,
         product_name: v.products.name,
         product_sku: v.products.sku,
         variant_sku: v.sku,
         stock_quantity: v.stock_quantity || 0,
-        attributes: v.product_variant_attributes.map((attr) => ({
+        attributes: v.product_variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,
         })),
       }))}
-      recentHistory={recentHistory.map((h) => ({
+      recentHistory={recentHistory.map((h: any) => ({
         ...h,
         quantity_before: h.quantity_before,
         quantity_after: h.quantity_after,
         quantity_change: h.quantity_change,
         created_at: h.created_at instanceof Date ? h.created_at : h.created_at ? new Date(h.created_at) : new Date(),
       }))}
-      allProducts={allProducts.map((p) => ({
+      allProducts={allProducts.map((p: any) => ({
         id: p.id,
         name: p.name,
         sku: p.sku,
         stock_quantity: p.stock_quantity || 0,
       }))}
-      allVariants={allVariants.map((v) => ({
+      allVariants={allVariants.map((v: any) => ({
         id: v.id,
         product_id: v.product_id,
         product_name: v.products.name,
         product_sku: v.products.sku,
         variant_sku: v.sku,
         stock_quantity: v.stock_quantity || 0,
-        attributes: v.product_variant_attributes.map((attr) => ({
+        attributes: v.product_variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
         })),

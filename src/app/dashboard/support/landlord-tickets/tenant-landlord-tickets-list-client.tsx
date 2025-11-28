@@ -86,7 +86,7 @@ function getPriorityBadgeVariant(priority: string) {
 function formatStatus(status: string) {
   return status
     .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -97,7 +97,7 @@ function formatPriority(priority: string) {
 function formatCategory(category: string) {
   return category
     .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -222,7 +222,7 @@ export default function TenantLandlordTicketsListClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {initialTickets.map((ticket) => (
+                    {initialTickets.map((ticket: any) => (
                       <TableRow key={ticket.id}>
                         <TableCell className="font-medium max-w-xs truncate">
                           {ticket.subject}

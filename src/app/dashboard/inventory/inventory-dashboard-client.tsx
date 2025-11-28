@@ -266,7 +266,7 @@ export default function InventoryDashboardClient({
                       <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                         Products ({filteredSearchProducts.length})
                       </div>
-                      {filteredSearchProducts.map((product) => (
+                      {filteredSearchProducts.map((product: any) => (
                         <Link
                           key={product.id}
                           href={`/dashboard/inventory/adjust?product_id=${product.id}`}
@@ -297,7 +297,7 @@ export default function InventoryDashboardClient({
                       <div className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                         Variants ({filteredSearchVariants.length})
                       </div>
-                      {filteredSearchVariants.map((variant) => (
+                      {filteredSearchVariants.map((variant: any) => (
                         <Link
                           key={variant.id}
                           href={`/dashboard/inventory/adjust?variant_id=${variant.id}`}
@@ -311,7 +311,7 @@ export default function InventoryDashboardClient({
                             <div>
                               <div className="font-medium">{variant.product_name}</div>
                               <div className="text-xs text-muted-foreground">
-                                {variant.attributes.map((a) => `${a.name}: ${a.value}`).join(', ')}
+                                {variant.attributes.map((a: any) => `${a.name}: ${a.value}`).join(', ')}
                               </div>
                               {(variant.variant_sku || variant.product_sku) && (
                                 <div className="text-xs text-muted-foreground font-mono">
@@ -422,7 +422,7 @@ export default function InventoryDashboardClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredLowStockProducts.map((product) => (
+                    {filteredLowStockProducts.map((product: any) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -472,7 +472,7 @@ export default function InventoryDashboardClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredLowStockVariants.map((variant) => (
+                    {filteredLowStockVariants.map((variant: any) => (
                       <TableRow key={variant.id}>
                         <TableCell className="font-medium">{variant.product_name}</TableCell>
                         <TableCell>
@@ -551,7 +551,7 @@ export default function InventoryDashboardClient({
                   </TableCell>
                 </TableRow>
               ) : (
-                recentHistory.map((history) => {
+                recentHistory.map((history: any) => {
                   const itemName = history.products
                     ? history.products.name
                     : history.product_variants

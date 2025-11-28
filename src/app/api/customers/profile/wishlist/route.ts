@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      wishlist: wishlistItems.map((item) => ({
+      wishlist: wishlistItems.map((item: any) => ({
         id: item.id,
         product: {
           id: item.products.id,

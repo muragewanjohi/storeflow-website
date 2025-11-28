@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     for (const product of productsWithVariants) {
       // Calculate sum of variant stocks
-      const variantTotal = product.product_variants.reduce((sum, variant) => {
+      const variantTotal = product.product_variants.reduce((sum: any, variant: any) => {
         return sum + (variant.stock_quantity ?? 0);
       }, 0);
 

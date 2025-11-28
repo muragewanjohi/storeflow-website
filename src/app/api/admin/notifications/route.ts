@@ -135,11 +135,11 @@ export async function GET(request: NextRequest) {
 
     // Filter unread only if requested
     const filteredNotifications = unreadOnly
-      ? notifications.filter((n) => !n.read)
+      ? notifications.filter((n: any) => !n.read)
       : notifications;
 
     // Get unread count
-    const unreadCount = notifications.filter((n) => !n.read).length;
+    const unreadCount = notifications.filter((n: any) => !n.read).length;
 
     return NextResponse.json({
       success: true,

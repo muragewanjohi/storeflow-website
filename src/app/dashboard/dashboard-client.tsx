@@ -482,7 +482,7 @@ export default function DashboardClient({
             <CardContent>
               {inventoryLoading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
+                  {[1, 2, 3].map((i: any) => (
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
@@ -532,7 +532,7 @@ export default function DashboardClient({
             <CardContent>
               {salesLoading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
+                  {[1, 2, 3].map((i: any) => (
                     <Skeleton key={i} className="h-10 w-full" />
                   ))}
                 </div>
@@ -581,13 +581,13 @@ export default function DashboardClient({
         <CardContent>
           {ordersLoading ? (
             <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
+              {[1, 2, 3, 4, 5].map((i: any) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
           ) : recentOrders && recentOrders.length > 0 ? (
             <div className="space-y-4">
-              {recentOrders.map((order) => (
+              {recentOrders.map((order: any) => (
                 <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">

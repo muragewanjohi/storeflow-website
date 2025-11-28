@@ -182,7 +182,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
       )}
 
       <div className="space-y-4">
-        {sortedFields.map((field) => (
+        {sortedFields.map((field: any) => (
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.name}>
               {field.label}
@@ -245,7 +245,7 @@ export default function FormRenderer({ form, formId }: Readonly<FormRendererProp
                         const current = (formData[field.name] as string[]) || [];
                         const updated = checked
                           ? [...current, option]
-                          : current.filter((v) => v !== option);
+                          : current.filter((v: any) => v !== option);
                         handleFieldChange(field.name, updated);
                       }}
                       disabled={isPending}

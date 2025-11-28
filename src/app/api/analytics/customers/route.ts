@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
           user_id: true,
         },
         distinct: ['user_id'],
-      }).then((orders) => orders.length),
+      }).then((orders: Array<{ user_id: string | null }>) => orders.length),
       // Customer acquisition trend (grouped by day/week/month)
       prisma.customers.findMany({
         where: {
@@ -85,10 +85,10 @@ export async function GET(request: NextRequest) {
           user_id: true,
           total_amount: true,
         },
-      }).then(async (orders) => {
+      }).then(async (orders: Array<{ user_id: string | null; total_amount: any }>) => {
         // Group by user_id and calculate totals
         const customerMap = new Map<string, { totalRevenue: number; orderCount: number }>();
-        orders.forEach((order) => {
+        orders.forEach((order: any) => {
           if (!order.user_id) return;
           const existing = customerMap.get(order.user_id) || { totalRevenue: 0, orderCount: 0 };
           customerMap.set(order.user_id, {
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        return customers.map((customer) => {
+        return customers.map((customer: typeof customers[0]) => {
           const stats = customerMap.get(customer.id)!;
           return {
             id: customer.id,
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     // Group customer acquisition by time period
     const acquisitionByPeriod: Record<string, number> = {};
-    customerAcquisitionTrend.forEach((customer) => {
+    customerAcquisitionTrend.forEach((customer: typeof customerAcquisitionTrend[0]) => {
       const date = new Date(customer.created_at!);
       const key = date.toISOString().split('T')[0]; // YYYY-MM-DD
       acquisitionByPeriod[key] = (acquisitionByPeriod[key] || 0) + 1;
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
         date,
         count,
       }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a: { date: string; count: number }, b: { date: string; count: number }) => a.date.localeCompare(b.date));
 
     // Calculate top customers by total revenue
     const topCustomersData = topCustomers

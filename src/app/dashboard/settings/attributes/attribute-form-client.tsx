@@ -58,7 +58,7 @@ export default function AttributeFormClient({
     value: string;
     color_code: string;
   }>>(
-    attribute?.attribute_values.map((v) => ({
+    attribute?.attribute_values.map((v: any) => ({
       id: v.id,
       value: v.value,
       color_code: v.color_code || '',

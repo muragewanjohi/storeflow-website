@@ -70,7 +70,7 @@ export default function InventoryAlertsClient({
     const rows: string[][] = [];
 
     // Add products
-    lowStockProducts.forEach((product) => {
+    lowStockProducts.forEach((product: any) => {
       rows.push([
         'Product',
         product.name,
@@ -82,9 +82,9 @@ export default function InventoryAlertsClient({
     });
 
     // Add variants
-    lowStockVariants.forEach((variant) => {
+    lowStockVariants.forEach((variant: any) => {
       const variantName = variant.attributes
-        .map((a) => `${a.name}: ${a.value}`)
+        .map((a: any) => `${a.name}: ${a.value}`)
         .join(', ');
       rows.push([
         'Variant',
@@ -98,7 +98,7 @@ export default function InventoryAlertsClient({
 
     const csvContent = [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ...rows.map((row: any) => row.map((cell: any) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -217,7 +217,7 @@ export default function InventoryAlertsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lowStockProducts.map((product) => (
+                {lowStockProducts.map((product: any) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -280,7 +280,7 @@ export default function InventoryAlertsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lowStockVariants.map((variant) => (
+                {lowStockVariants.map((variant: any) => (
                   <TableRow key={variant.id}>
                     <TableCell className="font-medium">{variant.product_name}</TableCell>
                     <TableCell>

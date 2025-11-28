@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
         category_id: validatedData.category_id || null,
         brand_id: validatedData.brand_id || null,
         created_by: user.id,
-        metadata: (validatedData.metadata || {}) as Prisma.InputJsonObject,
+        metadata: (validatedData.metadata || {}) as any,
       },
       // Note: Direct category relation via category_id
       // For many-to-many, we'd need to join through product_categories

@@ -394,7 +394,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                       <SelectValue placeholder="Select a country" />
                     </SelectTrigger>
                     <SelectContent>
-                      {countries.map((country) => (
+                      {countries.map((country: any) => (
                         <SelectItem key={country.id} value={country.id}>
                           {country.name} {country.code ? `(${country.code})` : ''}
                         </SelectItem>
@@ -451,7 +451,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CURRENCIES.map((currency) => (
+                    {CURRENCIES.map((currency: any) => (
                       <SelectItem key={currency.code} value={currency.code}>
                         {currency.code} - {currency.name} ({currency.symbol})
                       </SelectItem>

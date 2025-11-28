@@ -145,7 +145,7 @@ function FeaturesSectionComponent({
           </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-          {section.features.map((feature) => (
+          {section.features.map((feature: any) => (
             <Card key={feature.id}>
               <CardContent className="pt-6">
                 {feature.image && (
@@ -254,7 +254,7 @@ function TestimonialsSectionComponent({
           </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-          {section.testimonials.map((testimonial) => (
+          {section.testimonials.map((testimonial: any) => (
             <Card key={testimonial.id}>
               <CardContent className="pt-6">
                 {testimonial.rating && (

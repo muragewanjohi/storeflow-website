@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Read file content
     const text = await file.text();
-    const lines = text.split('\n').filter((line) => line.trim().length > 0);
+    const lines = text.split('\n').filter((line: any) => line.trim().length > 0);
 
     if (lines.length < 2) {
       return NextResponse.json(
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     // Parse header
     const headerLine = lines[0].replace(/^\uFEFF/, ''); // Remove BOM
-    const headers = parseCSVLine(headerLine).map((h) => h.toLowerCase().trim());
+    const headers = parseCSVLine(headerLine).map((h: any) => h.toLowerCase().trim());
 
     // Validate headers
     const requiredHeaders = ['type', 'sku', 'adjustment type', 'quantity'];

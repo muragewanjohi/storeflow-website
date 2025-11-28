@@ -216,7 +216,7 @@ export default function AnalyticsDashboardClient() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4].map((i: any) => (
             <Card key={i}>
               <CardContent className="pt-6">
                 <div className="h-20 bg-muted animate-pulse rounded" />
@@ -725,7 +725,7 @@ export default function AnalyticsDashboardClient() {
               <CardContent>
                 {inventory?.lowStock.products && inventory.lowStock.products.length > 0 ? (
                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {inventory.lowStock.products.slice(0, 10).map((product) => (
+                    {inventory.lowStock.products.slice(0, 10).map((product: any) => (
                       <div key={product.id} className="flex items-center justify-between p-2 border rounded">
                         <div>
                           <div className="text-sm font-medium">{product.name}</div>
@@ -746,7 +746,7 @@ export default function AnalyticsDashboardClient() {
                     {inventory.lowStock.variants.length > 0 && (
                       <div className="mt-4 pt-4 border-t">
                         <div className="text-sm font-medium mb-2">Low Stock Variants</div>
-                        {inventory.lowStock.variants.slice(0, 5).map((variant) => (
+                        {inventory.lowStock.variants.slice(0, 5).map((variant: any) => (
                           <div key={variant.id} className="flex items-center justify-between p-2 border rounded mb-2">
                             <div>
                               <div className="text-sm font-medium">{variant.productName}</div>

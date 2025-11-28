@@ -87,7 +87,7 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
   const updateSection = (sectionId: string, updates: Partial<PageSection>) => {
     const newData = {
       ...data,
-      sections: data.sections.map((s) =>
+      sections: data.sections.map((s: any) =>
         s.id === sectionId ? { ...s, ...updates } as PageSection : s
       ),
     };
@@ -98,7 +98,7 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
   const deleteSection = (sectionId: string) => {
     const newData = {
       ...data,
-      sections: data.sections.filter((s) => s.id !== sectionId),
+      sections: data.sections.filter((s: any) => s.id !== sectionId),
     };
     updateData(newData);
     if (selectedSectionId === sectionId) {
@@ -195,7 +195,7 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
               <div className="space-y-0">
                 {data.sections
                   .sort((a, b) => a.order - b.order)
-                  .map((section) => (
+                  .map((section: any) => (
                     <SectionRenderer key={section.id} section={section} isPreview={true} />
                   ))}
               </div>

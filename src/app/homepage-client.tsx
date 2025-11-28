@@ -72,7 +72,7 @@ export default function HomepageClient({
               </Button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
+              {featuredProducts.map((product: any) => (
                 <Link key={product.id} href={`/products/${product.slug}`}>
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                     <CardContent className="p-0">

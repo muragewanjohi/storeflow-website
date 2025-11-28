@@ -191,7 +191,7 @@ export async function POST(
       // Create variant attributes if provided
       if (attributesToCreate.length > 0) {
         await tx.product_variant_attributes.createMany({
-          data: attributesToCreate.map((attr) => ({
+          data: attributesToCreate.map((attr: any) => ({
             tenant_id: tenant.id,
             variant_id: newVariant.id,
             attribute_id: attr.attribute_id,

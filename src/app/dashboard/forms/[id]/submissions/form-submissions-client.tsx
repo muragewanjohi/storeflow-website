@@ -136,7 +136,7 @@ export default function FormSubmissionsClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {submissions.map((submission) => (
+                    {submissions.map((submission: any) => (
                       <TableRow
                         key={submission.id}
                         className={selectedSubmission?.id === submission.id ? 'bg-muted' : 'cursor-pointer'}

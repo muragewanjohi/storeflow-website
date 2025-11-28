@@ -204,7 +204,7 @@ export default function BulkInventoryClient({
       // Small delay to show loading state
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const updatedItems = items.map((item) => {
+      const updatedItems = items.map((item: any) => {
         let newQuantity = '';
         let newAdjustmentType: 'increase' | 'decrease' | 'set' = 'set';
 
@@ -267,7 +267,7 @@ export default function BulkInventoryClient({
     setIsSubmitting(true);
 
     try {
-      const updates = items.map((item) => ({
+      const updates = items.map((item: any) => ({
         [item.type === 'product' ? 'product_id' : 'variant_id']: item.id,
         adjustment_type: item.adjustmentType,
         quantity: parseInt(item.quantity),
@@ -363,7 +363,7 @@ export default function BulkInventoryClient({
                           <SelectValue placeholder="Select a product" />
                         </SelectTrigger>
                         <SelectContent>
-                          {products.map((product) => (
+                          {products.map((product: any) => (
                             <SelectItem key={product.id} value={product.id}>
                               {product.name} ({product.sku || 'No SKU'}) - Stock: {product.stock_quantity}
                             </SelectItem>
@@ -385,9 +385,9 @@ export default function BulkInventoryClient({
                           <SelectValue placeholder="Select a variant" />
                         </SelectTrigger>
                         <SelectContent>
-                          {variants.map((variant) => (
+                          {variants.map((variant: any) => (
                             <SelectItem key={variant.id} value={variant.id}>
-                              {variant.product_name} - {variant.attributes.map((a) => `${a.name}: ${a.value}`).join(', ')} ({variant.variant_sku || variant.product_sku || 'No SKU'}) - Stock: {variant.stock_quantity}
+                              {variant.product_name} - {variant.attributes.map((a: any) => `${a.name}: ${a.value}`).join(', ')} ({variant.variant_sku || variant.product_sku || 'No SKU'}) - Stock: {variant.stock_quantity}
                             </SelectItem>
                           ))}
                         </SelectContent>

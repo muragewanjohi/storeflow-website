@@ -156,16 +156,16 @@ export default async function CustomerDetailPage({
           support_tickets: customerData._count.support_tickets,
           saved_addresses: customerData._count.user_delivery_addresses,
         },
-        recent_orders: recentOrders.map((order) => ({
+        recent_orders: recentOrders.map((order: any) => ({
           id: order.id,
           order_number: order.order_number,
           total_amount: Number(order.total_amount),
           status: order.status,
           payment_status: order.payment_status,
-          item_count: order.order_products.reduce((sum, item) => sum + item.quantity, 0),
+          item_count: order.order_products.reduce((sum: any, item: any) => sum + item.quantity, 0),
           created_at: order.created_at?.toISOString() || '',
         })),
-        addresses: addresses.map((addr) => ({
+        addresses: addresses.map((addr: any) => ({
           id: addr.id,
           name: addr.name,
           email: addr.email,
@@ -178,7 +178,7 @@ export default async function CustomerDetailPage({
           is_default: addr.is_default,
           created_at: addr.created_at?.toISOString() || '',
         })),
-        reviews: reviews.map((review) => ({
+        reviews: reviews.map((review: any) => ({
           id: review.id,
           product: {
             id: review.products.id,

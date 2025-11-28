@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
     let quantityBefore = 0;
     let quantityAfter = 0;
     let quantityChange = 0;
-    let product = null;
-    let variant = null;
+    let product: any = null;
+    let variant: any = null;
 
     // Adjust product inventory
     if (validatedData.product_id) {

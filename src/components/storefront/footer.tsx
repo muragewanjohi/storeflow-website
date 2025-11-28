@@ -47,7 +47,7 @@ export default function StorefrontFooter() {
           <div>
             <h4 className="text-sm font-semibold mb-4">Shop</h4>
             <ul className="space-y-2">
-              {footerLinks.shop.map((link) => (
+              {footerLinks.shop.map((link: any) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
@@ -64,7 +64,7 @@ export default function StorefrontFooter() {
           <div>
             <h4 className="text-sm font-semibold mb-4">Company</h4>
             <ul className="space-y-2">
-              {footerLinks.company.map((link) => (
+              {footerLinks.company.map((link: any) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
@@ -81,7 +81,7 @@ export default function StorefrontFooter() {
           <div>
             <h4 className="text-sm font-semibold mb-4">Customer</h4>
             <ul className="space-y-2">
-              {footerLinks.customer.map((link) => (
+              {footerLinks.customer.map((link: any) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}

@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     // Calculate sales by product
     const salesByProduct: Record<string, { name: string; quantity: number; revenue: number }> = {};
     
-    orderProducts.forEach((op) => {
+    orderProducts.forEach((op: any) => {
       if (!op.products) return;
       
       const productId = op.product_id || 'unknown';
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
     // Calculate sales by category
     const salesByCategory: Record<string, { name: string; quantity: number; revenue: number }> = {};
     
-    orderProducts.forEach((op) => {
+    orderProducts.forEach((op: any) => {
       if (!op.products?.category_id) return;
       
       const categoryId = op.products.category_id;
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.revenue - a.revenue);
 
     // Calculate total sales
-    const totalSales = orderProducts.reduce((sum, op) => sum + op.quantity, 0);
-    const totalRevenue = orderProducts.reduce((sum, op) => sum + Number(op.total), 0);
+    const totalSales = orderProducts.reduce((sum: any, op: any) => sum + op.quantity, 0);
+    const totalRevenue = orderProducts.reduce((sum: any, op: any) => sum + Number(op.total), 0);
 
     return NextResponse.json({
       success: true,

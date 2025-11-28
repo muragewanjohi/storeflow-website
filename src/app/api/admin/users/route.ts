@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Map to response format
-    const mappedUsers = tenantUsers.map((u) => ({
+    const mappedUsers = tenantUsers.map((u: any) => ({
       id: u.id,
       email: u.email,
       name: u.user_metadata?.name,

@@ -184,7 +184,7 @@ export default function ProductsListingClient({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {initialCategories.map((cat) => (
+              {initialCategories.map((cat: any) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
                 </SelectItem>
@@ -227,7 +227,7 @@ export default function ProductsListingClient({
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-            {products.map((product) => (
+            {products.map((product: any) => (
               <Link key={product.id} href={`/products/${product.slug}`}>
                 <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                   <CardContent className="p-0">

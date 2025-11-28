@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      orders: orders.map((order) => ({
+      orders: orders.map((order: any) => ({
         id: order.id,
         order_number: order.order_number,
         name: order.name,
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
         status: order.status,
         payment_status: order.payment_status,
         payment_gateway: order.payment_gateway,
-        item_count: order.order_products.reduce((sum, item) => sum + item.quantity, 0),
+        item_count: order.order_products.reduce((sum: any, item: any) => sum + item.quantity, 0),
         created_at: order.created_at,
         updated_at: order.updated_at,
       })),

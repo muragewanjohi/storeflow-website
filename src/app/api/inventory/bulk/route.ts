@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
 
     const validatedData = bulkInventoryUpdateSchema.parse(body);
 
-    const results = [];
-    const errors = [];
+    const results: any[] = [];
+    const errors: any[] = [];
     const productsToSync = new Set<string>();
 
     // Process each update

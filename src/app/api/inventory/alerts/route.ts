@@ -109,14 +109,14 @@ export async function GET(request: NextRequest) {
     });
 
     // Format variant data
-    const formattedVariants = lowStockVariants.map((variant) => ({
+    const formattedVariants = lowStockVariants.map((variant: any) => ({
       id: variant.id,
       product_id: variant.product_id,
       product_name: variant.products.name,
       product_sku: variant.products.sku,
       variant_sku: variant.sku,
       stock_quantity: variant.stock_quantity,
-      attributes: variant.product_variant_attributes.map((attr) => ({
+      attributes: variant.product_variant_attributes.map((attr: any) => ({
         name: attr.attributes.name,
         value: attr.attribute_values.value,
         color_code: attr.attribute_values.color_code,

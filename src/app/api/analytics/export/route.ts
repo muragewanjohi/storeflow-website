@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        data = orders.map((order) => ({
+        data = orders.map((order: any) => ({
           Date: order.created_at?.toISOString().split('T')[0] || '',
           'Order Number': order.order_number,
           Amount: Number(order.total_amount),
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        data = orderProducts.map((op) => ({
+        data = orderProducts.map((op: any) => ({
           Date: op.orders?.created_at?.toISOString().split('T')[0] || '',
           'Order Number': op.orders?.order_number || '',
           Product: op.products?.name || 'Unknown',
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
 
         // Group orders by customer
         const ordersByCustomer = new Map<string, { count: number; revenue: number }>();
-        orders.forEach((order) => {
+        orders.forEach((order: any) => {
           if (!order.user_id) return;
           const existing = ordersByCustomer.get(order.user_id) || { count: 0, revenue: 0 };
           ordersByCustomer.set(order.user_id, {
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
           });
         });
 
-        data = customers.map((customer) => {
+        data = customers.map((customer: any) => {
           const orderStats = ordersByCustomer.get(customer.id) || { count: 0, revenue: 0 };
           return {
             'Registration Date': customer.created_at?.toISOString().split('T')[0] || '',
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
 
         const categoryMap = new Map(categories.map(c => [c.id, c.name]));
 
-        data = products.map((product) => ({
+        data = products.map((product: any) => ({
           Product: product.name,
           SKU: product.sku || '',
           Category: product.category_id ? (categoryMap.get(product.category_id) || 'Uncategorized') : 'Uncategorized',
@@ -273,8 +273,8 @@ export async function GET(request: NextRequest) {
         csv += headers.join(',') + '\n';
         
         // Add rows
-        data.forEach((row) => {
-          csv += headers.map((header) => {
+        data.forEach((row: any) => {
+          csv += headers.map((header: any) => {
             const value = row[header];
             // Escape commas and quotes in CSV
             if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {

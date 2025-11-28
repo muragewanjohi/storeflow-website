@@ -137,7 +137,7 @@ export default function ThemesListClient() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {themes.map((theme) => {
+        {themes.map((theme: any) => {
           const isActive = activeThemeId === theme.id;
           const isInstalling = installThemeMutation.isPending && installThemeMutation.variables === theme.id;
 

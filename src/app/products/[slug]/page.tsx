@@ -106,7 +106,7 @@ export default async function ProductDetailPage({
       price: Number(product.price),
       sale_price: product.sale_price ? Number(product.sale_price) : null,
       // stock_quantity is already synced with variant totals in the database
-      product_variants: product.product_variants.map((variant) => ({
+      product_variants: product.product_variants.map((variant: any) => ({
         ...variant,
         price: variant.price ? Number(variant.price) : null,
         // Rename product_variant_attributes to variant_attributes for client compatibility
@@ -140,7 +140,7 @@ export default async function ProductDetailPage({
   ]);
 
   // Convert related products prices
-  const relatedProductsData = relatedProducts.map((p) => ({
+  const relatedProductsData = relatedProducts.map((p: any) => ({
     ...p,
     price: Number(p.price),
     sale_price: p.sale_price ? Number(p.sale_price) : null,

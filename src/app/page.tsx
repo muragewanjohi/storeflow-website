@@ -62,7 +62,7 @@ export default async function HomePage() {
             <main className="flex-1">
               {pageData.sections
                 .sort((a, b) => a.order - b.order)
-                .map((section) => (
+                .map((section: any) => (
                   <SectionRenderer key={section.id} section={section} isPreview={false} />
                 ))}
             </main>
@@ -96,7 +96,7 @@ export default async function HomePage() {
   });
 
   // Convert Decimal to number for client components
-  const featuredProducts = featuredProductsRaw.map((product) => ({
+  const featuredProducts = featuredProductsRaw.map((product: any) => ({
     ...product,
     price: Number(product.price),
   }));

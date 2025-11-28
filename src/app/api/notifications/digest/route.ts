@@ -113,13 +113,13 @@ export async function POST(request: NextRequest) {
     ]);
 
     const allLowStock = [
-      ...lowStockProducts.map((p) => ({
+      ...lowStockProducts.map((p: any) => ({
         id: p.id,
         name: p.name,
         stock: p.stock_quantity || 0,
         isVariant: false,
       })),
-      ...lowStockVariants.map((v) => ({
+      ...lowStockVariants.map((v: any) => ({
         id: v.id,
         name: `${v.products.name} (Variant)`,
         stock: v.stock_quantity || 0,

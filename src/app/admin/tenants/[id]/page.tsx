@@ -59,7 +59,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
   });
 
   // Convert Prisma Decimal to number for client component
-  const pricePlans = pricePlansData.map((plan) => ({
+  const pricePlans = pricePlansData.map((plan: any) => ({
     ...plan,
     price: Number(plan.price),
   }));

@@ -389,7 +389,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Plan (Free Trial)</SelectItem>
-                  {pricePlans.map((plan) => (
+                  {pricePlans.map((plan: any) => (
                     <SelectItem key={plan.id} value={plan.id}>
                       {plan.name} - ${plan.price}/{plan.duration_months}mo
                     </SelectItem>
@@ -541,7 +541,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
                   <SelectValue placeholder="Select a plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {pricePlans.map((plan) => (
+                  {pricePlans.map((plan: any) => (
                     <SelectItem key={plan.id} value={plan.id}>
                       {plan.name} - ${plan.price}/{plan.duration_months}mo
                     </SelectItem>
@@ -578,7 +578,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
             <p className="text-sm text-muted-foreground">No billing history available</p>
           ) : (
             <div className="space-y-4">
-              {billingHistory.map((item) => (
+              {billingHistory.map((item: any) => (
                 <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
                     <p className="font-medium">{item.description}</p>

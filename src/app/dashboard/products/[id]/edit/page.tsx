@@ -99,7 +99,7 @@ export default async function EditProductPage({
       sale_price: product.sale_price ? Number(product.sale_price) : null,
     } as any;
 
-    const variantsData = variants.map((v) => ({
+    const variantsData = variants.map((v: any) => ({
       ...v,
       price: v.price ? Number(v.price) : null,
       stock_quantity: v.stock_quantity ?? 0,
@@ -107,7 +107,7 @@ export default async function EditProductPage({
       variant_attributes: v.product_variant_attributes,
     })) as any[];
 
-    const categoriesData = categories.map((c) => ({
+    const categoriesData = categories.map((c: any) => ({
       ...c,
       slug: c.slug || '',
     })) as any[];

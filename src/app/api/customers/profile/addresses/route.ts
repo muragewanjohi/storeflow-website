@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      addresses: addresses.map((address) => ({
+      addresses: addresses.map((address: any) => ({
         id: address.id,
         name: address.name,
         email: address.email,

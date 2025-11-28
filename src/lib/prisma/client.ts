@@ -6,8 +6,8 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient() {
   // Minimal logging in development, none in production for performance
-  const logLevel: Prisma.LogLevel[] = process.env.PRISMA_LOG_QUERIES === 'true' 
-    ? ['query', 'error', 'warn'] 
+  const logLevel: Array<'query' | 'error' | 'warn'> = process.env.PRISMA_LOG_QUERIES === 'true' 
+    ? ['query', 'error', 'warn']
     : ['error'];
   
   return new PrismaClient({

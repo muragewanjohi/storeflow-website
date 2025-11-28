@@ -179,10 +179,10 @@ export default function ProductDetailClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {variants.map((variant) => {
+                    {variants.map((variant: any) => {
                       const variantName = variant.variant_attributes && variant.variant_attributes.length > 0
                         ? generateVariantName(
-                            variant.variant_attributes.map((attr) => ({
+                            variant.variant_attributes.map((attr: any) => ({
                               attribute_id: attr.attribute_id,
                               attribute_value_id: attr.attribute_value_id,
                               attribute_name: attr.attributes.name,
@@ -206,7 +206,7 @@ export default function ProductDetailClient({
                                 <span className="font-medium">{variantName}</span>
                                 {variant.variant_attributes && variant.variant_attributes.length > 0 && (
                                   <div className="flex flex-wrap gap-1">
-                                    {variant.variant_attributes.map((attr) => (
+                                    {variant.variant_attributes.map((attr: any) => (
                                       <Badge key={attr.id} variant="outline" className="text-xs">
                                         {attr.attributes.name}: {attr.attribute_values.value}
                                         {attr.attribute_values.color_code && (

@@ -65,14 +65,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 1.0,
       },
       // Pages
-      ...pages.map((page) => ({
+      ...pages.map((page: any) => ({
         url: `${baseUrl}/${page.slug || ''}`,
         lastModified: page.updated_at || new Date(),
         changeFrequency: 'weekly' as const,
         priority: 0.8,
       })),
       // Blog posts
-      ...blogs.map((blog) => ({
+      ...blogs.map((blog: any) => ({
         url: `${baseUrl}/blog/${blog.slug || ''}`,
         lastModified: blog.updated_at || new Date(),
         changeFrequency: 'weekly' as const,

@@ -128,7 +128,7 @@ function FeaturesSectionEditor({
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
   const updateFeature = (featureId: string, updates: Partial<typeof section.features[0]>) => {
-    const newFeatures = section.features.map((f) =>
+    const newFeatures = section.features.map((f: any) =>
       f.id === featureId ? { ...f, ...updates } : f
     );
     onUpdate({ features: newFeatures });
@@ -144,7 +144,7 @@ function FeaturesSectionEditor({
   };
 
   const removeFeature = (featureId: string) => {
-    onUpdate({ features: section.features.filter((f) => f.id !== featureId) });
+    onUpdate({ features: section.features.filter((f: any) => f.id !== featureId) });
   };
 
   return (
@@ -336,7 +336,7 @@ function TestimonialsSectionEditor({
     testimonialId: string,
     updates: Partial<typeof section.testimonials[0]>
   ) => {
-    const newTestimonials = section.testimonials.map((t) =>
+    const newTestimonials = section.testimonials.map((t: any) =>
       t.id === testimonialId ? { ...t, ...updates } : t
     );
     onUpdate({ testimonials: newTestimonials });
@@ -353,7 +353,7 @@ function TestimonialsSectionEditor({
   };
 
   const removeTestimonial = (testimonialId: string) => {
-    onUpdate({ testimonials: section.testimonials.filter((t) => t.id !== testimonialId) });
+    onUpdate({ testimonials: section.testimonials.filter((t: any) => t.id !== testimonialId) });
   };
 
   return (

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Group revenue by time period
     const revenueByPeriod: Record<string, number> = {};
     
-    orders.forEach((order) => {
+    orders.forEach((order: any) => {
       const date = new Date(order.created_at!);
       let key: string;
       
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // Calculate total revenue for period
-    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
+    const totalRevenue = orders.reduce((sum: any, order: any) => sum + Number(order.total_amount), 0);
 
     // Calculate average order value
     const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;

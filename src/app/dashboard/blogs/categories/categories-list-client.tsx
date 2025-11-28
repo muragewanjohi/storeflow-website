@@ -87,7 +87,7 @@ export default function CategoriesListClient({
       }
 
       // Remove category from list
-      setCategories((prev) => prev.filter((cat) => cat.id !== categoryToDelete.id));
+      setCategories((prev) => prev.filter((cat: any) => cat.id !== categoryToDelete.id));
       setCategoryToDelete(null);
       router.refresh();
     } catch (err) {
@@ -169,7 +169,7 @@ export default function CategoriesListClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => (
+                {categories.map((category: any) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
                     <TableCell>

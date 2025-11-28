@@ -40,7 +40,7 @@ export function isValidStatusTransition(currentStatus: string, newStatus: string
  * Calculate order total from items
  */
 export function calculateOrderTotal(items: Array<{ price: number; quantity: number }>): number {
-  return items.reduce((total, item) => {
+  return items.reduce((total: any, item: any) => {
     return total + Number(item.price) * item.quantity;
   }, 0);
 }

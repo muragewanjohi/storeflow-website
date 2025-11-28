@@ -109,19 +109,19 @@ export default async function InventoryAlertsPage({
 
   return (
     <InventoryAlertsClient
-      lowStockProducts={lowStockProducts.map((p) => ({
+      lowStockProducts={lowStockProducts.map((p: any) => ({
         ...p,
         stock_quantity: p.stock_quantity || 0,
         status: p.status || 'active',
       }))}
-      lowStockVariants={lowStockVariants.map((v) => ({
+      lowStockVariants={lowStockVariants.map((v: any) => ({
         id: v.id,
         product_id: v.product_id,
         product_name: v.products.name,
         product_sku: v.products.sku,
         variant_sku: v.sku,
         stock_quantity: v.stock_quantity || 0,
-        attributes: v.product_variant_attributes.map((attr) => ({
+        attributes: v.product_variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,

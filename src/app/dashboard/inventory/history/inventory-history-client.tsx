@@ -114,7 +114,7 @@ export default function InventoryHistoryClient({
 
   const handleExportCSV = () => {
     const headers = ['Date', 'Item', 'SKU', 'Type', 'Before', 'After', 'Change', 'Reason', 'Notes'];
-    const rows = history.map((h) => {
+    const rows = history.map((h: any) => {
       const itemName = h.products
         ? h.products.name
         : h.product_variants
@@ -137,7 +137,7 @@ export default function InventoryHistoryClient({
 
     const csvContent = [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ...rows.map((row: any) => row.map((cell: any) => `"${cell}"`).join(',')),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -286,7 +286,7 @@ export default function InventoryHistoryClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.map((h) => {
+                  {history.map((h: any) => {
                     const itemName = h.products
                       ? h.products.name
                       : h.product_variants

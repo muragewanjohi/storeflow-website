@@ -215,7 +215,7 @@ export default function Notifications() {
 
           {!isLoading && !error && notifications.length > 0 && (
             <div className="py-1">
-              {notifications.map((notification) => (
+              {notifications.map((notification: any) => (
                 <DropdownMenuItem
                   key={notification.id}
                   asChild

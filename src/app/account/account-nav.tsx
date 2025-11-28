@@ -62,7 +62,7 @@ export default function AccountNav() {
       <div className="mb-6">
         <h2 className="text-lg font-semibold">My Account</h2>
       </div>
-      {navItems.map((item) => {
+      {navItems.map((item: any) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || 
           (item.href !== '/account' && pathname?.startsWith(item.href));

@@ -44,6 +44,7 @@ export default async function ThemePreviewPage({
     <ThemePreviewClient
       theme={{
         ...theme,
+        slug: theme.slug,
         colors: theme.colors as Record<string, unknown> | null,
         typography: theme.typography as Record<string, unknown> | null,
       } as any}

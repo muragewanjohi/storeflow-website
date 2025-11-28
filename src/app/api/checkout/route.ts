@@ -42,7 +42,13 @@ export async function POST(request: NextRequest) {
     const cartItems = validatedData.items;
 
     // Validate all items exist and have sufficient stock
-    const orderItems = [];
+    const orderItems: Array<{
+      product_id: string;
+      variant_id: string | null;
+      quantity: number;
+      price: number;
+      total: number;
+    }> = [];
     let totalAmount = 0;
 
     for (const item of cartItems) {
@@ -67,7 +73,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let variant = null;
+      let variant: { id: string; price: any; stock_quantity: number | null } | null = null;
       let finalPrice = Number(product.sale_price || product.price);
       let stockQuantity = product.stock_quantity;
 
@@ -158,7 +164,7 @@ export async function POST(request: NextRequest) {
         coupon_discounted: couponDiscounted,
         message: validatedData.notes || null,
         order_products: {
-          create: orderItems.map((item) => ({
+          create: orderItems.map((item: any) => ({
             tenant_id: tenant.id,
             product_id: item.product_id,
             variant_id: item.variant_id,

@@ -35,8 +35,8 @@ export default async function AdjustStockPage({
   const productId = typeof params.product_id === 'string' ? params.product_id : undefined;
   const variantId = typeof params.variant_id === 'string' ? params.variant_id : undefined;
 
-  let product = null;
-  let variant = null;
+  let product: any = null;
+  let variant: any = null;
   let products: any[] = [];
   let variants: any[] = [];
 
@@ -164,17 +164,17 @@ export default async function AdjustStockPage({
         product_sku: variant.products.sku,
         variant_sku: variant.sku,
         stock_quantity: variant.stock_quantity || 0,
-        attributes: variant.product_variant_attributes.map((attr) => ({
+        attributes: variant.product_variant_attributes.map((attr: any) => ({
           name: attr.attributes.name,
           value: attr.attribute_values.value,
           color_code: attr.attribute_values.color_code,
         })),
       } : null}
-      products={products.map((p) => ({
+      products={products.map((p: any) => ({
         ...p,
         stock_quantity: p.stock_quantity || 0,
       }))}
-      variants={variants.map((v) => ({
+      variants={variants.map((v: any) => ({
         id: v.id,
         product_id: v.product_id,
         product_name: v.products.name,

@@ -149,7 +149,7 @@ export default function OrderConfirmationClient({
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {order.order_products.map((item) => (
+                  {order.order_products.map((item: any) => (
                     <div key={item.id} className="flex gap-4">
                       {item.products?.image && (
                         <div className="relative w-20 h-20 rounded-md overflow-hidden bg-muted flex-shrink-0">

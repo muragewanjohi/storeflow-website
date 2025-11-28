@@ -184,7 +184,7 @@ export default function MediaLibraryClient() {
 
       // Update local state
       const updatedFile = { ...selectedFile, title: data.title, alt_text: data.alt_text };
-      setFiles(files.map((f) => 
+      setFiles(files.map((f: any) => 
         f.id === selectedFile.id ? updatedFile : f
       ));
       
@@ -232,7 +232,7 @@ export default function MediaLibraryClient() {
         const data = await response.json();
 
         // Remove from UI
-        setFiles(files.filter((f) => f.id !== fileToDelete.id));
+        setFiles(files.filter((f: any) => f.id !== fileToDelete.id));
         setDeleteDialogOpen(false);
         setFileToDelete(null);
       } catch (err) {
@@ -324,7 +324,7 @@ export default function MediaLibraryClient() {
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {files.map((file) => (
+          {files.map((file: any) => (
             <Card
               key={file.id}
               className="group relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"

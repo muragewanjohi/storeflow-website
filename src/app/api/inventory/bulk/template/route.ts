@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     const rows: string[][] = [headers];
 
     // Add example rows for products
-    products.forEach((product) => {
+    products.forEach((product: any) => {
       rows.push([
         'product',
         product.sku || product.id,
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Add example rows for variants
-    variants.forEach((variant) => {
+    variants.forEach((variant: any) => {
       rows.push([
         'variant',
         variant.sku || variant.id,
@@ -94,9 +94,9 @@ export async function GET(request: NextRequest) {
 
     // Convert to CSV string
     const csvContent = rows
-      .map((row) =>
+      .map((row: any) =>
         row
-          .map((cell) => {
+          .map((cell: any) => {
             // Escape quotes and wrap in quotes if contains comma, quote, or newline
             const escaped = String(cell).replace(/"/g, '""');
             if (escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')) {

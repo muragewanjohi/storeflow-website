@@ -161,7 +161,7 @@ export default function CreateTenantForm() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No Plan (Free Trial)</SelectItem>
-                    {pricePlans.map((plan) => (
+                    {pricePlans.map((plan: any) => (
                       <SelectItem key={plan.id} value={plan.id}>
                         {plan.name} - ${Number(plan.price).toFixed(2)}/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
                       </SelectItem>

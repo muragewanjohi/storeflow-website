@@ -29,7 +29,7 @@ export default async function TenantDashboardPage() {
     new Date(tenant.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000;
 
   // Get tenant plan info if exists
-  let planInfo = null;
+  let planInfo: { name: string; price: number; duration_months: number } | null = null;
   if (tenant.plan_id) {
     const plan = await prisma.price_plans.findUnique({
       where: { id: tenant.plan_id },

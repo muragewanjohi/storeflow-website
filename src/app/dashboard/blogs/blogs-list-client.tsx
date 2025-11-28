@@ -314,7 +314,7 @@ export default function BlogsListClient({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((category) => (
+                    {categories.map((category: any) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
                       </SelectItem>
@@ -354,7 +354,7 @@ export default function BlogsListClient({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {displayBlogs.map((blog) => (
+                      {displayBlogs.map((blog: any) => (
                         <TableRow key={blog.id}>
                           <TableCell className="font-medium">
                             <div>

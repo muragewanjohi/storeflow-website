@@ -202,7 +202,7 @@ export async function sendNotificationDigestEmail({
   }
 
   // Filter notifications that should be in digest
-  const digestNotifications = notifications.filter((n) =>
+  const digestNotifications = notifications.filter((n: any) =>
     preferences.digest.includes(n.type)
   );
 
@@ -377,7 +377,7 @@ function generateDigestEmail(
 function groupNotificationsByType(
   notifications: Notification[]
 ): Record<string, Notification[]> {
-  return notifications.reduce((acc, notification) => {
+  return notifications.reduce((acc: any, notification: any) => {
     if (!acc[notification.type]) {
       acc[notification.type] = [];
     }

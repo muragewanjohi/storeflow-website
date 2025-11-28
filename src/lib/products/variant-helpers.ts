@@ -29,8 +29,8 @@ export function generateVariantName(attributes: VariantAttribute[]): string {
 
   // Join attribute values with " - "
   return sorted
-    .map((attr) => attr.attribute_value || '')
-    .filter((val) => val.length > 0)
+    .map((attr: any) => attr.attribute_value || '')
+    .filter((val: any) => val.length > 0)
     .join(' - ') || 'Default';
 }
 
@@ -51,14 +51,14 @@ export function generateVariantSKU(
 
   // Get attribute value codes (first 2-3 letters, uppercase)
   const attributeCodes = attributes
-    .map((attr) => {
+    .map((attr: any) => {
       const value = attr.attribute_value || '';
       return value
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')
         .substring(0, 3);
     })
-    .filter((code) => code.length > 0);
+    .filter((code: any) => code.length > 0);
 
   // Combine: PRODUCT-ATTR1-ATTR2-ATTR3
   const parts = [productPrefix, ...attributeCodes];
@@ -79,7 +79,7 @@ export function formatVariantAttributes(attributes: VariantAttribute[]): string[
     return [];
   }
 
-  return attributes.map((attr) => {
+  return attributes.map((attr: any) => {
     const name = attr.attribute_name || 'Attribute';
     const value = attr.attribute_value || 'Unknown';
     return `${name}: ${value}`;

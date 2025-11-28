@@ -58,7 +58,7 @@ export async function sendOrderPlacedEmail({
   customerEmail: string;
   customerName: string;
 }) {
-  const orderItems = order.order_products.map((item) => ({
+  const orderItems = order.order_products.map((item: any) => ({
     name: item.products?.name || 'Unknown Product',
     quantity: item.quantity,
     price: Number(item.price),
@@ -108,7 +108,7 @@ export async function sendOrderPlacedEmail({
                 </tr>
               </thead>
               <tbody>
-                ${orderItems.map((item) => `
+                ${orderItems.map((item: any) => `
                   <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 10px 0;">${item.name}</td>
                     <td style="text-align: center; padding: 10px 0;">${item.quantity}</td>
@@ -157,7 +157,7 @@ Order Details:
 - Payment Status: ${order.payment_status}
 
 Order Items:
-${orderItems.map((item) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
+${orderItems.map((item: any) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
 
 Total: $${totalAmount.toFixed(2)}
 
@@ -205,7 +205,7 @@ export async function sendNewOrderAlertEmail({
     adminEmail = `${tenant.subdomain}@dukanest.com`;
   }
 
-  const orderItems = order.order_products.map((item) => ({
+  const orderItems = order.order_products.map((item: any) => ({
     name: item.products?.name || 'Unknown Product',
     quantity: item.quantity,
     price: Number(item.price),
@@ -255,7 +255,7 @@ export async function sendNewOrderAlertEmail({
                 </tr>
               </thead>
               <tbody>
-                ${orderItems.map((item) => `
+                ${orderItems.map((item: any) => `
                   <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 10px 0;">${item.name}</td>
                     <td style="text-align: center; padding: 10px 0;">${item.quantity}</td>
@@ -301,7 +301,7 @@ Order Details:
 - Order Date: ${new Date(order.created_at || '').toLocaleDateString()}
 
 Order Items:
-${orderItems.map((item) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
+${orderItems.map((item: any) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
 
 Total: $${totalAmount.toFixed(2)}
 

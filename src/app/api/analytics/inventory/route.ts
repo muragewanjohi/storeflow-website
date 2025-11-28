@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const totalInventoryValue = products.reduce((sum, product) => {
+    const totalInventoryValue = products.reduce((sum: number, product: typeof products[0]) => {
       const quantity = product.stock_quantity || 0;
       const price = Number(product.price);
       return sum + (quantity * price);
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
     // Group inventory by category
     const inventoryByCategoryMap: Record<string, { name: string; quantity: number; value: number }> = {};
     
-    inventoryByCategory.forEach((product) => {
+    inventoryByCategory.forEach((product: any) => {
       if (!product.category_id) return;
       
       const categoryId = product.category_id;
@@ -210,11 +210,11 @@ export async function GET(request: NextRequest) {
           totalInventoryValue,
         },
         lowStock: {
-          products: lowStockProducts.map((p) => ({
+          products: lowStockProducts.map((p: any) => ({
             ...p,
             price: Number(p.price),
           })),
-          variants: lowStockVariants.map((v) => ({
+          variants: lowStockVariants.map((v: any) => ({
             id: v.id,
             productId: v.product_id,
             productName: v.products?.name || 'Unknown',

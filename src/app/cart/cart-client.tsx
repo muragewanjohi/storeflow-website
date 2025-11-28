@@ -85,19 +85,19 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
 
     // Optimistic update - update UI immediately
     const oldQuantity = item.quantity;
-    const updatedItems = cart.items.map((i) => {
+    const updatedItems = cart.items.map((i: any) => {
       if (`${i.product_id}-${i.variant_id || 'base'}` === itemKey) {
         return { ...i, quantity: newQuantity };
       }
       return i;
     });
     
-    const newSubtotal = updatedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const newSubtotal = updatedItems.reduce((sum: any, i: any) => sum + i.price * i.quantity, 0);
     const optimisticCart: Cart = {
       ...cart,
       items: updatedItems,
       total: newSubtotal,
-      item_count: updatedItems.reduce((sum, i) => sum + i.quantity, 0),
+      item_count: updatedItems.reduce((sum: any, i: any) => sum + i.quantity, 0),
     };
     
     setCart(optimisticCart);
@@ -160,12 +160,12 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
       (i) => `${i.product_id}-${i.variant_id || 'base'}` !== itemKey
     );
     
-    const newSubtotal = updatedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const newSubtotal = updatedItems.reduce((sum: any, i: any) => sum + i.price * i.quantity, 0);
     const optimisticCart: Cart = {
       ...cart,
       items: updatedItems,
       total: newSubtotal,
-      item_count: updatedItems.reduce((sum, i) => sum + i.quantity, 0),
+      item_count: updatedItems.reduce((sum: any, i: any) => sum + i.quantity, 0),
     };
     
     setCart(optimisticCart);
@@ -266,7 +266,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     );
   }
 
-  const subtotal = cart.total || cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cart.total || cart.items.reduce((sum: any, item: any) => sum + item.price * item.quantity, 0);
   const total = subtotal - discount;
 
   return (
@@ -276,7 +276,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
-          {cart.items.map((item) => {
+          {cart.items.map((item: any) => {
             const itemKey = `${item.product_id}-${item.variant_id || 'base'}`;
             const isUpdating = updating === itemKey;
 

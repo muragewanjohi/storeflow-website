@@ -76,7 +76,7 @@ function getPriorityBadgeVariant(priority: string) {
 function formatStatus(status: string) {
   return status
     .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
@@ -276,7 +276,7 @@ export default function CustomerTicketDetailClient({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {ticket.messages.map((message) => (
+          {ticket.messages.map((message: any) => (
             <div
               key={message.id}
               className={`p-4 rounded-lg border ${

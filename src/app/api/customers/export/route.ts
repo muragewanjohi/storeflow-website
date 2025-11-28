@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       'Created At',
     ];
 
-    const rows = customersWithStats.map((customer) => [
+    const rows = customersWithStats.map((customer: any) => [
       customer.id,
       customer.name,
       customer.email,
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+      ...rows.map((row: any) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
     ].join('\n');
 
     return new NextResponse(csvContent, {

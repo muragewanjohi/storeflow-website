@@ -33,7 +33,7 @@ interface ProductWithVariants {
  */
 export function calculateStockFromVariants(product: ProductWithVariants): number {
   if (product.product_variants && product.product_variants.length > 0) {
-    return product.product_variants.reduce((sum, variant) => {
+    return product.product_variants.reduce((sum: any, variant: any) => {
       return sum + (variant.stock_quantity ?? 0);
     }, 0);
   }

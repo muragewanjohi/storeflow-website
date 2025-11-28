@@ -60,8 +60,8 @@ export default async function OrderDetailPage({
     } else {
       // Fetch product variants separately if needed
       const variantIds = orderData.order_products
-        .filter((item) => item.variant_id)
-        .map((item) => item.variant_id) as string[];
+        .filter((item: any) => item.variant_id)
+        .map((item: any) => item.variant_id) as string[];
 
       const variants = variantIds.length > 0
         ? await prisma.product_variants.findMany({
@@ -76,7 +76,7 @@ export default async function OrderDetailPage({
           })
         : [];
 
-      const variantMap = new Map(variants.map((v) => [v.id, v]));
+      const variantMap = new Map(variants.map((v: any) => [v.id, v]));
 
       order = {
         id: orderData.id,
@@ -94,7 +94,7 @@ export default async function OrderDetailPage({
         coupon: orderData.coupon,
         coupon_discounted: orderData.coupon_discounted ? Number(orderData.coupon_discounted) : null,
         message: orderData.message,
-        items: orderData.order_products.map((item) => ({
+        items: orderData.order_products.map((item: any) => ({
           id: item.id,
           product_id: item.product_id,
           variant_id: item.variant_id,

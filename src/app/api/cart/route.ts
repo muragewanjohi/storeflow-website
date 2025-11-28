@@ -84,12 +84,12 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-    const variantPriceMap = new Map(
-      variants.map(v => [v.id, v.price ? Number(v.price) : null])
+    const variantPriceMap = new Map<string, number | null>(
+      variants.map((v: any) => [v.id, v.price ? Number(v.price) : null])
     );
 
     // Build cart response with product details
-    const items = cartItems.map((item) => {
+    const items = cartItems.map((item: any) => {
       const product = item.products;
       if (!product) {
         return null;
@@ -116,8 +116,8 @@ export async function GET(request: NextRequest) {
       };
     }).filter(Boolean) as any[];
 
-    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
+    const total = items.reduce((sum: number, item: typeof items[0]) => sum + item.price * item.quantity, 0);
+    const item_count = items.reduce((sum: number, item: typeof items[0]) => sum + item.quantity, 0);
 
     const response = NextResponse.json({
       success: true,
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If variant is specified, fetch variant details
-    let variant = null;
+    let variant: { id: string; price: any; stock_quantity: number | null; sku: string | null } | null = null;
     let finalPrice = Number(product.sale_price || product.price);
     let finalSku = product.sku;
 
@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
       variants.map(v => [v.id, v.price ? Number(v.price) : null])
     );
 
-    const items = cartItems.map((item) => {
+    const items = cartItems.map((item: typeof cartItems[0]) => {
       const product = item.products;
       if (!product) return null;
 
@@ -325,8 +325,8 @@ export async function POST(request: NextRequest) {
       };
     }).filter(Boolean) as any[];
 
-    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
+    const total = items.reduce((sum: number, item: typeof items[0]) => sum + item.price * item.quantity, 0);
+    const item_count = items.reduce((sum: number, item: typeof items[0]) => sum + item.quantity, 0);
 
     return NextResponse.json({
       success: true,

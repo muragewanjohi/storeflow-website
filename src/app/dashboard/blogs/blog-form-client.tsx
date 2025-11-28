@@ -232,7 +232,7 @@ export default function BlogFormClient({ blog, categories }: Readonly<BlogFormCl
                   </SelectTrigger>
                   <SelectContent>
                     {categories.length > 0 ? (
-                      categories.map((category) => (
+                      categories.map((category: any) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>

@@ -506,7 +506,7 @@ export default function ThemeCustomizeClient() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FONT_OPTIONS.map((font) => (
+                    {FONT_OPTIONS.map((font: any) => (
                       <SelectItem key={font.value} value={font.value}>
                         {font.label}
                       </SelectItem>
@@ -527,7 +527,7 @@ export default function ThemeCustomizeClient() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FONT_OPTIONS.map((font) => (
+                    {FONT_OPTIONS.map((font: any) => (
                       <SelectItem key={font.value} value={font.value}>
                         {font.label}
                       </SelectItem>
@@ -568,7 +568,7 @@ export default function ThemeCustomizeClient() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FONT_WEIGHTS.map((weight) => (
+                    {FONT_WEIGHTS.map((weight: any) => (
                       <SelectItem key={weight.value} value={weight.value}>
                         {weight.label}
                       </SelectItem>

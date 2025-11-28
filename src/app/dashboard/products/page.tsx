@@ -95,7 +95,7 @@ export default async function ProductsPage({
       }
     }
 
-    categories = categoriesData.map((c) => ({
+    categories = categoriesData.map((c: any) => ({
       ...c,
       slug: c.slug || '',
     }));

@@ -225,7 +225,7 @@ export default function CreateTicketClient({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>
-                      {departments.map((dept) => (
+                      {departments.map((dept: any) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
                         </SelectItem>

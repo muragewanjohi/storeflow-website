@@ -696,7 +696,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
               <CardContent className="space-y-4">
                 {/* Cart Items */}
                 <div className="space-y-3">
-                  {cart.items.map((item) => (
+                  {cart.items.map((item: any) => (
                     <div key={`${item.product_id}-${item.variant_id || 'base'}`} className="flex gap-3">
                       {item.image && (
                         <div className="relative w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">

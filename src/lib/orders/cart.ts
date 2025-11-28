@@ -60,8 +60,8 @@ export function addToCart(cartId: string, item: CartItem): Cart {
   }
 
   // Recalculate totals
-  cart.total = cart.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
-  cart.item_count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  cart.total = cart.items.reduce((sum: any, i: any) => sum + Number(i.price) * i.quantity, 0);
+  cart.item_count = cart.items.reduce((sum: any, i: any) => sum + i.quantity, 0);
 
   carts.set(cartId, cart);
   return cart;
@@ -88,8 +88,8 @@ export function updateCartItem(cartId: string, productId: string, variantId: str
   }
 
   // Recalculate totals
-  cart.total = cart.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
-  cart.item_count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  cart.total = cart.items.reduce((sum: any, i: any) => sum + Number(i.price) * i.quantity, 0);
+  cart.item_count = cart.items.reduce((sum: any, i: any) => sum + i.quantity, 0);
 
   carts.set(cartId, cart);
   return cart;
@@ -106,8 +106,8 @@ export function removeFromCart(cartId: string, productId: string, variantId: str
   );
 
   // Recalculate totals
-  cart.total = cart.items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
-  cart.item_count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
+  cart.total = cart.items.reduce((sum: any, i: any) => sum + Number(i.price) * i.quantity, 0);
+  cart.item_count = cart.items.reduce((sum: any, i: any) => sum + i.quantity, 0);
 
   carts.set(cartId, cart);
   return cart;

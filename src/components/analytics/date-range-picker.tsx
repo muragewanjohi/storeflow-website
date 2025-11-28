@@ -81,7 +81,7 @@ export default function DateRangePicker({
           <div className="p-3">
             <div className="space-y-1">
               <div className="text-sm font-medium mb-2">Quick Select</div>
-              {PRESET_RANGES.map((preset) => (
+              {PRESET_RANGES.map((preset: any) => (
                 <Button
                   key={preset.label}
                   variant="ghost"

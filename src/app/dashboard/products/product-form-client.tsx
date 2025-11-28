@@ -115,13 +115,13 @@ export default function ProductFormClient({
     isNew?: boolean;
   }>>(() => {
     if (isEditing && initialVariants.length > 0) {
-      return initialVariants.map((variant) => ({
+      return initialVariants.map((variant: any) => ({
         id: variant.id,
         sku: variant.sku || '',
         price: variant.price?.toString() || '',
         stock_quantity: variant.stock_quantity.toString(),
         image: variant.image || '',
-        attributes: variant.variant_attributes?.map((attr) => ({
+        attributes: variant.variant_attributes?.map((attr: any) => ({
           attribute_id: attr.attribute_id,
           attribute_value_id: attr.attribute_value_id,
         })) || [],
@@ -373,7 +373,7 @@ export default function ProductFormClient({
   };
 
   // Calculate total variant stock
-  const totalVariantStock = variants.reduce((sum, v) => sum + (parseInt(v.stock_quantity) || 0), 0);
+  const totalVariantStock = variants.reduce((sum: any, v: any) => sum + (parseInt(v.stock_quantity) || 0), 0);
   
   // When variants exist, product-level stock should be calculated from variants (read-only)
   // When no variants exist, product-level stock is editable
@@ -615,7 +615,7 @@ export default function ProductFormClient({
                                   <SelectValue placeholder="Select attribute" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {attributes.map((attribute) => (
+                                  {attributes.map((attribute: any) => (
                                     <SelectItem key={attribute.id} value={attribute.id}>
                                       {attribute.name}
                                     </SelectItem>
@@ -638,7 +638,7 @@ export default function ProductFormClient({
                                   <SelectValue placeholder="Select value" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {selectedAttribute?.attribute_values.map((val) => (
+                                  {selectedAttribute?.attribute_values.map((val: any) => (
                                     <SelectItem key={val.id} value={val.id}>
                                       <div className="flex items-center gap-2">
                                         {/* Show color code for color attributes, but variant image is separate */}
@@ -692,7 +692,7 @@ export default function ProductFormClient({
                       {variant.attributes.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           Variant name: {generateVariantName(
-                            variant.attributes.map((attr) => {
+                            variant.attributes.map((attr: any) => {
                               const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
                               const selectedValue = selectedAttribute?.attribute_values.find(
                                 (v) => v.id === attr.attribute_value_id
@@ -983,7 +983,7 @@ export default function ProductFormClient({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No Category</SelectItem>
-                      {categories.map((category) => (
+                      {categories.map((category: any) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>

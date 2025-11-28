@@ -54,7 +54,7 @@ export default async function TenantSubscriptionPage() {
       }
     : null;
 
-  const availablePlans = availablePlansData.map((plan) => ({
+  const availablePlans = availablePlansData.map((plan: any) => ({
     ...plan,
     price: Number(plan.price),
   }));

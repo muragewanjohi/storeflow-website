@@ -72,7 +72,7 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
 
     return () => {
       // Cleanup on unmount
-      Object.keys(colors).forEach((key) => {
+      Object.keys(colors).forEach((key: any) => {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         root.style.removeProperty(`--color-${cssKey}`);
       });

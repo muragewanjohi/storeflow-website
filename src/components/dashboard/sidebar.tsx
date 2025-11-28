@@ -93,7 +93,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const setMobileMenuOpen = externalSetMobileMenuOpen ?? setInternalMobileMenuOpen;
 
   // Filter navigation based on user role
-  const filteredNavigation = navigation.filter((item) => {
+  const filteredNavigation = navigation.filter((item: any) => {
     if (item.adminOnly && user.role !== 'tenant_admin') {
       return false;
     }
@@ -102,10 +102,10 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
 
   // Group navigation items, ensuring Dashboard is first, then Catalog, then Content, then Support, then others
   const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
-  const catalogItems = filteredNavigation.filter((item) => item.group === 'Catalog');
-  const contentItems = filteredNavigation.filter((item) => item.group === 'Content');
-  const supportItems = filteredNavigation.filter((item) => item.group === 'Support');
-  const mainItems = filteredNavigation.filter((item) => !item.group && item.name !== 'Dashboard');
+  const catalogItems = filteredNavigation.filter((item: any) => item.group === 'Catalog');
+  const contentItems = filteredNavigation.filter((item: any) => item.group === 'Content');
+  const supportItems = filteredNavigation.filter((item: any) => item.group === 'Support');
+  const mainItems = filteredNavigation.filter((item: any) => !item.group && item.name !== 'Dashboard');
   
   // Build grouped navigation in the correct order using an array to maintain sequence
   const orderedGroupedNavigation: Array<{ groupName: string; items: NavigationItem[] }> = [];
@@ -229,7 +229,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                       )}
                       {isExpanded && (
                         <ul role="list" className="space-y-1">
-                          {items.map((item) => {
+                          {items.map((item: any) => {
                             // Dashboard should only be active when pathname is exactly /dashboard
                             const isActive = item.name === 'Dashboard' 
                               ? pathname === item.href
@@ -333,7 +333,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                     )}
                     {isExpanded && (
                       <ul role="list" className="flex flex-col gap-y-1">
-                        {items.map((item) => {
+                        {items.map((item: any) => {
                           // Dashboard should only be active when pathname is exactly /dashboard
                           const isActive = item.name === 'Dashboard' 
                             ? pathname === item.href

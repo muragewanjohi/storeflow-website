@@ -243,7 +243,7 @@ export default function AdjustStockClient({
                             <SelectValue placeholder="Select a product" />
                           </SelectTrigger>
                           <SelectContent>
-                            {filteredProducts.map((p) => (
+                            {filteredProducts.map((p: any) => (
                               <SelectItem key={p.id} value={p.id}>
                                 {p.name} ({p.sku || 'No SKU'}) - Stock: {p.stock_quantity}
                               </SelectItem>
@@ -265,9 +265,9 @@ export default function AdjustStockClient({
                             <SelectValue placeholder="Select a variant" />
                           </SelectTrigger>
                           <SelectContent>
-                            {filteredVariants.map((v) => (
+                            {filteredVariants.map((v: any) => (
                               <SelectItem key={v.id} value={v.id}>
-                                {v.product_name} - {v.attributes.map((a) => `${a.name}: ${a.value}`).join(', ')} ({v.variant_sku || v.product_sku || 'No SKU'}) - Stock: {v.stock_quantity}
+                                {v.product_name} - {v.attributes.map((a: any) => `${a.name}: ${a.value}`).join(', ')} ({v.variant_sku || v.product_sku || 'No SKU'}) - Stock: {v.stock_quantity}
                               </SelectItem>
                             ))}
                           </SelectContent>

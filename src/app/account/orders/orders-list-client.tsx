@@ -113,7 +113,7 @@ export default function OrdersListClient({ initialOrders }: Readonly<OrdersListC
       </div>
 
       <div className="space-y-4">
-        {orders.map((order) => (
+        {orders.map((order: any) => (
           <Card key={order.id} className="hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -144,7 +144,7 @@ export default function OrdersListClient({ initialOrders }: Readonly<OrdersListC
 
                   {/* Order Items Preview */}
                   <div className="flex gap-2 mb-3">
-                    {order.order_products.slice(0, 3).map((item) => (
+                    {order.order_products.slice(0, 3).map((item: any) => (
                       <div key={item.id} className="relative w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
                         {item.products?.image ? (
                           <Image

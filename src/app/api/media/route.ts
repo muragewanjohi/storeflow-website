@@ -68,15 +68,15 @@ export async function GET(request: NextRequest) {
           select: { path: true },
         });
 
-        const existingPaths = new Set(existingRecords.map((r) => r.path).filter(Boolean));
+        const existingPaths = new Set(existingRecords.map((r: any) => r.path).filter(Boolean));
 
         // Create database records for files in storage that don't have records
         const filesToCreate = storageFiles
-          .filter((file) => {
+          .filter((file: any) => {
             const filePath = `${tenantFolder}${file.name}`;
             return !existingPaths.has(filePath);
           })
-          .map((file) => {
+          .map((file: any) => {
             const filePath = `${tenantFolder}${file.name}`;
             const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
             const mimeType = 

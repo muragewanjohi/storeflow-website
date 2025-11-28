@@ -68,7 +68,7 @@ export async function GET(
       },
     });
 
-    const totalSpent = orders.reduce((sum, order) => sum + Number(order.total_amount), 0);
+    const totalSpent = orders.reduce((sum: number, order: typeof orders[0]) => sum + Number(order.total_amount), 0);
 
     return NextResponse.json({
       success: true,

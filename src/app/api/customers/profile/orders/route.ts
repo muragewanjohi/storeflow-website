@@ -68,14 +68,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      orders: orders.map((order) => ({
+      orders: orders.map((order: any) => ({
         id: order.id,
         order_number: order.order_number,
         total_amount: Number(order.total_amount),
         status: order.status,
         payment_status: order.payment_status,
-        item_count: order.order_products.reduce((sum, item) => sum + item.quantity, 0),
-        items: order.order_products.map((item) => ({
+        item_count: order.order_products.reduce((sum: any, item: any) => sum + item.quantity, 0),
+        items: order.order_products.map((item: any) => ({
           id: item.id,
           product_name: item.products?.name || 'Unknown Product',
           product_image: item.products?.image,

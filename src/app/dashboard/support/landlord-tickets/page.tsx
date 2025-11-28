@@ -75,7 +75,7 @@ export default async function TenantLandlordTicketsPage({
   }
 
   // Format tickets for client component
-  const formattedTickets = tickets.map((ticket) => ({
+  const formattedTickets = tickets.map((ticket: any) => ({
     id: ticket.id,
     subject: ticket.subject || 'No Subject',
     status: ticket.status || 'open',

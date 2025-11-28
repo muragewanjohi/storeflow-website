@@ -76,7 +76,7 @@ export default function AdminSidebar({
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Admin Dashboard</p>
               </div>
               <ul role="list" className="space-y-1">
-                {navigation.map((item) => {
+                {navigation.map((item: any) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                   return (
                     <li key={item.name}>
@@ -124,7 +124,7 @@ export default function AdminSidebar({
               </div>
             )}
             <ul role="list" className="flex flex-1 flex-col gap-y-1">
-              {navigation.map((item) => {
+              {navigation.map((item: any) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <li key={item.name}>

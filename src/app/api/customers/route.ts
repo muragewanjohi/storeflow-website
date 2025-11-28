@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      customers: customers.map((customer) => ({
+      customers: customers.map((customer: any) => ({
         id: customer.id,
         name: customer.name,
         email: customer.email,

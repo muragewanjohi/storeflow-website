@@ -100,7 +100,7 @@ export default function CustomerDetailClient({
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map((n: any) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -341,7 +341,7 @@ export default function CustomerDetailClient({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {customer.recent_orders.map((order) => (
+                      {customer.recent_orders.map((order: any) => (
                         <TableRow key={order.id}>
                           <TableCell className="font-medium">
                             {order.order_number}
@@ -395,7 +395,7 @@ export default function CustomerDetailClient({
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {customer.addresses.map((address) => (
+                  {customer.addresses.map((address: any) => (
                     <Card key={address.id}>
                       <CardHeader>
                         <div className="flex items-center justify-between">
@@ -448,7 +448,7 @@ export default function CustomerDetailClient({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {customer.reviews.map((review) => (
+                  {customer.reviews.map((review: any) => (
                     <Card key={review.id}>
                       <CardContent className="pt-6">
                         <div className="flex items-start justify-between">

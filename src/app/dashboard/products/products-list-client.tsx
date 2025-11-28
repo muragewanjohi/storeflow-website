@@ -288,7 +288,7 @@ export default function ProductsListClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
+                  {categories.map((category: any) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
@@ -339,7 +339,7 @@ export default function ProductsListClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {initialProducts.map((product) => (
+                    {initialProducts.map((product: any) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           {product.image ? (

@@ -58,8 +58,8 @@ export async function GET(
 
     // Fetch product variants separately if needed
     const variantIds = order.order_products
-      .filter((item) => item.variant_id)
-      .map((item) => item.variant_id) as string[];
+      .filter((item: any) => item.variant_id)
+      .map((item: any) => item.variant_id) as string[];
 
     const variants = variantIds.length > 0
       ? await prisma.product_variants.findMany({
@@ -74,7 +74,7 @@ export async function GET(
         })
       : [];
 
-    const variantMap = new Map(variants.map((v) => [v.id, v]));
+    const variantMap = new Map(variants.map((v: any) => [v.id, v]));
 
     return NextResponse.json({
       success: true,
@@ -94,7 +94,7 @@ export async function GET(
         coupon: order.coupon,
         coupon_discounted: order.coupon_discounted ? Number(order.coupon_discounted) : null,
         message: order.message,
-        items: order.order_products.map((item) => ({
+        items: order.order_products.map((item: any) => ({
           id: item.id,
           product_id: item.product_id,
           variant_id: item.variant_id,

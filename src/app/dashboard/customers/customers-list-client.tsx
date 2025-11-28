@@ -128,7 +128,7 @@ export default function CustomersListClient({
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map((n: any) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -251,7 +251,7 @@ export default function CustomersListClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {initialCustomers.map((customer) => (
+                    {initialCustomers.map((customer: any) => (
                       <TableRow key={customer.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">

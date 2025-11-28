@@ -182,8 +182,8 @@ export default function CategoryFormClient({
                     <SelectContent>
                       <SelectItem value="none">No parent (top-level)</SelectItem>
                       {parentCategories
-                        .filter((cat) => cat.id !== category?.id)
-                        .map((cat) => (
+                        .filter((cat: any) => cat.id !== category?.id)
+                        .map((cat: any) => (
                           <SelectItem key={cat.id} value={cat.id}>
                             {cat.name}
                           </SelectItem>

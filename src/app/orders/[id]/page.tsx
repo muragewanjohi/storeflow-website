@@ -99,7 +99,7 @@ export default async function OrderConfirmationPage({
     ...order,
     total_amount: Number(order.total_amount),
     order_details: order.order_details || {},
-    order_products: order.order_products.map((op) => ({
+    order_products: order.order_products.map((op: any) => ({
       ...op,
       price: Number(op.price),
       total: Number(op.total),

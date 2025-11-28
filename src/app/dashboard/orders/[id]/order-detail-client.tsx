@@ -378,7 +378,7 @@ export default function OrderDetailClient({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items.map((item) => (
+                {order.items.map((item: any) => (
                   <div key={item.id} className="flex items-start gap-4 border-b pb-4 last:border-0">
                     {item.product_image && (
                       <img

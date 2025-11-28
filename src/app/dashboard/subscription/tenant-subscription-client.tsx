@@ -513,7 +513,7 @@ export default function TenantSubscriptionClient({
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {availablePlans.map((plan) => {
+                {availablePlans.map((plan: any) => {
                   const isCurrentPlan = plan.id === currentPlan?.id;
                   const isUpgrade = currentPlan && Number(plan.price) > Number(currentPlan.price);
                   const isDowngrade = currentPlan && Number(plan.price) < Number(currentPlan.price);

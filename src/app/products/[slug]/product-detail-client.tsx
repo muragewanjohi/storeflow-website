@@ -285,7 +285,7 @@ export default function ProductDetailClient({
             <div>
               <h2 className="font-semibold mb-4">Variants</h2>
               <div className="space-y-3">
-                {product.product_variants.map((variant) => {
+                {product.product_variants.map((variant: any) => {
                   const variantImage = variant.image || 
                     variant.variant_attributes.find(va => va.attribute_values.image)?.attribute_values.image ||
                     product.image;
@@ -328,7 +328,7 @@ export default function ProductDetailClient({
                             <div className="flex-1 min-w-0">
                               {variantDetails ? (
                                 <div className="space-y-1">
-                                  {variant.variant_attributes.map((va) => (
+                                  {variant.variant_attributes.map((va: any) => (
                                     <div key={va.id} className="flex items-center gap-2">
                                       <span className="text-sm font-medium text-muted-foreground">
                                         {va.attributes.name}:

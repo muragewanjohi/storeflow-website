@@ -134,7 +134,7 @@ export default function StorefrontHeader() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex md:items-center md:gap-6">
-            {navigation.map((item) => {
+            {navigation.map((item: any) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               return (
                 <Link
@@ -235,7 +235,7 @@ export default function StorefrontHeader() {
         {mobileMenuOpen && (
           <div className="md:hidden">
             <div className="space-y-1 border-t pb-3 pt-4">
-              {navigation.map((item) => {
+              {navigation.map((item: any) => {
                 const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
                 return (
                   <Link

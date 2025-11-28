@@ -72,7 +72,7 @@ export default function AdminHeader({
     return email
       .split('@')[0]
       .split('.')
-      .map((n) => n[0])
+      .map((n: any) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
