@@ -1,8 +1,7 @@
 /**
- * Modern Theme Product Card
+ * Default Theme Product Card
  * 
- * Electronics-focused product card with tech styling
- * Day 37: Theme Templates
+ * Versatile product card suitable for any store type
  */
 
 'use client';
@@ -26,12 +25,12 @@ interface Product {
   metadata?: Record<string, unknown>;
 }
 
-interface ModernProductCardProps {
+interface DefaultProductCardProps {
   product: Product;
   className?: string;
 }
 
-export default function ModernProductCard({ product, className }: ModernProductCardProps) {
+export default function DefaultProductCard({ product, className }: DefaultProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
@@ -66,10 +65,23 @@ export default function ModernProductCard({ product, className }: ModernProductC
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    // Fallback on image error
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      const fallback = document.createElement('div');
+                      fallback.className = 'w-full h-full flex items-center justify-center bg-muted';
+                      fallback.innerHTML = '<span class="text-4xl">📦</span>';
+                      parent.appendChild(fallback);
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📱</span>
+                  <span className="text-4xl">📦</span>
                 </div>
               )}
               {isOnSale && (
@@ -88,25 +100,28 @@ export default function ModernProductCard({ product, className }: ModernProductC
           <Link href={`/products/${product.slug || product.id}`}>
             <div className="relative aspect-square bg-muted overflow-hidden">
               {product.image ? (
-                product.image.startsWith('http') || product.image.includes('unsplash.com') ? (
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                ) : (
-                  <Image
-                    src={product.image}
-                    alt={product.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                )
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    // Fallback on image error
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.image-fallback')) {
+                      const fallback = document.createElement('div');
+                      fallback.className = 'image-fallback w-full h-full flex items-center justify-center bg-muted';
+                      fallback.innerHTML = '<span class="text-4xl">📦</span>';
+                      parent.appendChild(fallback);
+                    }
+                  }}
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📱</span>
+                  <span className="text-4xl">📦</span>
                 </div>
               )}
               {isOnSale && (
@@ -146,18 +161,6 @@ export default function ModernProductCard({ product, className }: ModernProductC
               {product.name}
             </h3>
           </Link>
-        )}
-        
-        {/* Tech specs preview */}
-        {product.metadata && (
-          <div className="text-xs text-muted-foreground mb-2 space-y-1">
-            {(product.metadata as any).brand && (
-              <div>Brand: {String((product.metadata as any).brand)}</div>
-            )}
-            {(product.metadata as any).model && (
-              <div>Model: {String((product.metadata as any).model)}</div>
-            )}
-          </div>
         )}
         
         <div className="flex items-center justify-between">

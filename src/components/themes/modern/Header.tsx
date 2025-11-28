@@ -14,15 +14,24 @@ import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { usePreview } from '@/lib/themes/preview-context';
 
 export default function ModernHeader() {
   const pathname = usePathname();
+  const { isPreview, onNavigate } = usePreview();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
+    // Skip all API calls in preview mode to prevent hanging
+    if (isPreview) {
+      setCartItemCount(0);
+      setIsAuthenticated(false);
+      return;
+    }
+
     async function fetchCartCount() {
       try {
         const response = await fetch('/api/cart/count');
@@ -50,7 +59,7 @@ export default function ModernHeader() {
     fetchCartCount();
     const interval = setInterval(fetchCartCount, 120000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isPreview]);
 
   const navigation = [
     { name: 'Home', href: '/' },
@@ -75,18 +84,49 @@ export default function ModernHeader() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">T</span>
-              </div>
-              <span className="text-xl font-bold">TechStore</span>
-            </Link>
+            {isPreview && onNavigate ? (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigate('/');
+                }}
+                className="flex items-center gap-2"
+              >
+                <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-sm">T</span>
+                </div>
+                <span className="text-xl font-bold">TechStore</span>
+              </button>
+            ) : (
+              <Link href="/" className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-sm">T</span>
+                </div>
+                <span className="text-xl font-bold">TechStore</span>
+              </Link>
+            )}
           </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex md:items-center md:gap-6">
             {navigation.map((item: any) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+              if (isPreview && onNavigate) {
+                return (
+                  <button
+                    key={item.name}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onNavigate(item.href);
+                    }}
+                    className={`text-sm font-medium transition-colors hover:text-primary ${
+                      isActive ? 'text-primary' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={item.name}
@@ -129,16 +169,29 @@ export default function ModernHeader() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/customer-login">
-                <Button variant="ghost" size="sm">
+              isPreview && onNavigate ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate('/customer-login');
+                  }}
+                >
                   Sign In
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/customer-login">
+                  <Button variant="ghost" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+              )
             )}
 
             {/* Cart */}
-            <Link href="/cart">
-              <Button variant="ghost" size="icon" className="relative">
+            {isPreview ? (
+              <Button variant="ghost" size="icon" className="relative" title="Cart (Preview Mode)">
                 <ShoppingCartIcon className="h-6 w-6" />
                 {cartItemCount > 0 && (
                   <Badge
@@ -149,7 +202,21 @@ export default function ModernHeader() {
                   </Badge>
                 )}
               </Button>
-            </Link>
+            ) : (
+              <Link href="/cart">
+                <Button variant="ghost" size="icon" className="relative">
+                  <ShoppingCartIcon className="h-6 w-6" />
+                  {cartItemCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs"
+                    >
+                      {cartItemCount > 99 ? '99+' : cartItemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            )}
 
             {/* Mobile menu */}
             <Button
@@ -171,16 +238,32 @@ export default function ModernHeader() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t">
             <div className="space-y-1 py-4">
-              {navigation.map((item: any) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {item.name}
-                </Link>
-              ))}
+              {navigation.map((item: any) => {
+                if (isPreview && onNavigate) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onNavigate(item.href);
+                      }}
+                      className="block w-full text-left px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      {item.name}
+                    </button>
+                  );
+                }
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {item.name}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

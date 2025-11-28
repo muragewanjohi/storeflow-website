@@ -1,8 +1,7 @@
 /**
- * HexFashion Theme Header
+ * Minimal Theme Header
  * 
- * Fashion-focused minimal header
- * Day 37: Theme Templates
+ * Ultra-minimal header with clean lines
  */
 
 'use client';
@@ -10,23 +9,21 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBagIcon, Bars3Icon, XMarkIcon, UserIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { ShoppingBagIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { usePreview } from '@/lib/themes/preview-context';
 
-export default function HexFashionHeader() {
+export default function MinimalHeader() {
   const pathname = usePathname();
   const { isPreview, onNavigate } = usePreview();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     // Skip all API calls in preview mode to prevent hanging
     if (isPreview) {
       setCartItemCount(0);
-      setIsAuthenticated(false);
       return;
     }
 
@@ -42,18 +39,6 @@ export default function HexFashionHeader() {
       }
     }
 
-    async function checkAuth() {
-      try {
-        const response = await fetch('/api/customers/profile');
-        if (response.ok) {
-          setIsAuthenticated(true);
-        }
-      } catch {
-        setIsAuthenticated(false);
-      }
-    }
-
-    checkAuth();
     fetchCartCount();
     const interval = setInterval(fetchCartCount, 120000);
     return () => clearInterval(interval);
@@ -61,17 +46,17 @@ export default function HexFashionHeader() {
 
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'New Arrivals', href: '/products?sort=newest' },
-    { name: 'Collections', href: '/products?category=all' },
+    { name: 'Products', href: '/products' },
     { name: 'About', href: '/about' },
+    { name: 'Contact', href: '/contact' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b border-border/40 bg-background">
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
-          {/* Logo - Centered */}
-          <div className="flex-1 flex justify-start">
+          {/* Logo - Minimal */}
+          <div className="flex items-center">
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
@@ -80,17 +65,17 @@ export default function HexFashionHeader() {
                 }}
                 className="flex items-center"
               >
-                <span className="text-2xl font-light tracking-wider">HEXFASHION</span>
+                <span className="text-2xl font-light tracking-widest">STORE</span>
               </button>
             ) : (
               <Link href="/" className="flex items-center">
-                <span className="text-2xl font-light tracking-wider">HEXFASHION</span>
+                <span className="text-2xl font-light tracking-widest">STORE</span>
               </Link>
             )}
           </div>
 
-          {/* Desktop Navigation - Centered */}
-          <div className="hidden md:flex md:items-center md:gap-8 flex-1 justify-center">
+          {/* Desktop Navigation - Minimal spacing */}
+          <div className="hidden md:flex md:items-center md:gap-12">
             {navigation.map((item: any) => {
               const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
               if (isPreview && onNavigate) {
@@ -101,8 +86,8 @@ export default function HexFashionHeader() {
                       e.preventDefault();
                       onNavigate(item.href);
                     }}
-                    className={`text-sm font-light tracking-wide transition-colors hover:text-primary uppercase ${
-                      isActive ? 'text-primary' : 'text-muted-foreground'
+                    className={`text-xs font-light tracking-widest uppercase transition-colors ${
+                      isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {item.name}
@@ -113,8 +98,8 @@ export default function HexFashionHeader() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`text-sm font-light tracking-wide transition-colors hover:text-primary uppercase ${
-                    isActive ? 'text-primary' : 'text-muted-foreground'
+                  className={`text-xs font-light tracking-widest uppercase transition-colors ${
+                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {item.name}
@@ -123,46 +108,11 @@ export default function HexFashionHeader() {
             })}
           </div>
 
-          {/* Right side - Account, Wishlist, Cart */}
-          <div className="flex items-center gap-4 flex-1 justify-end">
-            {/* Account */}
-            {isAuthenticated ? (
-              <Link href="/account">
-                <Button variant="ghost" size="sm" className="hidden sm:flex">
-                  <UserIcon className="h-5 w-5" />
-                </Button>
-              </Link>
-            ) : (
-              isPreview && onNavigate ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hidden sm:flex"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onNavigate('/customer-login');
-                  }}
-                >
-                  Sign In
-                </Button>
-              ) : (
-                <Link href="/customer-login">
-                  <Button variant="ghost" size="sm" className="hidden sm:flex">
-                    Sign In
-                  </Button>
-                </Link>
-              )
-            )}
-
-            {/* Wishlist */}
-            <Button variant="ghost" size="icon" className="hidden sm:flex">
-              <HeartIcon className="h-5 w-5" />
-            </Button>
-
-            {/* Cart */}
+          {/* Right side - Cart only */}
+          <div className="flex items-center gap-2">
             {isPreview ? (
               <Button variant="ghost" size="icon" className="relative" title="Cart (Preview Mode)">
-                <ShoppingBagIcon className="h-6 w-6" />
+                <ShoppingBagIcon className="h-5 w-5" />
                 {cartItemCount > 0 && (
                   <Badge
                     variant="destructive"
@@ -175,7 +125,7 @@ export default function HexFashionHeader() {
             ) : (
               <Link href="/cart">
                 <Button variant="ghost" size="icon" className="relative">
-                  <ShoppingBagIcon className="h-6 w-6" />
+                  <ShoppingBagIcon className="h-5 w-5" />
                   {cartItemCount > 0 && (
                     <Badge
                       variant="destructive"
@@ -217,7 +167,7 @@ export default function HexFashionHeader() {
                         setMobileMenuOpen(false);
                         onNavigate(item.href);
                       }}
-                      className="block w-full text-left px-3 py-2 text-base font-light text-muted-foreground hover:bg-muted hover:text-foreground uppercase"
+                      className="block w-full text-left px-3 py-2 text-xs font-light tracking-widest uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
                       {item.name}
                     </button>
@@ -228,7 +178,7 @@ export default function HexFashionHeader() {
                     key={item.name}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-base font-light text-muted-foreground hover:bg-muted hover:text-foreground uppercase"
+                    className="block px-3 py-2 text-xs font-light tracking-widest uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     {item.name}
                   </Link>

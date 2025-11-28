@@ -1,13 +1,12 @@
 /**
- * Modern Theme Product Grid
+ * Minimal Theme Product Grid
  * 
- * Electronics-focused product grid layout
- * Day 37: Theme Templates
+ * Ultra-minimal product grid with generous spacing
  */
 
 'use client';
 
-import ModernProductCard from './ProductCard';
+import MinimalProductCard from './ProductCard';
 
 interface Product {
   id: string;
@@ -20,17 +19,19 @@ interface Product {
   metadata?: Record<string, unknown>;
 }
 
-interface ModernProductGridProps {
+interface MinimalProductGridProps {
   products: Product[];
   columns?: number;
   className?: string;
+  onProductClick?: (product: Product) => void;
 }
 
-export default function ModernProductGrid({
+export default function MinimalProductGrid({
   products,
   columns = 4,
   className,
-}: ModernProductGridProps) {
+  onProductClick,
+}: MinimalProductGridProps) {
   const gridCols = {
     1: 'grid-cols-1',
     2: 'grid-cols-1 sm:grid-cols-2',
@@ -39,10 +40,10 @@ export default function ModernProductGrid({
   };
 
   return (
-    <div className={`grid ${gridCols[columns as keyof typeof gridCols] || gridCols[4]} gap-6 ${className}`}>
+    <div className={`grid ${gridCols[columns as keyof typeof gridCols] || gridCols[4]} gap-12 ${className}`}>
       {products.map((product: any) => (
         <div key={product.id} data-product-id={product.id}>
-          <ModernProductCard product={product} />
+          <MinimalProductCard product={product} />
         </div>
       ))}
     </div>

@@ -18,7 +18,7 @@ import DefaultFooter from '@/components/storefront/footer';
 export function loadThemeHeader(themeSlug: string) {
   const template = getThemeTemplate(themeSlug);
   
-  if (!template || themeSlug === 'default') {
+  if (!template) {
     return DefaultHeader;
   }
 
@@ -34,6 +34,12 @@ export function loadThemeHeader(themeSlug: string) {
         ssr: true,
         loading: () => <DefaultHeader />,
       });
+    case 'minimal':
+      return dynamic(() => import('@/components/themes/minimal/Header'), {
+        ssr: true,
+        loading: () => <DefaultHeader />,
+      });
+    case 'default':
     default:
       return DefaultHeader;
   }
@@ -45,7 +51,7 @@ export function loadThemeHeader(themeSlug: string) {
 export function loadThemeFooter(themeSlug: string) {
   const template = getThemeTemplate(themeSlug);
   
-  if (!template || themeSlug === 'default') {
+  if (!template) {
     return DefaultFooter;
   }
 
@@ -60,6 +66,12 @@ export function loadThemeFooter(themeSlug: string) {
         ssr: true,
         loading: () => <DefaultFooter />,
       });
+    case 'minimal':
+      return dynamic(() => import('@/components/themes/minimal/Footer'), {
+        ssr: true,
+        loading: () => <DefaultFooter />,
+      });
+    case 'default':
     default:
       return DefaultFooter;
   }
@@ -84,6 +96,10 @@ export function loadThemeHero(themeSlug: string) {
       return dynamic(() => import('@/components/themes/hexfashion/Hero'), {
         ssr: true,
       });
+    case 'default':
+      return dynamic(() => import('@/components/themes/default/Hero'), {
+        ssr: true,
+      });
     default:
       return null;
   }
@@ -106,6 +122,46 @@ export function loadThemeProductGrid(themeSlug: string) {
       });
     case 'hexfashion':
       return dynamic(() => import('@/components/themes/hexfashion/ProductGrid'), {
+        ssr: true,
+      });
+    case 'default':
+      return dynamic(() => import('@/components/themes/default/ProductGrid'), {
+        ssr: true,
+      });
+    case 'minimal':
+      return dynamic(() => import('@/components/themes/minimal/ProductGrid'), {
+        ssr: true,
+      });
+    default:
+      return null;
+  }
+}
+
+/**
+ * Load theme-specific homepage component
+ */
+export function loadThemeHomepage(themeSlug: string) {
+  const template = getThemeTemplate(themeSlug);
+  
+  if (!template) {
+    return null;
+  }
+
+  switch (themeSlug) {
+    case 'modern':
+      return dynamic(() => import('@/components/themes/modern/Homepage'), {
+        ssr: true,
+      });
+    case 'hexfashion':
+      return dynamic(() => import('@/components/themes/hexfashion/Homepage'), {
+        ssr: true,
+      });
+    case 'default':
+      return dynamic(() => import('@/components/themes/default/Homepage'), {
+        ssr: true,
+      });
+    case 'minimal':
+      return dynamic(() => import('@/components/themes/minimal/Homepage'), {
         ssr: true,
       });
     default:

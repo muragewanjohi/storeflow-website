@@ -41,7 +41,9 @@ export default function HexFashionProductGrid({
   return (
     <div className={`grid ${gridCols[columns as keyof typeof gridCols] || gridCols[4]} gap-8 ${className}`}>
       {products.map((product: any) => (
-        <HexFashionProductCard key={product.id} product={product} />
+        <div key={product.id} data-product-id={product.id}>
+          <HexFashionProductCard product={product} />
+        </div>
       ))}
     </div>
   );

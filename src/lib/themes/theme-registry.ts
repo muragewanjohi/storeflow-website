@@ -16,6 +16,7 @@ export interface ThemeTemplateConfig {
   slug: string;
   industry: ThemeIndustry;
   description: string;
+  screenshotUrl?: string; // Preview/screenshot image for theme marketplace
   layout: {
     header: 'sticky' | 'transparent' | 'minimal' | 'centered';
     productGrid: 'grid' | 'masonry' | 'list' | 'catalog';
@@ -48,6 +49,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'modern',
     industry: 'electronics',
     description: 'Clean, tech-focused theme perfect for electronics and gadgets',
+    screenshotUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&h=800&fit=crop',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
@@ -66,9 +68,9 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
       products: 12,
       categories: 4,
       images: [
-        'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800',
-        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800',
-        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
+        'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop',
       ],
     },
   },
@@ -78,6 +80,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'hexfashion',
     industry: 'fashion',
     description: 'Elegant fashion theme with catalog-style layouts',
+    screenshotUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=800&fit=crop',
     layout: {
       header: 'minimal',
       productGrid: 'catalog',
@@ -96,9 +99,9 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
       products: 12,
       categories: 5,
       images: [
-        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',
-        'https://images.unsplash.com/photo-1445205170230-053b83016050?w=800',
-        'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800',
+        'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&h=800&fit=crop',
       ],
     },
   },
@@ -106,8 +109,9 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     id: 'default',
     name: 'Default',
     slug: 'default',
-    industry: 'general',
-    description: 'Versatile theme suitable for any type of store',
+    industry: 'electronics',
+    description: 'Most appealing theme with hero, testimonials, and blogs - perfect for computer and electronics stores',
+    screenshotUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200&h=800&fit=crop',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
@@ -117,16 +121,49 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     componentPaths: {
       Header: '@/components/storefront/header',
       Footer: '@/components/storefront/footer',
-      ProductCard: '@/components/storefront/product-card',
-      ProductGrid: '@/components/storefront/product-grid',
+      ProductCard: '@/components/themes/default/ProductCard',
+      ProductGrid: '@/components/themes/default/ProductGrid',
+      Hero: '@/components/themes/default/Hero',
+      Homepage: '@/components/themes/default/Homepage',
+    },
+    demoContent: {
+      products: 12,
+      categories: 4,
+      images: [
+        'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=800&fit=crop',
+      ],
+    },
+  },
+  minimal: {
+    id: 'minimal',
+    name: 'Minimal',
+    slug: 'minimal',
+    industry: 'general',
+    description: 'A minimal and elegant theme with clean lines and simple design',
+    screenshotUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop',
+    layout: {
+      header: 'minimal',
+      productGrid: 'grid',
+      sidebar: 'none',
+      footer: 'minimal',
+    },
+    componentPaths: {
+      Header: '@/components/themes/minimal/Header',
+      Footer: '@/components/themes/minimal/Footer',
+      ProductCard: '@/components/themes/minimal/ProductCard',
+      ProductGrid: '@/components/themes/minimal/ProductGrid',
       Hero: '@/components/storefront/hero',
+      Homepage: '@/components/themes/minimal/Homepage',
     },
     demoContent: {
       products: 8,
       categories: 3,
       images: [
-        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
-        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=800&fit=crop',
       ],
     },
   },
@@ -151,5 +188,14 @@ export function getAllThemeTemplates(): ThemeTemplateConfig[] {
  */
 export function getThemeTemplatesByIndustry(industry: ThemeIndustry): ThemeTemplateConfig[] {
   return Object.values(themeTemplates).filter((template: any) => template.industry === industry);
+}
+
+/**
+ * Get screenshot URL for a theme by slug
+ * Returns the screenshot URL from the theme template registry
+ */
+export function getThemeScreenshotUrl(slug: string): string | undefined {
+  const template = themeTemplates[slug];
+  return template?.screenshotUrl;
 }
 

@@ -1,13 +1,13 @@
 /**
- * Modern Theme Product Grid
+ * Default Theme Product Grid
  * 
- * Electronics-focused product grid layout
- * Day 37: Theme Templates
+ * Versatile product grid layout
  */
 
 'use client';
 
-import ModernProductCard from './ProductCard';
+import { memo } from 'react';
+import DefaultProductCard from './ProductCard';
 
 interface Product {
   id: string;
@@ -20,17 +20,19 @@ interface Product {
   metadata?: Record<string, unknown>;
 }
 
-interface ModernProductGridProps {
+interface DefaultProductGridProps {
   products: Product[];
   columns?: number;
   className?: string;
+  onProductClick?: (product: Product) => void;
 }
 
-export default function ModernProductGrid({
+function DefaultProductGrid({
   products,
   columns = 4,
   className,
-}: ModernProductGridProps) {
+  onProductClick,
+}: DefaultProductGridProps) {
   const gridCols = {
     1: 'grid-cols-1',
     2: 'grid-cols-1 sm:grid-cols-2',
@@ -42,10 +44,12 @@ export default function ModernProductGrid({
     <div className={`grid ${gridCols[columns as keyof typeof gridCols] || gridCols[4]} gap-6 ${className}`}>
       {products.map((product: any) => (
         <div key={product.id} data-product-id={product.id}>
-          <ModernProductCard product={product} />
+          <DefaultProductCard product={product} />
         </div>
       ))}
     </div>
   );
 }
+
+export default memo(DefaultProductGrid);
 
