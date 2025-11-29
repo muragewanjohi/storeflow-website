@@ -1,12 +1,14 @@
 /**
  * Homepage
  * 
- * Renders the tenant's homepage using page builder sections or default content
+ * Renders either:
+ * - Marketing landing page (if no tenant or marketing site)
+ * - Tenant's homepage using page builder sections or default content
  * 
  * Day 30: Tenant Storefront - Homepage
  */
 
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { SectionRenderer } from '@/components/content/page-builder/section-templates';
 import { PageBuilderData } from '@/lib/content/page-builder-types';
@@ -15,12 +17,28 @@ import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import MarketingLandingPage from '@/components/marketing/landing-page';
+import { headers } from 'next/headers';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  
+  // If no tenant, show marketing site metadata
+  if (!tenant) {
+    return {
+      title: 'StoreFlow - Multi-Tenant Ecommerce Platform',
+      description: 'Start Your Store. Grow Your Business. It\'s That Simple. Build and scale your online store with StoreFlow\'s powerful ecommerce platform.',
+      openGraph: {
+        title: 'StoreFlow - Multi-Tenant Ecommerce Platform',
+        description: 'Start Your Store. Grow Your Business. It\'s That Simple.',
+        type: 'website',
+      },
+    };
+  }
+  
   return generateStorefrontMetadata({
     tenant,
     title: 'Home',
@@ -30,8 +48,39 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const tenant = await requireTenant();
-
+  // Check if this is a marketing site by checking if tenant headers were set
+  const headersList = await headers();
+  const tenantId = headersList.get('x-tenant-id');
+  const hostname = headersList.get('host') || '';
+  
+  // If no tenant ID in headers, check if it's a marketing site hostname
+  if (!tenantId) {
+    const hostnameWithoutPort = hostname.split(':')[0];
+    
+    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
+    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
+                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+    
+    const isMarketingSite = 
+      hostnameWithoutPort === 'www' ||
+      hostnameWithoutPort === 'marketing' ||
+      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
+      hostnameWithoutPort === '127.0.0.1' ||
+      hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+    
+    // If it's a marketing site, show marketing landing page
+    if (isMarketingSite) {
+      return <MarketingLandingPage />;
+    }
+    
+    // If not marketing site and no tenant, show not found
+    return <div>Store not found</div>;
+  }
+  
+  // Get tenant if tenant ID exists in headers
+  const tenant = await getTenant();
+  
   if (!tenant) {
     return <div>Store not found</div>;
   }

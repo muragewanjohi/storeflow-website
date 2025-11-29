@@ -31,6 +31,26 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Check if this is a marketing site hostname (www, marketing, or main domain)
+  const hostnameWithoutPort = hostname.split(':')[0];
+  
+  // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
+  const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
+                           process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+  
+  const isMarketingSite = 
+    hostnameWithoutPort === 'www' ||
+    hostnameWithoutPort === 'marketing' ||
+    (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
+    hostnameWithoutPort === '127.0.0.1' ||
+    hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+
+  // Allow marketing site to proceed without tenant
+  if (isMarketingSite) {
+    return NextResponse.next();
+  }
+
   try {
     // Resolve tenant from hostname
     const tenant = await getTenantFromRequest(hostname);

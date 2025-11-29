@@ -28,6 +28,24 @@ export async function getTenant(): Promise<Tenant | null> {
   try {
     const headersList = await headers();
     const hostname = headersList.get('host') || '';
+    const hostnameWithoutPort = hostname.split(':')[0];
+    
+    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
+    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
+                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+    
+    // Check if this is a marketing site hostname - don't resolve tenant for these
+    const isMarketingSite = 
+      hostnameWithoutPort === 'www' ||
+      hostnameWithoutPort === 'marketing' ||
+      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
+      hostnameWithoutPort === '127.0.0.1' ||
+      hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+    
+    if (isMarketingSite) {
+      return null; // Marketing site - no tenant
+    }
     
     // Check if tenant ID is already in headers (from middleware)
     const tenantId = headersList.get('x-tenant-id');
@@ -50,7 +68,7 @@ export async function getTenant(): Promise<Tenant | null> {
       } as Tenant;
     }
 
-    // Fallback: resolve tenant from hostname
+    // Fallback: resolve tenant from hostname (only if not marketing site)
     return await getTenantFromRequest(hostname);
   } catch (error) {
     console.error('Error getting tenant:', error);

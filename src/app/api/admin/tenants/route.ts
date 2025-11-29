@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create tenant in database first
+    // Set default theme to light mode in tenant data
     const tenant = await prisma.tenants.create({
       data: {
         name: validatedData.name,
@@ -148,6 +149,9 @@ export async function POST(request: NextRequest) {
         start_date: new Date(),
         plan_id: validatedData.planId || null,
         expire_date: expireDate,
+        data: {
+          theme: 'light', // Default to light mode for new stores
+        },
       },
     });
 
