@@ -91,7 +91,6 @@ export default function HexFashionHomepage({ products = [], categories = [] }: H
                 metadata: p.metadata,
               }))}
               columns={4}
-              onProductClick={onProductClick}
             />
           </div>
         </section>

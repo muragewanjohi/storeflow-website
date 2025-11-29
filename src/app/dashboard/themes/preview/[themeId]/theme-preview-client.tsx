@@ -349,7 +349,7 @@ export default function ThemePreviewClient({
                     Home
                   </Button>
                   <Button
-                    variant={currentPage === 'products' ? 'default' : 'ghost'}
+                    variant={(currentPage as string) === 'products' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => {
                       setCurrentPage('products');

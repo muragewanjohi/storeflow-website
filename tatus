@@ -1,0 +1,35 @@
+[33mcommit 107de78cbc8c57633961fcb7f1117e57f0733427[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Murage Wanjoi <muragewanjohi@gmail.com>
+Date:   Fri Nov 28 22:25:59 2025 +0300
+
+    Enhance theme system by adding support for a new Unsplash image source in the Next.js configuration. Update demo content API to improve performance with a fallback mechanism for theme templates. Refactor theme preview components to handle additional pages and improve user navigation in preview mode. Update product card components to support click handling in preview mode, ensuring a seamless user experience. Additionally, refine database seeding scripts to include screenshot URLs for new themes.
+
+docs/roadmap.md
+next.config.ts
+src/app/api/themes/[id]/demo-content/route.ts
+src/app/dashboard/themes/preview/[themeId]/theme-preview-client.tsx
+src/components/storefront/header.tsx
+src/components/themes/default/Blogs.tsx
+src/components/themes/default/Hero.tsx
+src/components/themes/default/Homepage.tsx
+src/components/themes/default/ProductCard.tsx
+src/components/themes/default/ProductGrid.tsx
+src/components/themes/default/Testimonials.tsx
+src/components/themes/hexfashion/Header.tsx
+src/components/themes/hexfashion/Homepage.tsx
+src/components/themes/hexfashion/ProductCard.tsx
+src/components/themes/hexfashion/ProductGrid.tsx
+src/components/themes/minimal/Footer.tsx
+src/components/themes/minimal/Header.tsx
+src/components/themes/minimal/Homepage.tsx
+src/components/themes/minimal/ProductCard.tsx
+src/components/themes/minimal/ProductGrid.tsx
+src/components/themes/modern/Header.tsx
+src/components/themes/modern/Homepage.tsx
+src/components/themes/modern/ProductCard.tsx
+src/components/themes/modern/ProductGrid.tsx
+src/lib/themes/demo-content.ts
+src/lib/themes/preview-context.tsx
+src/lib/themes/theme-loader.tsx
+src/lib/themes/theme-registry.ts
+supabase/migrations/006_seed_default_themes.sql

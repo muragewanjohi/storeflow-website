@@ -6,6 +6,7 @@
 
 'use client';
 
+import { useCallback } from 'react';
 import type { DemoProduct } from '@/lib/themes/demo-content';
 import MinimalProductGrid from './ProductGrid';
 import { usePreview } from '@/lib/themes/preview-context';
@@ -16,8 +17,15 @@ interface MinimalHomepageProps {
 }
 
 export default function MinimalHomepage({ products = [], categories = [] }: MinimalHomepageProps) {
-  const { onProductClick } = usePreview();
+  const { onProductClick: onProductClickPreview } = usePreview();
   const featuredProducts = products.slice(0, 8);
+
+  // Wrap onProductClick to convert Product to productId
+  const handleProductClick = useCallback((product: { id: string; name: string; slug: string | null; price: number; compareAtPrice?: number; image: string | null; stock_quantity: number | null; metadata?: Record<string, unknown> }) => {
+    if (onProductClickPreview) {
+      onProductClickPreview(product.id);
+    }
+  }, [onProductClickPreview]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,7 +51,7 @@ export default function MinimalHomepage({ products = [], categories = [] }: Mini
                 metadata: p.metadata,
               }))}
               columns={4}
-              onProductClick={onProductClick}
+              onProductClick={handleProductClick}
             />
           </div>
         </section>

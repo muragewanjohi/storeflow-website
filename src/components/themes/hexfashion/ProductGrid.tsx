@@ -24,12 +24,14 @@ interface HexFashionProductGridProps {
   products: Product[];
   columns?: number;
   className?: string;
+  onProductClick?: (product: Product) => void;
 }
 
 export default function HexFashionProductGrid({
   products,
   columns = 4,
   className,
+  onProductClick,
 }: HexFashionProductGridProps) {
   const gridCols = {
     1: 'grid-cols-1',

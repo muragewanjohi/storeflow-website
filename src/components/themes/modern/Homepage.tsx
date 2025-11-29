@@ -92,7 +92,7 @@ export default function ModernHomepage({ products = [], categories = [] }: Moder
                 metadata: p.metadata,
               }))}
               columns={4}
-              onProductClick={onProductClick}
+              onProductClick={onProductClick ? (product) => onProductClick(product.id) : undefined}
             />
           </div>
         </section>
@@ -146,7 +146,7 @@ export default function ModernHomepage({ products = [], categories = [] }: Moder
                 metadata: p.metadata,
               }))}
               columns={4}
-              onProductClick={onProductClick}
+              onProductClick={onProductClick ? (product) => onProductClick(product.id) : undefined}
             />
           </div>
         </section>

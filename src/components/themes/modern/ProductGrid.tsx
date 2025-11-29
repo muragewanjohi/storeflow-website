@@ -24,12 +24,14 @@ interface ModernProductGridProps {
   products: Product[];
   columns?: number;
   className?: string;
+  onProductClick?: (product: Product) => void;
 }
 
 export default function ModernProductGrid({
   products,
   columns = 4,
   className,
+  onProductClick,
 }: ModernProductGridProps) {
   const gridCols = {
     1: 'grid-cols-1',

@@ -7,7 +7,7 @@
 
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, Laptop, Smartphone, Headphones, MousePointer2 } from 'lucide-react';
@@ -24,7 +24,7 @@ interface DefaultHomepageProps {
 }
 
 function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProps) {
-  const { onProductClick, onNavigate } = usePreview();
+  const { onProductClick: onProductClickPreview, onNavigate } = usePreview();
   
   // Memoize product mapping to prevent unnecessary re-renders
   const featuredProducts = useMemo(() => {
@@ -39,6 +39,13 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
       metadata: p.metadata,
     }));
   }, [products]);
+
+  // Wrap onProductClick to convert Product to productId
+  const handleProductClick = useCallback((product: { id: string; name: string; slug: string | null; price: number; compareAtPrice?: number; image: string | null; stock_quantity: number | null; metadata?: Record<string, unknown> }) => {
+    if (onProductClickPreview) {
+      onProductClickPreview(product.id);
+    }
+  }, [onProductClickPreview]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -184,7 +191,7 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
             <DefaultProductGrid
               products={featuredProducts}
               columns={4}
-              onProductClick={onProductClick}
+              onProductClick={handleProductClick}
             />
             <div className="text-center mt-12">
               {onNavigate ? (
