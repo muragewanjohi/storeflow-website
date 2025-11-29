@@ -30,7 +30,15 @@ export async function GET(request: NextRequest) {
     });
 
     // Convert Prisma Decimal to number
-    const plans = pricePlans.map((plan) => ({
+    const plans = pricePlans.map((plan: {
+      id: string;
+      name: string;
+      price: any; // Prisma Decimal type
+      duration_months: number;
+      trial_days: number | null;
+      features: any;
+      status: string | null;
+    }) => ({
       ...plan,
       price: Number(plan.price),
     }));

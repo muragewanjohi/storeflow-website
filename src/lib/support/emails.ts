@@ -11,17 +11,23 @@ import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Prisma } from '@prisma/client';
 
 // Define support ticket type based on Prisma model result
-type SupportTicketType = Prisma.support_ticketsGetPayload<{
-  include: {
-    customers: {
-      select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-  };
-}>;
+type SupportTicketType = {
+  id: string;
+  tenant_id: string;
+  user_id: string | null;
+  subject: string | null;
+  description: string | null;
+  status: string | null;
+  priority: string | null;
+  department_id: string | null;
+  created_at: Date | null;
+  updated_at: Date | null;
+  customers?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+};
 
 /**
  * Get tenant admin email for support notifications
