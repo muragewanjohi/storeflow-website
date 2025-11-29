@@ -99,7 +99,7 @@ export default async function CustomersPage({
 
     // Get order counts and total spent for each customer
     const customersWithStats = await Promise.all(
-      customersData.map(async (customer) => {
+      customersData.map(async (customer: typeof customersData[0]) => {
         const [orderCount, paidOrders] = await Promise.all([
           prisma.orders.count({
             where: {

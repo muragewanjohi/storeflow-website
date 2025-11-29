@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch variant prices for items with variants
     const variantIds = cartItems
-      .filter(item => item.variant_id)
-      .map(item => item.variant_id) as string[];
+      .filter((item: typeof cartItems[0]) => item.variant_id)
+      .map((item: typeof cartItems[0]) => item.variant_id) as string[];
 
     const variants = variantIds.length > 0
       ? await prisma.product_variants.findMany({

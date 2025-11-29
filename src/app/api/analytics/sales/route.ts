@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch categories for products
-    const categoryIds = [...new Set(orderProducts.map(op => op.products?.category_id).filter(Boolean))] as string[];
+    const categoryIds = [...new Set(orderProducts.map((op: typeof orderProducts[0]) => op.products?.category_id).filter(Boolean))] as string[];
     const categories = categoryIds.length > 0
       ? await prisma.categories.findMany({
           where: {
