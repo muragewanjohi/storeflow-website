@@ -8,6 +8,7 @@
 'use client';
 
 import { memo, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, Laptop, Smartphone, Headphones, MousePointer2 } from 'lucide-react';
@@ -207,9 +208,9 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
                 </Button>
               ) : (
                 <Button variant="outline" size="lg" asChild>
-                  <a href="/products">
+                  <Link href="/products">
                     View All Products <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
+                  </Link>
                 </Button>
               )}
             </div>

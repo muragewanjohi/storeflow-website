@@ -6,6 +6,7 @@
 
 'use client';
 
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Star, Shield, Truck } from 'lucide-react';
 import { usePreview } from '@/lib/themes/preview-context';
@@ -84,13 +85,13 @@ export default function DefaultHero({
               ) : (
                 <>
                   <Button asChild size="lg" className="group text-lg px-8 py-6">
-                    <a href={ctaLink}>
+                    <Link href={ctaLink}>
                       {ctaText}
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </a>
+                    </Link>
                   </Button>
                   <Button asChild variant="outline" size="lg" className="text-lg px-8 py-6">
-                    <a href="/products">Browse All Products</a>
+                    <Link href="/products">Browse All Products</Link>
                   </Button>
                 </>
               )}

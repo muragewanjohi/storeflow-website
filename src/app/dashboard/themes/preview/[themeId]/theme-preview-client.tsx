@@ -633,7 +633,7 @@ export default function ThemePreviewClient({
                         Sign In
                       </Button>
                       <div className="text-center text-sm text-muted-foreground">
-                        Don't have an account?{' '}
+                        Don&apos;t have an account?{' '}
                         <button className="text-primary hover:underline" disabled>
                           Sign up
                         </button>
