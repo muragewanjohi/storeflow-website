@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prebuild": "npm run type-check",
+    "prebuild": "prisma generate && npm run type-check",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "db:studio": "prisma studio",
