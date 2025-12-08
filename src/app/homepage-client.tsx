@@ -42,20 +42,32 @@ export default function HomepageClient({
       {/* Hero Section */}
       <section className="relative py-16 md:py-24 bg-gradient-to-b from-primary/10 to-background">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Welcome to {tenantName}
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8">
-              Discover amazing products at great prices
-            </p>
-            <div className="flex gap-4 justify-center">
-              <Button asChild size="lg">
-                <Link href="/products">Shop Now</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/products">Browse Products</Link>
-              </Button>
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="text-center md:text-left">
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                Welcome to {tenantName}
+              </h1>
+              <p className="text-xl text-muted-foreground mb-8">
+                Discover amazing products at great prices. Shop the latest trends and find everything you need.
+              </p>
+              <div className="flex gap-4 justify-center md:justify-start">
+                <Button asChild size="lg">
+                  <Link href="/products">Shop Now</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/products">Browse Products</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="relative h-[300px] md:h-[400px] rounded-2xl overflow-hidden shadow-xl">
+              <Image
+                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80"
+                alt="Shopping experience"
+                fill
+                className="object-cover"
+                priority
+                unoptimized
+              />
             </div>
           </div>
         </div>

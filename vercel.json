@@ -3,6 +3,18 @@
     {
       "path": "/api/admin/subscriptions/expiry-checker",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/admin/subscriptions/payment-reminders",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/admin/analytics/aggregate",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/admin/cleanup",
+      "schedule": "0 2 * * 0"
     }
   ]
 }

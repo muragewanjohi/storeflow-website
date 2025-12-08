@@ -17,9 +17,10 @@ import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
-import MarketingLandingPage from '@/components/marketing/landing-page';
 import { headers } from 'next/headers';
 import type { Metadata } from 'next';
+// Lazy load marketing landing page (large component) - using client wrapper
+import MarketingLandingPageWrapper from '@/components/marketing/landing-page-wrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +72,7 @@ export default async function HomePage() {
     
     // If it's a marketing site, show marketing landing page
     if (isMarketingSite) {
-      return <MarketingLandingPage />;
+      return <MarketingLandingPageWrapper />;
     }
     
     // If not marketing site and no tenant, show not found

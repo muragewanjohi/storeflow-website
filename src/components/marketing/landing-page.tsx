@@ -32,6 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import Image from 'next/image';
 
 export default function MarketingLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -331,25 +332,37 @@ export default function MarketingLandingPage() {
       {/* Hero Section */}
       <section id="home" className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-primary/5 via-background to-background">
         <div className="container mx-auto max-w-6xl">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-              Instant Build your
-              <br />
-              <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                eCommerce Platform
-              </span>
-            </h1>
-            
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-              Appropriately foster efficient ideas after go forward alignments. Monotonectally.
-            </p>
-            
-            <Button asChild size="lg" className="text-lg px-8 py-6 group">
-              <Link href="/pricing">
-                Get 14 Days Trial
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </Button>
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="text-center md:text-left">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+                Instant Build your
+                <br />
+                <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  eCommerce Platform
+                </span>
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl">
+                Start selling online in minutes. Create your store, add products, and accept payments - all in one powerful platform.
+              </p>
+              
+              <Button asChild size="lg" className="text-lg px-8 py-6 group">
+                <Link href="/pricing">
+                  Get 14 Days Trial
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            </div>
+            <div className="relative h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl">
+              <Image
+                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80"
+                alt="Ecommerce platform dashboard"
+                fill
+                className="object-cover"
+                priority
+                unoptimized
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -391,23 +404,39 @@ export default function MarketingLandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">Amazing Themes</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+              Choose from beautiful, professionally designed themes for every industry
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {themes.map((theme, index) => (
-              <div
-                key={index}
-                className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300 text-center"
-              >
-                <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 mx-auto mb-4 flex items-center justify-center">
-                  <Palette className="h-10 w-10 text-primary" />
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {themes.map((theme, index) => {
+              const themeImages = [
+                'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80', // Default
+                'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=600&q=80', // Modern
+                'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=80', // HexFashion
+                'https://images.unsplash.com/photo-1556740758-90de374c12ad?w=600&q=80', // Minimal
+              ];
+              return (
+                <div
+                  key={index}
+                  className="p-0 rounded-lg bg-background border hover:shadow-lg transition-all duration-300 text-center overflow-hidden"
+                >
+                  <div className="relative h-48 w-full">
+                    <Image
+                      src={themeImages[index]}
+                      alt={theme.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-semibold mb-2">{theme.name}</h3>
+                    <p className="text-sm text-muted-foreground">{theme.description}</p>
+                  </div>
                 </div>
-                <h3 className="font-semibold mb-2">{theme.name}</h3>
-                <p className="text-sm text-muted-foreground">{theme.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -418,20 +447,36 @@ export default function MarketingLandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">How it Works?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+              Get your online store up and running in just three simple steps
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {howItWorks.map((step, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-2xl font-bold mx-auto mb-6">
-                  {step.step}
+            {howItWorks.map((step, index) => {
+              const images = [
+                'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80', // Register/Setup
+                'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=800&q=80', // Upload Products
+                'https://images.unsplash.com/photo-1556740758-90de374c12ad?w=800&q=80', // Get Sales
+              ];
+              return (
+                <div key={index} className="text-center">
+                  <div className="relative h-48 rounded-lg overflow-hidden mb-6 shadow-lg">
+                    <Image
+                      src={images[index]}
+                      alt={step.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                    <div className="absolute top-4 left-4 w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold shadow-lg">
+                      {step.step}
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-semibold mb-4">{step.title}</h3>
+                  <p className="text-muted-foreground">{step.description}</p>
                 </div>
-                <h3 className="text-2xl font-semibold mb-4">{step.title}</h3>
-                <p className="text-muted-foreground">{step.description}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -456,17 +501,33 @@ export default function MarketingLandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">Why Choose us?</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+              Everything you need to succeed in ecommerce, all in one place
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {whyChooseUs.map((item, index) => (
-              <div key={index} className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300">
-                <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
-              </div>
-            ))}
+            {whyChooseUs.map((item, index) => {
+              const images = [
+                'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80', // Start Online Business
+                'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80', // Move Business Online
+                'https://images.unsplash.com/photo-1551434678-e076c223a692?w=800&q=80', // Switch Platform
+              ];
+              return (
+                <div key={index} className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300 overflow-hidden">
+                  <div className="relative h-48 rounded-lg overflow-hidden mb-4 -mx-2 -mt-2">
+                    <Image
+                      src={images[index]}
+                      alt={item.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
+                  <p className="text-muted-foreground">{item.description}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -557,18 +618,36 @@ export default function MarketingLandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300"
-              >
-                <p className="text-muted-foreground mb-6 italic">&quot;{testimonial.content}&quot;</p>
-                <div>
-                  <div className="font-semibold">{testimonial.name}</div>
-                  <div className="text-sm text-muted-foreground">{testimonial.company}</div>
+            {testimonials.map((testimonial, index) => {
+              const avatars = [
+                'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
+                'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
+                'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
+              ];
+              return (
+                <div
+                  key={index}
+                  className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300"
+                >
+                  <p className="text-muted-foreground mb-6 italic">&quot;{testimonial.content}&quot;</p>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+                      <Image
+                        src={avatars[index]}
+                        alt={testimonial.name}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                    <div>
+                      <div className="font-semibold">{testimonial.name}</div>
+                      <div className="text-sm text-muted-foreground">{testimonial.company}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -584,20 +663,39 @@ export default function MarketingLandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {blogPosts.map((post, index) => (
-              <div
-                key={index}
-                className="p-6 rounded-lg bg-background border hover:shadow-lg transition-all duration-300"
-              >
-                <h3 className="font-semibold mb-3 line-clamp-2">{post.title}</h3>
-                <div className="flex items-center justify-between">
-                  <Link href="#blog" className="text-sm text-primary hover:underline">
-                    Keep Reading
-                  </Link>
-                  <span className="text-sm text-muted-foreground">{post.date}</span>
+            {blogPosts.map((post, index) => {
+              const blogImages = [
+                'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80',
+                'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=600&q=80',
+                'https://images.unsplash.com/photo-1556740758-90de374c12ad?w=600&q=80',
+                'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80',
+              ];
+              return (
+                <div
+                  key={index}
+                  className="p-0 rounded-lg bg-background border hover:shadow-lg transition-all duration-300 overflow-hidden"
+                >
+                  <div className="relative h-48 w-full">
+                    <Image
+                      src={blogImages[index]}
+                      alt={post.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-semibold mb-3 line-clamp-2">{post.title}</h3>
+                    <div className="flex items-center justify-between">
+                      <Link href="#blog" className="text-sm text-primary hover:underline">
+                        Keep Reading
+                      </Link>
+                      <span className="text-sm text-muted-foreground">{post.date}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

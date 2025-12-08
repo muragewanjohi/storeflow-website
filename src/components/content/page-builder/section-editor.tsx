@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import RichTextEditor from '@/components/content/rich-text-editor';
+// Lazy load rich text editor for better performance
+import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
 
 interface SectionEditorProps {

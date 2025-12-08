@@ -20,7 +20,22 @@ import {
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+// Lazy load charts for better performance
+import { 
+  LineChart, 
+  Line, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell 
+} from '@/components/analytics/lazy-charts';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/lib/currency/currency-context';
@@ -339,7 +354,7 @@ export default function AnalyticsDashboardClient() {
                       />
                       <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip 
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value: any) => formatCurrency(Number(value))}
                         labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
                       />
                       <Legend />
@@ -379,7 +394,7 @@ export default function AnalyticsDashboardClient() {
                         tick={{ fontSize: 12 }}
                       />
                       <YAxis tickFormatter={formatAxisCurrency} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
                       <Legend />
                       <Bar dataKey="revenue" fill="#0088FE" name="Revenue" />
                     </BarChart>
@@ -434,7 +449,7 @@ export default function AnalyticsDashboardClient() {
                       />
                       <YAxis tickFormatter={formatAxisCurrency} />
                       <Tooltip 
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value: any) => formatCurrency(Number(value))}
                         labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
                       />
                       <Legend />
@@ -482,7 +497,7 @@ export default function AnalyticsDashboardClient() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -604,7 +619,7 @@ export default function AnalyticsDashboardClient() {
                       />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value: number) => `${value} customers`}
+                        formatter={(value: any) => `${Number(value)} customers`}
                         labelFormatter={(value) => format(new Date(value), 'MMM dd, yyyy')}
                       />
                       <Legend />
@@ -789,7 +804,7 @@ export default function AnalyticsDashboardClient() {
                         tick={{ fontSize: 12 }}
                       />
                       <YAxis tickFormatter={formatAxisCurrency} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
                       <Legend />
                       <Bar dataKey="value" fill="#FF8042" name="Inventory Value" />
                     </BarChart>
