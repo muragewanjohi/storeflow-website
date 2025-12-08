@@ -38,16 +38,25 @@ export async function middleware(request: NextRequest) {
   const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
                            process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
   
+  // Marketing site hostnames
   const isMarketingSite = 
     hostnameWithoutPort === 'www' ||
     hostnameWithoutPort === 'marketing' ||
+    hostnameWithoutPort === 'www.dukanest.com' ||
+    hostnameWithoutPort === 'dukanest.com' ||
     (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
     hostnameWithoutPort === '127.0.0.1' ||
     hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
 
   // Allow marketing site to proceed without tenant
   if (isMarketingSite) {
+    return NextResponse.next();
+  }
+
+  // Prevent redirect loops - if we're already on a 404 or error page, don't redirect again
+  if (pathname === '/404' || pathname === '/tenant-suspended' || pathname === '/tenant-expired') {
     return NextResponse.next();
   }
 

@@ -65,9 +65,12 @@ export default async function HomePage() {
     const isMarketingSite = 
       hostnameWithoutPort === 'www' ||
       hostnameWithoutPort === 'marketing' ||
+      hostnameWithoutPort === 'www.dukanest.com' ||
+      hostnameWithoutPort === 'dukanest.com' ||
       (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
       hostnameWithoutPort === '127.0.0.1' ||
       hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort.includes('vercel.app') ||
       hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
     
     // If it's a marketing site, show marketing landing page
