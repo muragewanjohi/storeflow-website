@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { CurrencyProvider } from "@/lib/currency/currency-context";
 import { Toaster } from "@/components/ui/sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "StoreFlow - Multi-Tenant Ecommerce Platform",
@@ -29,6 +30,7 @@ export default function RootLayout({
               {children}
             </CurrencyProvider>
             <Toaster />
+            <SpeedInsights />
           </ThemeProvider>
         </QueryProvider>
       </body>
