@@ -12,7 +12,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
 interface PricingPlan {
   id: string;
@@ -20,15 +22,29 @@ interface PricingPlan {
   price: number;
   duration_months: number;
   trial_days: number | null;
+  currency?: 'KES' | 'USD';
+  currencySymbol?: 'Ksh' | '$';
+}
+
+interface PricingResponse {
+  plans: PricingPlan[];
+  location?: {
+    country: string;
+    currency: 'KES' | 'USD';
+    currencySymbol: 'Ksh' | '$';
+  };
 }
 
 function TenantRegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const planId = searchParams.get('plan');
+  const planIdFromUrl = searchParams.get('plan');
 
+  const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(planIdFromUrl);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
-  const [isLoadingPlan, setIsLoadingPlan] = useState(!!planId);
+  const [isLoadingPlans, setIsLoadingPlans] = useState(true);
+  const [currencySymbol, setCurrencySymbol] = useState<'Ksh' | '$'>('$');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -43,27 +59,70 @@ function TenantRegisterForm() {
     contactEmail: '',
   });
 
-  // Fetch plan details if planId is provided
+  // Fetch all plans on component mount
   useEffect(() => {
-    if (planId) {
-      async function fetchPlan() {
-        try {
-          const response = await fetch('/api/pricing');
-          if (!response.ok) throw new Error('Failed to fetch plans');
-          const data = await response.json();
-          const plan = data.plans.find((p: PricingPlan) => p.id === planId);
+    async function fetchPlans() {
+      try {
+        // First, detect location on client side
+        let locationInfo = detectUserLocationClient();
+        
+        // Try IP-based detection as fallback (only if browser detection didn't find Kenya)
+        if (!locationInfo.isKenya) {
+          try {
+            locationInfo = await detectLocationByIP();
+          } catch (ipError) {
+            // If IP detection fails, use browser detection result
+            console.log('IP detection failed, using browser detection');
+          }
+        }
+
+        // Fetch plans with location header
+        const response = await fetch('/api/pricing', {
+          headers: {
+            'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
+            'X-User-Currency': locationInfo.currency,
+          },
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch plans');
+        const data: PricingResponse = await response.json();
+        setAllPlans(data.plans || []);
+        
+        // Use client-detected currency if API didn't provide it
+        if (data.location?.currencySymbol) {
+          setCurrencySymbol(data.location.currencySymbol);
+        } else {
+          setCurrencySymbol(locationInfo.currencySymbol);
+        }
+        
+        // If planId from URL exists, set it as selected
+        if (planIdFromUrl) {
+          const plan = data.plans.find((p: PricingPlan) => p.id === planIdFromUrl);
           if (plan) {
             setSelectedPlan(plan);
+            setSelectedPlanId(planIdFromUrl);
           }
-        } catch (err) {
-          console.error('Error fetching plan:', err);
-        } finally {
-          setIsLoadingPlan(false);
         }
+      } catch (err) {
+        console.error('Error fetching plans:', err);
+      } finally {
+        setIsLoadingPlans(false);
       }
-      fetchPlan();
     }
-  }, [planId]);
+    fetchPlans();
+  }, [planIdFromUrl]);
+
+  // Update selected plan when selectedPlanId changes
+  useEffect(() => {
+    if (selectedPlanId && allPlans.length > 0) {
+      const plan = allPlans.find((p: PricingPlan) => p.id === selectedPlanId);
+      if (plan) {
+        setSelectedPlan(plan);
+      }
+    } else {
+      setSelectedPlan(null);
+    }
+  }, [selectedPlanId, allPlans]);
 
   const handleSubdomainChange = (value: string) => {
     // Convert to lowercase and remove invalid characters
@@ -84,14 +143,26 @@ function TenantRegisterForm() {
     }
 
     try {
+      // Detect location before submitting
+      let locationInfo = detectUserLocationClient();
+      if (!locationInfo.isKenya) {
+        try {
+          locationInfo = await detectLocationByIP();
+        } catch (ipError) {
+          // Use browser detection result
+        }
+      }
+
       const response = await fetch('/api/tenants/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
+          'X-User-Currency': locationInfo.currency,
         },
         body: JSON.stringify({
           ...formData,
-          planId: planId || undefined,
+          planId: selectedPlanId || undefined,
         }),
       });
 
@@ -170,23 +241,57 @@ function TenantRegisterForm() {
             <p className="text-muted-foreground">
               Get started with your eCommerce platform in minutes
             </p>
-            {selectedPlan && (
-              <div className="mt-4 p-4 bg-primary/10 rounded-lg inline-block">
-                <p className="text-sm font-medium">
-                  Selected Plan: <span className="text-primary">{selectedPlan.name}</span>
-                  {selectedPlan.trial_days && (
-                    <span className="text-muted-foreground ml-2">
-                      ({selectedPlan.trial_days}-day trial)
-                    </span>
-                  )}
-                </p>
-              </div>
-            )}
-            {!planId && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                No plan selected? <Link href="/pricing" className="text-primary hover:underline">Choose a plan</Link>
+            {/* Plan Selection */}
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="plan-select" className="text-sm font-medium">
+                Select Plan
+              </Label>
+              {isLoadingPlans ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading plans...
+                </div>
+              ) : (
+                <Select
+                  value={selectedPlanId || ''}
+                  onValueChange={(value) => {
+                    setSelectedPlanId(value || null);
+                  }}
+                >
+                  <SelectTrigger id="plan-select" className="w-full">
+                    <SelectValue placeholder="Select a plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allPlans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} - {plan.currencySymbol || currencySymbol}
+                        {plan.currencySymbol === 'Ksh' 
+                          ? plan.price.toLocaleString('en-KE')
+                          : plan.price.toFixed(2)
+                        }
+                        {plan.duration_months > 0 && `/${plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}`}
+                        {plan.trial_days && plan.trial_days > 0 && ` (${plan.trial_days}-day trial)`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedPlan && (
+                <div className="mt-2 p-3 bg-primary/10 rounded-lg">
+                  <p className="text-sm font-medium">
+                    Selected: <span className="text-primary">{selectedPlan.name}</span>
+                    {selectedPlan.trial_days && selectedPlan.trial_days > 0 && (
+                      <span className="text-muted-foreground ml-2">
+                        ({selectedPlan.trial_days}-day trial)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                You can change your plan later in your dashboard
               </p>
-            )}
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6 bg-background border rounded-lg p-8">
@@ -292,7 +397,7 @@ function TenantRegisterForm() {
 
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingPlan}
+              disabled={isSubmitting || isLoadingPlans}
               className="w-full"
             >
               {isSubmitting ? (

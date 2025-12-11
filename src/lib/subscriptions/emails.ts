@@ -19,7 +19,13 @@ export async function sendSubscriptionRenewalReminderEmail({
 }: {
   tenant: Tenant;
   expireDate: Date;
-  plan: { name: string; price: number; duration_months: number } | null;
+  plan: { 
+    name: string; 
+    price: number; 
+    duration_months: number;
+    currency?: 'KES' | 'USD';
+    currencySymbol?: 'Ksh' | '$';
+  } | null;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
@@ -50,7 +56,11 @@ export async function sendSubscriptionRenewalReminderEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">$${plan?.price ? Number(plan.price).toFixed(2) : '0.00'}</td>
+                <td style="padding: 8px 0;">${plan?.price 
+                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
+                      ? Number(plan.price).toLocaleString('en-KE')
+                      : Number(plan.price).toFixed(2))
+                  : '$0.00'}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Expires:</td>
@@ -93,7 +103,13 @@ export async function sendSubscriptionExpiredEmail({
   plan,
 }: {
   tenant: Tenant;
-  plan: { name: string; price: number; duration_months: number } | null;
+  plan: { 
+    name: string; 
+    price: number; 
+    duration_months: number;
+    currency?: 'KES' | 'USD';
+    currencySymbol?: 'Ksh' | '$';
+  } | null;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
@@ -121,7 +137,11 @@ export async function sendSubscriptionExpiredEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">$${plan?.price ? Number(plan.price).toFixed(2) : '0.00'}</td>
+                <td style="padding: 8px 0;">${plan?.price 
+                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
+                      ? Number(plan.price).toLocaleString('en-KE')
+                      : Number(plan.price).toFixed(2))
+                  : '$0.00'}</td>
               </tr>
             </table>
           </div>
@@ -166,7 +186,13 @@ export async function sendSubscriptionActivatedEmail({
   expireDate,
 }: {
   tenant: Tenant;
-  plan: { name: string; price: number; duration_months: number } | null;
+  plan: { 
+    name: string; 
+    price: number; 
+    duration_months: number;
+    currency?: 'KES' | 'USD';
+    currencySymbol?: 'Ksh' | '$';
+  } | null;
   expireDate: Date;
 }) {
   try {
@@ -195,7 +221,11 @@ export async function sendSubscriptionActivatedEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">$${plan?.price ? Number(plan.price).toFixed(2) : '0.00'}</td>
+                <td style="padding: 8px 0;">${plan?.price 
+                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
+                      ? Number(plan.price).toLocaleString('en-KE')
+                      : Number(plan.price).toFixed(2))
+                  : '$0.00'}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Duration:</td>

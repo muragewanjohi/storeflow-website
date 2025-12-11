@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
+import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
 interface PricingPlan {
   id: string;
@@ -20,6 +21,17 @@ interface PricingPlan {
   trial_days: number | null;
   features: any;
   status: string | null;
+  currency?: 'KES' | 'USD';
+  currencySymbol?: 'Ksh' | '$';
+}
+
+interface PricingResponse {
+  plans: PricingPlan[];
+  location?: {
+    country: string;
+    currency: 'KES' | 'USD';
+    currencySymbol: 'Ksh' | '$';
+  };
 }
 
 export default function PricingPage() {
@@ -27,16 +39,44 @@ export default function PricingPage() {
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currencySymbol, setCurrencySymbol] = useState<'Ksh' | '$'>('$');
 
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const response = await fetch('/api/pricing');
+        // First, detect location on client side
+        let locationInfo = detectUserLocationClient();
+        
+        // Try IP-based detection as fallback (only if browser detection didn't find Kenya)
+        if (!locationInfo.isKenya) {
+          try {
+            locationInfo = await detectLocationByIP();
+          } catch (ipError) {
+            // If IP detection fails, use browser detection result
+            console.log('IP detection failed, using browser detection');
+          }
+        }
+
+        // Fetch plans with location header
+        const response = await fetch('/api/pricing', {
+          headers: {
+            'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
+            'X-User-Currency': locationInfo.currency,
+          },
+        });
+        
         if (!response.ok) {
           throw new Error('Failed to fetch pricing plans');
         }
-        const data = await response.json();
+        const data: PricingResponse = await response.json();
         setPlans(data.plans || []);
+        
+        // Use client-detected currency if API didn't provide it
+        if (data.location?.currencySymbol) {
+          setCurrencySymbol(data.location.currencySymbol);
+        } else {
+          setCurrencySymbol(locationInfo.currencySymbol);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load pricing plans');
       } finally {
@@ -186,7 +226,13 @@ export default function PricingPage() {
                     </div>
                     <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
                     <div className="mb-6">
-                      <span className="text-4xl font-bold">${plan.price.toFixed(2)}</span>
+                      <span className="text-4xl font-bold">
+                        {plan.currencySymbol || currencySymbol}
+                        {plan.currencySymbol === 'Ksh' 
+                          ? plan.price.toLocaleString('en-KE')
+                          : plan.price.toFixed(2)
+                        }
+                      </span>
                       <span className="text-muted-foreground">/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}</span>
                     </div>
                     <ul className="space-y-3 mb-8">

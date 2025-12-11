@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
+import { getTenantSubscriptionPricing } from '@/lib/subscriptions/pricing';
 
 // Grace period in days (default: 7 days)
 const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '7');
@@ -84,10 +85,30 @@ export async function GET(request: NextRequest) {
             results.expired++;
             results.gracePeriod++;
             
+            // Get subscription pricing (with currency) for email
+            const subscriptionPricing = tenant.price_plans
+              ? getTenantSubscriptionPricing(
+                  tenant as any,
+                  {
+                    name: tenant.price_plans.name,
+                    price: tenant.price_plans.price,
+                  },
+                  (tenant.data as any)?.subscription?.currency === 'KES'
+                )
+              : null;
+
             // Send expired email notification (only once when status changes)
             sendSubscriptionExpiredEmail({
               tenant: tenant as any,
-              plan: tenant.price_plans
+              plan: subscriptionPricing
+                ? {
+                    name: subscriptionPricing.planName,
+                    price: subscriptionPricing.price,
+                    currency: subscriptionPricing.currency,
+                    currencySymbol: subscriptionPricing.currencySymbol,
+                    duration_months: tenant.price_plans?.duration_months || 0,
+                  }
+                : tenant.price_plans
                 ? {
                     name: tenant.price_plans.name,
                     price: Number(tenant.price_plans.price),

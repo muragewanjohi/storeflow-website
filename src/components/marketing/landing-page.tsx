@@ -1,7 +1,7 @@
 /**
  * Marketing Landing Page
  * 
- * Modern landing page for StoreFlow platform
+ * Modern landing page for DukaNest platform
  * Inspired by Nazmart.net layout and design
  */
 
@@ -158,11 +158,11 @@ export default function MarketingLandingPage() {
   const faqs = [
     {
       question: 'What is the membership fee for joining?',
-      answer: 'StoreFlow offers flexible pricing plans to suit businesses of all sizes. We have free plans for getting started, and paid plans starting from $29/month. All plans include a 14-day free trial so you can try before you commit.',
+      answer: 'DukaNest offers flexible pricing plans to suit businesses of all sizes. We have free plans for getting started, and paid plans starting from $29/month. All plans include a 14-day free trial so you can try before you commit.',
     },
     {
       question: 'Can I use my own domain name?',
-      answer: 'Yes! StoreFlow supports custom domains for all plans. You can connect your existing domain or purchase a new one through our platform. Custom domain setup is included in Professional and Enterprise plans.',
+      answer: 'Yes! DukaNest supports custom domains for all plans. You can connect your existing domain or purchase a new one through our platform. Custom domain setup is included in Professional and Enterprise plans.',
     },
     {
       question: 'How many products can I add?',
@@ -170,7 +170,7 @@ export default function MarketingLandingPage() {
     },
     {
       question: 'Do you offer payment gateway integrations?',
-      answer: 'Yes! StoreFlow supports 18+ payment gateways including M-Pesa, PayPal, Stripe, Pesapal, and many more. You can accept payments from customers worldwide.',
+      answer: 'Yes! DukaNest supports 18+ payment gateways including M-Pesa, PayPal, Stripe, Pesapal, and many more. You can accept payments from customers worldwide.',
     },
   ];
 
@@ -263,7 +263,7 @@ export default function MarketingLandingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-2">
               <ShoppingCart className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">StoreFlow</span>
+              <span className="text-2xl font-bold">DukaNest</span>
             </div>
             
             {/* Desktop Navigation */}
@@ -743,7 +743,7 @@ export default function MarketingLandingPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
-              <span>example@storeflow.com</span>
+              <span>example@dukanest.com</span>
             </div>
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4" />
@@ -784,7 +784,7 @@ export default function MarketingLandingPage() {
             </div>
           </div>
           <div className="pt-8 border-t text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} All right reserved By StoreFlow</p>
+            <p>&copy; {new Date().getFullYear()} All right reserved By DukaNest</p>
           </div>
         </div>
       </footer>

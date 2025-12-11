@@ -14,6 +14,7 @@ import {
   sendSubscriptionActivatedEmail,
   sendPlanUpgradeConfirmationEmail,
 } from '@/lib/subscriptions/emails';
+import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
 
 const activatePlanSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
@@ -89,6 +90,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Detect user location for pricing
+    const locationInfo = detectUserLocation(request.headers);
+    const subscriptionPrice = getLocalizedPrice(newPlan.name, locationInfo.isKenya);
+
+    // Get current tenant data to preserve existing settings
+    const tenantWithData = await prisma.tenants.findUnique({
+      where: { id: tenant.id },
+      select: { data: true },
+    });
+    const currentData = (tenantWithData?.data as any) || {};
+    
     // Update tenant subscription
     const updatedTenant = await prisma.tenants.update({
       where: { id: tenant.id },
@@ -96,6 +108,16 @@ export async function POST(request: NextRequest) {
         plan_id: plan_id,
         expire_date: newExpireDate,
         status: 'active', // Ensure tenant is active when subscription is activated
+        data: {
+          ...currentData,
+          // Store subscription pricing info for future payments
+          subscription: {
+            currency: locationInfo.currency,
+            currencySymbol: locationInfo.currencySymbol,
+            price: subscriptionPrice,
+            planName: newPlan.name,
+          },
+        },
       },
       include: {
         price_plans: {
