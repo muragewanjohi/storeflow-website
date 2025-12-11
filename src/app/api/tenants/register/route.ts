@@ -12,6 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendEmail } from '@/lib/email/sendgrid';
 import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
+import { addTenantDomain } from '@/lib/vercel-domains';
 import { z } from 'zod';
 
 const registerTenantSchema = z.object({
@@ -240,6 +241,20 @@ export async function POST(request: NextRequest) {
       loginUrl = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard/login`;
     } else {
       loginUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/login`;
+    }
+
+    // Automatically add subdomain to Vercel (non-blocking)
+    // This ensures the subdomain is available immediately after registration
+    const projectId = process.env.VERCEL_PROJECT_ID;
+    if (projectId && !isLocalhost) {
+      const subdomainUrl = `${tenant.subdomain}.dukanest.com`;
+      addTenantDomain(subdomainUrl, projectId).catch((error) => {
+        // Log error but don't fail tenant creation
+        // Subdomain can be added manually later if needed
+        console.error(`Failed to add subdomain ${subdomainUrl} to Vercel:`, error);
+      });
+    } else if (!projectId && !isLocalhost) {
+      console.warn('VERCEL_PROJECT_ID not set. Subdomain will not be added to Vercel automatically.');
     }
 
     // Send welcome email
