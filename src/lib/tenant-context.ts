@@ -85,7 +85,8 @@ export async function getTenantFromRequest(
       subdomain = process.env.DEFAULT_TENANT_SUBDOMAIN || 'www';
     } else {
       // Extract subdomain from hostname (e.g., "teststore.dukanest.com" -> "teststore")
-      subdomain = parts.length > 1 ? parts[0] : 'www';
+      // Ensure lowercase for consistency (subdomains are stored in lowercase)
+      subdomain = parts.length > 1 ? parts[0].toLowerCase() : 'www';
     }
 
     // Query tenant by subdomain or custom domain
@@ -103,15 +104,39 @@ export async function getTenantFromRequest(
       return null;
     }
 
-    const { data: tenant, error } = await supabase
+    // Try to find tenant by subdomain first
+    let { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')
-      .or(`subdomain.eq.${subdomain},custom_domain.eq.${hostnameWithoutPort}`)
+      .eq('subdomain', subdomain)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
+
+    // If not found by subdomain, try custom domain
+    if (!tenant && !error) {
+      const { data: customDomainTenant, error: customError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('custom_domain', hostnameWithoutPort)
+        .eq('status', 'active')
+        .maybeSingle();
+      
+      if (customDomainTenant) {
+        tenant = customDomainTenant;
+      } else if (customError) {
+        error = customError;
+      }
+    }
 
     if (error || !tenant) {
-      console.error('Tenant not found:', hostname, error);
+      console.error('Tenant not found:', {
+        hostname,
+        hostnameWithoutPort,
+        subdomain,
+        error: error?.message || 'No tenant found',
+        errorCode: error?.code,
+        errorDetails: error,
+      });
       return null;
     }
 
