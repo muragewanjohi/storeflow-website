@@ -1,0 +1,32 @@
+# Vercel Ignore File
+# Files and directories to exclude from Vercel deployments
+
+# Test files
+tests/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+**/__mocks__/
+
+# Test results and coverage
+test-results/
+coverage/
+.nyc_output/
+
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Documentation (optional - can be included if needed)
+# docs/
+
+# Scripts (already excluded from tsconfig)
+scripts/
+
+# Playwright
+playwright-report/
+playwright/.cache/
+

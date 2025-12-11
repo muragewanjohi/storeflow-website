@@ -36,6 +36,13 @@
   ],
   "exclude": [
     "node_modules",
-    "scripts"
+    "scripts",
+    "tests",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/__tests__/**",
+    "**/__mocks__/**"
   ]
 }
