@@ -37,7 +37,7 @@ export default function StorefrontFooter() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div>
-            <h3 className="text-lg font-bold mb-4">StoreFlow</h3>
+            <h3 className="text-lg font-bold mb-4">DukaNest</h3>
             <p className="text-sm text-muted-foreground">
               Your trusted online store for quality products.
             </p>
@@ -98,7 +98,7 @@ export default function StorefrontFooter() {
         {/* Copyright */}
         <div className="mt-8 border-t pt-8">
           <p className="text-center text-sm text-muted-foreground">
-            © {currentYear} StoreFlow. All rights reserved.
+            © {currentYear} DukaNest. All rights reserved.
           </p>
         </div>
       </div>

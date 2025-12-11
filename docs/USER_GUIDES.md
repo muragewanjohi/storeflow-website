@@ -2,6 +2,8 @@
 
 **Complete user documentation for Dukanest multi-tenant e-commerce platform**
 
+> **📖 View the interactive user guide:** Visit `/help` on any tenant storefront for a visual guide with screenshots and interactive sections.
+
 ---
 
 ## Table of Contents

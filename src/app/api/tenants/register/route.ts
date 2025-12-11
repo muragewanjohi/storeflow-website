@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
           const storeListHtml = userTenants.map(tenant => 
             `<li style="margin: 10px 0;">
               <strong>${tenant.name}</strong><br>
-              <a href="https://${tenant.subdomain}.dukanest.com/login" style="color: #667eea; text-decoration: none;">
-                https://${tenant.subdomain}.dukanest.com/login
+              <a href="https://${tenant.subdomain}.dukanest.com/dashboard/login" style="color: #667eea; text-decoration: none;">
+                https://${tenant.subdomain}.dukanest.com/dashboard/login
               </a>
             </li>`
           ).join('');
@@ -226,14 +226,14 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
         
-        if (isLocalhost) {
-          // For local development, use subdomain format: http://subdomain.localhost:3000/login
-          const url = new URL(baseUrl);
-          loginUrl = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/login`;
-        } else {
-          // For production, use dukanest.com domain: https://subdomain.dukanest.com/login
-          loginUrl = `https://${tenant.subdomain}.dukanest.com/login`;
-        }
+    if (isLocalhost) {
+      // For local development, use subdomain format: http://subdomain.localhost:3000/dashboard/login
+      const url = new URL(baseUrl);
+      loginUrl = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard/login`;
+    } else {
+      // For production, use dukanest.com domain: https://subdomain.dukanest.com/dashboard/login
+      loginUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/login`;
+    }
 
         // Send welcome email
         const { sendWelcomeEmail } = await import('@/lib/email/sendgrid');
@@ -319,12 +319,12 @@ export async function POST(request: NextRequest) {
     const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
     
     if (isLocalhost) {
-      // For local development, use subdomain format: http://subdomain.localhost:3000/login
+      // For local development, use subdomain format: http://subdomain.localhost:3000/dashboard/login
       const url = new URL(baseUrl);
-      loginUrl = `${url.protocol}//${updatedTenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/login`;
+      loginUrl = `${url.protocol}//${updatedTenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard/login`;
     } else {
-      // For production, use dukanest.com domain: https://subdomain.dukanest.com/login
-      loginUrl = `https://${updatedTenant.subdomain}.dukanest.com/login`;
+      // For production, use dukanest.com domain: https://subdomain.dukanest.com/dashboard/login
+      loginUrl = `https://${updatedTenant.subdomain}.dukanest.com/dashboard/login`;
     }
 
     // Return success response

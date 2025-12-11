@@ -22,6 +22,8 @@ function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [isTokenExpired, setIsTokenExpired] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [hasValidToken, setHasValidToken] = useState<boolean | null>(null); // null = checking, true/false = result
+  const [isEstablishingSession, setIsEstablishingSession] = useState(true);
 
   // Only fetch tenant name after component mounts to prevent hydration issues
   useEffect(() => {
@@ -40,43 +42,90 @@ function ResetPasswordForm() {
     fetchTenantName();
   }, []);
 
-  // Check if Supabase tokens are present and establish session
+  // Check if Supabase tokens are present and establish session immediately
   // Supabase redirects with tokens in the hash fragment: #access_token=...&type=recovery
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const type = hashParams.get('type');
-      
-      // Supabase password reset includes access_token and type=recovery in hash
-      if (accessToken && type === 'recovery') {
-        // Establish Supabase session from the token
-        // This is handled automatically by Supabase client when we call updateUser
-        // But we can verify the session is established
-        (async () => {
-          try {
-            const { createClient } = await import('@/lib/supabase/client');
-            const supabase = createClient();
+    if (typeof window === 'undefined') return;
+
+    async function establishSession() {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+        
+        // Supabase password reset includes access_token and type=recovery in hash
+        if (accessToken && type === 'recovery') {
+          // Import and create Supabase client
+          // The createBrowserClient from @supabase/ssr should automatically handle hash tokens
+          // but we'll explicitly set the session to ensure it's established immediately
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          
+          // Explicitly set the session from the hash tokens to ensure it's established immediately
+          // This is critical - the session must be set immediately to prevent expiration
+          if (accessToken && refreshToken) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
             
-            // The session should be automatically established from the hash tokens
-            // Verify by checking if we have a session
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-              // Try to refresh the session from the hash
-              await supabase.auth.getUser();
+            if (sessionError || !sessionData.session) {
+              console.error('Failed to establish session:', sessionError);
+              setError('Invalid or expired reset token. Please request a new password reset link.');
+              setIsTokenExpired(true);
+              setHasValidToken(false);
+              setIsEstablishingSession(false);
+              return;
             }
-          } catch (err) {
-            console.error('Error establishing session:', err);
+            
+            // Verify the session is valid by getting the user
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
+              console.error('Failed to get user from session:', userError);
+              setError('Invalid or expired reset token. Please request a new password reset link.');
+              setIsTokenExpired(true);
+              setHasValidToken(false);
+              setIsEstablishingSession(false);
+              return;
+            }
+            
+            // Session established successfully - clear hash from URL for security
+            // Only clear after session is confirmed to be valid
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            setHasValidToken(true);
+          } else {
+            // Missing refresh token - try to get session anyway (might be in cookies)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              setHasValidToken(true);
+            } else {
+              setError('Invalid or expired reset token. Please request a new password reset link.');
+              setIsTokenExpired(true);
+              setHasValidToken(false);
+            }
           }
-        })();
-      } else {
-        // Check query params as fallback
-        const queryToken = searchParams.get('token') || searchParams.get('access_token');
-        if (!queryToken) {
-          setError('Invalid or missing reset token. Please request a new password reset.');
+        } else {
+          // Check query params as fallback
+          const queryToken = searchParams.get('token') || searchParams.get('access_token');
+          if (queryToken) {
+            setHasValidToken(true);
+          } else {
+            setError('Invalid or missing reset token. Please request a new password reset.');
+            setHasValidToken(false);
+          }
         }
+      } catch (err) {
+        console.error('Error establishing session:', err);
+        setError('An error occurred while validating the reset token. Please request a new password reset link.');
+        setIsTokenExpired(true);
+        setHasValidToken(false);
+      } finally {
+        setIsEstablishingSession(false);
       }
     }
+
+    establishSession();
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,17 +150,17 @@ function ResetPasswordForm() {
       return;
     }
 
+    // Verify session is still valid before submitting
     try {
-      // First, establish Supabase session from the reset token in URL hash
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
-
-      // Get session to ensure token is valid
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
         setError('Invalid or expired reset token. Please request a new password reset link.');
         setIsTokenExpired(true);
+        setHasValidToken(false);
+        setIsLoading(false);
         return;
       }
 
@@ -139,6 +188,7 @@ function ResetPasswordForm() {
         
         if (isExpiredError) {
           setIsTokenExpired(true);
+          setHasValidToken(false);
         }
         return;
       }
@@ -156,48 +206,9 @@ function ResetPasswordForm() {
     }
   };
 
-  // Check if we have valid Supabase tokens
-  const hasValidToken = typeof window !== 'undefined' && (() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
-    
-    // Supabase password reset includes access_token and type=recovery in hash
-    if (accessToken && type === 'recovery') {
-      return true;
-    }
-    
-    // Fallback: check query params
-    const queryToken = searchParams.get('token') || searchParams.get('access_token');
-    return !!queryToken;
-  })();
-
-  if (!hasValidToken) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4">
-        <div className="w-full max-w-md space-y-8">
-          <div className="mt-8 space-y-6 bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
-            <div className="rounded-md bg-red-50 border border-red-200 p-4">
-              <p className="text-sm font-medium text-red-800">
-                Invalid or missing reset token. Please request a new password reset.
-              </p>
-            </div>
-            <div className="text-center">
-              <Link
-                href="/forgot-password"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Request new reset link
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show consistent content on initial render to prevent hydration issues
-  if (!isMounted) {
+  // Show consistent loading state on initial render to prevent hydration issues
+  // This ensures server and client render the same initial HTML
+  if (!isMounted || isEstablishingSession || hasValidToken === null) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4">
         <div className="w-full max-w-md space-y-8">
@@ -213,8 +224,42 @@ function ResetPasswordForm() {
           <div className="mt-8 space-y-6 bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
             <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
               <p className="text-sm font-medium text-yellow-800">
-                Loading...
+                Validating reset token...
               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if token is invalid
+  if (hasValidToken === false) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4">
+        <div className="w-full max-w-md space-y-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+              Reset Password
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-700">
+              Enter your new password
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-6 bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+            <div className="rounded-md bg-red-50 border border-red-200 p-4">
+              <p className="text-sm font-medium text-red-800">
+                {error || 'Invalid or missing reset token. Please request a new password reset.'}
+              </p>
+            </div>
+            <div className="text-center">
+              <Link
+                href="/forgot-password"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Request new reset link
+              </Link>
             </div>
           </div>
         </div>
@@ -304,7 +349,7 @@ function ResetPasswordForm() {
             <div className="space-y-4">
               <button
                 type="submit"
-                disabled={isLoading || !hasValidToken}
+                disabled={isLoading || hasValidToken !== true}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? 'Resetting...' : 'Reset password'}
@@ -312,7 +357,7 @@ function ResetPasswordForm() {
 
               <div className="text-center">
                 <Link
-                  href="/login"
+                  href="/dashboard/login"
                   className="text-sm font-medium text-blue-600 hover:text-blue-500"
                 >
                   Back to login

@@ -7,7 +7,7 @@
 
 import { requireTenant } from '@/lib/tenant-context/server';
 import TrackOrderClient from './track-order-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 
 export const dynamic = 'force-dynamic';

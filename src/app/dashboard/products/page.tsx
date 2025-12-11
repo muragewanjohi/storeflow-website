@@ -27,7 +27,7 @@ export default async function ProductsPage({
 
   // Verify user belongs to tenant (unless landlord)
   if (user.role !== 'landlord' && user.tenant_id !== tenant.id) {
-    redirect('/login');
+    redirect('/dashboard/login');
   }
 
   // Parse search params

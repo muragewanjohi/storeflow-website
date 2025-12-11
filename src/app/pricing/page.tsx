@@ -135,7 +135,7 @@ export default function PricingPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold text-primary">
-              StoreFlow
+              DukaNest
             </Link>
             <Button asChild variant="outline">
               <Link href="/">Back to Home</Link>

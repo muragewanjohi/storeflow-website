@@ -11,7 +11,7 @@ import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
 import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { ErrorState } from '@/components/storefront/error-boundary';

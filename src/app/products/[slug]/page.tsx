@@ -10,7 +10,7 @@ import { notFound } from 'next/navigation';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import ProductDetailClient from './product-detail-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import { generateProductMetadata, generateProductStructuredData } from '@/lib/seo/storefront-metadata';
 import type { Metadata } from 'next';

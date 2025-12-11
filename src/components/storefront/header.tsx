@@ -14,13 +14,28 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { usePreview } from '@/lib/themes/preview-context';
 
-export default function StorefrontHeader() {
+interface StorefrontHeaderProps {
+  storeName?: string;
+  storeLogo?: string | null;
+}
+
+export default function StorefrontHeader({ 
+  storeName = 'DukaNest',
+  storeLogo = null 
+}: StorefrontHeaderProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const { isPreview, onNavigate } = usePreview();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Prevent hydration mismatch by only showing logo after mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Fetch cart item count using lightweight endpoint
   // Optimized: Only fetch when needed, use event-driven updates, reduce redundant calls
@@ -74,14 +89,21 @@ export default function StorefrontHeader() {
         const response = await fetch('/api/customers/profile', {
           cache: 'default',
           next: { revalidate: 60 }, // Cache for 60 seconds
+          // Suppress error logging for 401 (unauthorized) - this is expected for unauthenticated users
         });
         if (response.ok && isMounted) {
           setIsAuthenticated(true);
         } else {
-          setIsAuthenticated(false);
+          // 401 is expected for unauthenticated users - don't treat as error
+          // Only set to false if component is still mounted
+          if (isMounted) {
+            setIsAuthenticated(false);
+          }
         }
-      } catch {
-        if (isMounted) {
+      } catch (error: any) {
+        // Silently handle errors - user might not be authenticated
+        // Don't log 401 errors as they're expected for unauthenticated users
+        if (isMounted && error.name !== 'AbortError') {
           setIsAuthenticated(false);
         }
       }
@@ -136,20 +158,40 @@ export default function StorefrontHeader() {
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-3 md:gap-4" suppressHydrationWarning>
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   onNavigate('/');
                 }}
-                className="flex items-center"
+                className="flex items-center gap-3 md:gap-4"
               >
-                <span className="text-xl font-bold">StoreFlow</span>
+                {isMounted && storeLogo && !logoError ? (
+                  <img 
+                    src={storeLogo} 
+                    alt={storeName}
+                    className="h-10 md:h-12 w-auto object-contain max-w-[180px] md:max-w-[240px]"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : null}
+                <span className="text-lg md:text-xl font-bold" suppressHydrationWarning>
+                  {storeName}
+                </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center">
-                <span className="text-xl font-bold">StoreFlow</span>
+              <Link href="/" className="flex items-center gap-3 md:gap-4">
+                {isMounted && storeLogo && !logoError ? (
+                  <img 
+                    src={storeLogo} 
+                    alt={storeName}
+                    className="h-10 md:h-12 w-auto object-contain max-w-[180px] md:max-w-[240px]"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : null}
+                <span className="text-lg md:text-xl font-bold" suppressHydrationWarning>
+                  {storeName}
+                </span>
               </Link>
             )}
           </div>

@@ -238,7 +238,7 @@ export default function DashboardClient({
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  🎉 Welcome to StoreFlow!
+                  🎉 Welcome to DukaNest!
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Your store <strong>{tenantName}</strong> is live at{' '}

@@ -15,13 +15,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function TenantDashboardPage() {
   // Redirect to login if not authenticated or not tenant admin/staff
-  const user = await requireAuthOrRedirect('/login');
-  await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/login');
+  const user = await requireAuthOrRedirect('/dashboard/login');
+  await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/dashboard/login');
 
   // Verify user belongs to current tenant
   const tenant = await requireTenant();
   if (user.tenant_id !== tenant.id && user.role !== 'landlord') {
-    redirect('/login');
+    redirect('/dashboard/login');
   }
 
   // Check if tenant is newly created (within last 24 hours)

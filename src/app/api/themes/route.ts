@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         title,
         slug,
         description,
-        author: author || 'StoreFlow',
+        author: author || 'DukaNest',
         version: version || '1.0.0',
         is_premium: is_premium || false,
         price: price ? parseFloat(price) : null,

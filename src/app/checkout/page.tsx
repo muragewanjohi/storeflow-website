@@ -9,7 +9,7 @@
 import { getUser } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import CheckoutClient from './checkout-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 
 export const dynamic = 'force-dynamic';

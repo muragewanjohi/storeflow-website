@@ -60,20 +60,26 @@ export async function middleware(request: NextRequest) {
     response.headers.set('x-pathname', pathname);
     return response;
   }
-  
+
   // For localhost with default tenant, allow it
   if (isLocalhost && hasDefaultTenant) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
   }
   
   // For localhost without default tenant and not admin route, treat as marketing site
   if (isLocalhost && !hasDefaultTenant && !isAdminRoute) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
   }
 
   // Allow marketing site to proceed without tenant
   if (isMarketingSite) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
   }
 
   // Prevent redirect loops - if we're already on a 404 or error page, don't redirect again
@@ -110,6 +116,7 @@ export async function middleware(request: NextRequest) {
 
     // Clone the request headers and add tenant info
     const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-pathname', pathname); // Set pathname for layout conditional logic
     requestHeaders.set('x-tenant-id', tenant.id);
     requestHeaders.set('x-tenant-subdomain', tenant.subdomain);
     requestHeaders.set('x-tenant-name', tenant.name);
@@ -139,6 +146,25 @@ export async function middleware(request: NextRequest) {
         },
       }
     );
+
+    // CRITICAL SECURITY: Block landlords from accessing tenant subdomains
+    // Landlords should only access the platform admin at /admin routes on marketing domain
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const userRole = session.user.user_metadata?.role;
+      if (userRole === 'landlord') {
+        // Landlord trying to access tenant subdomain - BLOCK and redirect
+        // Build redirect URL to marketing domain
+        const marketingDomain = process.env.MARKETING_DOMAIN?.split(':')[0] || 
+                               (isLocalhost ? 'localhost' : 'www.dukanest.com');
+        const protocol = isLocalhost ? 'http:' : 'https:';
+        const port = isLocalhost && hostname.includes(':') ? hostname.split(':')[1] : '';
+        const redirectUrl = new URL(`${protocol}//${marketingDomain}${port ? `:${port}` : ''}/admin`);
+        redirectUrl.searchParams.set('error', 'access-denied');
+        redirectUrl.searchParams.set('message', 'Landlords cannot access tenant websites for privacy and security reasons.');
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
 
     // Refresh session (this updates cookies if needed)
     await supabase.auth.getSession();

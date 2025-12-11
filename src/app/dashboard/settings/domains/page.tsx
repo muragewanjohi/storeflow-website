@@ -10,7 +10,7 @@ import { DomainSettingsClient } from './domain-settings-client';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Domain Settings | StoreFlow',
+  title: 'Domain Settings | DukaNest',
   description: 'Manage your custom domain',
 };
 

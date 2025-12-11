@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
-  title: "StoreFlow - Multi-Tenant Ecommerce Platform",
+  title: "DukaNest - Multi-Tenant Ecommerce Platform",
   description: "Start Your Store. Grow Your Business. It's That Simple.",
 };
 

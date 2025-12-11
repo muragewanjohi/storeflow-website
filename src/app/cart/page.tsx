@@ -10,7 +10,7 @@ import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth/server';
 import { getTenant } from '@/lib/tenant-context/server';
 import CartClient from './cart-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 
 export const dynamic = 'force-dynamic';

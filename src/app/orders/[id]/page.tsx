@@ -10,7 +10,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import OrderConfirmationClient from './order-confirmation-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 
 export default async function OrderConfirmationPage({

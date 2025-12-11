@@ -52,8 +52,13 @@ const CURRENCIES = [
 export default function TenantSettingsClient({ tenant, initialSettings, countries }: Readonly<TenantSettingsClientProps>) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [contactEmailSuccess, setContactEmailSuccess] = useState<string | null>(null);
+  const [contactEmailError, setContactEmailError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     // Contact Email
@@ -109,6 +114,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const handleContactEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setContactEmailError(null);
+    setContactEmailSuccess(null);
     setError(null);
     setSuccess(null);
 
@@ -129,10 +136,13 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         throw new Error(data.message || 'Failed to update contact email');
       }
 
-      setSuccess('Contact email updated successfully!');
+      setContactEmailSuccess('Contact email updated successfully!');
       router.refresh();
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setContactEmailSuccess(null), 5000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setContactEmailError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,6 +151,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const handleSettingsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSettingsError(null);
+    setSettingsSuccess(null);
     setError(null);
     setSuccess(null);
 
@@ -199,10 +211,13 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         throw new Error(data.error || 'Failed to update settings');
       }
 
-      setSuccess('Settings updated successfully!');
+      setSettingsSuccess('Settings updated successfully!');
       router.refresh();
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSettingsSuccess(null), 5000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setSettingsError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -217,6 +232,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         </p>
       </div>
 
+      {/* Global error/success messages (for logo upload, etc.) */}
       {error && (
         <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
           {error}
@@ -267,10 +283,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               </p>
             </div>
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {contactEmailSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {contactEmailSuccess}
+              </div>
+            )}
+            {contactEmailError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {contactEmailError}
+              </div>
+            )}
           </div>
         </form>
       </Card>
@@ -313,27 +339,108 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </div>
             <div className="space-y-2">
               <Label htmlFor="store_logo">Store Logo</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-start gap-4">
                 {formData.store_logo && (
-                  <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+                  <div className="relative w-24 h-24 border rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                     <img
                       src={formData.store_logo}
                       alt="Store logo"
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Hide broken images
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}
-                <div className="flex-1">
-                  <Input
-                    id="store_logo"
-                    type="url"
-                    value={formData.store_logo}
-                    onChange={(e) => setFormData({ ...formData, store_logo: e.target.value })}
-                    placeholder="https://example.com/logo.png"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter the URL of your store logo image. You can upload images via the Products section.
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="store_logo_file"
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                        onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        // Validate file size (max 5MB)
+                        const maxSize = 5 * 1024 * 1024;
+                        if (file.size > maxSize) {
+                          setError('File size exceeds 5MB limit');
+                          return;
+                        }
+
+                        // Show uploading state
+                        setIsUploadingLogo(true);
+                        setError(null);
+                        setSuccess(null);
+
+                        try {
+                          // Upload file
+                          const uploadFormData = new FormData();
+                          uploadFormData.append('file', file);
+
+                          const uploadResponse = await fetch('/api/media/upload', {
+                            method: 'POST',
+                            body: uploadFormData,
+                          });
+
+                          const uploadData = await uploadResponse.json();
+
+                          if (!uploadResponse.ok) {
+                            throw new Error(uploadData.error || 'Failed to upload logo');
+                          }
+
+                          // Update form data with the uploaded URL
+                          setFormData({ ...formData, store_logo: uploadData.url });
+                          setSuccess('Logo uploaded successfully! Click "Save Changes" to save.');
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Failed to upload logo');
+                        } finally {
+                          setIsUploadingLogo(false);
+                          // Reset file input
+                          e.target.value = '';
+                        }
+                      }}
+                      className="cursor-pointer"
+                      disabled={isSubmitting || isUploadingLogo}
+                    />
+                    {isUploadingLogo && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      </div>
+                    )}
+                    </div>
+                    {formData.store_logo && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFormData({ ...formData, store_logo: '' });
+                          setSuccess(null);
+                        }}
+                        disabled={isSubmitting || isUploadingLogo}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Upload a logo image (JPEG, PNG, WebP, or GIF). Maximum file size: 5MB.
+                    Recommended size: 200x200px or larger square image.
                   </p>
+                  {formData.store_logo && (
+                    <Input
+                      id="store_logo"
+                      type="url"
+                      value={formData.store_logo}
+                      onChange={(e) => setFormData({ ...formData, store_logo: e.target.value })}
+                      placeholder="Or enter logo URL manually"
+                      className="text-xs"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -420,10 +527,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               </div>
             </div>
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
           </div>
         </form>
       </Card>
@@ -517,10 +634,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               </div>
             </div>
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
           </div>
         </form>
       </Card>
@@ -627,10 +754,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               </>
             )}
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
           </div>
         </form>
       </Card>
@@ -687,10 +824,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               />
             </div>
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
           </div>
         </form>
       </Card>
@@ -761,10 +908,20 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               </>
             )}
           </CardContent>
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-6 flex items-center gap-4">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
           </div>
         </form>
       </Card>

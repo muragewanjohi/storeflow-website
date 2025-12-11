@@ -58,7 +58,7 @@ export async function requireAuth(): Promise<AuthUser> {
  * Use this in Server Components instead of `requireAuth()`.
  * It will redirect to login page if user is not authenticated.
  * 
- * @param redirectTo - Optional redirect path (default: '/admin/login' for admin routes, '/login' for tenant routes)
+ * @param redirectTo - Optional redirect path (default: '/admin/login' for admin routes, '/dashboard/login' for tenant routes)
  * @returns User object (never null, redirects if not authenticated)
  */
 export async function requireAuthOrRedirect(redirectTo?: string): Promise<AuthUser> {
@@ -154,7 +154,7 @@ export function requireAnyRole(user: AuthUser, roles: UserRole[]): void {
  * 
  * @param user - User object
  * @param roles - Array of required roles
- * @param redirectTo - Optional redirect path (default: '/login')
+ * @param redirectTo - Optional redirect path (default: '/dashboard/login' for tenant routes, '/admin/login' for admin routes)
  */
 export async function requireAnyRoleOrRedirect(
   user: AuthUser,
@@ -164,7 +164,7 @@ export async function requireAnyRoleOrRedirect(
   const { redirect } = await import('next/navigation');
   
   if (!hasAnyRole(user, roles)) {
-    redirect(redirectTo || '/login');
+    redirect(redirectTo || '/dashboard/login');
   }
 }
 

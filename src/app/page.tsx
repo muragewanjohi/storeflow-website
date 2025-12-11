@@ -13,10 +13,11 @@ import { prisma } from '@/lib/prisma/client';
 import { SectionRenderer } from '@/components/content/page-builder/section-templates';
 import { PageBuilderData } from '@/lib/content/page-builder-types';
 import HomepageClient from './homepage-client';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import { getStaticOptions } from '@/lib/settings/static-options';
 import { headers } from 'next/headers';
 import type { Metadata } from 'next';
 // Lazy load marketing landing page (large component) - using client wrapper
@@ -30,10 +31,10 @@ export async function generateMetadata(): Promise<Metadata> {
   // If no tenant, show marketing site metadata
   if (!tenant) {
     return {
-      title: 'StoreFlow - Multi-Tenant Ecommerce Platform',
-      description: 'Start Your Store. Grow Your Business. It\'s That Simple. Build and scale your online store with StoreFlow\'s powerful ecommerce platform.',
+      title: 'DukaNest - Multi-Tenant Ecommerce Platform',
+      description: 'Start Your Store. Grow Your Business. It\'s That Simple. Build and scale your online store with DukaNest\'s powerful ecommerce platform.',
       openGraph: {
-        title: 'StoreFlow - Multi-Tenant Ecommerce Platform',
+        title: 'DukaNest - Multi-Tenant Ecommerce Platform',
         description: 'Start Your Store. Grow Your Business. It\'s That Simple.',
         type: 'website',
       },
@@ -88,6 +89,9 @@ export default async function HomePage() {
   if (!tenant) {
     return <div>Store not found</div>;
   }
+
+  // Fetch store settings for logo (will be used by header)
+  const settings = await getStaticOptions(tenant.id, ['store_logo']);
 
   // Try to find a homepage page (could be marked as homepage or slug = 'home')
   const homepage = await prisma.pages.findFirst({

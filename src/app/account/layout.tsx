@@ -8,7 +8,7 @@ import { redirect } from 'next/navigation';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import AccountNav from './account-nav';
-import StorefrontHeader from '@/components/storefront/header';
+import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 
 export default async function AccountLayout({
