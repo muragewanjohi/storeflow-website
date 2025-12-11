@@ -170,11 +170,26 @@ npm run test:e2e:chromium
 2. Verify email in Supabase dashboard
 3. Check user metadata has `role: 'landlord'`
 
-### "Access denied" error
+### "Access denied" error (403)
 
 **Cause**: User exists but doesn't have `role: 'landlord'` in metadata.
 
-**Solution**: Update user metadata in Supabase dashboard:
+**Solution 1: Using the Script (Recommended)**
+
+```bash
+cd storeflow
+npx tsx scripts/fix-landlord-role.ts <email>
+```
+
+Example:
+```bash
+npx tsx scripts/fix-landlord-role.ts admin@example.com
+```
+
+This will update the user's metadata to include `role: 'landlord'`.
+
+**Solution 2: Using Supabase Dashboard**
+
 1. Go to Authentication → Users
 2. Click on the user
 3. Edit **User Metadata**
@@ -204,4 +219,5 @@ If email verification is enabled in Supabase:
 - Login Page: `src/app/admin/login/page.tsx`
 - Find Script: `scripts/find-landlord-account.ts`
 - Reset Script: `scripts/reset-landlord-password.ts`
+- Fix Role Script: `scripts/fix-landlord-role.ts`
 
