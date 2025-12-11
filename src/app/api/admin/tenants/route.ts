@@ -12,6 +12,7 @@ import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendWelcomeEmail } from '@/lib/email/sendgrid';
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { z } from 'zod';
+import { handleApiError, handleValidationError, handleConflictError, createErrorResponse, ErrorCode } from '@/lib/errors/api-error-handler';
 
 // Validation schema for tenant creation
 const createTenantSchema = z.object({
@@ -53,31 +54,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tenants }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching tenants:', error);
-    
-    if (error instanceof Error) {
-      if (error.message === 'Authentication required') {
-        return NextResponse.json(
-          { message: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-      if (error.message.includes('Access denied')) {
-        return NextResponse.json(
-          { message: 'Access denied. Landlord role required.' },
-          { status: 403 }
-        );
-      }
-    }
-
-    return NextResponse.json(
-      { 
-        message: process.env.NODE_ENV === 'development' 
-          ? (error instanceof Error ? error.message : 'Internal server error')
-          : 'Failed to fetch tenants'
-      },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
@@ -96,9 +73,13 @@ export async function POST(request: NextRequest) {
     // Validate subdomain (reserved words, naming rules, etc.)
     const subdomainValidation = validateSubdomain(validatedData.subdomain);
     if (!subdomainValidation.isValid) {
-      return NextResponse.json(
-        { message: subdomainValidation.error },
-        { status: 400 }
+      // Return validation error using standard format
+      return createErrorResponse(
+        'Validation failed',
+        subdomainValidation.error || 'Invalid subdomain',
+        400,
+        { field: 'subdomain' },
+        ErrorCode.VALIDATION_ERROR
       );
     }
 
@@ -108,10 +89,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingTenant) {
-      return NextResponse.json(
-        { message: 'Subdomain already exists' },
-        { status: 409 }
-      );
+      return handleConflictError('Subdomain already exists');
     }
 
     // Validate plan and calculate expire_date if provided
@@ -178,15 +156,11 @@ export async function POST(request: NextRequest) {
       if (authError?.message?.includes('already registered') || 
           authError?.message?.includes('already exists') ||
           authError?.status === 422) {
-        return NextResponse.json(
-          { message: 'Email already registered' },
-          { status: 409 }
-        );
+        return handleConflictError('Email already registered');
       }
 
-      return NextResponse.json(
-        { message: `Failed to create admin user: ${authError?.message || 'Unknown error'}` },
-        { status: 500 }
+      return handleApiError(
+        new Error(`Failed to create admin user: ${authError?.message || 'Unknown error'}`)
       );
     }
 
@@ -240,38 +214,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating tenant:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'Validation error', errors: error.issues },
-        { status: 400 }
-      );
-    }
-
-    if (error instanceof Error) {
-      if (error.message === 'Authentication required') {
-        return NextResponse.json(
-          { message: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-      if (error.message.includes('Access denied')) {
-        return NextResponse.json(
-          { message: 'Access denied. Landlord role required.' },
-          { status: 403 }
-        );
-      }
-    }
-
-    return NextResponse.json(
-      {
-        message: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : 'Internal server error')
-          : 'Failed to create tenant'
-      },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 

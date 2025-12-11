@@ -34,7 +34,7 @@ export async function sendEmail(options: EmailOptions) {
   }
 
   const defaultFromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
-  const defaultFromName = process.env.SENDGRID_FROM_NAME || 'StoreFlow';
+  const defaultFromName = process.env.SENDGRID_FROM_NAME || 'Dukanest';
   
   // Try sending with the provided from address first
   let fromEmail = options.from || defaultFromEmail;
@@ -67,7 +67,7 @@ export async function sendEmail(options: EmailOptions) {
     msg.dynamicTemplateData = options.dynamicTemplateData || {};
   } else {
     // Use plain HTML/text
-    msg.subject = options.subject || 'Notification from StoreFlow';
+    msg.subject = options.subject || 'Notification from Dukanest';
     if (options.html) {
       msg.html = options.html;
     }
@@ -151,17 +151,17 @@ export async function sendWelcomeEmail({
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to StoreFlow</title>
+        <title>Welcome to Dukanest</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0;">Welcome to StoreFlow!</h1>
+          <h1 style="color: white; margin: 0;">Welcome to Dukanest!</h1>
         </div>
         
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
           <p>Hello ${adminName},</p>
           
-          <p>Congratulations! Your store <strong>${tenantName}</strong> has been successfully created on StoreFlow.</p>
+          <p>Congratulations! Your store <strong>${tenantName}</strong> has been successfully created on Dukanest.</p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
             <h2 style="margin-top: 0; color: #667eea;">Your Store Details</h2>
@@ -190,7 +190,7 @@ export async function sendWelcomeEmail({
           
           <p style="color: #666; font-size: 14px;">
             Best regards,<br>
-            The StoreFlow Team
+            The Dukanest Team
           </p>
         </div>
       </body>
@@ -198,11 +198,11 @@ export async function sendWelcomeEmail({
   `;
 
   const text = `
-Welcome to StoreFlow!
+Welcome to Dukanest!
 
 Hello ${adminName},
 
-Congratulations! Your store ${tenantName} has been successfully created on StoreFlow.
+Congratulations! Your store ${tenantName} has been successfully created on Dukanest.
 
 Your Store Details:
 - Store Name: ${tenantName}
@@ -220,12 +220,12 @@ Visit your dashboard: ${loginUrl}
 If you have any questions, please don't hesitate to contact our support team.
 
 Best regards,
-The StoreFlow Team
+The Dukanest Team
   `;
 
   return sendEmail({
     to,
-    subject: `Welcome to StoreFlow - ${tenantName} is Ready!`,
+    subject: `Welcome to Dukanest - ${tenantName} is Ready!`,
     html,
     text,
   });

@@ -8,7 +8,7 @@
 
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth/server';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant } from '@/lib/tenant-context/server';
 import CartClient from './cart-client';
 import StorefrontHeader from '@/components/storefront/header';
 import StorefrontFooter from '@/components/storefront/footer';
@@ -16,10 +16,14 @@ import StorefrontFooter from '@/components/storefront/footer';
 export const dynamic = 'force-dynamic';
 
 export default async function CartPage() {
-  const tenant = await requireTenant();
-
+  const tenant = await getTenant();
   if (!tenant) {
-    return <div>Store not found</div>;
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-4">Store not found</h1>
+        <p className="text-muted-foreground">The store you&apos;re looking for doesn&apos;t exist or is no longer available.</p>
+      </div>
+    );
   }
 
   // Allow both authenticated and guest users

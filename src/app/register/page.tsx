@@ -150,7 +150,7 @@ function TenantRegisterForm() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold text-primary">
-              StoreFlow
+              Dukanest
             </Link>
             <Button asChild variant="outline">
               <Link href="/pricing">
@@ -223,7 +223,7 @@ function TenantRegisterForm() {
                     className="rounded-r-none"
                   />
                   <span className="px-4 py-2 bg-muted border border-l-0 rounded-r-md text-muted-foreground">
-                    .{process.env.NEXT_PUBLIC_APP_DOMAIN || 'storeflow.com'}
+                    .{process.env.NEXT_PUBLIC_APP_DOMAIN || 'dukanest.com'}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">

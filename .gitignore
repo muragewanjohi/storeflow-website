@@ -4,10 +4,13 @@
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
 # testing
 /coverage
+/.nyc_output
+/test-results
+/playwright-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -41,25 +44,3 @@ next-env.d.ts
 
 # supabase
 /.supabase
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Logs
-logs
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
-
-/src/generated/prisma

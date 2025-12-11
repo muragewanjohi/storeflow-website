@@ -37,6 +37,10 @@ export async function middleware(request: NextRequest) {
   // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
   const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
                            process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+
+  // Check if path is admin route (don't require tenant for admin routes)
+  const isLocalhost = hostnameWithoutPort === 'localhost' || hostnameWithoutPort === '127.0.0.1';
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   
   // Marketing site hostnames
   const isMarketingSite = 
@@ -44,11 +48,28 @@ export async function middleware(request: NextRequest) {
     hostnameWithoutPort === 'marketing' ||
     hostnameWithoutPort === 'www.dukanest.com' ||
     hostnameWithoutPort === 'dukanest.com' ||
-    (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
-    hostnameWithoutPort === '127.0.0.1' ||
     hostnameWithoutPort.includes('storeflow') ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+  
+  // CRITICAL: Allow admin routes on localhost OR marketing sites BEFORE any tenant resolution
+  // Admin routes should never require tenant resolution - they're platform-level routes
+  if (isAdminRoute && (isLocalhost || isMarketingSite)) {
+    // Set pathname header for layout conditional logic
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
+  }
+  
+  // For localhost with default tenant, allow it
+  if (isLocalhost && hasDefaultTenant) {
+    return NextResponse.next();
+  }
+  
+  // For localhost without default tenant and not admin route, treat as marketing site
+  if (isLocalhost && !hasDefaultTenant && !isAdminRoute) {
+    return NextResponse.next();
+  }
 
   // Allow marketing site to proceed without tenant
   if (isMarketingSite) {
