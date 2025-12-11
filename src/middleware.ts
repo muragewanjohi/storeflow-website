@@ -130,9 +130,18 @@ export async function middleware(request: NextRequest) {
 
     // Refresh Supabase auth session if user is authenticated
     // This ensures session stays valid across requests
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing Supabase environment variables in middleware. Skipping auth refresh.');
+      // Continue without auth refresh - tenant resolution still works
+      return response;
+    }
+
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {

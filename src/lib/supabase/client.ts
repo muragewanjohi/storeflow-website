@@ -6,10 +6,18 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
  * Use this in client components
  */
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. ' +
+      'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set. ' +
+      'Check your Vercel project settings: https://vercel.com/docs/concepts/projects/environment-variables'
+    );
+  }
+
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
 /**
@@ -24,9 +32,20 @@ export function createClient() {
  * @returns Supabase client with tenant context
  */
 export async function createTenantSupabaseClient(tenantId: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. ' +
+      'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set. ' +
+      'Check your Vercel project settings: https://vercel.com/docs/concepts/projects/environment-variables'
+    );
+  }
+
   const supabase = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       global: {
         headers: {
