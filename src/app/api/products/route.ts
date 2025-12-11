@@ -258,26 +258,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate SKU if not provided
-    const sku = validatedData.sku || generateSKU(validatedData.name, tenant.id);
+    // Generate SKU if not provided or is null/empty
+    // Always ensure SKU is generated - it's required for inventory management
+    let finalSKU: string;
+    if (validatedData.sku && validatedData.sku.trim() !== '') {
+      finalSKU = validatedData.sku.trim();
+    } else {
+      finalSKU = generateSKU(validatedData.name, tenant.id);
+    }
 
     // Check if SKU already exists for this tenant
     const existingSKU = await prisma.products.findFirst({
       where: {
         tenant_id: tenant.id,
-        sku,
+        sku: finalSKU,
       },
     });
 
+    // If SKU collision, regenerate until we find a unique one
     if (existingSKU) {
-      // Regenerate SKU if collision
-      const newSKU = generateSKU(validatedData.name, tenant.id);
-      validatedData.sku = newSKU;
-    } else {
-      validatedData.sku = sku;
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (attempts < maxAttempts) {
+        finalSKU = generateSKU(validatedData.name, tenant.id);
+        const collision = await prisma.products.findFirst({
+          where: {
+            tenant_id: tenant.id,
+            sku: finalSKU,
+          },
+        });
+        if (!collision) {
+          break; // Found unique SKU
+        }
+        attempts++;
+      }
+      if (attempts >= maxAttempts) {
+        // Fallback: use timestamp-based SKU
+        finalSKU = `${tenant.id.substring(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+      }
+    }
+
+    // Include warning if description is missing (for SEO and user experience)
+    const warnings: string[] = [];
+    if (!validatedData.description || validatedData.description.trim() === '') {
+      warnings.push('Product description is missing. Adding a detailed description will improve SEO and help customers understand your product better.');
     }
 
     // Create product
+    // Note: If description is null/empty, we'll include a warning in the response
     const product = await prisma.products.create({
       data: {
         tenant_id: tenant.id,
@@ -287,7 +315,7 @@ export async function POST(request: NextRequest) {
         short_description: validatedData.short_description || null,
         price: validatedData.price,
         sale_price: validatedData.sale_price || null,
-        sku: validatedData.sku || null,
+        sku: finalSKU, // Always use generated SKU
         stock_quantity: validatedData.stock_quantity || 0,
         status: validatedData.status || 'active',
         image: validatedData.image || null,
@@ -302,7 +330,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { product },
+      { 
+        product,
+        ...(warnings.length > 0 && { warnings }) // Include warnings if any
+      },
       { status: 201 }
     );
   } catch (error) {

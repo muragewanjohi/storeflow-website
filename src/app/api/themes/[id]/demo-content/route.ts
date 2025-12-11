@@ -22,46 +22,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Fast path: Try to get template directly from slug if possible
-    // This avoids database query for known themes
-    const knownSlugs = ['modern', 'hexfashion', 'default', 'minimal'];
-    let template = null;
-    let themeSlug = null;
-    
-    // First, try to get template from registry without DB query
-    for (const slug of knownSlugs) {
-      const testTemplate = getThemeTemplate(slug);
-      if (testTemplate) {
-        // For preview, we can use any matching template
-        template = testTemplate;
-        themeSlug = slug;
-        break;
-      }
-    }
-
-    // If we have a template, use it directly (fast path)
-    if (template && themeSlug) {
-      const demoProducts = getDemoProducts(template.industry, template.demoContent.products);
-      const demoCategories = getDemoCategories(template.industry);
-      
-      return NextResponse.json({
-        theme: {
-          id,
-          slug: themeSlug,
-          title: template.name,
-          industry: template.industry,
-        },
-        products: demoProducts,
-        categories: demoCategories,
-      }, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
-          'X-Response-Time': `${Date.now() - startTime}ms`,
-        },
-      });
-    }
-
-    // Fallback: Try database query (slower but more accurate)
+    // Always query database first to get the correct theme by ID
     let theme: { id: string; slug: string; title: string } | null = null;
     try {
       theme = await prisma.themes.findUnique({

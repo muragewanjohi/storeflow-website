@@ -39,6 +39,11 @@ export function loadThemeHeader(themeSlug: string) {
         ssr: true,
         loading: () => <DefaultHeader />,
       });
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/Header'), {
+        ssr: true,
+        loading: () => <DefaultHeader />,
+      });
     case 'default':
     default:
       return DefaultHeader;
@@ -71,6 +76,11 @@ export function loadThemeFooter(themeSlug: string) {
         ssr: true,
         loading: () => <DefaultFooter />,
       });
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/Footer'), {
+        ssr: true,
+        loading: () => <DefaultFooter />,
+      });
     case 'default':
     default:
       return DefaultFooter;
@@ -98,6 +108,10 @@ export function loadThemeHero(themeSlug: string) {
       });
     case 'default':
       return dynamic(() => import('@/components/themes/default/Hero'), {
+        ssr: true,
+      });
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/Hero'), {
         ssr: true,
       });
     default:
@@ -132,6 +146,10 @@ export function loadThemeProductGrid(themeSlug: string) {
       return dynamic(() => import('@/components/themes/minimal/ProductGrid'), {
         ssr: true,
       });
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/ProductGrid'), {
+        ssr: true,
+      });
     default:
       return null;
   }
@@ -162,6 +180,10 @@ export function loadThemeHomepage(themeSlug: string) {
       });
     case 'minimal':
       return dynamic(() => import('@/components/themes/minimal/Homepage'), {
+        ssr: true,
+      });
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/Homepage'), {
         ssr: true,
       });
     default:

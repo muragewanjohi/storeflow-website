@@ -364,6 +364,152 @@ const generalProducts: DemoProduct[] = [
 ];
 
 /**
+ * Grocery demo products
+ */
+const groceryProducts: DemoProduct[] = [
+  {
+    name: 'Fresh Organic Broccoli',
+    description: 'Nutritious, crisp & fresh green broccoli, perfect for healthy meals.',
+    price: 3.14,
+    compareAtPrice: 3.49,
+    sku: 'VEG-BRO-ORG',
+    image: 'https://images.unsplash.com/photo-1584270354949-c26b550d4b4a?w=800&h=800&fit=crop',
+    category: 'Vegetables',
+    stock_quantity: 50,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Fresh Crisp Lettuce',
+    description: 'Organic, nutrient-packed & refreshing green lettuce.',
+    price: 1.28,
+    compareAtPrice: 1.51,
+    sku: 'VEG-LET-CRS',
+    image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=800&h=800&fit=crop',
+    category: 'Vegetables',
+    stock_quantity: 40,
+    metadata: { organic: true, unit: 'head' },
+  },
+  {
+    name: 'Fresh Cilantro',
+    description: 'Organic, fragrant, and flavorful herb perfect for cooking.',
+    price: 1.85,
+    compareAtPrice: 1.99,
+    sku: 'VEG-CIL-ORG',
+    image: 'https://images.unsplash.com/photo-1618375569909-3c8616cf7733?w=800&h=800&fit=crop',
+    category: 'Vegetables',
+    stock_quantity: 30,
+    metadata: { organic: true, unit: 'bunch' },
+  },
+  {
+    name: 'Fresh Organic Spinach',
+    description: 'Nutrient-rich & healthy green spinach, perfect for salads.',
+    price: 2.99,
+    sku: 'VEG-SPN-ORG',
+    image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&h=800&fit=crop',
+    category: 'Vegetables',
+    stock_quantity: 35,
+    metadata: { organic: true, unit: 'bunch' },
+  },
+  {
+    name: 'Premium Black Pepper',
+    description: 'Bold, spicy, and essential for every kitchen.',
+    price: 3.69,
+    compareAtPrice: 4.10,
+    sku: 'SPC-BLK-PEP',
+    image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&h=800&fit=crop',
+    category: 'Pure Spices',
+    stock_quantity: 60,
+    metadata: { organic: true, unit: 'oz' },
+  },
+  {
+    name: 'Pure Garlic Powder',
+    description: 'Aromatic, savory, and perfect for every dish.',
+    price: 3.20,
+    sku: 'SPC-GAR-PWD',
+    image: 'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=800&h=800&fit=crop',
+    category: 'Pure Spices',
+    stock_quantity: 55,
+    metadata: { organic: true, unit: 'oz' },
+  },
+  {
+    name: 'Fresh, Crisp Apples',
+    description: 'Sweet, juicy, and refreshing apples, perfect for snacking.',
+    price: 2.76,
+    compareAtPrice: 2.90,
+    sku: 'FRT-APP-CRS',
+    image: 'https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=800&h=800&fit=crop',
+    category: 'Pure Fruits',
+    stock_quantity: 80,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Fresh, Sweet Mangoes',
+    description: 'Tropical, juicy, and irresistible mangoes.',
+    price: 3.71,
+    compareAtPrice: 3.90,
+    sku: 'FRT-MNG-SWT',
+    image: 'https://images.unsplash.com/photo-1605027990121-c736a1ed3411?w=800&h=800&fit=crop',
+    category: 'Pure Fruits',
+    stock_quantity: 45,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Fresh & Sweet Pineapple',
+    description: 'Tropical delight in every bite.',
+    price: 4.56,
+    compareAtPrice: 4.90,
+    sku: 'FRT-PIN-SWT',
+    image: 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?w=800&h=800&fit=crop',
+    category: 'Pure Fruits',
+    stock_quantity: 25,
+    metadata: { organic: true, unit: 'each' },
+  },
+  {
+    name: 'Fresh, Juicy Oranges',
+    description: 'Sweet & refreshing citrus fruit, packed with vitamin C.',
+    price: 2.32,
+    compareAtPrice: 2.90,
+    sku: 'FRT-ORG-JCY',
+    image: 'https://images.unsplash.com/photo-1611080626919-7cf5e9adab5a?w=800&h=800&fit=crop',
+    category: 'Pure Fruits',
+    stock_quantity: 70,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Fresh & Ripe Bananas',
+    description: 'Naturally sweet, healthy & delicious bananas.',
+    price: 1.40,
+    compareAtPrice: 2.40,
+    sku: 'FRT-BAN-RPE',
+    image: 'https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=800&h=800&fit=crop',
+    category: 'Pure Fruits',
+    stock_quantity: 90,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Premium Beef Meat',
+    description: 'Fresh and tender beef cuts, perfect for grilling.',
+    price: 10.00,
+    compareAtPrice: 12.00,
+    sku: 'MT-BEF-PRM',
+    image: 'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=800&h=800&fit=crop',
+    category: 'Fresh Meat',
+    stock_quantity: 20,
+    metadata: { organic: true, unit: 'lb' },
+  },
+  {
+    name: 'Juicy Cheeseburger',
+    description: 'Tender, savory, and packed with flavor.',
+    price: 5.90,
+    sku: 'FFD-CHS-BRG',
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=800&h=800&fit=crop',
+    category: 'Fast Food',
+    stock_quantity: 15,
+    metadata: { unit: 'each' },
+  },
+];
+
+/**
  * Get demo products by industry
  */
 export function getDemoProducts(industry: ThemeIndustry, count?: number): DemoProduct[] {
@@ -375,6 +521,9 @@ export function getDemoProducts(industry: ThemeIndustry, count?: number): DemoPr
       break;
     case 'fashion':
       products = fashionProducts;
+      break;
+    case 'grocery':
+      products = groceryProducts;
       break;
     default:
       products = generalProducts;
@@ -402,6 +551,17 @@ export function getDemoCategories(industry: ThemeIndustry): DemoCategory[] {
         { name: 'Outerwear', slug: 'outerwear', description: 'Jackets, coats, and blazers' },
         { name: 'Footwear', slug: 'footwear', description: 'Shoes, boots, and sneakers' },
         { name: 'Accessories', slug: 'accessories', description: 'Bags, jewelry, and accessories' },
+      ];
+    case 'grocery':
+      return [
+        { name: 'Fresh Meat', slug: 'fresh-meat', description: 'Fresh and organic meat products', image: 'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=400&h=400&fit=crop' },
+        { name: 'Pure Fruits', slug: 'pure-fruits', description: 'Fresh organic fruits', image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop' },
+        { name: 'Fast Food', slug: 'fast-food', description: 'Quick and delicious meals', image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=400&h=400&fit=crop' },
+        { name: 'Pure Spices', slug: 'pure-spices', description: 'Premium quality spices', image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&h=400&fit=crop' },
+        { name: 'Dry Bread', slug: 'dry-bread', description: 'Fresh baked bread', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop' },
+        { name: 'Vegetables', slug: 'vegetables', description: 'Fresh organic vegetables', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop' },
+        { name: 'Layer Cake', slug: 'layer-cake', description: 'Delicious cakes and desserts', image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=400&fit=crop' },
+        { name: 'Organic Oil', slug: 'organic-oil', description: 'Premium organic cooking oils', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=400&fit=crop' },
       ];
     default:
       return [

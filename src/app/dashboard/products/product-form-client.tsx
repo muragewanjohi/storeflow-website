@@ -139,6 +139,7 @@ export default function ProductFormClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   // Fetch attributes on component mount
   useEffect(() => {
@@ -266,6 +267,7 @@ export default function ProductFormClient({
         name: formData.name.trim(),
         sku: formData.sku.trim() || null,
         short_description: formData.short_description.trim() || null,
+        // Send null if description is empty (not empty string)
         description: formData.description.trim() || null,
         price: parseFloat(formData.price),
         // When variants exist, product-level stock is calculated from variants (set to 0 or sum)
@@ -302,6 +304,15 @@ export default function ProductFormClient({
       }
 
       const data = await response.json();
+      
+      // Check for warnings from API (e.g., missing description)
+      if (data.warnings && Array.isArray(data.warnings) && data.warnings.length > 0) {
+        setWarnings(data.warnings);
+        // Don't block submission - just show warning
+      } else {
+        setWarnings([]);
+      }
+      
       const productId = isEditing ? product.id : data.product.id;
 
       // Track which existing variants should be deleted (if editing)
@@ -416,6 +427,30 @@ export default function ProductFormClient({
         </div>
       )}
 
+      {warnings.length > 0 && (
+        <div className="mb-4 rounded-md border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-4">
+          <div className="flex items-start gap-2">
+            <svg className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">Warning</h4>
+              <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                {warnings.map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={() => setWarnings([])}
+              className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main Form */}
@@ -473,10 +508,21 @@ export default function ProductFormClient({
                   <Textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, description: e.target.value });
+                      // Clear warnings when user starts typing
+                      if (e.target.value.trim() && warnings.length > 0) {
+                        setWarnings([]);
+                      }
+                    }}
                     placeholder="Detailed product description"
                     rows={8}
                   />
+                  {!formData.description.trim() && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      ⚠️ Leaving the description empty may negatively affect SEO and customer understanding of your product.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

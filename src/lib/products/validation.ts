@@ -12,8 +12,9 @@ import { z } from 'zod';
 export const createProductSchema = z.object({
   name: z.string().min(1, 'Product name is required').max(255, 'Product name must be less than 255 characters'),
   slug: z.string().optional(),
-  description: z.string().optional(),
-  short_description: z.string().max(500, 'Short description must be less than 500 characters').optional(),
+  // Allow description to be null or empty string, but warn user about SEO impact
+  description: z.string().nullable().optional().or(z.literal('').transform(() => null)),
+  short_description: z.string().max(500, 'Short description must be less than 500 characters').optional().nullable(),
   price: z.number().positive('Price must be positive').or(z.string().transform((val) => parseFloat(val))),
   sale_price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   sku: z.string().max(100, 'SKU must be less than 100 characters').optional().nullable(),

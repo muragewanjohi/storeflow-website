@@ -8,7 +8,7 @@
 
 import type { ThemeConfig } from '@/types/theme';
 
-export type ThemeIndustry = 'electronics' | 'fashion' | 'general';
+export type ThemeIndustry = 'electronics' | 'fashion' | 'general' | 'grocery';
 
 export interface ThemeTemplateConfig {
   id: string;
@@ -164,6 +164,38 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
       images: [
         'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=800&fit=crop',
         'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=800&fit=crop',
+      ],
+    },
+  },
+  grocery: {
+    id: 'grocery',
+    name: 'Grocery',
+    slug: 'grocery',
+    industry: 'grocery',
+    description: 'Fresh and organic grocery theme perfect for food stores, farmers markets, and organic food retailers',
+    screenshotUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=800&fit=crop',
+    layout: {
+      header: 'sticky',
+      productGrid: 'grid',
+      sidebar: 'none',
+      footer: 'multi-column',
+    },
+    componentPaths: {
+      Header: '@/components/themes/grocery/Header',
+      Footer: '@/components/themes/grocery/Footer',
+      ProductCard: '@/components/themes/grocery/ProductCard',
+      ProductGrid: '@/components/themes/grocery/ProductGrid',
+      Hero: '@/components/themes/grocery/Hero',
+      Homepage: '@/components/themes/grocery/Homepage',
+    },
+    demoContent: {
+      products: 12,
+      categories: 8,
+      images: [
+        'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&h=800&fit=crop',
       ],
     },
   },
