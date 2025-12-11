@@ -13,6 +13,7 @@ import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendEmail } from '@/lib/email/sendgrid';
 import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
 import { addTenantDomain } from '@/lib/vercel-domains';
+import { clearCachedTenant } from '@/lib/tenant-context/cache';
 import { z } from 'zod';
 
 const registerTenantSchema = z.object({
@@ -243,21 +244,37 @@ export async function POST(request: NextRequest) {
       loginUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/login`;
     }
 
-    // Automatically add subdomain to Vercel (non-blocking)
-    // This ensures the subdomain is available immediately after registration
+    // Automatically add subdomain to Vercel
+    // IMPORTANT: We await this to ensure domain is added before user tries to access it
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId && !isLocalhost) {
       const subdomainUrl = `${tenant.subdomain}.dukanest.com`;
-      addTenantDomain(subdomainUrl, projectId).catch((error) => {
+      try {
+        await addTenantDomain(subdomainUrl, projectId);
+        console.log(`✅ Successfully added subdomain ${subdomainUrl} to Vercel`);
+      } catch (error: any) {
         // Log error but don't fail tenant creation
         // Subdomain can be added manually later if needed
-        console.error(`Failed to add subdomain ${subdomainUrl} to Vercel:`, error);
-      });
+        console.error(`⚠️ Failed to add subdomain ${subdomainUrl} to Vercel:`, error?.message || error);
+        // Continue - tenant is still created, just domain needs manual addition
+      }
     } else if (!projectId && !isLocalhost) {
       console.warn('VERCEL_PROJECT_ID not set. Subdomain will not be added to Vercel automatically.');
     }
 
-    // Send welcome email
+    // Clear any cached tenant data to ensure fresh lookup
+    // This is important because the tenant was just created
+    try {
+      const subdomainHostname = `${tenant.subdomain}.dukanest.com`;
+      await clearCachedTenant(subdomainHostname);
+      // Also clear by subdomain alone (in case it was cached differently)
+      await clearCachedTenant(tenant.subdomain);
+    } catch (cacheError) {
+      // Non-critical - cache clear failure shouldn't block registration
+      console.warn('Failed to clear tenant cache:', cacheError);
+    }
+
+    // Send welcome email (non-blocking - can be delayed)
     const { sendWelcomeEmail } = await import('@/lib/email/sendgrid');
     sendWelcomeEmail({
       to: validatedData.adminEmail,
