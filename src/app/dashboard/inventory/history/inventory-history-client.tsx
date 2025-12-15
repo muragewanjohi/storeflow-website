@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -79,11 +79,7 @@ export default function InventoryHistoryClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [page, limit, adjustmentType, initialProductId, initialVariantId]);
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -110,7 +106,11 @@ export default function InventoryHistoryClient({
     } finally {
       setLoading(false);
     }
-  };
+  }, [adjustmentType, initialProductId, initialVariantId, limit, page]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const handleExportCSV = () => {
     const headers = ['Date', 'Item', 'SKU', 'Type', 'Before', 'After', 'Change', 'Reason', 'Notes'];

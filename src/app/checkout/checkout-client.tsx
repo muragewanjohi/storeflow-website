@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,12 +95,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   const [couponCode, setCouponCode] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Fetch cart on mount
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     try {
       const response = await fetch('/api/cart');
       if (response.ok) {
@@ -122,7 +117,12 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  // Fetch cart on mount
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   const validateShipping = (): boolean => {
     if (!shippingAddress.name.trim()) {

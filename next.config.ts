@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Avoid monorepo root inference issues (multiple lockfiles)
+  outputFileTracingRoot: __dirname,
   // Enable React compiler for better performance (if available)
   // reactCompiler: true,
   

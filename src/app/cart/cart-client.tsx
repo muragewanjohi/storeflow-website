@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -48,12 +48,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [discount, setDiscount] = useState(0);
 
-  // Fetch cart on mount
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     try {
       const response = await fetch('/api/cart');
       if (response.ok) {
@@ -68,7 +63,12 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, router]);
+
+  // Fetch cart on mount
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   const updateQuantity = async (productId: string, variantId: string | null, newQuantity: number) => {
     if (newQuantity < 1) {

@@ -8,6 +8,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -343,11 +344,16 @@ export default function ProductsListClient({
                       <TableRow key={product.id}>
                         <TableCell>
                           {product.image ? (
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="h-12 w-12 rounded object-cover"
-                            />
+                            <div className="relative h-12 w-12 overflow-hidden rounded">
+                              <Image
+                                src={product.image}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                sizes="48px"
+                                priority={false}
+                              />
+                            </div>
                           ) : (
                             <div className="flex h-12 w-12 items-center justify-center rounded bg-muted">
                               <span className="text-xs text-muted-foreground">No Image</span>
@@ -383,8 +389,19 @@ export default function ProductsListClient({
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <EllipsisVerticalIcon className="h-4 w-4" />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={deletingId === product.id}
+                              >
+                                {deletingId === product.id ? (
+                                  <span className="flex items-center gap-1 text-muted-foreground">
+                                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/50 border-t-transparent" />
+                                    <span className="text-xs">Working...</span>
+                                  </span>
+                                ) : (
+                                  <EllipsisVerticalIcon className="h-4 w-4" />
+                                )}
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -408,6 +425,7 @@ export default function ProductsListClient({
                               <DropdownMenuItem
                                 onClick={() => handleDelete(product)}
                                 className="text-destructive"
+                                disabled={deletingId === product.id}
                               >
                                 <TrashIcon className="mr-2 h-4 w-4" />
                                 Delete

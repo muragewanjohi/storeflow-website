@@ -6,9 +6,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { type Tenant } from '@/lib/tenant-context';
 import { type AuthUser } from '@/lib/auth/types';
 import {
@@ -82,10 +82,13 @@ const navigation: NavigationItem[] = [
 const CatalogIcon = Squares2X2Icon;
 
 export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externalMobileMenuOpen, setMobileMenuOpen: externalSetMobileMenuOpen, collapsed = false }: Readonly<SidebarProps>) {
+  const router = useRouter();
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
   const [catalogExpanded, setCatalogExpanded] = useState(true);
   const [contentExpanded, setContentExpanded] = useState(true);
   const [supportExpanded, setSupportExpanded] = useState(true);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   
   // Use external state if provided, otherwise use internal state
@@ -155,6 +158,22 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     (item) => item.group === 'Support' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
+  // Navigation handler with loading state
+  const navigateWithLoading = (href: string) => {
+    if (pathname === href) return;
+    setPendingHref(href);
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
+  // Clear pending state after transition settles
+  useEffect(() => {
+    if (!isPending) {
+      setPendingHref(null);
+    }
+  }, [isPending]);
+
   return (
     <>
       {/* Mobile sidebar */}
@@ -163,7 +182,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
           <div className="fixed inset-y-0 left-0 z-50 w-full overflow-y-auto bg-card px-6 pb-6 sm:max-w-sm sm:ring-1 sm:ring-border">
             <div className="flex h-16 shrink-0 items-center border-b">
-              <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigateWithLoading('/dashboard');
+                  setMobileMenuOpen(false);
+                }}
+                aria-busy={pendingHref === '/dashboard'}
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <CubeIcon className="h-5 w-5" />
                 </div>
@@ -234,11 +262,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             const isActive = item.name === 'Dashboard' 
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
+                            const isItemPending = pendingHref === item.href;
                             return (
                               <li key={item.href}>
                                 <Link
                                   href={item.href}
-                                  onClick={() => setMobileMenuOpen(false)}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    navigateWithLoading(item.href);
+                                    setMobileMenuOpen(false);
+                                  }}
                                   className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
                                     item.submenu ? 'px-6' : 'px-3'
                                   } ${
@@ -246,6 +279,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                                       ? 'bg-primary text-primary-foreground shadow-sm'
                                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                   }`}
+                                  aria-busy={isItemPending}
                                 >
                                   <item.icon
                                     className={`h-5 w-5 shrink-0 ${
@@ -253,7 +287,12 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                                     }`}
                                     aria-hidden="true"
                                   />
-                                  {item.name}
+                                  <span className="flex items-center gap-2">
+                                    {item.name}
+                                    {isItemPending && (
+                                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/60 border-t-transparent" />
+                                    )}
+                                  </span>
                                 </Link>
                               </li>
                             );
@@ -334,14 +373,19 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                     {isExpanded && (
                       <ul role="list" className="flex flex-col gap-y-1">
                         {items.map((item: any) => {
-                          // Dashboard should only be active when pathname is exactly /dashboard
-                          const isActive = item.name === 'Dashboard' 
-                            ? pathname === item.href
-                            : pathname === item.href || pathname.startsWith(item.href + '/');
+                          const isActive =
+                            item.name === 'Dashboard'
+                              ? pathname === item.href
+                              : pathname === item.href || pathname.startsWith(item.href + '/');
+                          const isItemPending = pendingHref === item.href;
                           return (
                             <li key={item.href}>
                               <Link
                                 href={item.href}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  navigateWithLoading(item.href);
+                                }}
                                 className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
                                   item.submenu ? 'px-6' : 'px-3'
                                 } ${
@@ -352,14 +396,24 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                                 }`}
                                 title={collapsed ? item.name : undefined}
+                                aria-busy={isItemPending}
                               >
                                 <item.icon
                                   className={`h-5 w-5 shrink-0 ${
-                                    isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'
+                                    isActive
+                                      ? 'text-primary-foreground'
+                                      : 'text-muted-foreground group-hover:text-accent-foreground'
                                   }`}
                                   aria-hidden="true"
                                 />
-                                {!collapsed && <span>{item.name}</span>}
+                                {!collapsed && (
+                                  <span className="flex items-center gap-2">
+                                    {item.name}
+                                    {isItemPending && (
+                                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary/60 border-t-transparent" />
+                                    )}
+                                  </span>
+                                )}
                               </Link>
                             </li>
                           );

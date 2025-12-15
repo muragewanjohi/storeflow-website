@@ -31,7 +31,10 @@
     "test:all": "npm run test && npm run test:e2e:chromium",
     "playwright:install": "playwright install",
     "screenshots:user-guide": "tsx scripts/capture-user-guide-screenshots.ts",
-    "screenshots:electric-scooters": "tsx scripts/capture-electric-scooters-screenshots.ts"
+    "screenshots:electric-scooters": "tsx scripts/capture-electric-scooters-screenshots.ts",
+    "deploy:verify-rls": "tsx scripts/verify-rls-policies.ts",
+    "deploy:smoke-tests": "tsx scripts/smoke-tests.ts",
+    "deploy:verify-ssl": "tsx scripts/verify-ssl-certificates.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

@@ -13,6 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -341,14 +342,16 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
               <Label htmlFor="store_logo">Store Logo</Label>
               <div className="flex items-start gap-4">
                 {formData.store_logo && (
-                  <div className="relative w-24 h-24 border rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img
+                  <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border bg-gray-100">
+                    <Image
                       src={formData.store_logo}
                       alt="Store logo"
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="96px"
                       onError={(e) => {
                         // Hide broken images
-                        e.currentTarget.style.display = 'none';
+                        (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                   </div>
