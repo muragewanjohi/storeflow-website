@@ -11,18 +11,21 @@ import StorefrontHeader from './header';
 export default async function StorefrontHeaderServer() {
   const tenant = await getTenant();
   
+  // Default logo from public folder
+  const defaultLogo = '/logo_with_name.png';
+  
   if (!tenant) {
     // Fallback to default if no tenant
-    return <StorefrontHeader storeName="DukaNest" storeLogo={null} />;
+    return <StorefrontHeader storeName="DukaNest" storeLogo={defaultLogo} />;
   }
 
   // Fetch store settings
   const settings = await getStaticOptions(tenant.id, ['store_logo']);
   
   // Use tenant name as store name (from tenants table)
-  // Store logo comes from static_options
+  // Store logo comes from static_options, fallback to default logo
   const storeName = tenant.name || tenant.subdomain || 'DukaNest';
-  const storeLogo = settings.store_logo || null;
+  const storeLogo = settings.store_logo || defaultLogo;
 
   return <StorefrontHeader storeName={storeName} storeLogo={storeLogo} />;
 }

@@ -40,29 +40,52 @@ export default function HomepageClient({
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative py-16 md:py-24 bg-gradient-to-b from-primary/10 to-background">
+      <section className="relative py-16 md:py-24 bg-gradient-to-b from-primary/5 via-background to-background">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="text-center md:text-left">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                Welcome to {tenantName}
+            <div className="text-center md:text-left space-y-6">
+              {/* Tagline */}
+              <div className="flex items-center gap-2 justify-center md:justify-start text-sm md:text-base text-muted-foreground">
+                <span>Our Platform, Your Success</span>
+                <span className="text-lg">🎯</span>
+              </div>
+              
+              {/* Headline */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+                Build your Online Shop site within{' '}
+                <span className="text-primary">minutes</span>
               </h1>
-              <p className="text-xl text-muted-foreground mb-8">
-                Discover amazing products at great prices. Shop the latest trends and find everything you need.
+              
+              {/* Description */}
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto md:mx-0">
+                Manage products, payments, and sales effortlessly. Everything you need to grow your business is just a click away. Start today and simplify your e-commerce journey.
               </p>
-              <div className="flex gap-4 justify-center md:justify-start">
-                <Button asChild size="lg">
-                  <Link href="/products">Shop Now</Link>
+              
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start pt-4">
+                <Button asChild size="lg" className="text-base px-8 py-6 group">
+                  <Link href="/products">
+                    Get Started Now
+                    <svg className="ml-2 h-5 w-5 inline-block group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg">
-                  <Link href="/products">Browse Products</Link>
+                <Button asChild variant="outline" size="lg" className="text-base px-8 py-6">
+                  <Link href="/products">
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                 </Button>
               </div>
             </div>
-            <div className="relative h-[300px] md:h-[400px] rounded-2xl overflow-hidden shadow-xl">
+            
+            {/* Image */}
+            <div className="relative h-[400px] md:h-[500px] lg:h-[600px] rounded-2xl overflow-hidden shadow-2xl">
               <Image
-                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80"
-                alt="Shopping experience"
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=1200&fit=crop"
+                alt="Person holding laptop"
                 fill
                 className="object-cover"
                 priority

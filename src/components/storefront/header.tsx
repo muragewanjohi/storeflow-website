@@ -148,8 +148,10 @@ export default function StorefrontHeader({
 
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'Products', href: '/products' },
-    { name: 'About', href: '/about' },
+    { name: 'Shops', href: '/products' },
+    { name: 'Pricing', href: '/pricing' },
+    { name: 'Templates', href: '/templates' },
+    { name: 'Blog', href: '/blog' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -171,7 +173,7 @@ export default function StorefrontHeader({
                   <img 
                     src={storeLogo} 
                     alt={storeName}
-                    className="h-10 md:h-12 w-auto object-contain max-w-[180px] md:max-w-[240px]"
+                    className="h-12 md:h-16 w-auto object-contain max-w-[220px] md:max-w-[300px]"
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
@@ -185,7 +187,7 @@ export default function StorefrontHeader({
                   <img 
                     src={storeLogo} 
                     alt={storeName}
-                    className="h-10 md:h-12 w-auto object-contain max-w-[180px] md:max-w-[240px]"
+                    className="h-12 md:h-16 w-auto object-contain max-w-[220px] md:max-w-[300px]"
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
@@ -266,42 +268,21 @@ export default function StorefrontHeader({
             ) : (
               <div className="flex items-center gap-2">
                 {isPreview && onNavigate ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        onNavigate('/customer-login');
-                      }}
-                    >
-                      Sign In
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="hidden sm:inline-flex"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        // Sign up could also navigate to sign-in in preview
-                        onNavigate('/customer-login');
-                      }}
-                    >
-                      Sign Up
-                    </Button>
-                  </>
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onNavigate('/customer-login');
+                    }}
+                  >
+                    Login
+                  </Button>
                 ) : (
-                  <>
-                    <Link href="/customer-login">
-                      <Button variant="ghost" size="sm">
-                        Sign In
-                      </Button>
-                    </Link>
-                    <Link href="/customer-register">
-                      <Button size="sm" className="hidden sm:inline-flex">
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </>
+                  <Link href="/customer-login">
+                    <Button size="sm">
+                      Login
+                    </Button>
+                  </Link>
                 )}
               </div>
             )}
@@ -425,22 +406,13 @@ export default function StorefrontHeader({
                     </button>
                   </>
                 ) : (
-                  <>
-                    <Link
-                      href="/customer-login"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/customer-register"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      Sign Up
-                    </Link>
-                  </>
+                  <Link
+                    href="/customer-login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Login
+                  </Link>
                 )}
               </div>
             </div>
