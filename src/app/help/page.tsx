@@ -9,7 +9,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import UserGuideContent from './user-guide-content';
 import MarketingHeader from '@/components/marketing/header';
-import MarketingFooter from '@/components/marketing/footer';
+import { Footer as MarketingFooter } from '@/components/marketing/footer';
 
 export const dynamic = 'force-dynamic';
 
