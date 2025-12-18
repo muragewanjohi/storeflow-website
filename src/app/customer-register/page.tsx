@@ -10,6 +10,8 @@ import StorefrontFooter from '@/components/storefront/footer';
 import CustomerRegisterForm from './customer-register-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+export const dynamic = 'force-dynamic';
+
 export default function CustomerRegisterPage() {
   return (
     <div className="min-h-screen flex flex-col">
