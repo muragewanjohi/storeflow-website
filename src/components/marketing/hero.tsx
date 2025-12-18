@@ -6,17 +6,17 @@ import { ImageWithFallback } from './image-with-fallback';
 
 export function Hero() {
   return (
-    <section id="home" className="relative overflow-hidden py-20 lg:py-32 bg-[#f6faff]">
+    <section id="home" className="relative overflow-hidden py-16 lg:py-24 bg-gradient-to-br from-white to-[#f6faff]">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#0025cc]/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#0025cc]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1000ms' }}></div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[600px] lg:min-h-[700px]">
           {/* Left Content */}
-          <div className="space-y-8">
+          <div className="space-y-8 lg:ml-5">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 text-[#0c0528]">
               <span className="text-base">{`Our Platform, Your Success Icon `}</span>
@@ -55,12 +55,12 @@ export function Hero() {
           </div>
 
           {/* Right Content - Hero Image */}
-          <div className="relative">
-            <div className="relative">
+          <div className="relative flex items-end justify-end self-stretch">
+            <div className="relative w-full lg:w-[130%] xl:w-[150%] -mr-0 lg:-mr-[28px] xl:-mr-[60px] h-full">
               <ImageWithFallback
                 alt="Build your online shop"
-                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=1200&fit=crop"
-                className="w-full h-auto"
+                src="/hero_image.png"
+                className="w-full h-full object-contain object-bottom"
               />
             </div>
           </div>

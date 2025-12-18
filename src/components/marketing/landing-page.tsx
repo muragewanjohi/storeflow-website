@@ -20,6 +20,7 @@ import { Blog } from './blog';
 import { FAQ } from './faq';
 import { Newsletter } from './newsletter';
 import { LandingFooter } from './landing-footer';
+import { Footer } from './footer';
 
 export default function MarketingLandingPage() {
   return (
@@ -29,14 +30,13 @@ export default function MarketingLandingPage() {
       <HowItWorks />
       <MoreFeatures />
       <Themes />
-      <Stats />
-      <WhyChooseUs />
+      {/* <Stats /> */}
       <Pricing />
       <Testimonials />
       <Blog />
-      <FAQ />
+      {/* <FAQ /> */}
       <Newsletter />
-      <LandingFooter />
+      <Footer />
     </div>
   );
 }

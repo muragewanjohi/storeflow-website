@@ -59,25 +59,33 @@ export function detectUserLocation(headers: Headers): PricingInfo {
 }
 
 /**
- * Convert USD price to KES price
- * Basic: $10 -> Ksh 1,000
- * Pro: $30 -> Ksh 3,000
+ * Get localized price based on plan name and location
+ * For Kenya: Fixed KES prices (no conversion)
+ * For others: USD prices
  */
-export function getLocalizedPrice(planName: string, isKenya: boolean): number {
+export function getLocalizedPrice(planName: string, isKenya: boolean, usdPrice?: number): number {
   if (!isKenya) {
-    // USD prices
+    // Return USD prices as-is
+    if (usdPrice !== undefined) {
+      return usdPrice;
+    }
+    // Fallback to hardcoded USD prices
     if (planName.toLowerCase().includes('basic')) {
       return 10;
-    } else if (planName.toLowerCase().includes('pro')) {
+    } else if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
       return 30;
+    } else if (planName.toLowerCase().includes('premium')) {
+      return 60;
     }
     return 0;
   } else {
-    // KES prices
+    // Fixed KES prices for Kenya (no conversion)
     if (planName.toLowerCase().includes('basic')) {
-      return 1000;
-    } else if (planName.toLowerCase().includes('pro')) {
-      return 3000;
+      return 1000; // KES 1,000
+    } else if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
+      return 3000; // KES 3,000
+    } else if (planName.toLowerCase().includes('premium')) {
+      return 6000; // KES 6,000
     }
     return 0;
   }

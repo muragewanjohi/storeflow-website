@@ -40,6 +40,7 @@ export default function PricingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currencySymbol, setCurrencySymbol] = useState<'Ksh' | '$'>('$');
+  const [isKenya, setIsKenya] = useState(false);
 
   useEffect(() => {
     async function fetchPlans() {
@@ -57,6 +58,9 @@ export default function PricingPage() {
           }
         }
 
+        setIsKenya(locationInfo.isKenya);
+        setCurrencySymbol(locationInfo.currencySymbol);
+
         // Fetch plans with location header
         const response = await fetch('/api/pricing', {
           headers: {
@@ -69,6 +73,8 @@ export default function PricingPage() {
           throw new Error('Failed to fetch pricing plans');
         }
         const data: PricingResponse = await response.json();
+        
+        // API should already return correct prices based on location
         setPlans(data.plans || []);
         
         // Use client-detected currency if API didn't provide it
@@ -227,10 +233,10 @@ export default function PricingPage() {
                     <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
                     <div className="mb-6">
                       <span className="text-4xl font-bold">
-                        {plan.currencySymbol || currencySymbol}
-                        {plan.currencySymbol === 'Ksh' 
-                          ? plan.price.toLocaleString('en-KE')
-                          : plan.price.toFixed(2)
+                        {(plan.currencySymbol || currencySymbol) === 'Ksh' ? '' : (plan.currencySymbol || currencySymbol)}
+                        {(plan.currencySymbol || currencySymbol) === 'Ksh' 
+                          ? `Ksh ${plan.price.toLocaleString('en-KE')}`
+                          : `${(plan.currencySymbol || currencySymbol)}${plan.price.toFixed(2)}`
                         }
                       </span>
                       <span className="text-muted-foreground">/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}</span>

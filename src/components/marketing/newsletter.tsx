@@ -21,7 +21,7 @@ export function Newsletter() {
           />
           <Button size="lg">Subscribe</Button>
         </div>
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center text-sm text-muted-foreground">
+        {/* <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             <span>example@dukanest.com</span>
@@ -30,7 +30,7 @@ export function Newsletter() {
             <Phone className="h-4 w-4" />
             <span>+1 (555) 123-4567</span>
           </div>
-        </div>
+        </div> */}
       </div>
     </section>
   );

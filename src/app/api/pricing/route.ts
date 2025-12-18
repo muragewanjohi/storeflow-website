@@ -66,12 +66,15 @@ export async function GET(request: NextRequest) {
       features: any;
       status: string | null;
     }) => {
-      // Get localized price based on location
-      const localizedPrice = getLocalizedPrice(plan.name, locationInfo.isKenya);
+      // Convert Prisma Decimal to number
+      const usdPrice = Number(plan.price);
+      
+      // Get localized price based on location (pass USD price for conversion)
+      const localizedPrice = getLocalizedPrice(plan.name, locationInfo.isKenya, usdPrice);
       
       return {
         ...plan,
-        price: localizedPrice || Number(plan.price), // Use localized price if available, otherwise use DB price
+        price: localizedPrice || usdPrice, // Use localized price if available, otherwise use DB price
         currency: locationInfo.currency,
         currencySymbol: locationInfo.currencySymbol,
       };

@@ -2134,6 +2134,380 @@ vercel env add VERCEL_TOKEN
 
 ---
 
+## **Phase 4: Post-Launch Features (Pricing Plan Features)**
+
+**Note:** These features are listed in the pricing plans but not yet implemented. They should be prioritized based on customer demand and business value.
+
+**📄 Reference:** See [`docs/PRICING_FEATURES_IMPLEMENTATION.md`](../docs/PRICING_FEATURES_IMPLEMENTATION.md) for detailed implementation guides.
+
+### Database Schema Enhancement for Plan Features
+
+**Current State:**
+- `price_plans.features` JSONB field stores numeric limits (max_products, max_orders, etc.)
+- Feature flags (boolean features) not yet stored
+
+**Recommended Enhancement:**
+- Store both limits and feature flags in `price_plans.features` JSONB
+- Structure: `{ limits: {...}, features: {...} }`
+- See implementation guide for detailed schema
+
+**Migration Required:**
+```sql
+-- Update existing plans to include feature flags
+UPDATE price_plans
+SET features = jsonb_set(
+  features,
+  '{features}',
+  '{"email_support": true}'::jsonb
+)
+WHERE name = 'Basic Plan';
+```
+
+---
+
+### Priority 1: High-Value Features
+
+#### **Feature 1: Abandoned Cart Recovery** ⏳
+
+**Status:** Not Implemented  
+**Plans:** Standard, Premium  
+**Priority:** High (conversion optimization)  
+**Estimated Time:** 16-20 hours
+
+**Implementation Tasks:**
+- [ ] Create `abandoned_carts` table schema
+- [ ] Implement cart abandonment tracking (1+ hour idle)
+- [ ] Build email reminder system (1h, 24h, 72h reminders)
+- [ ] Add discount code generation for reminders
+- [ ] Create admin dashboard for abandoned carts
+- [ ] Implement recovery tracking and statistics
+- [ ] Add cron job for daily abandoned cart processing
+- [ ] Create API endpoints for tracking and management
+- [ ] Add feature flag to plan features JSON
+
+**Database Schema:**
+```sql
+CREATE TABLE abandoned_carts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id),
+  session_id VARCHAR(255),
+  cart_items JSONB NOT NULL,
+  email VARCHAR(255),
+  last_activity TIMESTAMP DEFAULT NOW(),
+  reminder_sent BOOLEAN DEFAULT false,
+  reminder_count INTEGER DEFAULT 0,
+  recovered BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**API Endpoints:**
+- `POST /api/abandoned-carts/track` - Track abandoned cart
+- `GET /api/abandoned-carts` - List abandoned carts (admin)
+- `POST /api/abandoned-carts/:id/recover` - Mark as recovered
+- `GET /api/abandoned-carts/stats` - Recovery statistics
+
+---
+
+#### **Feature 2: Gift Cards** ⏳
+
+**Status:** Not Implemented  
+**Plans:** Standard, Premium  
+**Priority:** High (revenue generation)  
+**Estimated Time:** 20-24 hours
+
+**Implementation Tasks:**
+- [ ] Create `gift_cards` and `gift_card_transactions` tables
+- [ ] Implement gift card purchase flow
+- [ ] Build gift card code generation (unique, secure codes)
+- [ ] Add gift card application at checkout
+- [ ] Implement partial usage (remaining balance tracking)
+- [ ] Create email delivery to recipient
+- [ ] Build admin dashboard for gift card management
+- [ ] Add expiration date handling
+- [ ] Implement usage tracking and reporting
+- [ ] Add feature flag to plan features JSON
+
+**Database Schema:**
+```sql
+CREATE TABLE gift_cards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  balance DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(10) DEFAULT 'USD',
+  customer_id UUID REFERENCES customers(id),
+  recipient_email VARCHAR(255),
+  expires_at TIMESTAMP,
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE gift_card_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gift_card_id UUID NOT NULL REFERENCES gift_cards(id),
+  order_id UUID REFERENCES orders(id),
+  amount DECIMAL(10,2) NOT NULL,
+  transaction_type VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**API Endpoints:**
+- `POST /api/gift-cards` - Purchase gift card
+- `GET /api/gift-cards/:code/validate` - Validate gift card code
+- `POST /api/gift-cards/:code/apply` - Apply to cart
+- `GET /api/gift-cards` - List gift cards (admin)
+- `GET /api/gift-cards/my-cards` - Customer's gift cards
+
+---
+
+#### **Feature 3: Advanced Analytics** ⏳
+
+**Status:** Partially Implemented (basic analytics exists)  
+**Plans:** Premium  
+**Priority:** Medium (enhancement)  
+**Estimated Time:** 32-40 hours
+
+**Current State:**
+- ✅ Basic analytics dashboard exists (`/dashboard/analytics`)
+- ✅ Revenue, sales, customer, inventory reports
+- ✅ Export functionality
+
+**Missing "Advanced" Features:**
+- [ ] Cohort analysis (customer retention, revenue cohorts)
+- [ ] Funnel analysis (conversion funnel, drop-off points)
+- [ ] Predictive analytics (sales forecasting, CLV)
+- [ ] Custom reports builder (drag-and-drop)
+- [ ] Scheduled reports (email delivery)
+- [ ] A/B testing integration
+- [ ] Advanced segmentation
+- [ ] Real-time analytics dashboard
+
+**Implementation Tasks:**
+- [ ] Enhance existing analytics dashboard
+- [ ] Create cohort analysis queries and visualizations
+- [ ] Build funnel analysis components
+- [ ] Implement predictive analytics models
+- [ ] Create custom report builder UI
+- [ ] Add scheduled report generation (cron job)
+- [ ] Integrate A/B testing framework
+- [ ] Add feature flag to plan features JSON
+
+---
+
+#### **Feature 4: API Access** ⏳
+
+**Status:** Partially Implemented (API routes exist, no key management)  
+**Plans:** Premium  
+**Priority:** Medium (developer feature)  
+**Estimated Time:** 24-32 hours
+
+**Current State:**
+- ✅ API routes exist (`/api/*`)
+- ✅ Authentication via Supabase JWT
+- ❌ No dedicated API key management
+
+**Missing Features:**
+- [ ] API key generation and management
+- [ ] API key authentication middleware
+- [ ] Rate limiting per API key
+- [ ] Scope/permission system for API keys
+- [ ] API documentation (OpenAPI/Swagger)
+- [ ] Webhook support (event subscriptions)
+- [ ] Webhook retry logic and logging
+
+**Implementation Tasks:**
+- [ ] Create `api_keys` and `webhooks` tables
+- [ ] Build API key generation and management UI
+- [ ] Implement API key authentication middleware
+- [ ] Add rate limiting middleware
+- [ ] Create scope/permission system
+- [ ] Generate OpenAPI/Swagger documentation
+- [ ] Build webhook subscription system
+- [ ] Implement webhook delivery and retry logic
+- [ ] Add feature flag to plan features JSON
+
+**Database Schema:**
+```sql
+CREATE TABLE api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  key_hash VARCHAR(255) UNIQUE NOT NULL,
+  scopes JSONB DEFAULT '[]',
+  rate_limit INTEGER DEFAULT 1000,
+  last_used_at TIMESTAMP,
+  expires_at TIMESTAMP,
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE webhooks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  url VARCHAR(500) NOT NULL,
+  events JSONB NOT NULL,
+  secret VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+### Priority 2: Coming Soon Features
+
+#### **Feature 5: Automatic Payment Verification (Mpesa, Stripe)** ⏳
+
+**Status:** Coming Soon  
+**Plans:** Standard, Premium  
+**Priority:** Medium (payment optimization)  
+**Estimated Time:** 16-20 hours
+
+**Implementation Tasks:**
+- [ ] Integrate Mpesa STK Push API
+- [ ] Implement payment status polling
+- [ ] Add automatic order confirmation on payment
+- [ ] Integrate Stripe webhook for payment confirmation
+- [ ] Build payment verification tracking
+- [ ] Add feature flag to plan features JSON
+
+---
+
+#### **Feature 6: Custom Domain Purchase** ⏳
+
+**Status:** Coming Soon  
+**Plans:** Standard, Premium  
+**Priority:** Low (nice-to-have)  
+**Estimated Time:** 24-32 hours
+
+**Implementation Tasks:**
+- [ ] Integrate domain registrar API (Namecheap, GoDaddy)
+- [ ] Build domain search and availability check
+- [ ] Create domain purchase flow
+- [ ] Implement DNS configuration automation
+- [ ] Add auto-renewal system
+- [ ] Integrate with Vercel domain API
+- [ ] Add feature flag to plan features JSON
+
+**Database Schema:**
+```sql
+CREATE TABLE domain_purchases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  domain_name VARCHAR(255) NOT NULL,
+  provider VARCHAR(100) NOT NULL,
+  purchase_price DECIMAL(10,2) NOT NULL,
+  renewal_price DECIMAL(10,2),
+  expires_at TIMESTAMP,
+  status VARCHAR(50) DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## **Feature Flag Implementation**
+
+### Utility Functions
+
+Create feature checking utilities in `src/lib/subscriptions/features.ts`:
+
+```typescript
+export async function hasFeature(
+  tenant: Tenant,
+  feature: keyof PlanFeatures
+): Promise<boolean> {
+  // Check if plan has feature enabled
+}
+
+export async function requireFeature(
+  tenant: Tenant,
+  feature: keyof PlanFeatures
+): Promise<void> {
+  // Throw error if feature not available
+}
+```
+
+### Middleware
+
+Create feature gating middleware:
+
+```typescript
+export function withFeature(feature: keyof PlanFeatures) {
+  return (handler: (req: NextRequest) => Promise<NextResponse>) => {
+    // Wrap handler with feature check
+  };
+}
+```
+
+### Database Updates
+
+Update existing plans to include feature flags:
+
+```sql
+-- Basic Plan
+UPDATE price_plans
+SET features = jsonb_set(
+  features,
+  '{features}',
+  '{"email_support": true}'::jsonb
+)
+WHERE name = 'Basic Plan';
+
+-- Standard Plan
+UPDATE price_plans
+SET features = jsonb_set(
+  features,
+  '{features}',
+  '{
+    "abandoned_cart_recovery": true,
+    "gift_cards": true,
+    "priority_support": true,
+    "email_support": true
+  }'::jsonb
+)
+WHERE name = 'Standard Plan';
+
+-- Premium Plan
+UPDATE price_plans
+SET features = jsonb_set(
+  features,
+  '{features}',
+  '{
+    "abandoned_cart_recovery": true,
+    "gift_cards": true,
+    "advanced_analytics": true,
+    "api_access": true,
+    "priority_support": true,
+    "email_support": true
+  }'::jsonb
+)
+WHERE name = 'Premium Plan';
+```
+
+---
+
+## **Summary: Unimplemented Features**
+
+| Feature | Plans | Priority | Estimated Time | Status |
+|---------|-------|----------|----------------|--------|
+| Abandoned Cart Recovery | Standard, Premium | High | 16-20h | ⏳ Not Started |
+| Gift Cards | Standard, Premium | High | 20-24h | ⏳ Not Started |
+| Advanced Analytics | Premium | Medium | 32-40h | ⚠️ Partially Implemented |
+| API Access | Premium | Medium | 24-32h | ⚠️ Partially Implemented |
+| Auto Payment Verification | Standard, Premium | Medium | 16-20h | ⏳ Coming Soon |
+| Custom Domain Purchase | Standard, Premium | Low | 24-32h | ⏳ Coming Soon |
+
+**Total Estimated Time:** 132-168 hours (~3-4 weeks)
+
+**Recommendation:** Implement features in priority order, starting with Abandoned Cart Recovery and Gift Cards for maximum business value.
+
+---
+
 ## 🎯 Advantages of This Architecture
 
 ### Single Database Benefits:
