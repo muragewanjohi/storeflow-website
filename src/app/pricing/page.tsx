@@ -10,8 +10,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Loader2, Zap } from 'lucide-react';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
+import { getPlanFeatures } from '@/lib/pricing/features';
 
 interface PricingPlan {
   id: string;
@@ -96,61 +97,9 @@ export default function PricingPage() {
     router.push(`/register?plan=${planId}`);
   };
 
-  const formatFeatures = (features: any): string[] => {
-    if (!features || typeof features !== 'object') return [];
-    
-    const featureList: string[] = [];
-    if (features.max_products !== undefined) {
-      featureList.push(
-        features.max_products === -1 
-          ? 'Unlimited Products' 
-          : `Up to ${features.max_products} Products`
-      );
-    }
-    if (features.max_orders !== undefined) {
-      featureList.push(
-        features.max_orders === -1 
-          ? 'Unlimited Orders' 
-          : `Up to ${features.max_orders} Orders`
-      );
-    }
-    if (features.max_customers !== undefined) {
-      featureList.push(
-        features.max_customers === -1 
-          ? 'Unlimited Customers' 
-          : `Up to ${features.max_customers} Customers`
-      );
-    }
-    if (features.max_storage_mb !== undefined) {
-      const storageGB = features.max_storage_mb / 1024;
-      featureList.push(
-        features.max_storage_mb === -1 
-          ? 'Unlimited Storage' 
-          : `${storageGB} GB Storage`
-      );
-    }
-    if (features.max_pages !== undefined) {
-      featureList.push(
-        features.max_pages === -1 
-          ? 'Unlimited Pages' 
-          : `Up to ${features.max_pages} Pages`
-      );
-    }
-    if (features.max_blogs !== undefined) {
-      featureList.push(
-        features.max_blogs === -1 
-          ? 'Unlimited Blog Posts' 
-          : `Up to ${features.max_blogs} Blog Posts`
-      );
-    }
-    if (features.max_staff_users !== undefined) {
-      featureList.push(
-        features.max_staff_users === -1 
-          ? 'Unlimited Staff Users' 
-          : `Up to ${features.max_staff_users} Staff Users`
-      );
-    }
-    return featureList;
+  // Use original hardcoded features instead of formatting from API
+  const getFeatures = (planName: string): string[] => {
+    return getPlanFeatures(planName);
   };
 
   if (isLoading) {
@@ -175,12 +124,12 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold text-primary">
+            <Link href="/" className="text-2xl font-bold text-[#0025cc]">
               DukaNest
             </Link>
             <Button asChild variant="outline">
@@ -192,11 +141,15 @@ export default function PricingPage() {
 
       {/* Pricing Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Choose Your Plan</h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Select the perfect plan for your business. All plans include a 14-day free trial.
+        <div className="max-w-7xl mx-auto">
+          {/* Section Header */}
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <p className="text-[#0025cc] font-medium mb-2">Pricing Plan</p>
+            <h1 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
+              Choose Your Perfect Business Plan
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              Select the perfect plan for your business. All plans include a free trial.
             </p>
           </div>
 
@@ -208,55 +161,95 @@ export default function PricingPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {plans.map((plan, index) => {
-                const features = formatFeatures(plan.features);
+                const features = getFeatures(plan.name);
                 const isPopular = index === Math.floor(plans.length / 2); // Middle plan is popular
                 
                 return (
                   <div
                     key={plan.id}
-                    className={`p-8 rounded-lg border-2 ${
-                      isPopular ? 'border-primary bg-primary/5' : 'bg-background'
-                    } hover:shadow-lg transition-all duration-300 relative`}
+                    className={`relative bg-white rounded-2xl p-8 transition-all duration-300 ${
+                      isPopular
+                        ? 'shadow-2xl transform scale-105 border-2 border-[#0025cc]'
+                        : 'shadow-lg hover:shadow-xl hover:transform hover:scale-105'
+                    }`}
                   >
+                    {/* Popular Badge */}
                     {isPopular && (
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
+                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
+                          <Zap className="w-4 h-4" />
                           Most Popular
                         </span>
                       </div>
                     )}
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {plan.trial_days ? `${plan.trial_days}-Day Trial` : 'No Trial'}
+
+                    {/* Plan Name */}
+                    <div className="text-center mb-6">
+                      <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
+                        {plan.name}
+                      </h3>
                     </div>
-                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                    <div className="mb-6">
-                      <span className="text-4xl font-bold">
-                        {(plan.currencySymbol || currencySymbol) === 'Ksh' ? '' : (plan.currencySymbol || currencySymbol)}
-                        {(plan.currencySymbol || currencySymbol) === 'Ksh' 
-                          ? `Ksh ${plan.price.toLocaleString('en-KE')}`
-                          : `${(plan.currencySymbol || currencySymbol)}${plan.price.toFixed(2)}`
-                        }
-                      </span>
-                      <span className="text-muted-foreground">/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}</span>
+
+                    {/* Price */}
+                    <div className="text-center mb-6">
+                      <div className="flex items-baseline justify-center">
+                        <span className={`text-5xl font-bold ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
+                          {(plan.currencySymbol || currencySymbol) === 'Ksh' 
+                            ? `Ksh ${plan.price.toLocaleString('en-KE')}`
+                            : `${(plan.currencySymbol || currencySymbol)}${plan.price.toFixed(2)}`
+                          }
+                        </span>
+                        <span className={`ml-2 ${isPopular ? 'text-[#5B8AC4]/80' : 'text-[#8d8d8d]'}`}>
+                          / {plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
+                        </span>
+                      </div>
+                      {plan.trial_days && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {plan.trial_days}-Day Free Trial
+                        </p>
+                      )}
                     </div>
-                    <ul className="space-y-3 mb-8">
-                      {features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center space-x-3">
-                          <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
+
+                    {/* What's Included */}
+                    <div className={`mb-6 ${isPopular ? 'text-[#0025cc]/90' : 'text-[#0c0528]'}`}>
+                      <p className="font-semibold text-lg mb-4">{`What's Included`}</p>
+                    </div>
+
+                    {/* Features List */}
+                    <div className="space-y-3 mb-8">
+                      {features.map((feature, featureIndex) => (
+                        <div key={featureIndex} className="flex items-start gap-3">
+                          <div className={`rounded-full p-1 mt-0.5 ${
+                            isPopular ? 'bg-[#0025cc]/20' : 'bg-[#0025cc]'
+                          }`}>
+                            <CheckCircle2 className={`w-3 h-3 ${isPopular ? 'text-[#0025cc]' : 'text-white'}`} />
+                          </div>
+                          <span className={`text-sm ${isPopular ? 'text-[#0025cc]/90' : 'text-[#8d8d8d]'}`}>
+                            {feature}
+                          </span>
+                        </div>
                       ))}
-                    </ul>
-                    <Button
-                      onClick={() => handleSelectPlan(plan.id)}
-                      className={`w-full ${isPopular ? '' : 'variant-outline'}`}
-                      variant={isPopular ? 'default' : 'outline'}
+                    </div>
+
+                    {/* CTA Button */}
+                    <button
+                      onClick={() => plan.name.toLowerCase() !== 'premium' && handleSelectPlan(plan.id)}
+                      disabled={plan.name.toLowerCase() === 'premium'}
+                      className={`w-full py-4 rounded-lg font-medium transition-all ${
+                        plan.name.toLowerCase() === 'premium'
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : isPopular
+                          ? 'bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white hover:shadow-xl transform hover:-translate-y-1'
+                          : 'bg-gray-100 text-[#0025cc] hover:bg-[#0025cc] hover:text-white'
+                      }`}
                     >
-                      Get Started
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                      {plan.name.toLowerCase() === 'premium' ? 'Coming Soon' : 'Get Started'}
+                      {plan.name.toLowerCase() !== 'premium' && (
+                        <ArrowRight className="ml-2 h-4 w-4 inline" />
+                      )}
+                    </button>
                   </div>
                 );
               })}
@@ -265,9 +258,9 @@ export default function PricingPage() {
 
           <div className="text-center mt-12">
             <p className="text-muted-foreground mb-4">
-              All plans include 14-day free trial. No credit card required.
+              All plans include free trial. No credit card required.
             </p>
-            <Link href="/" className="text-primary hover:underline text-sm font-medium">
+            <Link href="/" className="text-[#0025cc] hover:underline text-sm font-medium">
               ← Back to Home
             </Link>
           </div>

@@ -36,10 +36,12 @@ export async function GET(request: NextRequest) {
     const pricePlans = await prisma.price_plans.findMany({
       where: {
         status: 'active',
-        // Only return Basic and Pro plans
+        // Return Basic, Pro/Standard, and Premium plans
         OR: [
           { name: 'Basic' },
           { name: 'Pro' },
+          { name: 'Standard' },
+          { name: 'Premium' },
         ],
       },
       orderBy: {
@@ -79,6 +81,26 @@ export async function GET(request: NextRequest) {
         currencySymbol: locationInfo.currencySymbol,
       };
     });
+
+    // Check if Premium plan exists, if not add it as a fallback
+    const hasPremium = plans.some(p => p.name.toLowerCase() === 'premium');
+    if (!hasPremium) {
+      const premiumPrice = getLocalizedPrice('Premium', locationInfo.isKenya);
+      plans.push({
+        id: 'premium-fallback',
+        name: 'Premium',
+        price: premiumPrice,
+        duration_months: 1,
+        trial_days: 14,
+        features: {},
+        status: 'active',
+        currency: locationInfo.currency,
+        currencySymbol: locationInfo.currencySymbol,
+      });
+    }
+
+    // Sort plans by price to ensure correct order (Basic, Standard/Pro, Premium)
+    plans.sort((a, b) => a.price - b.price);
 
     return NextResponse.json({ 
       plans,
