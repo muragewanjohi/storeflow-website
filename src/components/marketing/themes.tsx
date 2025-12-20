@@ -5,27 +5,27 @@ import { ImageWithFallback } from './image-with-fallback';
 const templates = [
   {
     name: 'Multipurpose Theme',
-    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80',
+    image: '/images/themes/electronics.png',
     color: 'from-blue-500 to-cyan-500'
   },
   {
     name: 'Grocery Theme',
-    image: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=800&q=80',
+    image: '/images/themes/grocery.png',
     color: 'from-green-500 to-emerald-500'
   },
   {
     name: 'Fashion Theme',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&q=80',
+    image: '/images/themes/general.png',
     color: 'from-pink-500 to-rose-500'
   },
   {
     name: 'Electronics Theme',
-    image: 'https://images.unsplash.com/photo-1556740758-90de374c12ad?w=800&q=80',
-    color: 'from-purple-500 to-indigo-500'
+    image: '/images/themes/electronics.png',
+    color: 'from-blue-500 to-cyan-500'
   },
   {
     name: 'Furniture Theme',
-    image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800&q=80',
+    image: '/images/themes/general.png',
     color: 'from-amber-500 to-orange-500'
   },
   {
