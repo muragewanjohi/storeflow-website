@@ -8,6 +8,8 @@ import { sendPlatformEmail } from '@/lib/email/service';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
 import { prisma } from '@/lib/prisma/client';
+import { getTenantPaymentUrl } from './tenant-url';
+import { getLocalizedPrice } from '@/lib/pricing/location';
 
 /**
  * Send subscription renewal reminder email (7 days before expiry)
@@ -16,6 +18,7 @@ export async function sendSubscriptionRenewalReminderEmail({
   tenant,
   expireDate,
   plan,
+  isKenya = false,
 }: {
   tenant: Tenant;
   expireDate: Date;
@@ -26,12 +29,21 @@ export async function sendSubscriptionRenewalReminderEmail({
     currency?: 'KES' | 'USD';
     currencySymbol?: 'Ksh' | '$';
   } | null;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
     const daysUntilExpiry = Math.ceil(
       (expireDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     );
+
+    // Determine pricing for Kenya vs others
+    const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
+    const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
+    const price = plan 
+      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      : 0;
+    const paymentUrl = getTenantPaymentUrl(tenant);
 
     const html = `
       <!DOCTYPE html>
@@ -56,10 +68,10 @@ export async function sendSubscriptionRenewalReminderEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">${plan?.price 
-                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
-                      ? Number(plan.price).toLocaleString('en-KE')
-                      : Number(plan.price).toFixed(2))
+                <td style="padding: 8px 0;">${price 
+                  ? (currencySymbol === 'Ksh' 
+                      ? `Ksh ${Number(price).toLocaleString('en-KE')}`
+                      : `${currencySymbol}${Number(price).toFixed(2)}`)
                   : '$0.00'}</td>
               </tr>
               <tr>
@@ -70,7 +82,7 @@ export async function sendSubscriptionRenewalReminderEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${paymentUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               Renew Subscription
             </a>
@@ -272,14 +284,24 @@ export async function sendPaymentDueReminderEmail({
   plan,
   amount,
   dueDate,
+  isKenya = false,
 }: {
   tenant: Tenant;
   plan: { name: string; price: number; duration_months: number } | null;
   amount: number;
   dueDate: Date;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currency = isKenya ? 'KES' : 'USD';
+    const currencySymbol = isKenya ? 'Ksh' : '$';
+    const finalAmount = plan && isKenya 
+      ? getLocalizedPrice(plan.name, true, amount) 
+      : amount;
+    const paymentUrl = getTenantPaymentUrl(tenant);
 
     const html = `
       <!DOCTYPE html>
@@ -304,7 +326,9 @@ export async function sendPaymentDueReminderEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Amount Due:</td>
-                <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #2563eb;">$${amount.toFixed(2)}</td>
+                <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #2563eb;">${currencySymbol === 'Ksh' 
+                  ? `Ksh ${Number(finalAmount).toLocaleString('en-KE')}`
+                  : `${currencySymbol}${Number(finalAmount).toFixed(2)}`}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Due Date:</td>
@@ -314,7 +338,7 @@ export async function sendPaymentDueReminderEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${paymentUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               Make Payment
             </a>
@@ -330,7 +354,9 @@ export async function sendPaymentDueReminderEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Payment Due Reminder - $${amount.toFixed(2)}`,
+      subject: `Payment Due Reminder - ${currencySymbol === 'Ksh' 
+        ? `Ksh ${Number(finalAmount).toLocaleString('en-KE')}`
+        : `${currencySymbol}${Number(finalAmount).toFixed(2)}`}`,
       html,
     });
   } catch (error) {

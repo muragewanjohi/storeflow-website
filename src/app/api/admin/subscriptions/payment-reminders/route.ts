@@ -19,18 +19,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { sendPaymentDueReminderEmail } from '@/lib/subscriptions/emails';
 import { sendSubscriptionRenewalReminderEmail } from '@/lib/subscriptions/emails';
+import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
 /**
  * GET /api/admin/subscriptions/payment-reminders
  * Send payment reminder emails
  */
 export async function GET(request: NextRequest) {
+  const logId = await startCronJobLog({
+    jobName: 'Payment Reminders',
+    jobPath: '/api/admin/subscriptions/payment-reminders',
+  });
+
   try {
     // Optional: Add secret token check for security
     const authHeader = request.headers.get('authorization');
     const expectedToken = process.env.CRON_SECRET_TOKEN;
     
     if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+      await completeCronJobLog(logId, 'failed', {
+        error: 'Unauthorized - Invalid token',
+      });
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 }
@@ -69,7 +78,17 @@ export async function GET(request: NextRequest) {
           not: null,
         },
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+        custom_domain: true,
+        country: true,
+        expire_date: true,
+        status: true,
+        plan_id: true,
+        contact_email: true,
+        data: true,
         price_plans: {
           select: {
             id: true,
@@ -145,6 +164,10 @@ export async function GET(request: NextRequest) {
         const shouldSendRenewalReminder = !lastRenewalReminderDateStr || lastRenewalReminderDateStr < todayStr;
         const shouldSendPaymentReminder = !lastPaymentReminderDateStr || lastPaymentReminderDateStr < todayStr;
 
+        // Detect if tenant is from Kenya (check country field)
+        const tenantCountry = (tenant as any).country || '';
+        const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA';
+
         // Send renewal reminder (daily for 7 days before expiry, only if payment is unpaid)
         if (daysUntilExpiry <= 7 && daysUntilExpiry > 0 && shouldSendRenewalReminder && isPaymentUnpaid) {
           await sendSubscriptionRenewalReminderEmail({
@@ -157,6 +180,7 @@ export async function GET(request: NextRequest) {
                   duration_months: tenant.price_plans.duration_months,
                 }
               : null,
+            isKenya,
           });
           results.renewal_reminders_sent++;
 
@@ -189,6 +213,7 @@ export async function GET(request: NextRequest) {
               : null,
             amount: Number(tenant.price_plans.price),
             dueDate: tenant.expire_date,
+            isKenya,
           });
           results.payment_reminders_sent++;
 

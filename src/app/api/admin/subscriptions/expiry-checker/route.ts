@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
 import { getTenantSubscriptionPricing } from '@/lib/subscriptions/pricing';
+import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
 // Grace period in days (default: 2 days)
 const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '2');
@@ -25,12 +26,20 @@ const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS ||
  * or called only from cron jobs
  */
 export async function GET(request: NextRequest) {
+  const logId = await startCronJobLog({
+    jobName: 'Expiry Checker',
+    jobPath: '/api/admin/subscriptions/expiry-checker',
+  });
+
   try {
     // Optional: Add secret token check for security
     const authHeader = request.headers.get('authorization');
     const expectedToken = process.env.CRON_SECRET_TOKEN;
     
     if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+      await completeCronJobLog(logId, 'failed', {
+        error: 'Unauthorized - Invalid token',
+      });
       return NextResponse.json(
         { message: 'Unauthorized' },
         { status: 401 }
@@ -136,16 +145,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      {
-        message: 'Expiry check completed',
-        results,
-        timestamp: now.toISOString(),
-      },
-      { status: 200 }
-    );
+    const response = {
+      message: 'Expiry check completed',
+      results,
+      timestamp: now.toISOString(),
+    };
+
+    await completeCronJobLog(logId, 'success', {
+      result: response.results,
+    });
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error('Error checking subscription expiry:', error);
+    
+    await completeCronJobLog(logId, 'failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       {
         message: process.env.NODE_ENV === 'development'

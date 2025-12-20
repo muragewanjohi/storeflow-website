@@ -18,6 +18,7 @@ import {
   XMarkIcon,
   ChatBubbleLeftRightIcon,
   CreditCardIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Tenants', href: '/admin/tenants', icon: BuildingOfficeIcon },
   { name: 'Price Plans', href: '/admin/price-plans', icon: CreditCardIcon },
   { name: 'Support Tickets', href: '/admin/support/tickets', icon: ChatBubbleLeftRightIcon },
+  { name: 'Cron Jobs', href: '/admin/cron-jobs', icon: ClockIcon },
   { name: 'Users', href: '/admin/users', icon: UsersIcon },
   { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
 ];
