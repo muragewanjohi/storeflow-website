@@ -34,7 +34,9 @@
     "screenshots:electric-scooters": "tsx scripts/capture-electric-scooters-screenshots.ts",
     "deploy:verify-rls": "tsx scripts/verify-rls-policies.ts",
     "deploy:smoke-tests": "tsx scripts/smoke-tests.ts",
-    "deploy:verify-ssl": "tsx scripts/verify-ssl-certificates.ts"
+    "deploy:verify-ssl": "tsx scripts/verify-ssl-certificates.ts",
+    "test:subscriptions": "tsx scripts/test-subscription-reminders.ts",
+    "test:email": "tsx scripts/test-email-sending.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

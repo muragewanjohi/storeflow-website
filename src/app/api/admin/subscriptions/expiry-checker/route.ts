@@ -14,8 +14,8 @@ import { prisma } from '@/lib/prisma/client';
 import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
 import { getTenantSubscriptionPricing } from '@/lib/subscriptions/pricing';
 
-// Grace period in days (default: 7 days)
-const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '7');
+// Grace period in days (default: 2 days)
+const GRACE_PERIOD_DAYS = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '2');
 
 /**
  * GET /api/admin/subscriptions/expiry-checker
