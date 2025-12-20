@@ -8,9 +8,15 @@
  *   tsx scripts/test-email-sending.ts your-email@example.com
  * 
  * Prerequisites:
- *   - SENDGRID_API_KEY must be set in environment
+ *   - SENDGRID_API_KEY must be set in .env.local
  *   - At least one tenant with a plan must exist in database
  */
+
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load environment variables from .env.local
+dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 import { prisma } from '../src/lib/prisma/client';
 import { sendPaymentDueReminderEmail } from '../src/lib/subscriptions/emails';
@@ -31,44 +37,71 @@ async function testEmailSending(testEmail: string) {
 
   console.log('✅ SendGrid API key found\n');
 
-  // Get a test tenant with a plan
-  const testTenant = await prisma.tenants.findFirst({
-    where: {
-      plan_id: {
-        not: null,
-      },
-    },
-    include: {
-      price_plans: true,
-    },
-  });
+  // Try to get a real tenant, but fall back to mock data if database is unavailable
+  let testTenant: any = null;
+  let useMockData = false;
 
-  if (!testTenant) {
-    console.error('❌ No tenant found with a plan');
-    console.log('\nPlease create a tenant with a plan first.');
-    process.exit(1);
+  try {
+    testTenant = await prisma.tenants.findFirst({
+      where: {
+        plan_id: {
+          not: null,
+        },
+      },
+      include: {
+        price_plans: true,
+      },
+    });
+
+    if (testTenant) {
+      console.log(`📧 Using tenant from database: ${testTenant.name}`);
+      console.log(`📦 Plan: ${testTenant.price_plans?.name || 'N/A'}\n`);
+    } else {
+      console.log('⚠️  No tenant found in database, using mock data\n');
+      useMockData = true;
+    }
+  } catch (error) {
+    console.log('⚠️  Database connection unavailable, using mock data');
+    console.log('   (This is okay for email testing)\n');
+    useMockData = true;
   }
 
-  console.log(`📧 Using tenant: ${testTenant.name}`);
-  console.log(`📦 Plan: ${testTenant.price_plans?.name || 'N/A'}\n`);
-
-  // Create mock tenant with test email
-  const mockTenant = {
-    ...testTenant,
-    contact_email: testEmail,
-  };
+  // Create mock tenant data if needed
+  const mockTenant = useMockData
+    ? {
+        id: 'test-tenant-id',
+        name: 'Test Tenant',
+        subdomain: 'test',
+        contact_email: testEmail,
+        data: {},
+      }
+    : {
+        ...testTenant,
+        contact_email: testEmail,
+      };
 
   const now = new Date();
   const expireDate = new Date(now);
   expireDate.setDate(expireDate.getDate() + 5); // 5 days from now
 
-  const plan = testTenant.price_plans
+  // Use real plan data if available, otherwise use mock
+  const plan = useMockData
+    ? {
+        name: 'Basic Plan',
+        price: 29.99,
+        duration_months: 1,
+      }
+    : testTenant?.price_plans
     ? {
         name: testTenant.price_plans.name,
         price: Number(testTenant.price_plans.price),
         duration_months: testTenant.price_plans.duration_months,
       }
-    : null;
+    : {
+        name: 'Basic Plan',
+        price: 29.99,
+        duration_months: 1,
+      };
 
   const results: Array<{ type: string; success: boolean; error?: string }> = [];
 
@@ -105,7 +138,7 @@ async function testEmailSending(testEmail: string) {
     const result = await sendPaymentDueReminderEmail({
       tenant: mockTenant as any,
       plan,
-      amount: Number(testTenant.price_plans?.price || 0),
+      amount: plan.price,
       dueDate: expireDate,
     });
 
