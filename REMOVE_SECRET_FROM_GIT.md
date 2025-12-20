@@ -19,9 +19,9 @@ brew install bfg
 
 ### Step 2: Create a file with the secret to remove
 
-Create a file `secrets.txt` in your project root:
+Create a file `secrets.txt` in your project root with the actual API key that was exposed:
 ```
-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
+SG.your-actual-api-key-here
 ```
 
 ### Step 3: Run BFG

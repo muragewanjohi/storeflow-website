@@ -17,7 +17,7 @@ GitHub is blocking your push because commit `9d96c222b6117aae5ab5744b26fa6728812
 **Step 2: Rotate the API Key IMMEDIATELY**
 1. Go to SendGrid Dashboard: https://app.sendgrid.com/
 2. Settings → API Keys
-3. Delete the compromised key: `SG.ORN1zTwpR2KNUWFUQUTbug...`
+3. Delete the compromised key (if it was exposed)
 4. Create a new API key
 5. Update `.env.local` with the new key
 
@@ -38,7 +38,7 @@ Use BFG Repo-Cleaner or git filter-repo to clean history.
 2. **Create secrets file:**
    ```bash
    cd c:\xampp\htdocs\storeflow
-   echo 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 > secrets.txt
+   echo SG.your-actual-api-key-here > secrets.txt
    ```
 
 3. **Run BFG:**
@@ -75,8 +75,7 @@ Then:
 ```bash
 # Fix the file
 notepad docs/SENDGRID_API_KEY_TROUBLESHOOTING.md
-# Replace: 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
-# With: SG.your-actual-api-key-here
+# Replace any actual API key with: SG.your-actual-api-key-here
 
 git add docs/SENDGRID_API_KEY_TROUBLESHOOTING.md
 git commit --amend --no-edit

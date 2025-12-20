@@ -29,7 +29,7 @@ remote:       path: docs/SENDGRID_API_KEY_TROUBLESHOOTING.md:15
 **Step 2: Rotate API Key IMMEDIATELY** ⚠️
 1. Go to SendGrid: https://app.sendgrid.com/
 2. Settings → API Keys
-3. **Delete** the compromised key: `SG.ORN1zTwpR2KNUWFUQUTbug...`
+3. **Delete** the compromised key (if it was exposed)
 4. Create a new API key
 5. Update `.env.local` with the new key
 
@@ -50,7 +50,7 @@ See "Permanent Fix" section below.
 2. **Create secrets file:**
    ```powershell
    cd c:\xampp\htdocs\storeflow
-   "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" | Out-File -Encoding utf8 secrets.txt
+   "SG.your-actual-api-key-here" | Out-File -Encoding utf8 secrets.txt
    ```
 
 3. **Run BFG:**
@@ -84,7 +84,7 @@ Then:
 ```powershell
 # Edit the file
 notepad docs/SENDGRID_API_KEY_TROUBLESHOOTING.md
-# Find: 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
+# Find: SG.your-actual-api-key-here (or the actual key if it exists)
 # Replace with: SG.your-actual-api-key-here
 # Save and close
 
