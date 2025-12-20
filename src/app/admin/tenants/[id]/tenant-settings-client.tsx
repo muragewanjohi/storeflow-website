@@ -33,6 +33,7 @@ interface Tenant {
   created_at: Date | null;
   expire_date: Date | null;
   plan_id: string | null;
+  data: any;
   price_plans: {
     id: string;
     name: string;
@@ -562,6 +563,149 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
               {isChangingSubscription ? 'Processing...' : `${subscriptionAction === 'renew' ? 'Renew' : subscriptionAction === 'upgrade' ? 'Upgrade' : 'Downgrade'} Subscription`}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Subscription Monitoring & Services */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription Monitoring & Services</CardTitle>
+          <CardDescription>
+            Monitor email reminders and manually trigger subscription services
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Email Reminder Status */}
+          <div>
+            <h4 className="text-sm font-medium mb-3">Email Reminder Status</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Last Renewal Reminder:</p>
+                <p className="font-medium">
+                  {tenant.data && (tenant.data as any).subscription?.last_renewal_reminder_date
+                    ? new Date((tenant.data as any).subscription.last_renewal_reminder_date).toLocaleDateString()
+                    : 'Never sent'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Count: {(tenant.data as any)?.subscription?.renewal_reminder_count || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Last Payment Reminder:</p>
+                <p className="font-medium">
+                  {tenant.data && (tenant.data as any).subscription?.last_payment_reminder_date
+                    ? new Date((tenant.data as any).subscription.last_payment_reminder_date).toLocaleDateString()
+                    : 'Never sent'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Count: {(tenant.data as any)?.subscription?.payment_reminder_count || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Email Schedule Info */}
+          {tenant.expire_date && (
+            <div>
+              <h4 className="text-sm font-medium mb-2">Expected Email Schedule</h4>
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p>
+                  <strong>Renewal Reminders:</strong> Will start{' '}
+                  {new Date(new Date(tenant.expire_date).getTime() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}{' '}
+                  (7 days before expiry)
+                </p>
+                <p>
+                  <strong>Payment Reminders:</strong> Will start{' '}
+                  {new Date(tenant.expire_date).toLocaleDateString()} (on expiry day, during 2-day grace period)
+                </p>
+                <p>
+                  <strong>Suspension:</strong> Will occur{' '}
+                  {new Date(new Date(tenant.expire_date).getTime() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString()}{' '}
+                  (2 days after expiry)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Manual Service Triggers */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-medium mb-3">Manual Service Triggers</h4>
+            <p className="text-xs text-muted-foreground mb-4">
+              Manually trigger subscription services (useful for testing or immediate processing)
+            </p>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setIsLoading(true);
+                  setError(null);
+                  setSuccess(null);
+                  try {
+                    const response = await fetch('/api/admin/subscriptions/manual-trigger', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ service: 'payment-reminders' }),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setSuccess(
+                        `Payment reminders processed: ${data.results?.renewal_reminders_sent || 0} renewal, ${data.results?.payment_reminders_sent || 0} payment reminders sent`
+                      );
+                      // Refresh page to update reminder status
+                      setTimeout(() => router.refresh(), 2000);
+                    } else {
+                      setError(data.message || 'Failed to trigger payment reminders');
+                    }
+                  } catch (error) {
+                    setError('Error triggering payment reminders');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : 'Trigger Payment Reminders'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setIsLoading(true);
+                  setError(null);
+                  setSuccess(null);
+                  try {
+                    const response = await fetch('/api/admin/subscriptions/manual-trigger', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ service: 'expiry-checker' }),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      setSuccess(
+                        `Expiry check completed: ${data.results?.expired || 0} expired, ${data.results?.suspended || 0} suspended`
+                      );
+                      // Refresh page to update tenant status
+                      setTimeout(() => router.refresh(), 2000);
+                    } else {
+                      setError(data.message || 'Failed to trigger expiry checker');
+                    }
+                  } catch (error) {
+                    setError('Error triggering expiry checker');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : 'Trigger Expiry Checker'}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

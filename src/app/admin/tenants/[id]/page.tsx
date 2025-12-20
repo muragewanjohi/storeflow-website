@@ -41,6 +41,17 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     redirect('/admin/tenants');
   }
 
+  // Include data field for reminder tracking
+  const tenantData = {
+    ...tenant,
+    price_plans: tenant.price_plans
+      ? {
+          ...tenant.price_plans,
+          price: Number(tenant.price_plans.price),
+        }
+      : null,
+  };
+
   // Fetch all available price plans for plan selection
   const pricePlansData = await prisma.price_plans.findMany({
     where: {
@@ -64,17 +75,6 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     price: Number(plan.price),
   }));
 
-  // Convert tenant price_plans Decimal to number
-  const tenantData = {
-    ...tenant,
-    price_plans: tenant.price_plans
-      ? {
-          ...tenant.price_plans,
-          price: Number(tenant.price_plans.price),
-        }
-      : null,
-  };
-
   return (
     <div>
       {/* Breadcrumb */}
@@ -96,7 +96,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
           Manage settings for {tenant.name}
         </p>
       </div>
-      <TenantSettingsClient tenant={tenantData} pricePlans={pricePlans} />
+      <TenantSettingsClient tenant={tenantData as any} pricePlans={pricePlans} />
     </div>
   );
 }
