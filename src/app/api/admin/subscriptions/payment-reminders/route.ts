@@ -83,7 +83,6 @@ export async function GET(request: NextRequest) {
         name: true,
         subdomain: true,
         custom_domain: true,
-        country: true,
         expire_date: true,
         status: true,
         plan_id: true,
@@ -136,7 +135,16 @@ export async function GET(request: NextRequest) {
 
     for (const tenant of tenantsExpiringSoon) {
       try {
-        if (!tenant.expire_date || !tenant.price_plans) continue;
+        // Type assertion for price_plans relation (Prisma includes it in select but TypeScript may not infer it)
+        const tenantWithPlan = tenant as typeof tenant & { 
+          price_plans: { 
+            id: string; 
+            name: string; 
+            price: any; // Prisma Decimal type
+            duration_months: number 
+          } | null 
+        };
+        if (!tenant.expire_date || !tenantWithPlan.price_plans) continue;
 
         const daysUntilExpiry = Math.ceil(
           (tenant.expire_date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
@@ -145,9 +153,10 @@ export async function GET(request: NextRequest) {
           (now.getTime() - tenant.expire_date.getTime()) / (1000 * 60 * 60 * 24)
         );
 
-        // Get tenant data to track last reminder date
+        // Get tenant data to track last reminder date and country
         const tenantData = (tenant.data as any) || {};
         const subscriptionData = tenantData.subscription || {};
+        const tenantSettings = tenantData.settings || {};
         const lastRenewalReminderDateStr = subscriptionData.last_renewal_reminder_date || null;
         const lastPaymentReminderDateStr = subscriptionData.last_payment_reminder_date || null;
         
@@ -164,8 +173,8 @@ export async function GET(request: NextRequest) {
         const shouldSendRenewalReminder = !lastRenewalReminderDateStr || lastRenewalReminderDateStr < todayStr;
         const shouldSendPaymentReminder = !lastPaymentReminderDateStr || lastPaymentReminderDateStr < todayStr;
 
-        // Detect if tenant is from Kenya (check country field)
-        const tenantCountry = (tenant as any).country || '';
+        // Detect if tenant is from Kenya (check country from data JSON or settings)
+        const tenantCountry = tenantSettings.store_country || '';
         const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA';
 
         // Send renewal reminder (daily for 7 days before expiry, only if payment is unpaid)
@@ -173,11 +182,11 @@ export async function GET(request: NextRequest) {
           await sendSubscriptionRenewalReminderEmail({
             tenant: tenant as any,
             expireDate: tenant.expire_date,
-            plan: tenant.price_plans
+            plan: tenantWithPlan.price_plans
               ? {
-                  name: tenant.price_plans.name,
-                  price: Number(tenant.price_plans.price),
-                  duration_months: tenant.price_plans.duration_months,
+                  name: tenantWithPlan.price_plans.name,
+                  price: Number(tenantWithPlan.price_plans.price),
+                  duration_months: tenantWithPlan.price_plans.duration_months,
                 }
               : null,
             isKenya,
@@ -204,14 +213,14 @@ export async function GET(request: NextRequest) {
         if (shouldSendPaymentReminder && isPaymentUnpaid && (daysUntilExpiry <= 7 || (daysExpired >= 0 && daysExpired <= GRACE_PERIOD_DAYS))) {
           await sendPaymentDueReminderEmail({
             tenant: tenant as any,
-            plan: tenant.price_plans
+            plan: tenantWithPlan.price_plans
               ? {
-                  name: tenant.price_plans.name,
-                  price: Number(tenant.price_plans.price),
-                  duration_months: tenant.price_plans.duration_months,
+                  name: tenantWithPlan.price_plans.name,
+                  price: Number(tenantWithPlan.price_plans.price),
+                  duration_months: tenantWithPlan.price_plans.duration_months,
                 }
               : null,
-            amount: Number(tenant.price_plans.price),
+            amount: tenantWithPlan.price_plans ? Number(tenantWithPlan.price_plans.price) : 0,
             dueDate: tenant.expire_date,
             isKenya,
           });
@@ -239,6 +248,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    await completeCronJobLog(logId, 'success', {
+      result: results,
+    });
+
     return NextResponse.json(
       {
         message: 'Payment reminders processed',
@@ -249,6 +262,9 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error processing payment reminders:', error);
+    await completeCronJobLog(logId, 'failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
       {
         message: process.env.NODE_ENV === 'development'

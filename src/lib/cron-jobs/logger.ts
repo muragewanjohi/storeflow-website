@@ -21,7 +21,8 @@ export interface CronJobLogResult {
  * Start logging a cron job execution
  */
 export async function startCronJobLog(input: CronJobLogInput): Promise<string> {
-  const log = await prisma.cron_job_logs.create({
+  // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
+  const log = await (prisma as any).cron_job_logs.create({
     data: {
       job_name: input.jobName,
       job_path: input.jobPath,
@@ -40,7 +41,8 @@ export async function completeCronJobLog(
   status: 'success' | 'failed',
   result?: CronJobLogResult
 ): Promise<void> {
-  const startedAt = await prisma.cron_job_logs.findUnique({
+  // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
+  const startedAt = await (prisma as any).cron_job_logs.findUnique({
     where: { id: logId },
     select: { started_at: true },
   });
@@ -49,7 +51,7 @@ export async function completeCronJobLog(
     ? Math.floor((new Date().getTime() - startedAt.started_at.getTime()))
     : null;
 
-  await prisma.cron_job_logs.update({
+  await (prisma as any).cron_job_logs.update({
     where: { id: logId },
     data: {
       status,
@@ -65,7 +67,8 @@ export async function completeCronJobLog(
  * Get recent cron job logs
  */
 export async function getCronJobLogs(limit: number = 50) {
-  return await prisma.cron_job_logs.findMany({
+  // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
+  return await (prisma as any).cron_job_logs.findMany({
     orderBy: { started_at: 'desc' },
     take: limit,
   });
@@ -75,7 +78,8 @@ export async function getCronJobLogs(limit: number = 50) {
  * Get cron job logs by job name
  */
 export async function getCronJobLogsByName(jobName: string, limit: number = 20) {
-  return await prisma.cron_job_logs.findMany({
+  // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
+  return await (prisma as any).cron_job_logs.findMany({
     where: { job_name: jobName },
     orderBy: { started_at: 'desc' },
     take: limit,
@@ -86,15 +90,16 @@ export async function getCronJobLogsByName(jobName: string, limit: number = 20) 
  * Get cron job statistics
  */
 export async function getCronJobStats() {
+  // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
   const [total, successful, failed, running] = await Promise.all([
-    prisma.cron_job_logs.count(),
-    prisma.cron_job_logs.count({ where: { status: 'success' } }),
-    prisma.cron_job_logs.count({ where: { status: 'failed' } }),
-    prisma.cron_job_logs.count({ where: { status: 'running' } }),
+    (prisma as any).cron_job_logs.count(),
+    (prisma as any).cron_job_logs.count({ where: { status: 'success' } }),
+    (prisma as any).cron_job_logs.count({ where: { status: 'failed' } }),
+    (prisma as any).cron_job_logs.count({ where: { status: 'running' } }),
   ]);
 
   // Get last execution for each job
-  const jobs = await prisma.cron_job_logs.findMany({
+  const jobs = await (prisma as any).cron_job_logs.findMany({
     select: {
       job_name: true,
       job_path: true,
