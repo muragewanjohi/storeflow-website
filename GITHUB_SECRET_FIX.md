@@ -25,7 +25,7 @@ remote:       path: docs/SENDGRID_API_KEY_TROUBLESHOOTING.md:15
 **Step 2: Rotate API Key IMMEDIATELY**
 1. Go to: https://app.sendgrid.com/
 2. Settings → API Keys
-3. **Delete** the key: `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`
+3. **Delete** the compromised key (if it was exposed)
 4. Create a new API key
 5. Update `.env.local` with the new key
 
@@ -42,7 +42,7 @@ The secret is still in commit `9d96c222`. You need to remove it from history.
 2. **Create replacement file:**
    ```bash
    cd c:\xampp\htdocs\storeflow
-   echo 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 > secrets.txt
+   echo SG.your-actual-api-key-here > secrets.txt
    ```
 
 3. **Run BFG:**
