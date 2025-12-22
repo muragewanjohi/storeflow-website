@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
 interface CustomerRegisterFormProps {
   redirect?: string;
@@ -56,10 +57,22 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
     }
 
     try {
+      // Detect location before submitting
+      let locationInfo = detectUserLocationClient();
+      if (!locationInfo.isKenya) {
+        try {
+          locationInfo = await detectLocationByIP();
+        } catch (ipError) {
+          // Use browser detection result
+        }
+      }
+
       const response = await fetch('/api/customers/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Country': locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
+          'X-User-Currency': locationInfo.currency,
         },
         body: JSON.stringify({
           name: formData.name,

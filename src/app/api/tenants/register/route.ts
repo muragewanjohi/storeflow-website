@@ -46,14 +46,23 @@ export async function POST(request: NextRequest) {
         currency: 'KES',
         currencySymbol: 'Ksh',
         isKenya: true,
+        countryCode: 'KE',
       };
     } else if (clientCountry && clientCountry !== 'KE') {
       locationInfo = {
         currency: 'USD',
         currencySymbol: '$',
         isKenya: false,
+        countryCode: clientCountry,
       };
     }
+    
+    // Get country code for storage (prioritize detected country code)
+    const countryCode = locationInfo.countryCode || 
+                       clientCountry || 
+                       request.headers.get('x-vercel-ip-country') ||
+                       request.headers.get('cf-ipcountry') ||
+                       null;
 
     // Validate subdomain
     const subdomainValidation = validateSubdomain(validatedData.subdomain);
@@ -158,6 +167,7 @@ export async function POST(request: NextRequest) {
         start_date: new Date(),
         plan_id: validatedData.planId || null,
         expire_date: expireDate,
+        country: countryCode, // Store country code
         data: {
           theme: 'light',
           // Store subscription pricing info for future payments

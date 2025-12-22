@@ -157,7 +157,7 @@ function TenantRegisterForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
+          'X-User-Country': locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
           'X-User-Currency': locationInfo.currency,
         },
         body: JSON.stringify({

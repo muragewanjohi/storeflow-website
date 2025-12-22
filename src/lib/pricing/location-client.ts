@@ -10,6 +10,7 @@ export interface PricingInfo {
   currency: 'KES' | 'USD';
   currencySymbol: 'Ksh' | '$';
   isKenya: boolean;
+  countryCode?: string; // ISO 3166-1 alpha-2 country code (e.g., "KE", "US")
 }
 
 /**
@@ -25,6 +26,7 @@ export function detectUserLocationClient(): PricingInfo {
         currency: 'KES',
         currencySymbol: 'Ksh',
         isKenya: true,
+        countryCode: 'KE',
       };
     }
   } catch (error) {
@@ -39,6 +41,7 @@ export function detectUserLocationClient(): PricingInfo {
         currency: 'KES',
         currencySymbol: 'Ksh',
         isKenya: true,
+        countryCode: 'KE',
       };
     }
   } catch (error) {
@@ -54,6 +57,7 @@ export function detectUserLocationClient(): PricingInfo {
           currency: 'KES',
           currencySymbol: 'Ksh',
           isKenya: true,
+          countryCode: 'KE',
         };
       }
     }
@@ -66,6 +70,7 @@ export function detectUserLocationClient(): PricingInfo {
     currency: 'USD',
     currencySymbol: '$',
     isKenya: false,
+    countryCode: 'US',
   };
 }
 
@@ -92,8 +97,17 @@ export async function detectLocationByIP(): Promise<PricingInfo> {
           currency: 'KES',
           currencySymbol: 'Ksh',
           isKenya: true,
+          countryCode: 'KE',
         };
       }
+      
+      // Return with detected country code
+      return {
+        currency: 'USD',
+        currencySymbol: '$',
+        isKenya: false,
+        countryCode: countryCode || 'US',
+      };
     }
   } catch (error) {
     console.error('Error detecting location by IP:', error);

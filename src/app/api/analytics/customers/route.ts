@@ -182,6 +182,36 @@ export async function GET(request: NextRequest) {
     // Calculate conversion rate (customers with orders / total customers)
     const conversionRate = totalCustomers > 0 ? (customersWithOrders / totalCustomers) * 100 : 0;
 
+    // Fetch customers by country
+    let customersByCountry: Array<{ country: string; count: number }> = [];
+    try {
+      const countryData = await prisma.$queryRaw<Array<{ country_code: string | null; count: bigint }>>`
+        SELECT 
+          COALESCE(country_code, 'Unknown') as country_code,
+          COUNT(*)::bigint as count
+        FROM customers
+        WHERE tenant_id = ${tenant.id}
+          AND created_at >= ${startDate}
+          AND created_at <= ${endDate}
+        GROUP BY country_code
+        ORDER BY count DESC
+        LIMIT 10
+      `;
+      
+      customersByCountry = countryData.map((item) => ({
+        country: item.country_code || 'Unknown',
+        count: Number(item.count),
+      }));
+    } catch (error: any) {
+      // If country_code column doesn't exist yet, return empty array
+      if (error?.code === '42703' || error?.message?.includes('column') || error?.message?.includes('country_code')) {
+        console.warn('Country code column not found in customers table. Run the migration to add it.');
+        customersByCountry = [];
+      } else {
+        throw error;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -191,6 +221,7 @@ export async function GET(request: NextRequest) {
         conversionRate: Number(conversionRate.toFixed(2)),
         acquisitionTrend,
         topCustomers: topCustomersData,
+        customersByCountry,
         lifetimeValue: {
           average: avgLifetimeValue,
           averageOrderValue: avgOrderValue,

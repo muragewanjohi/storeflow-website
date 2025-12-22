@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerRegisterSchema } from '@/lib/customers/validation';
+import { detectUserLocation } from '@/lib/pricing/location';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -16,6 +17,36 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     const validatedData = customerRegisterSchema.parse(body);
+
+    // Detect customer location for country tracking
+    let locationInfo = detectUserLocation(request.headers);
+    
+    // Check if client provided location info (from client-side detection)
+    const clientCountry = request.headers.get('x-user-country');
+    const clientCurrency = request.headers.get('x-user-currency');
+    
+    if (clientCountry === 'KE' || clientCurrency === 'KES') {
+      locationInfo = {
+        currency: 'KES',
+        currencySymbol: 'Ksh',
+        isKenya: true,
+        countryCode: 'KE',
+      };
+    } else if (clientCountry && clientCountry !== 'KE') {
+      locationInfo = {
+        currency: 'USD',
+        currencySymbol: '$',
+        isKenya: false,
+        countryCode: clientCountry,
+      };
+    }
+    
+    // Get country code for storage (prioritize detected country code)
+    const countryCode = locationInfo.countryCode || 
+                       clientCountry || 
+                       request.headers.get('x-vercel-ip-country') ||
+                       request.headers.get('cf-ipcountry') ||
+                       null;
 
     // Check if customer with this email already exists
     const existingCustomer = await prisma.customers.findFirst({
@@ -50,6 +81,7 @@ export async function POST(request: NextRequest) {
         company: validatedData.company,
         email_verified: false,
         email_verify_token: emailVerifyToken,
+        country_code: countryCode, // Store country code for analytics
       },
       select: {
         id: true,

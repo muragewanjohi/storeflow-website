@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { type AuthUser } from '@/lib/auth/types';
 import AdminSidebar from './sidebar';
 import AdminHeader from './header';
+import { useAdminAnalytics } from '@/hooks/use-admin-analytics';
 
 interface LayoutClientProps {
   user: AuthUser;
@@ -19,6 +20,9 @@ interface LayoutClientProps {
 export default function AdminLayoutClient({ user, children }: Readonly<LayoutClientProps>) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Track admin page views automatically
+  useAdminAnalytics({ user });
 
   return (
     <div className="min-h-screen bg-background">

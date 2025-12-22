@@ -3,24 +3,46 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 model admins {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String    @db.VarChar(255)
-  email      String    @unique @db.VarChar(255)
-  username   String?   @unique @db.VarChar(255)
-  password   String    @db.VarChar(255)
-  role       String?   @default("admin") @db.VarChar(50)
-  image      String?   @db.VarChar(255)
-  status     String?   @default("active") @db.VarChar(50)
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String               @db.VarChar(255)
+  email              String               @unique @db.VarChar(255)
+  username           String?              @unique @db.VarChar(255)
+  password           String               @db.VarChar(255)
+  role               String?              @default("admin") @db.VarChar(50)
+  image              String?              @db.VarChar(255)
+  status             String?              @default("active") @db.VarChar(50)
+  created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamp(6)
+  analytics_tracking analytics_tracking[]
 
   @@index([email], map: "idx_admins_email")
+}
+
+model analytics_tracking {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?   @db.Uuid
+  page_path      String    @db.VarChar(500)
+  page_title     String?   @db.VarChar(255)
+  event_name     String?   @db.VarChar(100)
+  event_category String?   @db.VarChar(100)
+  event_label    String?   @db.VarChar(255)
+  event_value    Decimal?  @db.Decimal(10, 2)
+  metadata       Json?     @default("{}")
+  ip_address     String?   @db.VarChar(45)
+  country        String?   @db.VarChar(100)
+  user_agent     String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  admins         admins?   @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_analytics_created_at")
+  @@index([user_id], map: "idx_analytics_user_id")
+  @@index([page_path], map: "idx_analytics_page_path")
+  @@index([event_name], map: "idx_analytics_event_name")
+  @@index([country], map: "idx_analytics_country")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -230,6 +252,7 @@ model customers {
   city                    String?                   @db.VarChar(100)
   state                   String?                   @db.VarChar(100)
   country                 String?                   @db.VarChar(100)
+  country_code            String?                   @db.VarChar(2)
   postal_code             String?                   @db.VarChar(20)
   image                   String?                   @db.VarChar(255)
   created_at              DateTime?                 @default(now()) @db.Timestamp(6)
@@ -752,6 +775,7 @@ model tenants {
   created_at                 DateTime?                    @default(now()) @db.Timestamp(6)
   updated_at                 DateTime?                    @default(now()) @db.Timestamp(6)
   contact_email              String?                      @db.VarChar(255)
+  country                    String?                      @db.VarChar(2)
   attribute_values           attribute_values[]
   attributes                 attributes[]
   blog_categories            blog_categories[]
@@ -855,16 +879,16 @@ model wallets {
 }
 
 model cron_job_logs {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  job_name    String    @db.VarChar(255)
-  job_path    String    @db.VarChar(500)
-  status      String    @default("running") @db.VarChar(50) // running, success, failed
-  started_at  DateTime  @default(now()) @db.Timestamp(6)
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job_name     String    @db.VarChar(255)
+  job_path     String    @db.VarChar(500)
+  status       String    @default("running") @db.VarChar(50) // running, success, failed
+  started_at   DateTime  @default(now()) @db.Timestamp(6)
   completed_at DateTime? @db.Timestamp(6)
-  duration_ms Int?      @db.Integer
-  result      Json?     @default("{}")
-  error       String?
-  metadata    Json?     @default("{}")
+  duration_ms  Int?      @db.Integer
+  result       Json?     @default("{}")
+  error        String?
+  metadata     Json?     @default("{}")
 
   @@index([job_name], map: "idx_cron_job_logs_job_name")
   @@index([status], map: "idx_cron_job_logs_status")

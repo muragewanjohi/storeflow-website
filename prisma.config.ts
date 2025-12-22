@@ -29,9 +29,7 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
-  engine: "classic",
   datasource: {
-    url: databaseUrl, // Pooled connection for queries
-    directUrl: directUrl, // Direct connection for migrations
+    url: databaseUrl, // Connection URL
   },
 });

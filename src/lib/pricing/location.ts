@@ -8,6 +8,7 @@ export interface PricingInfo {
   currency: 'KES' | 'USD';
   currencySymbol: 'Ksh' | '$';
   isKenya: boolean;
+  countryCode?: string; // ISO 3166-1 alpha-2 country code (e.g., "KE", "US")
 }
 
 /**
@@ -22,6 +23,7 @@ export function detectUserLocation(headers: Headers): PricingInfo {
       currency: vercelCountry === 'KE' ? 'KES' : 'USD',
       currencySymbol: vercelCountry === 'KE' ? 'Ksh' : '$',
       isKenya: vercelCountry === 'KE',
+      countryCode: vercelCountry,
     };
   }
 
@@ -32,6 +34,7 @@ export function detectUserLocation(headers: Headers): PricingInfo {
       currency: cloudflareCountry === 'KE' ? 'KES' : 'USD',
       currencySymbol: cloudflareCountry === 'KE' ? 'Ksh' : '$',
       isKenya: cloudflareCountry === 'KE',
+      countryCode: cloudflareCountry,
     };
   }
 
@@ -47,6 +50,7 @@ export function detectUserLocation(headers: Headers): PricingInfo {
       currency: isKenya ? 'KES' : 'USD',
       currencySymbol: isKenya ? 'Ksh' : '$',
       isKenya,
+      countryCode: isKenya ? 'KE' : 'US',
     };
   }
 
@@ -55,6 +59,7 @@ export function detectUserLocation(headers: Headers): PricingInfo {
     currency: 'USD',
     currencySymbol: '$',
     isKenya: false,
+    countryCode: 'US',
   };
 }
 

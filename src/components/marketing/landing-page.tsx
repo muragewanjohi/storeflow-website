@@ -7,6 +7,7 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import { Navigation } from './navigation';
 import { Hero } from './hero';
 import { HowItWorks } from './how-it-works';
@@ -21,8 +22,16 @@ import { FAQ } from './faq';
 import { Newsletter } from './newsletter';
 import { LandingFooter } from './landing-footer';
 import { Footer } from './footer';
+import { trackEvent } from '@/lib/analytics/google-analytics';
 
 export default function MarketingLandingPage() {
+  useEffect(() => {
+    // Track landing page specific event
+    trackEvent('landing_page_view', {
+      page_title: 'Landing Page',
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />

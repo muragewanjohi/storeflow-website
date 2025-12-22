@@ -7,9 +7,11 @@
 import { sendCustomerEmail, sendAdminEmail } from '@/lib/email/service';
 import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
+
+// Decimal type from Prisma
+type Decimal = Prisma.Decimal;
 
 /**
  * Get tenant contact email address for customer inquiries
