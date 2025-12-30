@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
 import DashboardLayoutClient from '@/components/dashboard/layout-client';
 
 export default async function DashboardLayout({
@@ -40,6 +41,27 @@ export default async function DashboardLayout({
     redirect('/dashboard/login');
   }
 
-  return <DashboardLayoutClient user={user} tenant={tenant}>{children}</DashboardLayoutClient>;
+  // Check tenant access restrictions
+  const accessRestriction = getTenantAccessRestriction(tenant);
+
+  // Block access if completely restricted (suspended or deleted)
+  // Allow read-only access during grace period
+  if (accessRestriction.level === 'blocked' || 
+      (accessRestriction.level === 'restricted' && tenant.status === 'suspended')) {
+    // Allow access to subscription/renewal page even when suspended
+    if (pathname !== '/dashboard/subscription' && !pathname.startsWith('/dashboard/subscription/')) {
+      redirect('/tenant-suspended');
+    }
+  }
+
+  return (
+    <DashboardLayoutClient 
+      user={user} 
+      tenant={tenant}
+      accessRestriction={accessRestriction}
+    >
+      {children}
+    </DashboardLayoutClient>
+  );
 }
 

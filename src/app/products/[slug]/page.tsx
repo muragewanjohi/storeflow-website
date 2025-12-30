@@ -13,6 +13,7 @@ import ProductDetailClient from './product-detail-client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import { generateProductMetadata, generateProductStructuredData } from '@/lib/seo/storefront-metadata';
+import { loadThemeProductDetail } from '@/lib/themes/theme-loader';
 import type { Metadata } from 'next';
 import Script from 'next/script';
 
@@ -165,6 +166,11 @@ export default async function ProductDetailPage({
     productUrl: `/products/${slug}`,
   });
 
+  // Load theme-specific product detail component if available
+  const themeSlug = tenant.theme_slug || 'default';
+  const ThemeProductDetail = loadThemeProductDetail(themeSlug);
+  const ProductDetailComponent = ThemeProductDetail || ProductDetailClient;
+
   // Use Suspense boundaries for streaming - allows page to render progressively
   return (
     <>
@@ -176,7 +182,7 @@ export default async function ProductDetailPage({
       <div className="min-h-screen flex flex-col">
         <StorefrontHeader />
         <main className="flex-1">
-          <ProductDetailClient
+          <ProductDetailComponent
             product={productData}
             relatedProducts={relatedProductsData}
           />

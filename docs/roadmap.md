@@ -1844,6 +1844,166 @@ vercel env add VERCEL_TOKEN
   - [x] Subscription management endpoints ✅
   - [x] Payment reminders endpoint ✅
 
+---
+
+## **Subscription Expiry Management Phases**
+
+**📄 Reference:** See [`storeflow/docs/SUBSCRIPTION_EXPIRY_BEST_PRACTICES.md`](../storeflow/docs/SUBSCRIPTION_EXPIRY_BEST_PRACTICES.md) for complete implementation details.
+
+### **Phase 1: Basic Expiry Handling** ✅ (Completed)
+
+- [x] Grace period implementation (2 days) ✅
+- [x] Status changes (active → expired → suspended) ✅
+- [x] Email notifications ✅
+- [x] Expiry checker cron job ✅
+- [x] Payment reminders ✅
+
+**Implementation Details:**
+- Grace period: 2 days (configurable via `SUBSCRIPTION_GRACE_PERIOD_DAYS`)
+- Daily cron job at midnight UTC checks for expired subscriptions
+- Automatic status updates based on expiry date
+- Email notifications sent at key milestones
+
+### **Phase 2: Access Restrictions** ✅ (Completed)
+
+- [x] Read-only access during grace period ✅
+- [x] Complete access block after suspension ✅
+- [x] Middleware/guards for access control ✅
+- [x] Storefront suspension page ✅
+- [x] Dashboard restriction UI ✅
+- [x] Access restriction banner component ✅
+- [x] API route access checks ✅
+- [x] Access control utility functions ✅
+- [x] Enhanced expired/suspended pages ✅
+
+**Implementation Details:**
+- **Grace Period (Expired Status):** Read-only access to dashboard, view-only storefront, payment/renewal access
+- **Suspension (After Grace Period):** Login + payment only, storefront shows "Store Temporarily Unavailable"
+- Access control enforced via middleware and API route guards
+- UI components show contextual banners and restrictions
+
+### **Phase 3: Enhanced UX** ⏳ (Future Implementation)
+
+- [ ] In-app expiry warnings
+  - [ ] Warning banner 7 days before expiry
+  - [ ] Critical banner on expiry day
+  - [ ] Dashboard notifications
+- [ ] Countdown timers
+  - [ ] Days remaining in grace period
+  - [ ] Time until suspension
+  - [ ] Renewal deadline countdown
+- [ ] One-click renewal
+  - [ ] Quick renewal button in dashboard
+  - [ ] Same plan renewal flow
+  - [ ] Instant access restoration
+- [ ] Payment method update flow
+  - [ ] Update payment method UI
+  - [ ] Payment method validation
+  - [ ] Seamless payment update
+- [ ] Restoration confirmation
+  - [ ] Success message on renewal
+  - [ ] Confirmation email with details
+  - [ ] Access restoration notification
+
+**Estimated Time:** 16-20 hours
+
+### **Phase 4: Analytics & Monitoring** ⏳ (Future Implementation)
+
+- [ ] Expiry rate dashboard
+  - [ ] Tenants expiring per day/week/month
+  - [ ] Expiry trends over time
+  - [ ] Expiry rate by plan type
+- [ ] Renewal rate tracking
+  - [ ] Percentage of expired tenants that renew
+  - [ ] Renewal rate by plan type
+  - [ ] Renewal rate trends
+- [ ] Grace period analytics
+  - [ ] Average days in grace period before renewal
+  - [ ] Grace period usage statistics
+  - [ ] Grace period effectiveness metrics
+- [ ] Automated alerts
+  - [ ] High expiry rate alerts
+  - [ ] Low renewal rate alerts
+  - [ ] Payment failure alerts
+  - [ ] Suspension spike alerts
+- [ ] Retention reports
+  - [ ] Customer retention analysis
+  - [ ] Churn rate tracking
+  - [ ] Retention by plan type
+  - [ ] Revenue impact of expiries
+
+**Estimated Time:** 24-32 hours
+
+**📄 Documentation:** See [`storeflow/docs/SUBSCRIPTION_EXPIRY_BEST_PRACTICES.md`](../storeflow/docs/SUBSCRIPTION_EXPIRY_BEST_PRACTICES.md) for detailed implementation guides and best practices.
+
+---
+
+## **Tenant Deletion Management Phases**
+
+**📄 Reference:** See [`storeflow/docs/TENANT_DELETION_BEST_PRACTICES.md`](../storeflow/docs/TENANT_DELETION_BEST_PRACTICES.md) for complete implementation details.
+
+### **Phase 1: Soft Delete Only** ✅ (Completed)
+
+- [x] Soft delete with status update ✅
+- [x] Store `deleted_at` timestamp ✅
+- [x] Remove subdomain from Vercel ✅
+- [x] Filter deleted tenants in admin UI ✅
+
+**Implementation Details:**
+- When tenant is deleted, `status` is set to `'deleted'`
+- `deleted_at` timestamp stored in database column
+- Subdomain removed from Vercel (non-blocking)
+- Tenant record and all data preserved in database
+- Access suspended (no storefront or dashboard access)
+
+### **Phase 2: Retention Tracking** ✅ (Completed)
+
+- [x] Add `deleted_at` column to database ✅
+- [x] Create cleanup cron job ✅
+- [x] Add retention period configuration ✅
+- [x] Implement hard deletion logic ✅
+
+**Implementation Details:**
+- **Database Schema:** `deleted_at` column added to `tenants` table with index
+- **Cron Job:** `/api/admin/cleanup/hard-delete-tenants` runs weekly (Sunday 3 AM UTC)
+- **Retention Period:** 90 days (configurable via `TENANT_RETENTION_DAYS`)
+- **Hard Deletion Process:**
+  - Finds tenants with `status='deleted'` and `deleted_at` older than retention period
+  - Removes subdomain and custom domain from Vercel
+  - Hard deletes tenant record and all related data
+  - Logs all operations for monitoring
+
+### **Phase 3: Compliance & Monitoring** ⏳ (Future Implementation)
+
+- [ ] Add restoration request system
+  - [ ] Self-service restoration request form
+  - [ ] Automatic approval if within grace period
+  - [ ] Manual review for extended periods
+  - [ ] Restoration workflow automation
+- [ ] Implement audit logging
+  - [ ] Log all deletion events
+  - [ ] Log restoration events
+  - [ ] Track deletion reasons
+  - [ ] Audit trail for compliance
+- [ ] Add monitoring and alerts
+  - [ ] Soft deleted tenants count
+  - [ ] Hard deletion rate tracking
+  - [ ] Restoration request tracking
+  - [ ] Storage usage monitoring
+  - [ ] High deletion rate alerts
+  - [ ] Retention period expiring notifications
+- [ ] Create compliance reports
+  - [ ] Deletion rate reports
+  - [ ] Restoration rate reports
+  - [ ] Retention period compliance reports
+  - [ ] GDPR/CCPA compliance reports
+
+**Estimated Time:** 24-32 hours
+
+**📄 Documentation:** See [`storeflow/docs/TENANT_DELETION_BEST_PRACTICES.md`](../storeflow/docs/TENANT_DELETION_BEST_PRACTICES.md) for detailed implementation guides and best practices.
+
+---
+
 **Day 27-29: Content Management (16-20 hours)** ⭐ **UPDATED: Using Custom CMS with Existing Schema**
 
 **📄 Analysis:** See [`CMS_OPTIONS_ANALYSIS.md`](CMS_OPTIONS_ANALYSIS.md) for detailed comparison. **Recommendation: Build custom CMS using existing `pages` and `blogs` tables** (saves 20-30 hours vs. third-party integration).

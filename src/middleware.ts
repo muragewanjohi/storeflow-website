@@ -100,19 +100,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Check if tenant is active
-    if (tenant.status !== 'active') {
+    // Check tenant access level based on status and expiry
+    // Import access control utilities
+    const { getTenantAccessRestriction } = await import('./lib/tenant-context/access-control');
+    const accessRestriction = getTenantAccessRestriction(tenant);
+
+    // Block deleted tenants completely
+    if (accessRestriction.level === 'blocked') {
       const url = request.nextUrl.clone();
       url.pathname = '/tenant-suspended';
       return NextResponse.redirect(url);
     }
 
-    // Check if tenant subscription has expired
-    if (tenant.expire_date && new Date(tenant.expire_date) < new Date()) {
+    // Redirect suspended tenants (past grace period)
+    if (accessRestriction.level === 'restricted' && tenant.status === 'suspended') {
       const url = request.nextUrl.clone();
-      url.pathname = '/tenant-expired';
+      url.pathname = '/tenant-suspended';
       return NextResponse.redirect(url);
     }
+
+    // For expired tenants in grace period, allow access but mark as read-only
+    // Don't redirect - let them access dashboard in read-only mode
+    // The dashboard layout will enforce read-only restrictions
 
     // Clone the request headers and add tenant info
     const requestHeaders = new Headers(request.headers);
@@ -120,6 +129,8 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-tenant-id', tenant.id);
     requestHeaders.set('x-tenant-subdomain', tenant.subdomain);
     requestHeaders.set('x-tenant-name', tenant.name);
+    requestHeaders.set('x-tenant-status', tenant.status || 'active');
+    requestHeaders.set('x-tenant-access-level', accessRestriction.level);
 
     // Create Supabase client for session refresh
     const response = NextResponse.next({

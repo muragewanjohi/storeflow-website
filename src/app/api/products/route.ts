@@ -225,6 +225,10 @@ export async function POST(request: NextRequest) {
     // Require authentication for creating products
     const user = await requireAuth();
     const tenant = await requireTenant();
+    
+    // Check if tenant has edit access (not in read-only mode)
+    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+    await requireEditAccess();
 
     const body = await request.json();
 

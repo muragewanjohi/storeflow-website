@@ -44,6 +44,11 @@ export function loadThemeHeader(themeSlug: string) {
         ssr: true,
         loading: () => <DefaultHeader />,
       });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/Header'), {
+        ssr: true,
+        loading: () => <DefaultHeader />,
+      });
     case 'default':
     default:
       return DefaultHeader;
@@ -78,6 +83,11 @@ export function loadThemeFooter(themeSlug: string) {
       });
     case 'grocery':
       return dynamic(() => import('@/components/themes/grocery/Footer'), {
+        ssr: true,
+        loading: () => <DefaultFooter />,
+      });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/Footer'), {
         ssr: true,
         loading: () => <DefaultFooter />,
       });
@@ -150,6 +160,10 @@ export function loadThemeProductGrid(themeSlug: string) {
       return dynamic(() => import('@/components/themes/grocery/ProductGrid'), {
         ssr: true,
       });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/ProductGrid'), {
+        ssr: true,
+      });
     default:
       return null;
   }
@@ -186,8 +200,36 @@ export function loadThemeHomepage(themeSlug: string) {
       return dynamic(() => import('@/components/themes/grocery/Homepage'), {
         ssr: true,
       });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/Homepage'), {
+        ssr: true,
+      });
     default:
       return null;
+  }
+}
+
+/**
+ * Load theme-specific product detail component
+ */
+export function loadThemeProductDetail(themeSlug: string) {
+  const template = getThemeTemplate(themeSlug);
+  
+  if (!template) {
+    return null;
+  }
+
+  switch (themeSlug) {
+    case 'hexfashion':
+      return dynamic(() => import('@/components/themes/hexfashion/ProductDetail'), {
+        ssr: true,
+      });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/ProductDetail'), {
+        ssr: true,
+      });
+    default:
+      return null; // Use default ProductDetailClient for other themes
   }
 }
 

@@ -259,12 +259,12 @@ export async function DELETE(
 
     // Soft delete: Update status to 'deleted' instead of actually deleting
     // This allows for potential restoration later
+    // Store deleted_at timestamp for tracking retention period
     const deletedTenant = await prisma.tenants.update({
       where: { id },
       data: {
         status: 'deleted',
-        // Optionally, you could add a deleted_at timestamp field
-        // deleted_at: new Date(),
+        deleted_at: new Date(),
       },
     });
 

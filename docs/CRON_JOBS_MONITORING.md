@@ -50,6 +50,7 @@ The Cron Jobs Monitoring Dashboard allows landlords to view, monitor, and manual
 | **Expiry Checker** | `/api/admin/subscriptions/expiry-checker` | Daily at midnight UTC | Checks for expired subscriptions and applies grace period logic |
 | **Analytics Aggregate** | `/api/admin/analytics/aggregate` | Daily at 1 AM UTC | Pre-computes daily analytics data for all tenants |
 | **Data Cleanup** | `/api/admin/cleanup` | Weekly on Sunday at 2 AM UTC | Cleans up old data and temporary files |
+| **Hard Delete Tenants** | `/api/admin/cleanup/hard-delete-tenants` | Weekly on Sunday at 3 AM UTC | Hard deletes tenants past retention period (90 days) |
 
 ---
 

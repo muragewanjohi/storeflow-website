@@ -68,7 +68,7 @@ export default async function ProductsPage({
   }
 
   try {
-    const [productsRaw, total, categories] = await Promise.all([
+    const [productsRaw, total, categories, currentCategory] = await Promise.all([
       prisma.products.findMany({
         where,
         skip: (page - 1) * limit,
@@ -101,6 +101,10 @@ export default async function ProductsPage({
           name: 'asc',
         },
       }),
+      category_id ? prisma.categories.findUnique({
+        where: { id: category_id },
+        select: { id: true, name: true, slug: true },
+      }) : null,
     ]);
 
     // Convert Decimal to number for client components
@@ -142,6 +146,7 @@ export default async function ProductsPage({
               initialCategory={category_id}
               initialSortBy={sort_by}
               initialSortOrder={sort_order}
+              currentCategory={currentCategory}
             />
           </Suspense>
         </main>

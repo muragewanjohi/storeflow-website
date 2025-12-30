@@ -9,14 +9,13 @@
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { trackPageView } from '@/lib/analytics/google-analytics';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export function GoogleAnalytics() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
   useEffect(() => {
@@ -32,7 +31,12 @@ export function GoogleAnalytics() {
 
     // Small delay to ensure gtag is fully initialized
     const timer = setTimeout(() => {
-      const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '');
+      // Use window.location to get full URL including search params
+      // This avoids the useSearchParams() hook which can cause issues in Next.js 15
+      const url = typeof window !== 'undefined' 
+        ? window.location.pathname + window.location.search
+        : pathname;
+      
       trackPageView(url);
       
       if (process.env.NODE_ENV === 'development') {
@@ -41,7 +45,7 @@ export function GoogleAnalytics() {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [pathname, searchParams, isScriptLoaded]);
+  }, [pathname, isScriptLoaded]);
 
   if (!GA_MEASUREMENT_ID) {
     return null;

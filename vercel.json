@@ -15,6 +15,10 @@
     {
       "path": "/api/admin/cleanup",
       "schedule": "0 2 * * 0"
+    },
+    {
+      "path": "/api/admin/cleanup/hard-delete-tenants",
+      "schedule": "0 3 * * 0"
     }
   ]
 }

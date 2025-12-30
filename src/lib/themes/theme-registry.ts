@@ -8,7 +8,7 @@
 
 import type { ThemeConfig } from '@/types/theme';
 
-export type ThemeIndustry = 'electronics' | 'fashion' | 'general' | 'grocery';
+export type ThemeIndustry = 'electronics' | 'fashion' | 'general' | 'grocery' | 'furniture';
 
 export interface ThemeTemplateConfig {
   id: string;
@@ -196,6 +196,37 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
         'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800&h=800&fit=crop',
         'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=800&h=800&fit=crop',
         'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&h=800&fit=crop',
+      ],
+    },
+  },
+  furniture: {
+    id: 'furniture',
+    name: 'Furniture',
+    slug: 'furniture',
+    industry: 'furniture',
+    description: 'Modern furniture theme perfect for interior design stores and furniture retailers',
+    screenshotUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&h=800&fit=crop',
+    layout: {
+      header: 'sticky',
+      productGrid: 'grid',
+      sidebar: 'none',
+      footer: 'multi-column',
+    },
+    componentPaths: {
+      Header: '@/components/themes/furniture/Header',
+      Footer: '@/components/themes/furniture/Footer',
+      ProductCard: '@/components/themes/furniture/ProductCard',
+      ProductGrid: '@/components/themes/furniture/ProductGrid',
+      Hero: '@/components/themes/furniture/Homepage',
+      Homepage: '@/components/themes/furniture/Homepage',
+    },
+    demoContent: {
+      products: 12,
+      categories: 3,
+      images: [
+        'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=800&fit=crop',
+        'https://images.unsplash.com/photo-1631889993954-22e7ef0e7d73?w=800&h=800&fit=crop',
       ],
     },
   },

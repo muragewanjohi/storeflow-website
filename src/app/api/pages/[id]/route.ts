@@ -70,6 +70,11 @@ export async function PUT(
   try {
     const user = await requireAuth();
     const tenant = await requireTenant();
+    
+    // Check if tenant has edit access (not in read-only mode)
+    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+    await requireEditAccess();
+    
     const { id } = await params;
     const body = await request.json();
 
@@ -167,6 +172,11 @@ export async function DELETE(
   try {
     const user = await requireAuth();
     const tenant = await requireTenant();
+    
+    // Check if tenant has edit access (not in read-only mode)
+    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+    await requireEditAccess();
+    
     const { id } = await params;
 
     // Check if page exists and belongs to tenant
