@@ -6,6 +6,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { CurrencyProvider } from "@/lib/currency/currency-context";
 import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 
 export const metadata: Metadata = {
@@ -47,6 +48,7 @@ export default function RootLayout({
             </CurrencyProvider>
             <Toaster />
             <SpeedInsights />
+            <Analytics />
           </ThemeProvider>
         </QueryProvider>
       </body>
