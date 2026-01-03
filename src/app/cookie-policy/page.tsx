@@ -119,7 +119,7 @@ export default function CookiePolicyPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">4. How Long Do Cookies Last?</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Cookies can be either "persistent" or "session" cookies:
+                Cookies can be either &quot;persistent&quot; or &quot;session&quot; cookies:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li><strong>Session Cookies:</strong> These are temporary cookies that expire when you close your browser. They help 
@@ -163,7 +163,7 @@ export default function CookiePolicyPage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">6. Do Not Track Signals</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Some browsers include a "Do Not Track" (DNT) feature that signals to websites you visit that you do not want to have 
+                Some browsers include a &quot;Do Not Track&quot; (DNT) feature that signals to websites you visit that you do not want to have 
                 your online activity tracked. Currently, there is no standard for how DNT signals should be interpreted. As a result, 
                 our Service does not currently respond to DNT browser signals or mechanisms.
               </p>
@@ -187,7 +187,7 @@ export default function CookiePolicyPage() {
               <p className="text-gray-700 leading-relaxed mb-4">
                 We may update this Cookie Policy from time to time to reflect changes in our practices or for other operational, 
                 legal, or regulatory reasons. We will notify you of any material changes by posting the new Cookie Policy on this 
-                page and updating the "Last updated" date.
+                page and updating the &quot;Last updated&quot; date.
               </p>
             </section>
 

@@ -25,7 +25,7 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">1. Agreement to Terms</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                By accessing or using DukaNest ("the Service"), you agree to be bound by these Terms of Service ("Terms"). 
+                By accessing or using DukaNest (&quot;the Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). 
                 If you disagree with any part of these terms, you may not access the Service.
               </p>
               <p className="text-gray-700 leading-relaxed">
@@ -37,7 +37,7 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">2. Use License</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Permission is granted to temporarily access the materials on DukaNest's website for personal, non-commercial 
+                Permission is granted to temporarily access the materials on DukaNest&apos;s website for personal, non-commercial 
                 transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
@@ -45,7 +45,7 @@ export default function TermsOfServicePage() {
                 <li>Use the materials for any commercial purpose or for any public display (commercial or non-commercial)</li>
                 <li>Attempt to decompile or reverse engineer any software contained on DukaNest's website</li>
                 <li>Remove any copyright or other proprietary notations from the materials</li>
-                <li>Transfer the materials to another person or "mirror" the materials on any other server</li>
+                <li>Transfer the materials to another person or &quot;mirror&quot; the materials on any other server</li>
               </ul>
             </section>
 
@@ -137,7 +137,7 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">6. User Content</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                You retain ownership of any content you submit, post, or display on or through the Service ("User Content"). 
+                You retain ownership of any content you submit, post, or display on or through the Service (&quot;User Content&quot;). 
                 By submitting User Content, you grant us a worldwide, non-exclusive, royalty-free license to use, reproduce, 
                 modify, and distribute your User Content solely for the purpose of operating and providing the Service.
               </p>
@@ -197,7 +197,7 @@ export default function TermsOfServicePage() {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-[#0c0528] mb-4">10. Disclaimer</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                The information on this Service is provided on an "as is" basis. To the fullest extent permitted by law, DukaNest:
+                The information on this Service is provided on an &quot;as is&quot; basis. To the fullest extent permitted by law, DukaNest:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Excludes all representations, warranties, and conditions relating to our Service and the use of this Service</li>
