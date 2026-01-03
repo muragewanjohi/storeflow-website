@@ -3,8 +3,6 @@
  * 
  * Handles GET (list blogs) and POST (create blog) requests
  * Full CRUD with validation, search, filtering, and pagination
- * 
- * Day 27: Content Management - Blogs
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,7 +11,6 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { createBlogSchema, blogQuerySchema, generateSlug } from '@/lib/content/validation';
-import { canCreateBlog } from '@/lib/subscriptions/limits';
 
 /**
  * GET /api/blogs
@@ -56,7 +53,7 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
         { excerpt: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -74,25 +71,22 @@ export async function GET(request: NextRequest) {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
+    // Optimize orderBy to use indexed columns
+    const orderBy: any = {};
+    if (sort_by === 'created_at' || sort_by === 'updated_at') {
+      orderBy[sort_by] = sort_order;
+    } else {
+      orderBy[sort_by] = sort_order;
+    }
+
     // Fetch blogs with pagination
     const [blogs, total] = await Promise.all([
       prisma.blogs.findMany({
         where,
         skip,
         take: limit,
-        orderBy: {
-          [sort_by]: sort_order,
-        },
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          excerpt: true,
-          image: true,
-          status: true,
-          category_id: true,
-          created_at: true,
-          updated_at: true,
+        orderBy,
+        include: {
           blog_categories: {
             select: {
               id: true,
@@ -105,7 +99,7 @@ export async function GET(request: NextRequest) {
       prisma.blogs.count({ where }),
     ]);
 
-    // Add cache control headers to prevent caching
+    // Add cache control headers
     const headers = new Headers();
     headers.set('Cache-Control', 'no-store, max-age=0');
 
@@ -145,12 +139,17 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/blogs
  * 
- * Create a new blog post
+ * Create a new blog
  */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
     const tenant = await requireTenant();
+    
+    // Check if tenant has edit access
+    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+    await requireEditAccess();
+    
     const body = await request.json();
 
     // Validate request body
@@ -169,17 +168,8 @@ export async function POST(request: NextRequest) {
 
     if (existingBlog) {
       return NextResponse.json(
-        { error: 'A blog post with this slug already exists' },
+        { error: 'A blog with this slug already exists' },
         { status: 400 }
-      );
-    }
-
-    // Check plan limits before creating blog
-    const limitCheck = await canCreateBlog(tenant);
-    if (!limitCheck.allowed) {
-      return NextResponse.json(
-        { error: limitCheck.reason || 'Blog limit reached' },
-        { status: 403 }
       );
     }
 
@@ -233,4 +223,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

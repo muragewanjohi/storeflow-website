@@ -34,18 +34,18 @@ export default function MarketingHeader() {
             <Link href="#home" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Home
             </Link>
-            <Link href="#shops" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            {/* <Link href="#shops" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Shops
-            </Link>
+            </Link> */}
             <Link href="#pricing" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Pricing
             </Link>
             <Link href="#themes" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Templates
             </Link>
-            <Link href="#blog" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            {/* <Link href="#blog" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Blog
-            </Link>
+            </Link> */}
             <Link href="#contact" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Contact
             </Link>

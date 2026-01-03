@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrency } from '@/lib/currency/currency-context';
 import HexFashionProductCard from '@/components/themes/hexfashion/ProductCard';
-import '../../../../assets/tenant/themes/css/hexfashion/hexfashion.css';
+import '@/styles/themes/hexfashion.css';
 
 interface Product {
   id: string;

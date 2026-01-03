@@ -1,8 +1,14 @@
+/**
+ * Blog Listing Client Component
+ * 
+ * Client component for displaying blog posts list
+ */
+
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Calendar, User, Tag } from 'lucide-react';
+import { Calendar, Tag } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface BlogPost {
   id: string;
@@ -18,33 +24,11 @@ interface BlogPost {
   } | null;
 }
 
-export function Blog() {
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface BlogListingClientProps {
+  blogs: BlogPost[];
+}
 
-  useEffect(() => {
-    async function fetchBlogs() {
-      try {
-        // Fetch marketing blogs (blogs with special marketing tenant_id)
-        const response = await fetch('/api/marketing/blogs?limit=4&sort_by=created_at&sort_order=desc');
-        if (response.ok) {
-          const data = await response.json();
-          setBlogPosts(data.blogs || []);
-        } else {
-          setError('Failed to load blogs');
-        }
-      } catch (err) {
-        console.error('Error fetching blogs:', err);
-        setError('Failed to load blogs');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchBlogs();
-  }, []);
-
+export default function BlogListingClient({ blogs }: Readonly<BlogListingClientProps>) {
   const formatDate = (date: Date | null) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
@@ -54,54 +38,56 @@ export function Blog() {
     });
   };
 
-  if (isLoading) {
+  if (blogs.length === 0) {
     return (
-      <section id="blog" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-white pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
-            <p className="text-muted-foreground">Loading blogs...</p>
+            <h1 className="text-4xl font-bold text-[#0c0528] mb-4">Blog</h1>
+            <p className="text-muted-foreground">No blog posts available yet.</p>
           </div>
         </div>
-      </section>
+      </div>
     );
   }
 
-  if (error || blogPosts.length === 0) {
-    return null; // Don't show section if no blogs
-  }
   return (
-    <section id="blog" className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+    <div className="min-h-screen bg-white pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <p className="text-[#0025cc] font-medium mb-2">Read Our News</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
-            Our Latest{' '}
+          <p className="text-[#0025cc] font-medium mb-2">Our Blog</p>
+          <h1 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
+            Latest{' '}
             <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-              Blog Post
+              Articles
             </span>
-          </h2>
+          </h1>
+          <p className="text-muted-foreground">
+            Stay updated with our latest news, tips, and insights
+          </p>
         </div>
 
         {/* Blog Posts Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {blogPosts.map((post) => (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {blogs.map((post) => (
             <Link
               key={post.id}
               href={post.slug ? `/blog/${post.slug}` : `/blog/${post.id}`}
               className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden"
             >
               {/* Post Image */}
-              <div className="relative h-48 bg-[#e7e9eb] overflow-hidden">
+              <div className="relative h-64 bg-[#e7e9eb] overflow-hidden">
                 {post.image ? (
-                  <img
+                  <Image
                     src={post.image}
                     alt={post.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#0025cc] to-[#001a99] flex items-center justify-center">
-                    <Tag className="w-12 h-12 text-white opacity-50" />
+                    <Tag className="w-16 h-16 text-white opacity-50" />
                   </div>
                 )}
               </div>
@@ -123,33 +109,24 @@ export function Blog() {
               </div>
 
               {/* Post Content */}
-              <div className="px-4 pb-6">
-                <h3 className="text-lg font-semibold text-[#0c0528] mb-2 line-clamp-2">
+              <div className="px-6 pb-6">
+                <h3 className="text-xl font-semibold text-[#0c0528] mb-3 line-clamp-2 group-hover:text-[#0025cc] transition-colors">
                   {post.title}
                 </h3>
                 {post.excerpt && (
-                  <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-2">
+                  <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-3">
                     {post.excerpt}
                   </p>
                 )}
                 <span className="text-[#0025cc] text-sm font-medium hover:underline">
-                  Read More
+                  Read More →
                 </span>
               </div>
             </Link>
           ))}
         </div>
-
-        {/* View All Button */}
-        <div className="text-center mt-12">
-          <Link
-            href="/blog"
-            className="inline-block bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all"
-          >
-            View All Posts
-          </Link>
-        </div>
       </div>
-    </section>
+    </div>
   );
 }
+

@@ -1,4 +1,5 @@
 import { Mail, Phone, MapPin } from 'lucide-react';
+import Link from 'next/link';
 
 export function Footer() {
   return (
@@ -110,9 +111,9 @@ export function Footer() {
               © 2024 DukaNest. All rights reserved.
             </p>
             <div className="flex gap-6">
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Terms of Service</a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">Cookie Policy</a>
+              <Link href="/privacy-policy" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</Link>
+              <Link href="/terms-of-service" className="text-gray-400 hover:text-white text-sm transition-colors">Terms of Service</Link>
+              <Link href="/cookie-policy" className="text-gray-400 hover:text-white text-sm transition-colors">Cookie Policy</Link>
             </div>
           </div>
         </div>

@@ -8,10 +8,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { createClient } from '@supabase/supabase-js';
 import { prisma } from '@/lib/prisma/client';
+import { MARKETING_TENANT_ID } from '@/lib/content/marketing';
 
 /**
  * POST /api/media/upload
@@ -21,7 +22,25 @@ import { prisma } from '@/lib/prisma/client';
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
-    const tenant = await requireTenant();
+    
+    // For landlords, allow uploads without tenant context (use marketing tenant_id)
+    // For tenant users, require tenant context
+    let tenant = await getTenant();
+    let tenantId: string;
+    
+    if (!tenant) {
+      // Landlord uploading - use marketing tenant_id
+      if (user.role === 'landlord') {
+        tenantId = MARKETING_TENANT_ID;
+      } else {
+        return NextResponse.json(
+          { error: 'Tenant not found' },
+          { status: 404 }
+        );
+      }
+    } else {
+      tenantId = tenant.id;
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -59,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
-    const fileName = `${tenant.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const fileName = `${tenantId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `media/${fileName}`;
 
     // Convert File to ArrayBuffer
@@ -103,29 +122,40 @@ export async function POST(request: NextRequest) {
       .from(bucketName)
       .getPublicUrl(filePath);
 
-    // Create media_uploads record
-    const mediaRecord = await prisma.media_uploads.create({
-      data: {
-        tenant_id: tenant.id,
-        title: null, // User can set title later
-        path: filePath,
-        alt_text: null, // User can set alt text later
-        file_type: file.type,
-        file_size: file.size,
-        is_synced: true,
-      },
-    });
+    // Create media_uploads record (skip for marketing tenant_id due to foreign key constraint)
+    let mediaRecord = null;
+    const isMarketing = tenantId === MARKETING_TENANT_ID;
+    
+    if (!isMarketing) {
+      // Only create media_uploads record if tenant exists in tenants table
+      try {
+        mediaRecord = await prisma.media_uploads.create({
+          data: {
+            tenant_id: tenantId,
+            title: null, // User can set title later
+            path: filePath,
+            alt_text: null, // User can set alt text later
+            file_type: file.type,
+            file_size: file.size,
+            is_synced: true,
+          },
+        });
+      } catch (error) {
+        // If tenant doesn't exist, continue without creating media_uploads record
+        console.warn('Could not create media_uploads record:', error);
+      }
+    }
 
     return NextResponse.json({
       message: 'Image uploaded successfully',
-      id: mediaRecord.id,
+      id: mediaRecord?.id || null,
       url: urlData.publicUrl,
       path: filePath,
       filename: file.name,
       size: file.size,
       type: file.type,
-      title: mediaRecord.title,
-      alt_text: mediaRecord.alt_text,
+      title: mediaRecord?.title || null,
+      alt_text: mediaRecord?.alt_text || null,
     });
   } catch (error) {
     console.error('Error uploading media:', error);
