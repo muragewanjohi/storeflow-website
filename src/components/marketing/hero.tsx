@@ -33,7 +33,7 @@ export function Hero() {
 
             {/* Description */}
             <p className="text-lg text-[#8d8d8d] leading-relaxed">
-              Manage products, payments, and sales effortlessly. Everything you need to grow your business is just a click away. Start today and simplify your e-commerce journey.
+              Create your own online store with a unique web address and dedicated dashboard. Manage products, payments, and sales effortlessly. Everything you need to grow your business is just a click away. Start today and simplify your e-commerce journey.
             </p>
 
             {/* CTA Buttons */}

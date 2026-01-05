@@ -94,11 +94,11 @@ export function Blog() {
               {/* Post Image */}
               <div className="relative h-48 bg-[#e7e9eb] overflow-hidden">
                 {post.image ? (
-                  <img
-                    src={post.image}
-                    alt={post.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                <img
+                  src={post.image}
+                  alt={post.title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#0025cc] to-[#001a99] flex items-center justify-center">
                     <Tag className="w-12 h-12 text-white opacity-50" />
@@ -114,10 +114,10 @@ export function Blog() {
                     <span>{formatDate(post.created_at)}</span>
                   </div>
                   {post.blog_categories && (
-                    <div className="flex items-center gap-1 text-[#0c0528]">
-                      <Tag className="w-3 h-3 text-[#0025cc]" />
+                  <div className="flex items-center gap-1 text-[#0c0528]">
+                    <Tag className="w-3 h-3 text-[#0025cc]" />
                       <span>{post.blog_categories.name}</span>
-                    </div>
+                  </div>
                   )}
                 </div>
               </div>
@@ -128,9 +128,9 @@ export function Blog() {
                   {post.title}
                 </h3>
                 {post.excerpt && (
-                  <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-2">
-                    {post.excerpt}
-                  </p>
+                <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-2">
+                  {post.excerpt}
+                </p>
                 )}
                 <span className="text-[#0025cc] text-sm font-medium hover:underline">
                   Read More

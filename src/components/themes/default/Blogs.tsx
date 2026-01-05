@@ -6,6 +6,7 @@
 
 'use client';
 
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Calendar, User } from 'lucide-react';
@@ -91,9 +92,9 @@ export default function DefaultBlogs({ posts = defaultPosts }: DefaultBlogsProps
             </Button>
           ) : (
             <Button variant="outline" size="lg" asChild>
-              <a href="/blog">
+              <Link href="/blog">
                 View All Posts <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
+              </Link>
             </Button>
           )}
         </div>
@@ -145,10 +146,10 @@ export default function DefaultBlogs({ posts = defaultPosts }: DefaultBlogsProps
                   </Button>
                 ) : (
                   <Button variant="ghost" className="w-full group/btn" asChild>
-                    <a href={`/blog/${post.id}`}>
+                    <Link href={`/blog/${post.id}`}>
                       Read More
                       <ArrowRight className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
-                    </a>
+                    </Link>
                   </Button>
                 )}
               </CardContent>
