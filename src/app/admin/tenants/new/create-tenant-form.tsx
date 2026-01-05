@@ -37,6 +37,7 @@ export default function CreateTenantForm() {
     adminName: '',
     contactEmail: '',
     planId: '',
+    isDemo: false,
   });
 
   // Fetch price plans on mount
@@ -71,6 +72,7 @@ export default function CreateTenantForm() {
         body: JSON.stringify({
           ...formData,
           planId: formData.planId || undefined, // Send undefined instead of empty string
+          isDemo: formData.isDemo || false,
         }),
       });
 
@@ -153,14 +155,17 @@ export default function CreateTenantForm() {
             ) : pricePlans.length > 0 ? (
               <div className="space-y-3">
                 <Select
-                  value={formData.planId}
-                  onValueChange={(value) => setFormData({ ...formData, planId: value })}
+                  value={formData.planId || undefined}
+                  onValueChange={(value) => {
+                    // Convert "none" to empty string for API
+                    setFormData({ ...formData, planId: value === 'none' ? '' : value });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a plan (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Plan (Free Trial)</SelectItem>
+                    <SelectItem value="none">No Plan (Free Trial)</SelectItem>
                     {pricePlans.map((plan: any) => (
                       <SelectItem key={plan.id} value={plan.id}>
                         {plan.name} - ${Number(plan.price).toFixed(2)}/{plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
@@ -168,7 +173,7 @@ export default function CreateTenantForm() {
                     ))}
                   </SelectContent>
                 </Select>
-                {formData.planId && (
+                {formData.planId && formData.planId !== 'none' && (
                   <div className="rounded-lg border p-4 bg-muted/50">
                     {(() => {
                       const selectedPlan = pricePlans.find((p: any) => p.id === formData.planId);
@@ -267,6 +272,43 @@ export default function CreateTenantForm() {
                 This email will be used for customer inquiries, order notifications, and support. 
                 It can be different from your admin login email. Customers will see this email in order confirmations and can contact you directly.
               </p>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-4">Store Type</h3>
+            
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="isDemo"
+                  checked={formData.isDemo}
+                  onChange={(e) => setFormData({ ...formData, isDemo: e.target.checked })}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <div className="flex-1">
+                  <Label htmlFor="isDemo" className="font-medium cursor-pointer">
+                    Create as Demo Store
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Demo stores are pre-populated with sample products and data for showcasing the platform. 
+                    They are read-only for visitors and can be reset to their original state. Perfect for marketing and demonstrations.
+                  </p>
+                  {formData.isDemo && (
+                    <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-xs">
+                      <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">Demo Store Features:</p>
+                      <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
+                        <li>Pre-populated with sample products, categories, and content</li>
+                        <li>Read-only for visitors (no real purchases)</li>
+                        <li>Can be reset to original state anytime</li>
+                        <li>Visible on demo showcase page</li>
+                        <li>No expiration date (always active)</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>

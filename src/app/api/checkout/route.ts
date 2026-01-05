@@ -14,6 +14,7 @@ import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import { sendOrderPlacedEmail, sendNewOrderAlertEmail } from '@/lib/orders/emails';
 import { canCreateOrder } from '@/lib/subscriptions/limits';
 import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock';
+import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -25,6 +26,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     const validatedData = checkoutSchema.parse(body);
+
+    // Prevent purchases on demo stores
+    await requireNotDemoStore(tenant.id, 'Purchases');
 
     // Check plan limits before creating order
     const limitCheck = await canCreateOrder(tenant);

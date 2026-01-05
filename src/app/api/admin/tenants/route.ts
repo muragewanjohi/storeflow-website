@@ -26,6 +26,7 @@ const createTenantSchema = z.object({
   adminName: z.string().min(1, 'Admin name is required'),
   contactEmail: z.string().email('Invalid contact email address'),
   planId: z.string().uuid().optional(), // Optional plan selection
+  isDemo: z.boolean().optional().default(false), // Demo store flag
 });
 
 /**
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
 
     // Create tenant in database first
     // Set default theme to light mode in tenant data
+    // For demo stores: no expiration date, mark as demo in data field
     const tenant = await prisma.tenants.create({
       data: {
         name: validatedData.name,
@@ -125,13 +127,27 @@ export async function POST(request: NextRequest) {
         contact_email: validatedData.contactEmail,
         status: 'active',
         start_date: new Date(),
-        plan_id: validatedData.planId || null,
-        expire_date: expireDate,
+        plan_id: validatedData.isDemo ? null : (validatedData.planId || null), // Demo stores don't need plans
+        expire_date: validatedData.isDemo ? null : expireDate, // Demo stores never expire
         data: {
           theme: 'light', // Default to light mode for new stores
+          isDemo: validatedData.isDemo || false, // Mark as demo store
         },
       },
     });
+
+    // If this is a demo store, seed it with sample data
+    if (validatedData.isDemo) {
+      // Import and run demo data seeding (non-blocking)
+      import('@/lib/demo-store/seed-demo-data').then(({ seedDemoStoreData }) => {
+        seedDemoStoreData(tenant.id).catch((error) => {
+          console.error('Failed to seed demo store data:', error);
+          // Don't fail tenant creation if seeding fails
+        });
+      }).catch((error) => {
+        console.error('Failed to import demo data seeder:', error);
+      });
+    }
 
     // Create tenant admin user in Supabase Auth
     const adminClient = createAdminClient();

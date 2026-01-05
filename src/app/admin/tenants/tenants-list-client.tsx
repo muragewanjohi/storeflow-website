@@ -22,7 +22,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
 
 interface Tenant {
   id: string;
@@ -32,6 +33,7 @@ interface Tenant {
   status: string | null;
   created_at: Date | null;
   expire_date: Date | null;
+  data?: any; // JSON field that may contain isDemo flag
 }
 
 interface TenantsListClientProps {
@@ -41,8 +43,44 @@ interface TenantsListClientProps {
 export default function TenantsListClient({ tenants }: Readonly<TenantsListClientProps>) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Check if tenant is a demo store
+  const isDemoStore = (tenant: Tenant): boolean => {
+    return tenant.data?.isDemo === true;
+  };
+
+  const handleResetDemo = async (tenantId: string, tenantName: string) => {
+    if (!confirm(`Are you sure you want to reset "${tenantName}"? This will delete all products, orders, and content, then re-seed with fresh demo data.`)) {
+      return;
+    }
+
+    setIsResetting(tenantId);
+    try {
+      const response = await fetch('/api/admin/demo-stores/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tenantId }),
+      });
+
+      if (response.ok) {
+        toast.success('Demo store reset successfully');
+        router.refresh();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to reset demo store');
+        setIsResetting(null);
+      }
+    } catch (error) {
+      console.error('Error resetting demo store:', error);
+      toast.error('An error occurred while resetting the demo store');
+      setIsResetting(null);
+    }
+  };
 
   const handleDelete = async (tenantId: string) => {
     if (!confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
@@ -209,7 +247,16 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
             <TableBody>
               {filteredTenants.map((tenant: any) => (
                 <TableRow key={tenant.id}>
-                  <TableCell className="font-medium">{tenant.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {tenant.name}
+                      {isDemoStore(tenant) && (
+                        <Badge variant="secondary" className="bg-purple-500 text-white">
+                          Demo
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <code className="text-sm bg-muted px-2 py-1 rounded">
                       {tenant.subdomain}
@@ -224,7 +271,11 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell>{getStatusBadge(tenant.status)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(tenant.status)}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {tenant.created_at
                       ? new Date(tenant.created_at).toLocaleDateString()
@@ -243,16 +294,27 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                             variant="ghost"
                             size="icon"
                             asChild
-                            title="Visit Store Dashboard"
+                            title="Visit Store"
                           >
                             <a
-                              href={`https://${tenant.subdomain}.dukanest.com/dashboard`}
+                              href={`https://${tenant.subdomain}.dukanest.com`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
                               <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                             </a>
                           </Button>
+                          {isDemoStore(tenant) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleResetDemo(tenant.id, tenant.name)}
+                              disabled={isResetting === tenant.id}
+                              title="Reset Demo Store"
+                            >
+                              <ArrowPathIcon className={`h-4 w-4 ${isResetting === tenant.id ? 'animate-spin' : ''}`} />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

@@ -28,6 +28,7 @@ export default async function TenantsPage() {
       status: true,
       created_at: true,
       expire_date: true,
+      data: true, // Include data field to check for isDemo flag
     },
   });
 
