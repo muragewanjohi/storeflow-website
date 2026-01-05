@@ -89,6 +89,29 @@ All cron jobs are configured in `vercel.json` and run automatically on Vercel:
 - `0 1 * * *` = Daily at 1 AM UTC
 - `0 2 * * 0` = Weekly on Sunday at 2 AM UTC
 
+### ⚠️ Important: Authentication Setup
+
+**If cron jobs are failing with "Unauthorized - Invalid token" errors:**
+
+Vercel cron jobs should automatically send the `x-vercel-cron` header, but if this isn't working, you need to ensure `CRON_SECRET_TOKEN` is properly configured:
+
+1. **Set CRON_SECRET_TOKEN in Vercel:**
+   - Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+   - Add `CRON_SECRET_TOKEN` with a secure random token
+   - Apply to: Production, Preview, Development
+
+2. **Verify the token is set:**
+   ```bash
+   # Check in Vercel dashboard or via CLI
+   vercel env ls
+   ```
+
+3. **Redeploy after setting the token:**
+   - After adding the environment variable, trigger a new deployment
+   - Cron jobs will use the token for authentication
+
+**Note:** The code checks for the `x-vercel-cron` header first (case-insensitive). If the header is present, authentication is bypassed. If not, it falls back to checking the `CRON_SECRET_TOKEN` in the Authorization header.
+
 ---
 
 ## Manual Trigger

@@ -33,26 +33,50 @@ export async function GET(request: NextRequest) {
 
   try {
     // Security: Check for Vercel Cron header OR valid token
-    // Vercel Cron automatically sends 'x-vercel-cron' header
+    // Vercel Cron automatically sends 'x-vercel-cron' header (case-insensitive check)
     // Manual calls require CRON_SECRET_TOKEN via Authorization header or query parameter
-    const vercelCronHeader = request.headers.get('x-vercel-cron');
+    const allHeaders = Object.fromEntries(
+      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
+    );
+    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
     const authHeader = request.headers.get('authorization');
     const { searchParams } = new URL(request.url);
     const queryToken = searchParams.get('token');
     const expectedToken = process.env.CRON_SECRET_TOKEN;
     
+    // Debug logging (only in production to help diagnose issues)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[Expiry Checker] Auth check:', {
+        hasVercelCronHeader: !!vercelCronHeader,
+        hasAuthHeader: !!authHeader,
+        hasQueryToken: !!queryToken,
+        hasExpectedToken: !!expectedToken,
+        allHeaderKeys: Object.keys(allHeaders).filter(k => k.includes('vercel') || k.includes('cron') || k.includes('authorization')),
+      });
+    }
+    
     // Allow if it's a Vercel Cron call (has x-vercel-cron header)
     // OR if token is provided and valid
+    // OR if no token is configured (development mode)
     if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '');
+      const headerToken = authHeader?.replace('Bearer ', '').trim();
       const providedToken = queryToken || headerToken;
       
-      if (providedToken !== expectedToken) {
+      if (!providedToken || providedToken !== expectedToken) {
         await completeCronJobLog(logId, 'failed', {
-          error: 'Unauthorized - Invalid token',
+          error: 'Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN.',
+          debug: {
+            hasVercelCronHeader: !!vercelCronHeader,
+            hasAuthHeader: !!authHeader,
+            hasQueryToken: !!queryToken,
+            hasExpectedToken: !!expectedToken,
+          },
         });
         return NextResponse.json(
-          { message: 'Unauthorized' },
+          { 
+            message: 'Unauthorized',
+            error: 'Invalid token. Ensure CRON_SECRET_TOKEN is set in Vercel environment variables and cron jobs are configured correctly.',
+          },
           { status: 401 }
         );
       }

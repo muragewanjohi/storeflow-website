@@ -115,12 +115,18 @@ if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
 
 ### Vercel Cron (Automatic)
 
-When using Vercel Cron (configured in `vercel.json`), Vercel automatically adds the token to requests if you set it in environment variables.
+When using Vercel Cron (configured in `vercel.json`), Vercel automatically sends the `x-vercel-cron` header to identify legitimate cron job requests.
 
-**Vercel automatically sends:**
-```
-Authorization: Bearer ${CRON_SECRET_TOKEN}
-```
+**Important Notes:**
+1. **Vercel sends `x-vercel-cron` header** - This header identifies requests from Vercel's cron system
+2. **If `CRON_SECRET_TOKEN` is set** - The code will check for the `x-vercel-cron` header first. If the header is present, authentication is bypassed. If not, it requires the token in the Authorization header.
+3. **If cron jobs are failing** - Ensure `CRON_SECRET_TOKEN` is set in Vercel environment variables. Even though Vercel sends the header, having the token provides a fallback authentication method.
+
+**Troubleshooting "Unauthorized - Invalid token" errors:**
+- Verify `CRON_SECRET_TOKEN` is set in Vercel Dashboard → Settings → Environment Variables
+- Ensure the token is applied to Production, Preview, and Development environments
+- Redeploy your application after setting the environment variable
+- Check Vercel function logs to see if the `x-vercel-cron` header is being received
 
 ### Manual Testing
 
