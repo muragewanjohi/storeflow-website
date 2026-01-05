@@ -63,14 +63,9 @@ export async function GET(request: NextRequest) {
       const providedToken = queryToken || headerToken;
       
       if (!providedToken || providedToken !== expectedToken) {
+        const debugInfo = `hasVercelCronHeader: ${!!vercelCronHeader}, hasAuthHeader: ${!!authHeader}, hasQueryToken: ${!!queryToken}, hasExpectedToken: ${!!expectedToken}`;
         await completeCronJobLog(logId, 'failed', {
-          error: 'Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN.',
-          debug: {
-            hasVercelCronHeader: !!vercelCronHeader,
-            hasAuthHeader: !!authHeader,
-            hasQueryToken: !!queryToken,
-            hasExpectedToken: !!expectedToken,
-          },
+          error: `Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
         });
         return NextResponse.json(
           { 
