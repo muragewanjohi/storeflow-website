@@ -71,8 +71,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createTenantSchema.parse(body);
 
+    // Normalize subdomain to lowercase (ensure consistency)
+    const normalizedSubdomain = validatedData.subdomain.toLowerCase().trim();
+
     // Validate subdomain (reserved words, naming rules, etc.)
-    const subdomainValidation = validateSubdomain(validatedData.subdomain);
+    const subdomainValidation = validateSubdomain(normalizedSubdomain);
     if (!subdomainValidation.isValid) {
       // Return validation error using standard format
       return createErrorResponse(
@@ -84,13 +87,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if subdomain already exists
-    const existingTenant = await prisma.tenants.findUnique({
-      where: { subdomain: validatedData.subdomain },
-    });
+    // Check if subdomain already exists (case-insensitive check)
+    // Use raw query with LOWER() to ensure case-insensitive comparison
+    // This catches duplicates even if stored with different casing
+    const existingTenantCheck = await prisma.$queryRaw<Array<{ id: string; subdomain: string }>>`
+      SELECT id, subdomain FROM tenants 
+      WHERE LOWER(subdomain) = LOWER(${normalizedSubdomain})
+      LIMIT 1
+    `;
+
+    if (existingTenantCheck.length > 0) {
+      const existingTenant = existingTenantCheck[0];
+      return createErrorResponse(
+        'Subdomain already taken',
+        `The subdomain "${normalizedSubdomain}" is already in use${existingTenant.subdomain !== normalizedSubdomain ? ` (found as "${existingTenant.subdomain}")` : ''}. Please choose a different subdomain.`,
+        409,
+        { field: 'subdomain', subdomain: normalizedSubdomain, existingSubdomain: existingTenant.subdomain },
+        ErrorCode.CONFLICT
+      );
+    }
 
     if (existingTenant) {
-      return handleConflictError('Subdomain already exists');
+      return createErrorResponse(
+        'Subdomain already taken',
+        `The subdomain "${normalizedSubdomain}" is already in use. Please choose a different subdomain.`,
+        409,
+        { field: 'subdomain', subdomain: normalizedSubdomain },
+        ErrorCode.CONFLICT
+      );
     }
 
     // Validate plan and calculate expire_date if provided
@@ -123,7 +147,7 @@ export async function POST(request: NextRequest) {
     const tenant = await prisma.tenants.create({
       data: {
         name: validatedData.name,
-        subdomain: validatedData.subdomain,
+        subdomain: normalizedSubdomain, // Use normalized subdomain
         contact_email: validatedData.contactEmail,
         status: 'active',
         start_date: new Date(),
@@ -149,54 +173,98 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create tenant admin user in Supabase Auth
+    // Check if user with this email already exists
     const adminClient = createAdminClient();
-    const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-      email: validatedData.adminEmail,
-      password: validatedData.adminPassword,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        role: 'tenant_admin',
-        tenant_id: tenant.id,
-        name: validatedData.adminName,
-      },
-    });
+    let userId: string;
+    let existingUser = null;
 
-    if (authError || !authUser) {
-      // Rollback: delete tenant if user creation fails
-      await prisma.tenants.delete({
-        where: { id: tenant.id },
-      });
-
-      // Check if error is due to duplicate email
-      if (authError?.message?.includes('already registered') || 
-          authError?.message?.includes('already exists') ||
-          authError?.status === 422) {
-        return handleConflictError('Email already registered');
-      }
-
-      return handleApiError(
-        new Error(`Failed to create admin user: ${authError?.message || 'Unknown error'}`)
-      );
+    try {
+      // Try to find existing user by email
+      const { data: { users } } = await adminClient.auth.admin.listUsers();
+      existingUser = users.find((u) => u.email?.toLowerCase() === validatedData.adminEmail.toLowerCase());
+    } catch (checkError) {
+      // If check fails, continue with user creation attempt
+      console.warn('Could not check existing user:', checkError);
     }
 
-    // Update tenant with user_id
-    const updatedTenant = await prisma.tenants.update({
+    if (existingUser) {
+      // User already exists - use existing user_id
+      userId = existingUser.id;
+
+      // Update tenant with existing user_id
+      await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: {
+          user_id: userId,
+        },
+      });
+
+      // Update user metadata to include the new tenant_id
+      // Note: This allows one user to have multiple stores
+      await adminClient.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          ...existingUser.user_metadata,
+          tenant_id: tenant.id, // Update to latest tenant (or could store array of tenant_ids)
+          name: validatedData.adminName,
+          role: 'tenant_admin',
+        },
+      }).catch((error) => {
+        console.error('Failed to update user metadata:', error);
+        // Continue even if metadata update fails
+      });
+    } else {
+      // Create new user in Supabase Auth
+      const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+        email: validatedData.adminEmail,
+        password: validatedData.adminPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          role: 'tenant_admin',
+          tenant_id: tenant.id,
+          name: validatedData.adminName,
+        },
+      });
+
+      if (authError || !authUser) {
+        // Rollback: delete tenant if user creation fails
+        await prisma.tenants.delete({
+          where: { id: tenant.id },
+        });
+
+        return handleApiError(
+          new Error(`Failed to create admin user: ${authError?.message || 'Unknown error'}`)
+        );
+      }
+
+      userId = authUser.user.id;
+
+      // Update tenant with user_id
+      await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: {
+          user_id: userId,
+        },
+      });
+    }
+
+    // Fetch updated tenant for response
+    const updatedTenant = await prisma.tenants.findUnique({
       where: { id: tenant.id },
-      data: {
-        user_id: authUser.user.id,
-      },
     });
+
+    if (!updatedTenant) {
+      return handleApiError(new Error('Failed to retrieve created tenant'));
+    }
 
     // Send welcome email to tenant admin (non-blocking)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    const loginUrl = `${baseUrl}/${validatedData.subdomain}/dashboard`;
+    const loginUrl = `${baseUrl}/${normalizedSubdomain}/dashboard`;
 
-    sendWelcomeEmail({
+      sendWelcomeEmail({
       to: validatedData.adminEmail,
       tenantName: validatedData.name,
-      subdomain: validatedData.subdomain,
+      subdomain: normalizedSubdomain,
       adminName: validatedData.adminName,
       loginUrl,
     }).catch((error) => {
@@ -207,7 +275,7 @@ export async function POST(request: NextRequest) {
     // Automatically add subdomain to Vercel (non-blocking)
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId) {
-      const subdomainUrl = `${validatedData.subdomain}.dukanest.com`;
+      const subdomainUrl = `${normalizedSubdomain}.dukanest.com`;
       addTenantDomain(subdomainUrl, projectId).catch((error) => {
         // Log error but don't fail tenant creation
         // Subdomain can be added manually later if needed

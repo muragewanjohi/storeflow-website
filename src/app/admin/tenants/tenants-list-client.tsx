@@ -46,6 +46,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
   const [isResetting, setIsResetting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all'); // 'all', 'demo', 'regular'
 
   // Check if tenant is a demo store
   const isDemoStore = (tenant: Tenant): boolean => {
@@ -107,9 +108,16 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
     }
   };
 
-  // Filter tenants based on search query and status
+  // Filter tenants based on search query, status, and type (demo/regular)
   const filteredTenants = useMemo(() => {
     let filtered = tenants;
+
+    // Filter by type (demo vs regular)
+    if (typeFilter === 'demo') {
+      filtered = filtered.filter((tenant) => isDemoStore(tenant));
+    } else if (typeFilter === 'regular') {
+      filtered = filtered.filter((tenant) => !isDemoStore(tenant));
+    }
 
     // Filter by status
     if (statusFilter !== 'all') {
@@ -132,7 +140,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
     }
 
     return filtered;
-  }, [tenants, searchQuery, statusFilter]);
+  }, [tenants, searchQuery, statusFilter, typeFilter]);
 
   // Count tenants by status
   const statusCounts = useMemo(() => {
@@ -142,6 +150,15 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
       suspended: tenants.filter((t) => t.status === 'suspended').length,
       expired: tenants.filter((t) => t.status === 'expired').length,
       deleted: tenants.filter((t) => t.status === 'deleted').length,
+    };
+  }, [tenants]);
+
+  // Count tenants by type (demo vs regular)
+  const typeCounts = useMemo(() => {
+    return {
+      all: tenants.length,
+      demo: tenants.filter((t) => isDemoStore(t)).length,
+      regular: tenants.filter((t) => !isDemoStore(t)).length,
     };
   }, [tenants]);
 
@@ -191,6 +208,21 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
             />
           </div>
 
+          {/* Type Filter Tabs (Demo vs Regular) */}
+          <Tabs value={typeFilter} onValueChange={setTypeFilter}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">
+                All ({typeCounts.all})
+              </TabsTrigger>
+              <TabsTrigger value="demo">
+                Demo Stores ({typeCounts.demo})
+              </TabsTrigger>
+              <TabsTrigger value="regular">
+                Regular ({typeCounts.regular})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {/* Status Tabs */}
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList className="grid w-full grid-cols-5">
@@ -218,7 +250,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
             <p className="text-muted-foreground mb-4">
               {tenants.length === 0
                 ? 'No tenants found'
-                : searchQuery || statusFilter !== 'all'
+                : searchQuery || statusFilter !== 'all' || typeFilter !== 'all'
                   ? 'No tenants match your search criteria'
                   : 'No tenants found'}
             </p>
@@ -282,9 +314,13 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                       : '—'}
                   </TableCell>
                   <TableCell>
-                    {tenant.expire_date
-                      ? new Date(tenant.expire_date).toLocaleDateString()
-                      : '—'}
+                    {isDemoStore(tenant) ? (
+                      <span className="text-muted-foreground italic">Never (Demo)</span>
+                    ) : tenant.expire_date ? (
+                      new Date(tenant.expire_date).toLocaleDateString()
+                    ) : (
+                      '—'
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">

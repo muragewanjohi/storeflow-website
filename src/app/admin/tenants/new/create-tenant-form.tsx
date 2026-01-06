@@ -79,7 +79,9 @@ export default function CreateTenantForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to create tenant');
+        // Extract error message from API response
+        const errorMessage = data.message || data.error || 'Failed to create tenant';
+        throw new Error(errorMessage);
       }
 
       // Redirect to tenants list
