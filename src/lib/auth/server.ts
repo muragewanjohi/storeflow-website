@@ -14,14 +14,31 @@ import type { UserRole, AuthUser } from './types';
  */
 export async function getUser(): Promise<AuthUser | null> {
   try {
+    console.log('[Auth Server] ========================================');
     console.log('[Auth Server] Getting user from session...');
     const supabase = await createClient();
+    
+    // Check what cookies are available
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    const supabaseCookies = allCookies.filter(c => 
+      c.name.includes('supabase') || 
+      c.name.includes('auth') ||
+      c.name.includes('sb-')
+    );
+    console.log('[Auth Server] Available Supabase cookies:', {
+      count: supabaseCookies.length,
+      cookieNames: supabaseCookies.map(c => c.name),
+    });
     
     // First check session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     console.log('[Auth Server] Session check:', {
       hasSession: !!session,
       hasAccessToken: !!session?.access_token,
+      hasRefreshToken: !!session?.refresh_token,
+      expiresAt: session?.expires_at,
       error: sessionError?.message,
     });
 
@@ -31,11 +48,19 @@ export async function getUser(): Promise<AuthUser | null> {
       userId: user?.id,
       email: user?.email,
       role: user?.user_metadata?.role,
+      tenantId: user?.user_metadata?.tenant_id,
       error: error?.message,
     });
 
     if (error || !user) {
-      console.log('[Auth Server] No user found or error:', error?.message || 'No user');
+      console.log('[Auth Server] ❌ No user found or error:', error?.message || 'No user');
+      if (error) {
+        console.log('[Auth Server] Error details:', {
+          name: error.name,
+          message: error.message,
+          status: error.status,
+        });
+      }
       return null;
     }
 
