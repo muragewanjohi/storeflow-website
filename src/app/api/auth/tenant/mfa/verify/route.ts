@@ -87,9 +87,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Use the tempSession if available, otherwise create a new session
-    if (tempSession && tempSession.access_token) {
-      // Validate the session token is still valid
-      return NextResponse.json({
+    if (tempSession && tempSession.access_token && tempSession.refresh_token) {
+      // Set the session server-side so cookies are available immediately
+      // This ensures the dashboard layout can read the session
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: tempSession.access_token,
+        refresh_token: tempSession.refresh_token,
+      });
+
+      if (sessionError || !sessionData.session) {
+        console.error('[MFA Verify] Failed to set session server-side:', sessionError);
+        return NextResponse.json(
+          { 
+            error: 'Session error',
+            message: 'Failed to establish session. Please try logging in again.'
+          },
+          { status: 500 }
+        );
+      }
+
+      // Verify the session is valid
+      const { data: { user: sessionUser }, error: userCheckError } = await supabase.auth.getUser();
+      
+      if (userCheckError || !sessionUser || sessionUser.id !== userId) {
+        console.error('[MFA Verify] Session validation failed:', userCheckError);
+        return NextResponse.json(
+          { 
+            error: 'Session error',
+            message: 'Session validation failed. Please try logging in again.'
+          },
+          { status: 500 }
+        );
+      }
+
+      // Create response with session data
+      // Cookies are already set by supabase.auth.setSession() above
+      const response = NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -105,6 +138,9 @@ export async function POST(request: NextRequest) {
         },
         message: 'Code verified successfully',
       });
+
+      console.log('[MFA Verify] Session set server-side, cookies should be available');
+      return response;
     }
 
     // Fallback: Create a new session using admin API
