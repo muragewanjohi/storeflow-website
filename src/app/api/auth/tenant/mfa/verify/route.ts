@@ -17,6 +17,7 @@ const verifySchema = z.object({
   code: z.string().length(6, 'Code must be 6 digits').regex(/^\d+$/, 'Code must be numeric'),
   tempSession: z.object({
     access_token: z.string(),
+    refresh_token: z.string().optional(),
     expires_at: z.number().optional(),
   }).optional(),
 });
