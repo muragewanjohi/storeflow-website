@@ -75,18 +75,73 @@ export default function TenantAdminLoginPage() {
 
         // If session is returned, set it in Supabase client
         if (data.session && data.session.access_token) {
+          console.log('[Login] Setting session client-side', {
+            hasAccessToken: !!data.session.access_token,
+            hasRefreshToken: !!data.session.refresh_token,
+            expiresAt: data.session.expires_at,
+          });
+          
           // Set the session in Supabase
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
-          await supabase.auth.setSession({
+          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token || '',
+          });
+
+          if (sessionError) {
+            console.error('[Login] Failed to set session:', sessionError);
+            setError('Failed to establish session. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
+          if (!sessionData.session) {
+            console.error('[Login] No session returned from setSession');
+            setError('Failed to establish session. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
+          console.log('[Login] Session set successfully', {
+            hasUser: !!sessionData.user,
+            userId: sessionData.user?.id,
+            email: sessionData.user?.email,
+            role: sessionData.user?.user_metadata?.role,
+          });
+
+          // Verify session is accessible
+          const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
+          if (verifyError || !verifyUser) {
+            console.error('[Login] Session verification failed:', verifyError);
+            setError('Session verification failed. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
+          console.log('[Login] Session verified, user authenticated:', {
+            userId: verifyUser.id,
+            email: verifyUser.email,
+            role: verifyUser.user_metadata?.role,
+          });
+
+          // Get current session to check cookies
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          console.log('[Login] Current session after setSession:', {
+            hasSession: !!currentSession,
+            hasAccessToken: !!currentSession?.access_token,
+            expiresAt: currentSession?.expires_at,
           });
         }
 
         // 2FA verified - redirect to dashboard
-        router.push('/dashboard');
-        router.refresh();
+        // Use window.location.href for full page reload to ensure cookies are available
+        console.log('[Login] Redirecting to dashboard with full page reload...');
+        setIsLoading(false);
+        // Small delay to ensure session cookies are set
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 100);
         return;
       }
 

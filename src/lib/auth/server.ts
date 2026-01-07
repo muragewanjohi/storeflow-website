@@ -14,22 +14,49 @@ import type { UserRole, AuthUser } from './types';
  */
 export async function getUser(): Promise<AuthUser | null> {
   try {
+    console.log('[Auth Server] Getting user from session...');
     const supabase = await createClient();
+    
+    // First check session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[Auth Server] Session check:', {
+      hasSession: !!session,
+      hasAccessToken: !!session?.access_token,
+      error: sessionError?.message,
+    });
+
     const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('[Auth Server] User check:', {
+      hasUser: !!user,
+      userId: user?.id,
+      email: user?.email,
+      role: user?.user_metadata?.role,
+      error: error?.message,
+    });
 
     if (error || !user) {
+      console.log('[Auth Server] No user found or error:', error?.message || 'No user');
       return null;
     }
 
-    return {
+    const authUser = {
       id: user.id,
       email: user.email!,
       role: (user.user_metadata?.role as UserRole) || 'customer',
       tenant_id: user.user_metadata?.tenant_id,
       metadata: user.user_metadata as any,
     };
+    
+    console.log('[Auth Server] Returning auth user:', {
+      id: authUser.id,
+      email: authUser.email,
+      role: authUser.role,
+      tenantId: authUser.tenant_id,
+    });
+    
+    return authUser;
   } catch (error) {
-    console.error('Error getting user:', error);
+    console.error('[Auth Server] Error getting user:', error);
     return null;
   }
 }

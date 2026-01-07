@@ -31,8 +31,16 @@ export default async function DashboardLayout({
   }
 
   // Require authentication and tenant admin/staff role for all other dashboard pages
+  console.log('[Dashboard Layout] Checking authentication for pathname:', pathname);
   const user = await requireAuthOrRedirect('/dashboard/login');
+  console.log('[Dashboard Layout] User authenticated:', {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    tenantId: user.tenant_id,
+  });
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/dashboard/login');
+  console.log('[Dashboard Layout] Role check passed');
 
   // Get tenant context
   const tenant = await requireTenant();
