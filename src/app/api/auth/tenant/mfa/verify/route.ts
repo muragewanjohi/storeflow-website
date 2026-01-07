@@ -171,14 +171,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Return JSON response with session (similar to landlord login)
-      // Let the client set the session and redirect to avoid redirect URL issues
+      // Return JSON response with session
+      // The session was already set server-side via supabase.auth.setSession()
+      // which sets cookies automatically. We also return the session data
+      // so the client can verify it was set correctly.
       console.log('[MFA Verify] Verification successful, returning session', {
         userId: user.id,
         hasSession: !!sessionData.session,
+        hasAccessToken: !!sessionData.session?.access_token,
+        hasRefreshToken: !!sessionData.session?.refresh_token,
       });
       
-      return NextResponse.json({
+      // Ensure we have a valid session before returning
+      if (!sessionData.session || !sessionData.session.access_token) {
+        console.error('[MFA Verify] Session is missing or invalid');
+        return NextResponse.json(
+          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
+          { status: 500 }
+        );
+      }
+      
+      // Create JSON response - cookies are already set by supabase.auth.setSession()
+      const response = NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -194,6 +208,15 @@ export async function POST(request: NextRequest) {
         },
         message: 'Code verified successfully',
       });
+      
+      // Verify cookies are in the response
+      const cookies = response.cookies.getAll();
+      console.log('[MFA Verify] Cookies in response', {
+        count: cookies.length,
+        cookieNames: cookies.map(c => c.name),
+      });
+      
+      return response;
     }
 
     // Fallback: Create a new session using admin API
