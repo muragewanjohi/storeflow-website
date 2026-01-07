@@ -190,11 +190,25 @@ export async function POST(request: NextRequest) {
       });
     } catch (otpError: any) {
       console.error('Failed to send OTP:', otpError);
+      console.error('OTP Error details:', {
+        message: otpError.message,
+        stack: otpError.stack,
+        userId: authData.user.id,
+        email: authData.user.email,
+      });
       await supabase.auth.signOut();
+      
+      // Provide more specific error message in development
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const errorMessage = isDevelopment && otpError.message 
+        ? `Unable to send verification code: ${otpError.message}`
+        : 'Unable to send verification code. Please try again.';
+      
       return NextResponse.json(
         { 
           error: 'Failed to send code',
-          message: 'Unable to send verification code. Please try again.'
+          message: errorMessage,
+          ...(isDevelopment && { details: otpError.message })
         },
         { status: 500 }
       );
@@ -216,6 +230,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.error('Login error:', error);
+    console.error('Login error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
     
     // Don't expose internal error details in production
     const isDevelopment = process.env.NODE_ENV === 'development';
@@ -223,7 +242,10 @@ export async function POST(request: NextRequest) {
       { 
         error: 'Login failed',
         message: 'An unexpected error occurred. Please try again.',
-        ...(isDevelopment && { details: error.message })
+        ...(isDevelopment && { 
+          details: error.message,
+          stack: error.stack 
+        })
       },
       { status: 500 }
     );

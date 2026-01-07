@@ -19,6 +19,34 @@ function generateOTP(): string {
 /**
  * Store OTP code in database for verification
  */
+/**
+ * Ensure the mfa_otp_codes table exists
+ */
+async function ensureOTPTableExists(): Promise<void> {
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS mfa_otp_codes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        code VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, code, created_at)
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_mfa_otp_user_id ON mfa_otp_codes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_mfa_otp_expires_at ON mfa_otp_codes(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_mfa_otp_used ON mfa_otp_codes(used);
+    `;
+  } catch (error: any) {
+    // If table already exists or creation fails, log but don't throw
+    // The INSERT will fail with a more specific error if table doesn't exist
+    console.warn('Could not ensure mfa_otp_codes table exists:', error.message);
+  }
+}
+
 export async function storeOTP(
   userId: string,
   email: string,
@@ -26,12 +54,21 @@ export async function storeOTP(
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-  // Store OTP in database using raw SQL (since Prisma schema might not have this table yet)
-  await prisma.$executeRaw`
-    INSERT INTO mfa_otp_codes (user_id, email, code, expires_at, used)
-    VALUES (${userId}::uuid, ${email}, ${otp}, ${expiresAt}, FALSE)
-    ON CONFLICT DO NOTHING
-  `;
+  try {
+    // Ensure table exists before inserting
+    await ensureOTPTableExists();
+    
+    // Store OTP in database using raw SQL
+    await prisma.$executeRaw`
+      INSERT INTO mfa_otp_codes (user_id, email, code, expires_at, used)
+      VALUES (${userId}::uuid, ${email}, ${otp}, ${expiresAt}, FALSE)
+      ON CONFLICT DO NOTHING
+    `;
+  } catch (error: any) {
+    console.error('Failed to store OTP in database:', error);
+    // Re-throw with a more descriptive error
+    throw new Error(`Failed to store OTP: ${error.message || 'Database error'}`);
+  }
 }
 
 /**
@@ -100,12 +137,17 @@ Best regards,
 The Dukanest Team
   `;
 
-  await sendEmail({
+  const emailResult = await sendEmail({
     to,
     subject: `Your Login Code - ${otp}`,
     html,
     text,
   });
+
+  // Check if email sending failed
+  if (!emailResult.success) {
+    throw new Error(emailResult.error || 'Failed to send email');
+  }
 }
 
 /**
