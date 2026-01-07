@@ -77,11 +77,12 @@ export default function TenantAdminLoginPage() {
     try {
       // If 2FA is required, verify the code
       if (requiresMFA && userId) {
-        const response = await fetch('/api/auth/tenant/mfa/verify', {
+        const verifyResponse = await fetch('/api/auth/tenant/mfa/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          redirect: 'manual', // Don't automatically follow redirects - we'll handle it
           body: JSON.stringify({ 
             userId, 
             code: mfaCode,
@@ -94,19 +95,51 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.message || data.error || 'Invalid code. Please try again.');
-          setMfaCode(''); // Clear code on error
+        // Handle redirect response (307)
+        if (verifyResponse.status === 307 || verifyResponse.status === 301 || verifyResponse.status === 302) {
+          // Get redirect location from headers
+          const location = verifyResponse.headers.get('location') || '/dashboard';
+          // Use full page reload to ensure cookies are properly set
+          window.location.href = location;
           return;
         }
 
-        // Session is already set server-side by the verify route
-        // Just redirect to dashboard with full page reload
-        // The server-side session cookies will be included in the response
-        window.location.href = '/dashboard';
-        return;
+        // Handle error responses
+        if (!verifyResponse.ok) {
+          const errorData = await verifyResponse.json().catch(() => ({ message: 'Invalid code. Please try again.' }));
+          setError(errorData.message || errorData.error || 'Invalid code. Please try again.');
+          setMfaCode(''); // Clear code on error
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to parse as JSON (fallback if redirect wasn't used)
+        try {
+          const verifyData = await verifyResponse.json();
+          if (verifyData.success || verifyData.verified) {
+            // Success - redirect to dashboard
+            // Use full page reload to ensure cookies are properly set
+            window.location.href = '/dashboard';
+            return;
+          } else {
+            setError(verifyData.message || verifyData.error || 'Verification failed');
+            setMfaCode('');
+            setIsLoading(false);
+            return;
+          }
+        } catch (parseError) {
+          // If response is not JSON, check if it's a successful status
+          if (verifyResponse.status >= 200 && verifyResponse.status < 300) {
+            // Assume success and redirect
+            window.location.href = '/dashboard';
+            return;
+          } else {
+            setError('An unexpected error occurred. Please try again.');
+            setMfaCode('');
+            setIsLoading(false);
+            return;
+          }
+        }
       }
 
       // Initial login (password only)

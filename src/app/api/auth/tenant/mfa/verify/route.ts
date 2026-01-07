@@ -41,6 +41,10 @@ export async function POST(request: NextRequest) {
     const isValid = await verifyOTP(userId, code);
 
     if (!isValid) {
+      // Log for debugging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('MFA verification failed: Invalid or expired code for user:', userId);
+      }
       return NextResponse.json(
         { 
           error: 'Verification failed',
@@ -141,32 +145,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create response with session data
-      // The cookies are automatically set by supabase.auth.setSession() through the cookie handlers
-      const response = NextResponse.json({
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: role as string,
-          tenant_id: tenant.id,
-          name: user.user_metadata?.name,
-        },
-        session: {
-          access_token: sessionData.session.access_token,
-          expires_at: sessionData.session.expires_at,
-          refresh_token: sessionData.session.refresh_token,
-        },
-        message: 'Code verified successfully',
-      });
-
-      // Redirect to dashboard after successful session setup
-      const redirectUrl = new URL('/dashboard', request.url);
-      const redirectResponse = NextResponse.redirect(redirectUrl);
+      // Create a redirect response to /dashboard
+      // This ensures cookies set by supabase.auth.setSession() are included
+      // The cookies are automatically included in redirect responses
+      // Use the origin from the request to ensure correct redirect URL
+      const origin = request.headers.get('origin') || request.nextUrl.origin;
+      const redirectUrl = new URL('/dashboard', origin);
+      const response = NextResponse.redirect(redirectUrl);
       
-      // Copy cookies from the JSON response to the redirect response
-      // The cookies are automatically set by supabase.auth.setSession() through the cookie handlers
-      return redirectResponse;
+      // The cookies were already set by supabase.auth.setSession() via the cookie store
+      // They will be automatically included in the redirect response
+      
+      // Log for debugging (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('MFA verification successful, redirecting to:', redirectUrl.toString());
+      }
+      
+      return response;
     }
 
     // Fallback: Create a new session using admin API
