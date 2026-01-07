@@ -182,10 +182,20 @@ export async function POST(request: NextRequest) {
       // The cookies were already set by supabase.auth.setSession() via the cookie store
       // They will be automatically included in the redirect response
       
-      // Log for debugging (only in development)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('MFA verification successful, redirecting to:', redirectUrl.toString());
-      }
+      // Log for debugging
+      console.log('[MFA Verify] Verification successful, creating redirect', {
+        redirectUrl: redirectUrl.toString(),
+        userId: user.id,
+        hasSession: !!sessionData.session,
+        cookiesSet: response.cookies.getAll().length,
+      });
+      
+      // Verify cookies are being set
+      const cookies = response.cookies.getAll();
+      console.log('[MFA Verify] Cookies in redirect response', {
+        count: cookies.length,
+        cookieNames: cookies.map(c => c.name),
+      });
       
       return response;
     }
