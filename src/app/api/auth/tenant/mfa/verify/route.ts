@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
         },
         session: {
           access_token: tempSession.access_token,
+          refresh_token: tempSession.refresh_token,
           expires_at: tempSession.expires_at,
         },
         message: 'Code verified successfully',

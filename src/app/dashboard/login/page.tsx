@@ -81,12 +81,20 @@ export default function TenantAdminLoginPage() {
             expiresAt: data.session.expires_at,
           });
           
+          // Supabase requires both access_token and refresh_token
+          if (!data.session.refresh_token) {
+            console.error('[Login] Missing refresh_token in session response');
+            setError('Session data incomplete. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+          
           // Set the session in Supabase
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
           const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token || '',
+            refresh_token: data.session.refresh_token,
           });
 
           if (sessionError) {
