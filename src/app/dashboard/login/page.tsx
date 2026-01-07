@@ -109,68 +109,7 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
-        console.log('[Login] MFA verify response', {
-          status: verifyResponse.status,
-          ok: verifyResponse.ok,
-          redirected: verifyResponse.redirected,
-          contentType: verifyResponse.headers.get('content-type'),
-          url: verifyResponse.url,
-        });
-
-        // Check if response was redirected (browser followed redirect)
-        // If redirected and status is OK, it means we successfully verified and were redirected
-        if (verifyResponse.redirected && verifyResponse.ok) {
-          console.log('[Login] MFA verification successful, server redirected');
-          console.log('[Login] Response URL:', verifyResponse.url);
-          // Server already redirected - cookies should be set
-          // Do a full page reload to ensure cookies are available
-          window.location.href = '/dashboard';
-          return;
-        }
-
-        // Check content type before parsing JSON
-        const contentType = verifyResponse.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          console.error('[Login] Response is not JSON', {
-            contentType,
-            status: verifyResponse.status,
-            url: verifyResponse.url,
-          });
-          // If it's a successful status but not JSON, assume redirect worked
-          if (verifyResponse.ok || verifyResponse.status === 200) {
-            console.log('[Login] Non-JSON successful response (likely HTML from redirect)');
-            console.log('[Login] Response URL:', verifyResponse.url);
-            // Server redirected and we got HTML - do full page reload
-            window.location.href = '/dashboard';
-            return;
-          }
-          setError('An unexpected error occurred. Please try again.');
-          setIsLoading(false);
-          return;
-        }
-
-        // Parse JSON response
-        let data;
-        try {
-          data = await verifyResponse.json();
-        } catch (parseError: any) {
-          console.error('[Login] Failed to parse JSON response', {
-            error: parseError.message,
-            status: verifyResponse.status,
-            contentType,
-          });
-          // If status is OK but parsing failed, might be a redirect that returned HTML
-          if (verifyResponse.ok) {
-            console.log('[Login] JSON parse failed but status OK (likely HTML from redirect)');
-            console.log('[Login] Response URL:', verifyResponse.url);
-            // Server redirected and we got HTML - do full page reload
-            window.location.href = '/dashboard';
-            return;
-          }
-          setError('An unexpected error occurred. Please try again.');
-          setIsLoading(false);
-          return;
-        }
+        const data = await verifyResponse.json();
 
         if (!verifyResponse.ok) {
           console.error('[Login] MFA verification failed', {
@@ -184,42 +123,19 @@ export default function TenantAdminLoginPage() {
           return;
         }
 
-        console.log('[Login] MFA verification successful', {
-          hasSession: !!data.session,
-          hasAccessToken: !!data.session?.access_token,
-        });
-
-        // If session is returned, set it in Supabase client (similar to landlord login)
+        // If session is returned, set it in Supabase client (same as landlord login)
         if (data.session && data.session.access_token) {
-          console.log('[Login] Setting session client-side');
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          await supabase.auth.setSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token || '',
           });
-          
-          if (sessionError) {
-            console.error('[Login] Failed to set session client-side', sessionError);
-            setError('Failed to establish session. Please try again.');
-            setIsLoading(false);
-            return;
-          }
-          
-          console.log('[Login] Session set successfully', {
-            hasUser: !!sessionData.user,
-            userId: sessionData.user?.id,
-          });
         }
 
-        // 2FA verified - redirect to dashboard (similar to landlord login)
-        console.log('[Login] MFA verification successful, redirecting to dashboard');
-        // If session was set client-side, wait a moment for it to be saved
-        if (data.session && data.session.access_token) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-        // Use full page reload to ensure cookies are available
-        window.location.href = '/dashboard';
+        // 2FA verified - redirect to dashboard (same as landlord login)
+        router.push('/dashboard');
+        router.refresh();
         return;
       }
 

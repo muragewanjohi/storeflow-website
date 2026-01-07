@@ -171,33 +171,29 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Create a redirect response to /dashboard
-      // This ensures cookies set by supabase.auth.setSession() are included
-      // The cookies are automatically included in redirect responses
-      // Use the origin from the request to ensure correct redirect URL
-      const origin = request.headers.get('origin') || request.nextUrl.origin;
-      const redirectUrl = new URL('/dashboard', origin);
-      const response = NextResponse.redirect(redirectUrl);
-      
-      // The cookies were already set by supabase.auth.setSession() via the cookie store
-      // They will be automatically included in the redirect response
-      
-      // Log for debugging
-      console.log('[MFA Verify] Verification successful, creating redirect', {
-        redirectUrl: redirectUrl.toString(),
+      // Return JSON response with session (similar to landlord login)
+      // Let the client set the session and redirect to avoid redirect URL issues
+      console.log('[MFA Verify] Verification successful, returning session', {
         userId: user.id,
         hasSession: !!sessionData.session,
-        cookiesSet: response.cookies.getAll().length,
       });
       
-      // Verify cookies are being set
-      const cookies = response.cookies.getAll();
-      console.log('[MFA Verify] Cookies in redirect response', {
-        count: cookies.length,
-        cookieNames: cookies.map(c => c.name),
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: role as string,
+          tenant_id: tenant.id,
+          name: user.user_metadata?.name,
+        },
+        session: {
+          access_token: sessionData.session.access_token,
+          refresh_token: sessionData.session.refresh_token,
+          expires_at: sessionData.session.expires_at,
+        },
+        message: 'Code verified successfully',
       });
-      
-      return response;
     }
 
     // Fallback: Create a new session using admin API
