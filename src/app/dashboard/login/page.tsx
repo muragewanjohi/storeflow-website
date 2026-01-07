@@ -74,9 +74,23 @@ export default function TenantAdminLoginPage() {
     setIsLoading(true);
     setError(null);
 
+    console.log('[Login] Form submitted', {
+      requiresMFA,
+      userId,
+      hasEmail: !!email,
+      hasPassword: !!password,
+      hasMfaCode: !!mfaCode,
+      deviceFingerprint: !!deviceFingerprint,
+    });
+
     try {
       // If 2FA is required, verify the code
       if (requiresMFA && userId) {
+        console.log('[Login] Starting MFA verification', {
+          userId,
+          codeLength: mfaCode.length,
+          hasTempSession: !!tempSession,
+        });
         const verifyResponse = await fetch('/api/auth/tenant/mfa/verify', {
           method: 'POST',
           headers: {
@@ -95,10 +109,18 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
+        console.log('[Login] MFA verify response', {
+          status: verifyResponse.status,
+          ok: verifyResponse.ok,
+          redirected: verifyResponse.redirected,
+          headers: Object.fromEntries(verifyResponse.headers.entries()),
+        });
+
         // Handle redirect response (307)
         if (verifyResponse.status === 307 || verifyResponse.status === 301 || verifyResponse.status === 302) {
           // Get redirect location from headers
           const location = verifyResponse.headers.get('location') || '/dashboard';
+          console.log('[Login] Redirecting after MFA verification', { location });
           // Use full page reload to ensure cookies are properly set
           window.location.href = location;
           return;
@@ -106,7 +128,15 @@ export default function TenantAdminLoginPage() {
 
         // Handle error responses
         if (!verifyResponse.ok) {
-          const errorData = await verifyResponse.json().catch(() => ({ message: 'Invalid code. Please try again.' }));
+          console.error('[Login] MFA verification failed', {
+            status: verifyResponse.status,
+            statusText: verifyResponse.statusText,
+          });
+          const errorData = await verifyResponse.json().catch(() => {
+            console.error('[Login] Failed to parse error response as JSON');
+            return { message: 'Invalid code. Please try again.' };
+          });
+          console.error('[Login] MFA error details', errorData);
           setError(errorData.message || errorData.error || 'Invalid code. Please try again.');
           setMfaCode(''); // Clear code on error
           setIsLoading(false);
@@ -143,6 +173,13 @@ export default function TenantAdminLoginPage() {
       }
 
       // Initial login (password only)
+      console.log('[Login] Starting initial login request', {
+        email,
+        hasPassword: !!password,
+        deviceFingerprint: !!deviceFingerprint,
+        trustDevice,
+      });
+
       const response = await fetch('/api/auth/tenant/login', {
         method: 'POST',
         headers: {
@@ -159,9 +196,36 @@ export default function TenantAdminLoginPage() {
         }),
       });
 
-      const data = await response.json();
+      console.log('[Login] Login response received', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
+      const data = await response.json().catch(async (parseError) => {
+        console.error('[Login] Failed to parse response as JSON', parseError);
+        const text = await response.text().catch(() => 'Unable to read response');
+        console.error('[Login] Response text', text);
+        throw new Error('Invalid response from server');
+      });
+
+      console.log('[Login] Login response data', {
+        success: data.success,
+        requiresMFA: data.requiresMFA,
+        userId: data.userId,
+        hasTempSession: !!data.tempSession,
+        error: data.error,
+        message: data.message,
+      });
 
       if (!response.ok) {
+        console.error('[Login] Login failed', {
+          status: response.status,
+          error: data.error,
+          message: data.message,
+          details: data.details,
+        });
         setError(data.message || data.error || 'Login failed');
         setIsLoading(false);
         return;
@@ -177,18 +241,31 @@ export default function TenantAdminLoginPage() {
       // 2FA is ALWAYS required for tenant admin accounts
       // The API will always return requiresMFA: true for tenant admins
       if (data.requiresMFA && data.userId) {
+        console.log('[Login] 2FA required, switching to MFA input', {
+          userId: data.userId,
+          email: data.email,
+          hasTempSession: !!data.tempSession,
+        });
         setRequiresMFA(true);
         setUserId(data.userId);
         setTempSession(data.tempSession); // Store temporary session
         setError(null); // Clear any previous errors
+        setIsLoading(false); // Stop loading to show MFA input
         return;
       }
 
       // This should never happen for tenant admins (2FA is mandatory)
       // But handle it gracefully just in case
+      console.warn('[Login] Unexpected: Login succeeded without 2FA requirement', data);
       window.location.href = '/dashboard';
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch (err: any) {
+      console.error('[Login] Unexpected error during login', {
+        error: err,
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name,
+      });
+      setError(err?.message || 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
