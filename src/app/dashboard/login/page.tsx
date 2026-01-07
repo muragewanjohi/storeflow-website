@@ -109,7 +109,61 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
-        const data = await verifyResponse.json();
+        console.log('[Login] MFA verify response', {
+          status: verifyResponse.status,
+          ok: verifyResponse.ok,
+          redirected: verifyResponse.redirected,
+          contentType: verifyResponse.headers.get('content-type'),
+          url: verifyResponse.url,
+        });
+
+        // Check if response was redirected (browser followed redirect)
+        // If redirected and status is OK, it means we successfully verified and were redirected
+        if (verifyResponse.redirected && verifyResponse.ok) {
+          console.log('[Login] MFA verification successful, redirecting to dashboard');
+          window.location.href = '/dashboard';
+          return;
+        }
+
+        // Check content type before parsing JSON
+        const contentType = verifyResponse.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          console.error('[Login] Response is not JSON', {
+            contentType,
+            status: verifyResponse.status,
+            url: verifyResponse.url,
+          });
+          // If it's a successful status but not JSON, assume redirect worked
+          if (verifyResponse.ok || verifyResponse.status === 200) {
+            console.log('[Login] Non-JSON successful response, redirecting to dashboard');
+            window.location.href = '/dashboard';
+            return;
+          }
+          setError('An unexpected error occurred. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Parse JSON response
+        let data;
+        try {
+          data = await verifyResponse.json();
+        } catch (parseError: any) {
+          console.error('[Login] Failed to parse JSON response', {
+            error: parseError.message,
+            status: verifyResponse.status,
+            contentType,
+          });
+          // If status is OK but parsing failed, might be a redirect that returned HTML
+          if (verifyResponse.ok) {
+            console.log('[Login] JSON parse failed but status OK, redirecting to dashboard');
+            window.location.href = '/dashboard';
+            return;
+          }
+          setError('An unexpected error occurred. Please try again.');
+          setIsLoading(false);
+          return;
+        }
 
         if (!verifyResponse.ok) {
           console.error('[Login] MFA verification failed', {
@@ -318,20 +372,14 @@ export default function TenantAdminLoginPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <Link
-                href="/dashboard/account-recovery"
-                className="text-sm font-medium text-blue-600 hover:text-blue-500"
-              >
-                Lost access to email?
-              </Link>
-              <Link
-                href="/forgot-password"
-                className="text-sm font-medium text-blue-600 hover:text-blue-500"
-              >
-                Forgot password?
-              </Link>
-            </div>
+          <div className="flex items-center justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
             <div>
           <button
@@ -552,13 +600,7 @@ export default function TenantAdminLoginPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <Link
-              href="/dashboard/account-recovery"
-              className="text-sm font-medium text-blue-600 hover:text-blue-500"
-            >
-              Lost access to email?
-            </Link>
+          <div className="flex items-center justify-end">
             <Link
               href="/forgot-password"
               className="text-sm font-medium text-blue-600 hover:text-blue-500"
