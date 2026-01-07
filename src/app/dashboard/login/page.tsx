@@ -123,59 +123,20 @@ export default function TenantAdminLoginPage() {
           return;
         }
 
-        // Set session client-side (same as landlord login)
-        // This ensures the session is available in the browser
-        if (!data.session || !data.session.access_token) {
-          console.error('[Login] No session in response', data);
-          setError('Session not returned. Please try again.');
-          setIsLoading(false);
-          return;
-        }
-
-        console.log('[Login] Setting session client-side');
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token || '',
-        });
-        
-        if (sessionError || !sessionData.session) {
-          console.error('[Login] Failed to set session client-side', {
-            error: sessionError,
-            hasSession: !!sessionData.session,
+        // If session is returned, set it in Supabase client (same as landlord login)
+        if (data.session && data.session.access_token) {
+          // Set the session in Supabase
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token || '',
           });
-          setError('Failed to establish session. Please try again.');
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('[Login] Session set successfully', {
-          hasUser: !!sessionData.user,
-          userId: sessionData.user?.id,
-          email: sessionData.user?.email,
-        });
-
-        // Verify session is accessible
-        const { data: { user: verifyUser }, error: verifyError } = await supabase.auth.getUser();
-        if (verifyError || !verifyUser) {
-          console.error('[Login] Session verification failed', verifyError);
-          setError('Session verification failed. Please try again.');
-          setIsLoading(false);
-          return;
         }
 
-        console.log('[Login] Session verified, user authenticated:', verifyUser.id);
-
-        // 2FA verified - redirect to dashboard
-        // Use full page reload to ensure cookies are available for server-side auth check
-        console.log('[Login] Redirecting to dashboard with full page reload');
-        setIsLoading(false);
-        // Use window.location.href for full page reload (ensures cookies are available)
-        // Small delay to ensure session is saved to browser storage
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 300);
+        // 2FA verified - redirect to dashboard (same as landlord login)
+        router.push('/dashboard');
+        router.refresh();
         return;
       }
 

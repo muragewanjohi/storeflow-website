@@ -122,77 +122,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // After OTP verification, we need to create a session
-    // The client should have stored the tempSession from the initial login
+    // If user opted to trust this device, create trusted device record
+    // Do this before returning the session (same as landlord pattern)
+    if (trustDevice && deviceFingerprint && deviceName && browserInfo && osInfo) {
+      try {
+        const { createTrustedDevice } = await import('@/lib/auth/trusted-devices');
+        await createTrustedDevice({
+          userId: user.id,
+          deviceFingerprint,
+          deviceName,
+          browserInfo,
+          osInfo,
+          ipAddress,
+        });
+      } catch (deviceError) {
+        // Log error but don't fail the login if device trust creation fails
+        console.error('Failed to create trusted device:', deviceError);
+      }
+    }
+
     // Use the tempSession if available, otherwise create a new session
-    
-    if (tempSession && tempSession.access_token && tempSession.refresh_token) {
-      // Set the session server-side using the Supabase client
-      // This will properly set the cookies that the server can read
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: tempSession.access_token,
-        refresh_token: tempSession.refresh_token,
-      });
-
-      if (sessionError || !sessionData.session) {
-        console.error('Failed to set session after OTP verification:', sessionError);
-        return NextResponse.json(
-          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
-          { status: 500 }
-        );
-      }
-
-      // Verify the session is valid by getting the user
-      const { data: { user: sessionUser }, error: userCheckError } = await supabase.auth.getUser();
-      
-      if (userCheckError || !sessionUser || sessionUser.id !== userId) {
-        console.error('Session validation failed after OTP verification:', userCheckError);
-        return NextResponse.json(
-          { error: 'Session error', message: 'Session validation failed. Please try logging in again.' },
-          { status: 500 }
-        );
-      }
-
-      // If user opted to trust this device, create trusted device record
-      if (trustDevice && deviceFingerprint && deviceName && browserInfo && osInfo) {
-        try {
-          const { createTrustedDevice } = await import('@/lib/auth/trusted-devices');
-          await createTrustedDevice({
-            userId: user.id,
-            deviceFingerprint,
-            deviceName,
-            browserInfo,
-            osInfo,
-            ipAddress,
-          });
-        } catch (deviceError) {
-          // Log error but don't fail the login if device trust creation fails
-          console.error('Failed to create trusted device:', deviceError);
-        }
-      }
-
-      // Return JSON response with session
-      // The session was already set server-side via supabase.auth.setSession()
-      // which sets cookies automatically. We also return the session data
-      // so the client can verify it was set correctly.
-      console.log('[MFA Verify] Verification successful, returning session', {
-        userId: user.id,
-        hasSession: !!sessionData.session,
-        hasAccessToken: !!sessionData.session?.access_token,
-        hasRefreshToken: !!sessionData.session?.refresh_token,
-      });
-      
-      // Ensure we have a valid session before returning
-      if (!sessionData.session || !sessionData.session.access_token) {
-        console.error('[MFA Verify] Session is missing or invalid');
-        return NextResponse.json(
-          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
-          { status: 500 }
-        );
-      }
-      
-      // Create JSON response - cookies are already set by supabase.auth.setSession()
-      const response = NextResponse.json({
+    // Same pattern as landlord login - just return the session, let client set it
+    if (tempSession && tempSession.access_token) {
+      // Validate the session token is still valid
+      return NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -202,21 +155,12 @@ export async function POST(request: NextRequest) {
           name: user.user_metadata?.name,
         },
         session: {
-          access_token: sessionData.session.access_token,
-          refresh_token: sessionData.session.refresh_token,
-          expires_at: sessionData.session.expires_at,
+          access_token: tempSession.access_token,
+          refresh_token: tempSession.refresh_token,
+          expires_at: tempSession.expires_at,
         },
         message: 'Code verified successfully',
       });
-      
-      // Verify cookies are in the response
-      const cookies = response.cookies.getAll();
-      console.log('[MFA Verify] Cookies in response', {
-        count: cookies.length,
-        cookieNames: cookies.map(c => c.name),
-      });
-      
-      return response;
     }
 
     // Fallback: Create a new session using admin API
