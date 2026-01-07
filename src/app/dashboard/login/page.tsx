@@ -73,9 +73,11 @@ export default function TenantAdminLoginPage() {
           return;
         }
 
-        // If session is returned, set it in Supabase client (same as landlord login)
+        // If session is returned, set it in Supabase client
+        // The server already set cookies in the verify response, but we also set client-side
+        // for browser storage (localStorage/cookies)
         if (data.session && data.session.access_token) {
-          // Set the session in Supabase
+          // Set the session in Supabase client-side (for browser storage)
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
           await supabase.auth.setSession({
@@ -84,9 +86,12 @@ export default function TenantAdminLoginPage() {
           });
         }
 
-        // 2FA verified - redirect to dashboard (same as landlord login)
-        router.push('/dashboard');
-        router.refresh();
+        // 2FA verified - redirect to dashboard
+        // Use window.location.href for full page reload to ensure cookies from verify response are sent
+        // The server-side verify route already set cookies in the response, so they should be available
+        setIsLoading(false);
+        // Use full page reload to ensure cookies are sent with the request
+        window.location.href = '/dashboard';
         return;
       }
 

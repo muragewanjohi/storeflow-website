@@ -16,6 +16,22 @@ export async function getUser(): Promise<AuthUser | null> {
   try {
     console.log('[Auth Server] ========================================');
     console.log('[Auth Server] Getting user from session...');
+    
+    // Check what cookies are available
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    const supabaseCookies = allCookies.filter(c => 
+      c.name.includes('supabase') || 
+      c.name.includes('auth') ||
+      c.name.includes('sb-')
+    );
+    console.log('[Auth Server] Available Supabase cookies:', {
+      count: supabaseCookies.length,
+      cookieNames: supabaseCookies.map(c => c.name),
+      cookieValues: supabaseCookies.map(c => `${c.name}=${c.value.substring(0, 20)}...`),
+    });
+    
     const supabase = await createClient();
     
     // Use getUser() directly (recommended by Supabase - verifies with server)

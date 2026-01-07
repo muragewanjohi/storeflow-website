@@ -139,7 +139,13 @@ export async function POST(request: NextRequest) {
         message: 'Code verified successfully',
       });
 
-      console.log('[MFA Verify] Session set server-side, cookies should be available');
+      // Verify cookies are in the response
+      const responseCookies = response.cookies.getAll();
+      console.log('[MFA Verify] Session set server-side, cookies in response:', {
+        count: responseCookies.length,
+        cookieNames: responseCookies.map(c => c.name),
+      });
+
       return response;
     }
 
