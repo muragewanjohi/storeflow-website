@@ -17,15 +17,16 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Check if we're on the login page - skip auth check if so
-  // The login page has its own layout, but Next.js still processes parent layouts
+  // Check if we're on the login or account recovery page - skip auth check if so
+  // These pages have their own layouts, but Next.js still processes parent layouts
   // So we need to check the pathname here to prevent redirect loops
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') || '';
   
-  // If we're on the login page, just render children without auth check
-  // The child layout will handle it
-  if (pathname === '/dashboard/login' || pathname.startsWith('/dashboard/login')) {
+  // If we're on the login or account recovery page, just render children without auth check
+  // The child layouts will handle it
+  if (pathname === '/dashboard/login' || pathname.startsWith('/dashboard/login') ||
+      pathname === '/dashboard/account-recovery' || pathname.startsWith('/dashboard/account-recovery')) {
     return <>{children}</>;
   }
 

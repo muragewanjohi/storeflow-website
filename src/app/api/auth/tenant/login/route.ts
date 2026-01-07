@@ -16,6 +16,11 @@ import { z } from 'zod';
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+  deviceFingerprint: z.string().optional(),
+  deviceName: z.string().optional(),
+  browserInfo: z.string().optional(),
+  osInfo: z.string().optional(),
+  trustDevice: z.boolean().optional().default(false),
 });
 
 export async function POST(request: NextRequest) {
@@ -24,7 +29,12 @@ export async function POST(request: NextRequest) {
     
     // Validate input
     const validatedData = loginSchema.parse(body);
-    const { email, password } = validatedData;
+    const { email, password, deviceFingerprint, deviceName, browserInfo, osInfo, trustDevice } = validatedData;
+    
+    // Get client IP address
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     request.headers.get('x-real-ip') ||
+                     null;
 
     // Get tenant from middleware
     const tenant = await requireTenant();
@@ -106,68 +116,89 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has email-based 2FA enabled
-    // We'll check user metadata for 2FA enabled flag
-    const hasMFA = authData.user.user_metadata?.mfa_enabled === true;
-
-    // If 2FA is enabled, send OTP code via email instead of completing login
-    if (hasMFA) {
-      // Import here to avoid circular dependencies
-      const { generateAndSendOTP } = await import('@/lib/mfa/email-otp');
+    // Check if device is trusted (if device fingerprint is provided)
+    let deviceTrusted = false;
+    if (deviceFingerprint) {
+      const { isDeviceTrusted } = await import('@/lib/auth/trusted-devices');
+      const trustCheck = await isDeviceTrusted(
+        authData.user.id,
+        deviceFingerprint,
+        ipAddress
+      );
+      deviceTrusted = trustCheck.trusted;
       
-      try {
-        // Generate and send OTP code
-        await generateAndSendOTP(
-          authData.user.id,
-          authData.user.email!,
-          tenant.name
-        );
-
-        // Don't sign out - keep the session for after OTP verification
-        // Return response indicating 2FA is required
-        // Include a temporary session token that can be used after OTP verification
-        return NextResponse.json({
-          success: true,
-          requiresMFA: true,
-          userId: authData.user.id,
-          email: authData.user.email,
-          // Store session info temporarily (client should store this securely)
-          tempSession: {
-            access_token: authData.session?.access_token,
-            expires_at: authData.session?.expires_at,
-            refresh_token: authData.session?.refresh_token, // Include refresh token
-          },
-          message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
-        });
-      } catch (otpError: any) {
-        console.error('Failed to send OTP:', otpError);
-        await supabase.auth.signOut();
-        return NextResponse.json(
-          { 
-            error: 'Failed to send code',
-            message: 'Unable to send verification code. Please try again.'
-          },
-          { status: 500 }
-        );
+      // If IP changed significantly, require 2FA even if device was trusted
+      if (trustCheck.requiresReauth) {
+        deviceTrusted = false;
       }
     }
 
-    // No 2FA - complete login normally
-    return NextResponse.json({
-      success: true,
-      requiresMFA: false,
-      user: {
-        id: authData.user.id,
+    // If device is trusted, skip 2FA and complete login
+    if (deviceTrusted) {
+      // Set session cookies
+      const response = NextResponse.json({
+        success: true,
+        requiresMFA: false,
+        message: 'Login successful',
+        user: {
+          id: authData.user.id,
+          email: authData.user.email,
+        },
+      });
+
+      // Set auth cookies (Supabase handles this automatically via middleware)
+      return response;
+    }
+
+    // 2FA is MANDATORY for tenant admin accounts (unless device is trusted)
+    // Always require 2FA verification, regardless of mfa_enabled flag
+    // Import here to avoid circular dependencies
+    const { generateAndSendOTP } = await import('@/lib/mfa/email-otp');
+    
+    try {
+      // Generate and send OTP code
+      await generateAndSendOTP(
+        authData.user.id,
+        authData.user.email!,
+        tenant.name
+      );
+
+      // If user wants to trust this device, create trusted device after 2FA verification
+      // We'll handle this in the MFA verify route
+      // For now, just pass the trustDevice flag in the response
+      
+      // Don't sign out - keep the session for after OTP verification
+      // Return response indicating 2FA is required
+      // Include a temporary session token that can be used after OTP verification
+      return NextResponse.json({
+        success: true,
+        requiresMFA: true,
+        userId: authData.user.id,
         email: authData.user.email,
-        role: role as string,
-        tenant_id: tenant.id,
-        name: authData.user.user_metadata?.name,
-      },
-      session: {
-        access_token: authData.session?.access_token,
-        expires_at: authData.session?.expires_at,
-      },
-    });
+        trustDevice: trustDevice && !!deviceFingerprint, // Only trust if fingerprint provided
+        deviceFingerprint,
+        deviceName,
+        browserInfo,
+        osInfo,
+        // Store session info temporarily (client should store this securely)
+        tempSession: {
+          access_token: authData.session?.access_token,
+          expires_at: authData.session?.expires_at,
+          refresh_token: authData.session?.refresh_token, // Include refresh token
+        },
+        message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
+      });
+    } catch (otpError: any) {
+      console.error('Failed to send OTP:', otpError);
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { 
+          error: 'Failed to send code',
+          message: 'Unable to send verification code. Please try again.'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error: any) {
     // Handle validation errors
     if (error instanceof z.ZodError) {

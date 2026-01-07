@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { generateDeviceFingerprint, generateDeviceName, parseUserAgent } from '@/lib/auth/device-fingerprint';
 
 export default function TenantAdminLoginPage() {
   const router = useRouter();
@@ -29,10 +30,31 @@ export default function TenantAdminLoginPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
+  const [deviceFingerprint, setDeviceFingerprint] = useState<string | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState<{ deviceName: string; browserInfo: string; osInfo: string } | null>(null);
 
   // Only fetch tenant name after component mounts to prevent hydration issues
   useEffect(() => {
     setIsMounted(true);
+    
+    // Generate device fingerprint and info
+    try {
+      const fingerprint = generateDeviceFingerprint();
+      const userAgent = navigator.userAgent;
+      const { browser, os } = parseUserAgent(userAgent);
+      const deviceName = generateDeviceName(userAgent);
+      
+      setDeviceFingerprint(fingerprint);
+      setDeviceInfo({
+        deviceName,
+        browserInfo: browser,
+        osInfo: os,
+      });
+    } catch (err) {
+      console.error('Failed to generate device fingerprint:', err);
+    }
+    
     async function fetchTenantName() {
       try {
         const response = await fetch('/api/tenant/current');
@@ -64,6 +86,11 @@ export default function TenantAdminLoginPage() {
             userId, 
             code: mfaCode,
             tempSession, // Pass the temporary session from initial login
+            trustDevice: trustDevice && !!deviceFingerprint,
+            deviceFingerprint: deviceFingerprint || undefined,
+            deviceName: deviceInfo?.deviceName,
+            browserInfo: deviceInfo?.browserInfo,
+            osInfo: deviceInfo?.osInfo,
           }),
         });
 
@@ -75,29 +102,9 @@ export default function TenantAdminLoginPage() {
           return;
         }
 
-        // If session is returned, set it in Supabase client
-        if (data.session && data.session.access_token) {
-          // Set the session in Supabase
-          const { createClient } = await import('@/lib/supabase/client');
-          const supabase = createClient();
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token || '',
-          });
-
-          if (sessionError) {
-            console.error('Failed to set session:', sessionError);
-            setError('Failed to establish session. Please try logging in again.');
-            return;
-          }
-
-          // Wait a moment for cookies to be set, then redirect with full page reload
-          // This ensures the session is properly established before navigation
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        // 2FA verified - redirect to dashboard with full page reload
-        // Use window.location instead of router.push to ensure cookies are picked up
+        // Session is already set server-side by the verify route
+        // Just redirect to dashboard with full page reload
+        // The server-side session cookies will be included in the response
         window.location.href = '/dashboard';
         return;
       }
@@ -108,17 +115,34 @@ export default function TenantAdminLoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email, 
+          password,
+          deviceFingerprint: deviceFingerprint || undefined,
+          deviceName: deviceInfo?.deviceName,
+          browserInfo: deviceInfo?.browserInfo,
+          osInfo: deviceInfo?.osInfo,
+          trustDevice: trustDevice && !!deviceFingerprint, // Only trust if fingerprint available
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         setError(data.message || data.error || 'Login failed');
+        setIsLoading(false);
         return;
       }
 
-      // Check if 2FA is required
+      // If device is trusted, skip 2FA and redirect directly
+      if (data.success && !data.requiresMFA) {
+        // Device is trusted - session is already set, just redirect
+        window.location.href = '/dashboard';
+        return;
+      }
+
+      // 2FA is ALWAYS required for tenant admin accounts
+      // The API will always return requiresMFA: true for tenant admins
       if (data.requiresMFA && data.userId) {
         setRequiresMFA(true);
         setUserId(data.userId);
@@ -127,19 +151,8 @@ export default function TenantAdminLoginPage() {
         return;
       }
 
-      // No 2FA required - set session if provided and redirect to dashboard
-      if (data.session && data.session.access_token) {
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token || '',
-        });
-        // Wait a moment for cookies to be set
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      // Redirect with full page reload to ensure session is picked up
+      // This should never happen for tenant admins (2FA is mandatory)
+      // But handle it gracefully just in case
       window.location.href = '/dashboard';
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -203,9 +216,38 @@ export default function TenantAdminLoginPage() {
                   placeholder="Enter your password"
                 />
               </div>
+
+              {deviceFingerprint && (
+                <div className="flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="trust-device"
+                      name="trust-device"
+                      type="checkbox"
+                      checked={trustDevice}
+                      onChange={(e) => setTrustDevice(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="trust-device" className="font-medium text-gray-700 cursor-pointer">
+                      Trust this device for 30 days
+                    </label>
+                    <p className="text-gray-500 mt-0.5">
+                      Skip 2FA verification on this device. Not recommended for shared or public computers.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-between">
+              <Link
+                href="/dashboard/account-recovery"
+                className="text-sm font-medium text-blue-600 hover:text-blue-500"
+              >
+                Lost access to email?
+              </Link>
               <Link
                 href="/forgot-password"
                 className="text-sm font-medium text-blue-600 hover:text-blue-500"
@@ -310,6 +352,29 @@ export default function TenantAdminLoginPage() {
                     placeholder="Enter your password"
                   />
                 </div>
+
+                {deviceFingerprint && (
+                  <div className="flex items-start">
+                    <div className="flex items-center h-5">
+                      <input
+                        id="trust-device-main"
+                        name="trust-device-main"
+                        type="checkbox"
+                        checked={trustDevice}
+                        onChange={(e) => setTrustDevice(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                      />
+                    </div>
+                    <div className="ml-3 text-sm">
+                      <label htmlFor="trust-device-main" className="font-medium text-gray-700 cursor-pointer">
+                        Trust this device for 30 days
+                      </label>
+                      <p className="text-gray-500 mt-0.5">
+                        Skip 2FA verification on this device. Not recommended for shared or public computers.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="space-y-4">
@@ -320,9 +385,12 @@ export default function TenantAdminLoginPage() {
                     </svg>
                     <div>
                       <h3 className="text-sm font-semibold text-blue-900 mb-1">Two-Factor Authentication Required</h3>
-                  <p className="text-sm text-blue-800">
-                    Enter the 6-digit code sent to your email to complete login.
-                  </p>
+                      <p className="text-sm text-blue-800 font-semibold text-blue-700 mb-1">
+                        Two-factor authentication is required for all tenant admin accounts.
+                      </p>
+                      <p className="text-sm text-blue-800">
+                        A 6-digit code has been sent to your email. Please enter it below to complete your login.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -398,7 +466,13 @@ export default function TenantAdminLoginPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/dashboard/account-recovery"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500"
+            >
+              Lost access to email?
+            </Link>
             <Link
               href="/forgot-password"
               className="text-sm font-medium text-blue-600 hover:text-blue-500"

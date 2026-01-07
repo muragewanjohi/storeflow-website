@@ -301,6 +301,29 @@ function TenantRegisterForm() {
               </div>
             )}
 
+            {/* 2FA Information Notice */}
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    Two-Factor Authentication Required
+                  </h3>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                    For your security, <strong>two-factor authentication (2FA) is mandatory</strong> for all store admin accounts. 
+                    Each time you log in, you&apos;ll receive a 6-digit code via email to complete your login.
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                    <li>Secure your store and customer data</li>
+                    <li>Protect against unauthorized access</li>
+                    <li>Quick and easy email-based verification</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name">Store Name *</Label>
@@ -390,7 +413,7 @@ function TenantRegisterForm() {
                   minLength={8}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Must be at least 8 characters
+                  Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.
                 </p>
               </div>
             </div>

@@ -24,7 +24,7 @@ export const createLandlordTicketSchema = z.object({
   subject: z.string().min(1, 'Subject is required').max(255, 'Subject must be less than 255 characters'),
   description: z.string().min(1, 'Description is required').max(5000, 'Description must be less than 5000 characters'),
   priority: landlordTicketPrioritySchema.default('medium'),
-  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'other']).optional(),
+  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'account_recovery', 'other']).optional(),
 });
 
 /**
@@ -35,7 +35,7 @@ export const updateLandlordTicketSchema = z.object({
   priority: landlordTicketPrioritySchema.optional(),
   subject: z.string().min(1).max(255).optional(),
   description: z.string().min(1).max(5000).optional(),
-  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'other']).optional(),
+  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'account_recovery', 'other']).optional(),
 });
 
 /**
@@ -55,7 +55,7 @@ export const landlordTicketQuerySchema = z.object({
   search: z.string().optional(),
   status: landlordTicketStatusSchema.optional(),
   priority: landlordTicketPrioritySchema.optional(),
-  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'other']).optional(),
+  category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'account_recovery', 'other']).optional(),
   tenant_id: z.string().uuid().optional(),
   sort_by: z.enum(['created_at', 'updated_at', 'priority', 'status']).optional(),
   sort_order: z.enum(['asc', 'desc']).optional(),

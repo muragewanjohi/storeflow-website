@@ -117,7 +117,7 @@
 
 3. **Mandatory 2FA:**
    - ✅ **MANDATORY for landlord/admin accounts** (Security requirement)
-   - ❌ **Optional for tenant admins** (But strongly encouraged)
+   - ✅ **Mandatory for tenant admins** (Required for all tenant admin accounts)
    - ✅ **Allow store owners to require it for their staff**
    - ✅ **Consider mandatory for Pro/Enterprise plans**
 
@@ -247,7 +247,7 @@
 ### **Our Recommendation:**
 
 1. ✅ **2FA is MANDATORY for Landlord Accounts** (Security requirement - always enforced)
-2. ✅ **2FA is Optional for Tenant Admins** (but strongly encouraged)
+2. ✅ **2FA is Mandatory for Tenant Admins** (Required for all tenant admin accounts, matching landlord security requirements)
 3. ✅ **Use Email-Based 2FA** (current implementation)
 4. ✅ **Allow Store Owners to Require 2FA for Staff**
 5. 🔮 **Future: Add TOTP Option** for more security-conscious users

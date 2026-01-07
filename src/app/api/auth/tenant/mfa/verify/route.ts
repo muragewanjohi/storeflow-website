@@ -15,6 +15,11 @@ import { z } from 'zod';
 const verifySchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
   code: z.string().length(6, 'Code must be 6 digits').regex(/^\d+$/, 'Code must be numeric'),
+  trustDevice: z.boolean().optional().default(false),
+  deviceFingerprint: z.string().optional(),
+  deviceName: z.string().optional(),
+  browserInfo: z.string().optional(),
+  osInfo: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -22,8 +27,13 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     const validatedData = verifySchema.parse(body);
-    const { userId, code } = validatedData;
+    const { userId, code, trustDevice, deviceFingerprint, deviceName, browserInfo, osInfo } = validatedData;
     const tempSession = (body as any).tempSession;
+    
+    // Get client IP address
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                     request.headers.get('x-real-ip') ||
+                     null;
 
     const supabase = await createClient();
 
@@ -86,9 +96,54 @@ export async function POST(request: NextRequest) {
     // The client should have stored the tempSession from the initial login
     // Use the tempSession if available, otherwise create a new session
     
-    if (tempSession && tempSession.access_token) {
-      // Return the tempSession - it should still be valid since we didn't sign out
-      return NextResponse.json({
+    if (tempSession && tempSession.access_token && tempSession.refresh_token) {
+      // Set the session server-side using the Supabase client
+      // This will properly set the cookies that the server can read
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: tempSession.access_token,
+        refresh_token: tempSession.refresh_token,
+      });
+
+      if (sessionError || !sessionData.session) {
+        console.error('Failed to set session after OTP verification:', sessionError);
+        return NextResponse.json(
+          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
+          { status: 500 }
+        );
+      }
+
+      // Verify the session is valid by getting the user
+      const { data: { user: sessionUser }, error: userCheckError } = await supabase.auth.getUser();
+      
+      if (userCheckError || !sessionUser || sessionUser.id !== userId) {
+        console.error('Session validation failed after OTP verification:', userCheckError);
+        return NextResponse.json(
+          { error: 'Session error', message: 'Session validation failed. Please try logging in again.' },
+          { status: 500 }
+        );
+      }
+
+      // If user opted to trust this device, create trusted device record
+      if (trustDevice && deviceFingerprint && deviceName && browserInfo && osInfo) {
+        try {
+          const { createTrustedDevice } = await import('@/lib/auth/trusted-devices');
+          await createTrustedDevice({
+            userId: user.id,
+            deviceFingerprint,
+            deviceName,
+            browserInfo,
+            osInfo,
+            ipAddress,
+          });
+        } catch (deviceError) {
+          // Log error but don't fail the login if device trust creation fails
+          console.error('Failed to create trusted device:', deviceError);
+        }
+      }
+
+      // Create response with session data
+      // The cookies are automatically set by supabase.auth.setSession() through the cookie handlers
+      const response = NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -98,12 +153,20 @@ export async function POST(request: NextRequest) {
           name: user.user_metadata?.name,
         },
         session: {
-          access_token: tempSession.access_token,
-          expires_at: tempSession.expires_at,
-          refresh_token: tempSession.refresh_token,
+          access_token: sessionData.session.access_token,
+          expires_at: sessionData.session.expires_at,
+          refresh_token: sessionData.session.refresh_token,
         },
         message: 'Code verified successfully',
       });
+
+      // Redirect to dashboard after successful session setup
+      const redirectUrl = new URL('/dashboard', request.url);
+      const redirectResponse = NextResponse.redirect(redirectUrl);
+      
+      // Copy cookies from the JSON response to the redirect response
+      // The cookies are automatically set by supabase.auth.setSession() through the cookie handlers
+      return redirectResponse;
     }
 
     // Fallback: Create a new session using admin API
