@@ -37,14 +37,38 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
+    console.log('[MFA Verify] Starting verification', {
+      userId,
+      codeLength: code.length,
+      code: code.replace(/\d/g, '*'), // Mask code in logs for security
+      hasTempSession: !!tempSession,
+    });
+
     // Verify the OTP code
-    const isValid = await verifyOTP(userId, code);
+    let isValid;
+    try {
+      isValid = await verifyOTP(userId, code);
+      console.log('[MFA Verify] OTP verification result', { isValid });
+    } catch (verifyError: any) {
+      console.error('[MFA Verify] Error during OTP verification', {
+        error: verifyError.message,
+        stack: verifyError.stack,
+      });
+      return NextResponse.json(
+        { 
+          error: 'Verification failed',
+          message: 'An error occurred while verifying the code. Please try again.'
+        },
+        { status: 500 }
+      );
+    }
 
     if (!isValid) {
       // Log for debugging (only in development)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('MFA verification failed: Invalid or expired code for user:', userId);
-      }
+      console.log('[MFA Verify] Verification failed: Invalid or expired code', {
+        userId,
+        codeLength: code.length,
+      });
       return NextResponse.json(
         { 
           error: 'Verification failed',
@@ -53,6 +77,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log('[MFA Verify] OTP verified successfully', { userId });
 
     // Get the user from Supabase
     const { createAdminClient } = await import('@/lib/supabase/admin');

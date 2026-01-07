@@ -176,18 +176,119 @@ export async function verifyOTP(
   userId: string,
   code: string
 ): Promise<boolean> {
-  // Find and verify the OTP
-  const result = await prisma.$queryRaw<Array<{ id: string }>>`
-    UPDATE mfa_otp_codes
-    SET used = TRUE
-    WHERE user_id = ${userId}::uuid
-      AND code = ${code}
-      AND used = FALSE
-      AND expires_at > NOW()
-    RETURNING id
-  `;
+  // Trim and normalize the code (remove any whitespace)
+  const normalizedCode = code.trim();
+  
+  console.log('[verifyOTP] Starting verification', {
+    userId,
+    code: normalizedCode,
+    codeLength: normalizedCode.length,
+    codeType: typeof normalizedCode,
+  });
 
-  return result.length > 0;
+  try {
+    // First, check if a matching OTP exists (for debugging)
+    const checkResult = await prisma.$queryRaw<Array<{
+      id: string;
+      code: string;
+      used: boolean;
+      expires_at: Date;
+      created_at: Date;
+    }>>`
+      SELECT id, code, used, expires_at, created_at
+      FROM mfa_otp_codes
+      WHERE user_id = ${userId}::uuid
+        AND code = ${normalizedCode}
+      ORDER BY created_at DESC
+      LIMIT 5
+    `;
+
+    console.log('[verifyOTP] Found matching OTP records', {
+      count: checkResult.length,
+      records: checkResult.map(r => ({
+        id: r.id,
+        code: r.code,
+        used: r.used,
+        expires_at: r.expires_at,
+        isExpired: new Date(r.expires_at) < new Date(),
+      })),
+    });
+
+    // Find and verify the OTP (only update if not used and not expired)
+    let result = await prisma.$queryRaw<Array<{ id: string }>>`
+      UPDATE mfa_otp_codes
+      SET used = TRUE
+      WHERE user_id = ${userId}::uuid
+        AND code = ${normalizedCode}
+        AND used = FALSE
+        AND expires_at > NOW()
+      RETURNING id
+    `;
+
+    console.log('[verifyOTP] Update result', {
+      updated: result.length,
+      success: result.length > 0,
+    });
+
+    // If code was not found as unused, check if it was used very recently
+    // This handles cases where verification succeeded but session creation failed
+    if (result.length === 0 && checkResult.length > 0) {
+      const latest = checkResult[0];
+      const isExpired = new Date(latest.expires_at) < new Date();
+      const now = new Date();
+      const codeAge = now.getTime() - new Date(latest.created_at).getTime();
+      const recentlyUsed = latest.used && codeAge < 60000; // Used within last 60 seconds
+      
+      console.warn('[verifyOTP] Primary verification failed', {
+        reason: latest.used ? 'already_used' : isExpired ? 'expired' : 'unknown',
+        used: latest.used,
+        isExpired,
+        recentlyUsed,
+        codeAge: codeAge / 1000, // in seconds
+        expires_at: latest.expires_at,
+        created_at: latest.created_at,
+        now: now,
+      });
+
+      // If code was used very recently and not expired, allow it (session creation might have failed)
+      if (recentlyUsed && !isExpired) {
+        console.log('[verifyOTP] Allowing recently used code (within 60 seconds)');
+        // Don't update again, just return true
+        return true;
+      }
+
+      // Check if there are any unused, non-expired codes for this user
+      const unusedCodes = await prisma.$queryRaw<Array<{
+        code: string;
+        expires_at: Date;
+        created_at: Date;
+      }>>`
+        SELECT code, expires_at, created_at
+        FROM mfa_otp_codes
+        WHERE user_id = ${userId}::uuid
+          AND used = FALSE
+          AND expires_at > NOW()
+        ORDER BY created_at DESC
+        LIMIT 5
+      `;
+      
+      console.log('[verifyOTP] Available unused codes for user', {
+        count: unusedCodes.length,
+        codes: unusedCodes.map(c => ({
+          code: c.code,
+          expires_at: c.expires_at,
+        })),
+      });
+    }
+
+    return result.length > 0;
+  } catch (error: any) {
+    console.error('[verifyOTP] Error during verification', {
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
 }
 
 /**
