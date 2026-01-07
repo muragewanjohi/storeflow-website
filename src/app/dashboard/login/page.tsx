@@ -128,15 +128,43 @@ export default function TenantAdminLoginPage() {
           // Set the session in Supabase
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
-          await supabase.auth.setSession({
+          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token || '',
           });
+
+          if (sessionError || !sessionData.session) {
+            console.error('[Login] Failed to set session:', sessionError);
+            setError('Failed to establish session. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
+          // Verify session is accessible before redirecting
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) {
+            console.error('[Login] Session verification failed:', userError);
+            setError('Session verification failed. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
+          console.log('[Login] Session set and verified', {
+            userId: user.id,
+            email: user.email,
+            role: user.user_metadata?.role,
+          });
+
+          // Small delay to ensure cookies are fully set before redirect
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        // 2FA verified - redirect to dashboard (same as landlord login)
-        router.push('/dashboard');
-        router.refresh();
+        // 2FA verified - redirect to dashboard
+        // Use window.location.href for full page reload to ensure cookies are available
+        // This ensures the server-side layout can read the cookies
+        setIsLoading(false);
+        console.log('[Login] Redirecting to dashboard...');
+        window.location.href = '/dashboard';
         return;
       }
 
