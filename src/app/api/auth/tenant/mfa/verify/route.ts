@@ -84,16 +84,10 @@ export async function POST(request: NextRequest) {
 
     // After OTP verification, we need to create a session
     // The client should have stored the tempSession from the initial login
-    // We can either:
-    // 1. Use the tempSession from client (passed in request)
-    // 2. Create a new session using admin API
+    // Use the tempSession if available, otherwise create a new session
     
-    // For now, we'll accept the tempSession from the client
-    // and validate it, then return it as the verified session
-
     if (tempSession && tempSession.access_token) {
-      // Validate the session token is still valid
-      // For now, we'll trust it since it was just created
+      // Return the tempSession - it should still be valid since we didn't sign out
       return NextResponse.json({
         success: true,
         user: {
@@ -106,13 +100,13 @@ export async function POST(request: NextRequest) {
         session: {
           access_token: tempSession.access_token,
           expires_at: tempSession.expires_at,
+          refresh_token: tempSession.refresh_token,
         },
         message: 'Code verified successfully',
       });
     }
 
     // Fallback: Create a new session using admin API
-    
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
       email: user.email!,

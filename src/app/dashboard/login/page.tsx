@@ -80,15 +80,25 @@ export default function TenantAdminLoginPage() {
           // Set the session in Supabase
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
-          await supabase.auth.setSession({
+          const { error: sessionError } = await supabase.auth.setSession({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token || '',
           });
+
+          if (sessionError) {
+            console.error('Failed to set session:', sessionError);
+            setError('Failed to establish session. Please try logging in again.');
+            return;
+          }
+
+          // Wait a moment for cookies to be set, then redirect with full page reload
+          // This ensures the session is properly established before navigation
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        // 2FA verified - redirect to dashboard
-        router.push('/dashboard');
-        router.refresh();
+        // 2FA verified - redirect to dashboard with full page reload
+        // Use window.location instead of router.push to ensure cookies are picked up
+        window.location.href = '/dashboard';
         return;
       }
 
@@ -117,9 +127,20 @@ export default function TenantAdminLoginPage() {
         return;
       }
 
-      // No 2FA required - redirect to dashboard
-      router.push('/dashboard');
-      router.refresh();
+      // No 2FA required - set session if provided and redirect to dashboard
+      if (data.session && data.session.access_token) {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token || '',
+        });
+        // Wait a moment for cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Redirect with full page reload to ensure session is picked up
+      window.location.href = '/dashboard';
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {

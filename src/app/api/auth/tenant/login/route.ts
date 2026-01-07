@@ -123,15 +123,20 @@ export async function POST(request: NextRequest) {
           tenant.name
         );
 
-        // Sign out the user (they'll sign in again after OTP verification)
-        await supabase.auth.signOut();
-
+        // Don't sign out - keep the session for after OTP verification
         // Return response indicating 2FA is required
+        // Include a temporary session token that can be used after OTP verification
         return NextResponse.json({
           success: true,
           requiresMFA: true,
           userId: authData.user.id,
           email: authData.user.email,
+          // Store session info temporarily (client should store this securely)
+          tempSession: {
+            access_token: authData.session?.access_token,
+            expires_at: authData.session?.expires_at,
+            refresh_token: authData.session?.refresh_token, // Include refresh token
+          },
           message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
         });
       } catch (otpError: any) {
