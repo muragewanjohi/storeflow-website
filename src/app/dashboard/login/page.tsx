@@ -91,12 +91,12 @@ export default function TenantAdminLoginPage() {
           codeLength: mfaCode.length,
           hasTempSession: !!tempSession,
         });
+        
         const verifyResponse = await fetch('/api/auth/tenant/mfa/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          redirect: 'manual', // Don't automatically follow redirects - we'll handle it
           body: JSON.stringify({ 
             userId, 
             code: mfaCode,
@@ -109,67 +109,34 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
-        console.log('[Login] MFA verify response', {
-          status: verifyResponse.status,
-          ok: verifyResponse.ok,
-          redirected: verifyResponse.redirected,
-          headers: Object.fromEntries(verifyResponse.headers.entries()),
-        });
+        const data = await verifyResponse.json();
 
-        // Handle redirect response (307)
-        if (verifyResponse.status === 307 || verifyResponse.status === 301 || verifyResponse.status === 302) {
-          // Get redirect location from headers
-          const location = verifyResponse.headers.get('location') || '/dashboard';
-          console.log('[Login] Redirecting after MFA verification', { location });
-          // Use full page reload to ensure cookies are properly set
-          window.location.href = location;
-          return;
-        }
-
-        // Handle error responses
         if (!verifyResponse.ok) {
           console.error('[Login] MFA verification failed', {
             status: verifyResponse.status,
-            statusText: verifyResponse.statusText,
+            error: data.error,
+            message: data.message,
           });
-          const errorData = await verifyResponse.json().catch(() => {
-            console.error('[Login] Failed to parse error response as JSON');
-            return { message: 'Invalid code. Please try again.' };
-          });
-          console.error('[Login] MFA error details', errorData);
-          setError(errorData.message || errorData.error || 'Invalid code. Please try again.');
+          setError(data.message || data.error || 'Invalid code. Please try again.');
           setMfaCode(''); // Clear code on error
           setIsLoading(false);
           return;
         }
 
-        // Try to parse as JSON (fallback if redirect wasn't used)
-        try {
-          const verifyData = await verifyResponse.json();
-          if (verifyData.success || verifyData.verified) {
-            // Success - redirect to dashboard
-            // Use full page reload to ensure cookies are properly set
-            window.location.href = '/dashboard';
-            return;
-          } else {
-            setError(verifyData.message || verifyData.error || 'Verification failed');
-            setMfaCode('');
-            setIsLoading(false);
-            return;
-          }
-        } catch (parseError) {
-          // If response is not JSON, check if it's a successful status
-          if (verifyResponse.status >= 200 && verifyResponse.status < 300) {
-            // Assume success and redirect
-            window.location.href = '/dashboard';
-            return;
-          } else {
-            setError('An unexpected error occurred. Please try again.');
-            setMfaCode('');
-            setIsLoading(false);
-            return;
-          }
+        // If session is returned, set it in Supabase client (similar to landlord login)
+        if (data.session && data.session.access_token) {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token || '',
+          });
         }
+
+        // 2FA verified - redirect to dashboard (similar to landlord login)
+        console.log('[Login] MFA verification successful, redirecting to dashboard');
+        window.location.href = '/dashboard';
+        return;
       }
 
       // Initial login (password only)
@@ -541,14 +508,17 @@ export default function TenantAdminLoginPage() {
                       setMfaCode('');
                       setError(null);
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    disabled={isLoading}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     ← Back to password
                   </button>
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!userId) return;
+                      if (!userId || isLoading) return;
+                      setIsLoading(true);
+                      setError(null);
                       try {
                         const response = await fetch('/api/auth/tenant/mfa/send-code', {
                           method: 'POST',
@@ -565,11 +535,17 @@ export default function TenantAdminLoginPage() {
                         }
                       } catch (err) {
                         setError('Failed to resend code');
+                      } finally {
+                        setIsLoading(false);
                       }
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    disabled={isLoading}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
-                    Resend code
+                    {isLoading && (
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600/30 border-t-blue-600" />
+                    )}
+                    {isLoading ? 'Sending...' : 'Resend code'}
                   </button>
                 </div>
               </div>
@@ -595,8 +571,11 @@ export default function TenantAdminLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
+              {isLoading && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-transparent" />
+              )}
               {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
             </button>
           </div>
