@@ -107,16 +107,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (existingTenant) {
-      return createErrorResponse(
-        'Subdomain already taken',
-        `The subdomain "${normalizedSubdomain}" is already in use. Please choose a different subdomain.`,
-        409,
-        { field: 'subdomain', subdomain: normalizedSubdomain },
-        ErrorCode.CONFLICT
-      );
-    }
-
     // Validate plan and calculate expire_date if provided
     let expireDate: Date | null = null;
     if (validatedData.planId) {

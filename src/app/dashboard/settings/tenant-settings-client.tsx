@@ -30,6 +30,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Tenant } from '@/lib/tenant-context';
+import MFASettings from './mfa-settings';
 
 interface TenantSettingsClientProps {
   tenant: Tenant;
@@ -257,6 +258,9 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
+          {/* Two-Factor Authentication */}
+          <MFASettings />
+
           {/* Contact Email */}
           <Card>
         <form onSubmit={handleContactEmailSubmit}>

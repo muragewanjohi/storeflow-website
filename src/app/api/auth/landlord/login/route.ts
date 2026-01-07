@@ -66,19 +66,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: authData.user.id,
+    // 2FA is MANDATORY for landlord accounts
+    // Always require 2FA verification, regardless of mfa_enabled flag
+    // Import here to avoid circular dependencies
+    const { generateAndSendOTP } = await import('@/lib/mfa/email-otp');
+    
+    try {
+      // Generate and send OTP code
+      await generateAndSendOTP(
+        authData.user.id,
+        authData.user.email!,
+        'Dukanest Admin'
+      );
+
+      // Don't sign out - keep the session for after OTP verification
+      // Return response indicating 2FA is required
+      // Include a temporary session token that can be used after OTP verification
+      return NextResponse.json({
+        success: true,
+        requiresMFA: true,
+        userId: authData.user.id,
         email: authData.user.email,
-        role: 'landlord',
-        name: authData.user.user_metadata?.name,
-      },
-      session: {
-        access_token: authData.session?.access_token,
-        expires_at: authData.session?.expires_at,
-      },
-    });
+        // Store session info temporarily (client should store this securely)
+        tempSession: {
+          access_token: authData.session?.access_token,
+          expires_at: authData.session?.expires_at,
+        },
+        message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
+      });
+    } catch (otpError: any) {
+      console.error('Failed to send OTP:', otpError);
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { 
+          error: 'Failed to send code',
+          message: 'Unable to send verification code. Please try again.'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error: any) {
     // Handle validation errors
     if (error instanceof z.ZodError) {
