@@ -15,11 +15,10 @@ import { z } from 'zod';
 const verifySchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
   code: z.string().length(6, 'Code must be 6 digits').regex(/^\d+$/, 'Code must be numeric'),
-  trustDevice: z.boolean().optional().default(false),
-  deviceFingerprint: z.string().optional(),
-  deviceName: z.string().optional(),
-  browserInfo: z.string().optional(),
-  osInfo: z.string().optional(),
+  tempSession: z.object({
+    access_token: z.string(),
+    expires_at: z.number().optional(),
+  }).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -27,48 +26,14 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     const validatedData = verifySchema.parse(body);
-    const { userId, code, trustDevice, deviceFingerprint, deviceName, browserInfo, osInfo } = validatedData;
-    const tempSession = (body as any).tempSession;
-    
-    // Get client IP address
-    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                     request.headers.get('x-real-ip') ||
-                     null;
+    const { userId, code, tempSession } = validatedData;
 
     const supabase = await createClient();
 
-    console.log('[MFA Verify] Starting verification', {
-      userId,
-      codeLength: code.length,
-      code: code.replace(/\d/g, '*'), // Mask code in logs for security
-      hasTempSession: !!tempSession,
-    });
-
     // Verify the OTP code
-    let isValid;
-    try {
-      isValid = await verifyOTP(userId, code);
-      console.log('[MFA Verify] OTP verification result', { isValid });
-    } catch (verifyError: any) {
-      console.error('[MFA Verify] Error during OTP verification', {
-        error: verifyError.message,
-        stack: verifyError.stack,
-      });
-      return NextResponse.json(
-        { 
-          error: 'Verification failed',
-          message: 'An error occurred while verifying the code. Please try again.'
-        },
-        { status: 500 }
-      );
-    }
+    const isValid = await verifyOTP(userId, code);
 
     if (!isValid) {
-      // Log for debugging (only in development)
-      console.log('[MFA Verify] Verification failed: Invalid or expired code', {
-        userId,
-        codeLength: code.length,
-      });
       return NextResponse.json(
         { 
           error: 'Verification failed',
@@ -77,8 +42,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log('[MFA Verify] OTP verified successfully', { userId });
 
     // Get the user from Supabase
     const { createAdminClient } = await import('@/lib/supabase/admin');
@@ -122,27 +85,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If user opted to trust this device, create trusted device record
-    // Do this before returning the session (same as landlord pattern)
-    if (trustDevice && deviceFingerprint && deviceName && browserInfo && osInfo) {
-      try {
-        const { createTrustedDevice } = await import('@/lib/auth/trusted-devices');
-        await createTrustedDevice({
-          userId: user.id,
-          deviceFingerprint,
-          deviceName,
-          browserInfo,
-          osInfo,
-          ipAddress,
-        });
-      } catch (deviceError) {
-        // Log error but don't fail the login if device trust creation fails
-        console.error('Failed to create trusted device:', deviceError);
-      }
-    }
-
     // Use the tempSession if available, otherwise create a new session
-    // Same pattern as landlord login - just return the session, let client set it
     if (tempSession && tempSession.access_token) {
       // Validate the session token is still valid
       return NextResponse.json({
@@ -156,7 +99,6 @@ export async function POST(request: NextRequest) {
         },
         session: {
           access_token: tempSession.access_token,
-          refresh_token: tempSession.refresh_token,
           expires_at: tempSession.expires_at,
         },
         message: 'Code verified successfully',
