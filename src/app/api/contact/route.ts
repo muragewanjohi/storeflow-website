@@ -2,11 +2,15 @@
  * Contact Form API Route
  * 
  * POST /api/contact
- * Handles contact form submissions and sends email to support@dukanest.com
+ * Handles contact form submissions:
+ * - Marketing site: sends to support@dukanest.com
+ * - Tenant site: sends to tenant's contact email
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendUnifiedEmail } from '@/lib/email/service';
+import { getTenant } from '@/lib/tenant-context/server';
+import { getTenantContactEmail } from '@/lib/orders/emails';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +20,7 @@ const contactFormSchema = z.object({
   email: z.string().email('Invalid email address'),
   subject: z.string().min(3, 'Subject must be at least 3 characters'),
   message: z.string().min(10, 'Message must be at least 10 characters'),
+  tenant_contact: z.boolean().optional(), // Flag to indicate tenant contact form
 });
 
 export async function POST(request: NextRequest) {
@@ -31,6 +36,30 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-real-ip') ||
       'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
+
+    // Determine recipient email and form name (needed for email template)
+    let recipientEmail: string;
+    let fromName: string;
+    let formName: string;
+    
+    if (validatedData.tenant_contact) {
+      // Tenant contact form - get tenant and their contact email
+      const tenant = await getTenant();
+      if (!tenant) {
+        return NextResponse.json(
+          { error: 'Tenant not found' },
+          { status: 404 }
+        );
+      }
+      recipientEmail = getTenantContactEmail(tenant);
+      fromName = `${tenant.name || tenant.subdomain} Contact Form`;
+      formName = tenant.name || tenant.subdomain;
+    } else {
+      // Marketing contact form
+      recipientEmail = 'support@dukanest.com';
+      fromName = 'DukaNest Contact Form';
+      formName = 'DukaNest';
+    }
 
     // Create email HTML content
     const htmlContent = `
@@ -80,7 +109,7 @@ export async function POST(request: NextRequest) {
               </div>
             </div>
             <div class="footer">
-              This email was sent from the DukaNest contact form. Please reply directly to ${escapeHtml(validatedData.email)} to respond.
+              This email was sent from the ${escapeHtml(formName)} contact form. Please reply directly to ${escapeHtml(validatedData.email)} to respond.
             </div>
           </div>
         </body>
@@ -103,16 +132,16 @@ Technical Details:
 IP Address: ${ipAddress}
 User Agent: ${userAgent}
 
-This email was sent from the DukaNest contact form. Please reply directly to ${validatedData.email} to respond.
+This email was sent from the contact form. Please reply directly to ${validatedData.email} to respond.
     `.trim();
 
-    // Send email to support@dukanest.com
+    // Send email
     const emailResult = await sendUnifiedEmail({
-      to: 'support@dukanest.com',
+      to: recipientEmail,
       subject: `Contact Form: ${validatedData.subject}`,
       html: htmlContent,
       text: textContent,
-      fromName: 'DukaNest Contact Form',
+      fromName: fromName,
       replyTo: validatedData.email, // Set reply-to to the sender's email
     });
 

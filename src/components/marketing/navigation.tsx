@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
 import { ImageWithFallback } from './image-with-fallback';
 
@@ -38,12 +37,9 @@ export function Navigation() {
             <Link href="#blog" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
-            <Link href="#contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Contact
             </Link>
-            <Button asChild>
-              <Link href="/customer-login">Login</Link>
-            </Button>
           </div>
 
           {/* Mobile menu button */}
@@ -73,12 +69,9 @@ export function Navigation() {
             <Link href="#blog" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Blog
             </Link>
-            <Link href="#contact" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/contact" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Contact
             </Link>
-            <Button asChild className="w-full">
-              <Link href="/customer-login">Login</Link>
-            </Button>
           </div>
         )}
       </div>
