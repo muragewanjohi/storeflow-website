@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import CategoriesListClient from './categories-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -21,26 +22,39 @@ export default async function CategoriesPage() {
     redirect('/login');
   }
 
-  // Fetch categories
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  // Fetch categories directly from database (matching blog categories pattern)
   let categories: any[] = [];
+  let dbError: string | null = null;
 
   try {
-    const response = await fetch(`${baseUrl}/api/categories?include_children=true`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+    categories = await prisma.categories.findMany({
+      where: {
+        tenant_id: tenant.id,
       },
-      cache: 'no-store',
+      orderBy: {
+        name: 'asc',
+      },
+      include: {
+        other_categories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            parent_id: true,
+            status: true,
+            image: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
     });
-
-    if (response.ok) {
-      const data = await response.json();
-      categories = data.categories || [];
-    }
   } catch (error) {
     console.error('Error fetching categories:', error);
+    dbError = 'Failed to load categories. Please try again later.';
   }
 
-  return <CategoriesListClient initialCategories={categories} />;
+  return <CategoriesListClient initialCategories={categories} dbError={dbError} />;
 }
 

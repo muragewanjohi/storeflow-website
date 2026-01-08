@@ -395,22 +395,23 @@ export async function createDemoCategories(
       if (existingCategory) {
         console.log(`[Demo Content] Category already exists with slug: ${slug}, using existing category`);
         categoryMap[i] = existingCategory.id;
-        continue;
-      }
+        // Don't continue - we still want to log success, just use existing category
+      } else {
 
-      // Create category - matching API route structure
-      const category = await prisma.categories.create({
-        data: {
-          tenant_id: tenantId,
-          name: categoryData.name,
-          slug,
-          image: categoryData.image || null,
-          status: 'active',
-        },
-      });
-      
-      categoryMap[i] = category.id;
-      console.log(`[Demo Content] Created category: ${categoryData.name} (${category.id})`);
+        // Create category - matching API route structure
+        const category = await prisma.categories.create({
+          data: {
+            tenant_id: tenantId,
+            name: categoryData.name,
+            slug,
+            image: categoryData.image || null,
+            status: 'active',
+          },
+        });
+        
+        categoryMap[i] = category.id;
+        console.log(`[Demo Content] Created category: ${categoryData.name} (${category.id})`);
+      }
     } catch (error: any) {
       console.error(`[Demo Content] Error creating category ${categoryData.name}:`, {
         error: error.message,
@@ -422,7 +423,13 @@ export async function createDemoCategories(
     }
   }
 
-  console.log(`[Demo Content] Created ${Object.keys(categoryMap).length} categories`);
+  const successfulCategories = Object.keys(categoryMap).length;
+  console.log(`[Demo Content] Category map final state:`, {
+    totalCategories: config.categories.length,
+    successfulCategories,
+    categoryMap: categoryMap,
+    categoryMapKeys: Object.keys(categoryMap).map(k => parseInt(k)).sort((a, b) => a - b),
+  });
   return categoryMap;
 }
 

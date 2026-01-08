@@ -44,10 +44,12 @@ interface Category {
 
 interface CategoriesListClientProps {
   initialCategories: Category[];
+  dbError?: string | null;
 }
 
 export default function CategoriesListClient({
   initialCategories,
+  dbError,
 }: Readonly<CategoriesListClientProps>) {
   const router = useRouter();
   const [categories, setCategories] = useState(initialCategories);
@@ -161,7 +163,11 @@ export default function CategoriesListClient({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {categories.length === 0 ? (
+          {dbError ? (
+            <div className="text-center py-12">
+              <p className="text-destructive mb-4">{dbError}</p>
+            </div>
+          ) : categories.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-4">No categories found</p>
               <Button asChild>
