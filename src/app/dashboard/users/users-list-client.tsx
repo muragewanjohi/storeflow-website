@@ -6,9 +6,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -19,6 +19,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface User {
   id: string;
@@ -32,12 +43,25 @@ interface User {
 interface UsersListClientProps {
   users: User[];
   currentUserId: string;
+  canAddUsers: boolean;
+  planName: string | null;
 }
 
-export default function UsersListClient({ users, currentUserId }: Readonly<UsersListClientProps>) {
+export default function UsersListClient({ users, currentUserId, canAddUsers, planName }: Readonly<UsersListClientProps>) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+
+  // Check for upgrade required message from query params
+  useEffect(() => {
+    if (searchParams.get('error') === 'upgrade_required') {
+      setError('Your current plan does not allow adding staff or admin users. Please upgrade your plan to continue.');
+      // Clean up the URL
+      router.replace('/dashboard/users', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleDelete = async (userId: string, userName: string) => {
     if (userId === currentUserId) {
@@ -91,24 +115,71 @@ export default function UsersListClient({ users, currentUserId }: Readonly<Users
             Manage your team members and their permissions
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/users/new">Add User</Link>
-        </Button>
+        {canAddUsers ? (
+          <Button asChild>
+            <Link href="/dashboard/users/new">Add User</Link>
+          </Button>
+        ) : (
+          <div className="flex flex-col items-end gap-2">
+            <Button 
+              onClick={() => setShowUpgradeDialog(true)}
+              className="cursor-pointer"
+            >
+              Add User
+            </Button>
+            <p className="text-xs text-muted-foreground text-right max-w-[200px]">
+              Upgrade your plan to add staff or admins
+            </p>
+            <Button 
+              onClick={() => setShowUpgradeDialog(true)}
+              variant="outline" 
+              size="sm"
+            >
+              Upgrade Plan
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-4">
-          <p className="text-sm text-destructive">{error}</p>
-        </div>
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Action Restricted</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>{error}</span>
+            {!canAddUsers && (
+              <Button 
+                onClick={() => router.push('/dashboard/subscription?tab=plans')}
+                variant="outline" 
+                size="sm" 
+                className="ml-4"
+              >
+                View Plans & Pricing
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
       )}
 
       {users.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-12">
             <p className="text-sm text-muted-foreground mb-4">No users found</p>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/users/new">Create your first user</Link>
-            </Button>
+            {canAddUsers ? (
+              <Button asChild variant="outline">
+                <Link href="/dashboard/users/new">Create your first user</Link>
+              </Button>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  {planName 
+                    ? `Your current plan (${planName}) does not allow adding staff or admin users.`
+                    : 'You need an active plan to add staff or admin users.'}
+                </p>
+                <Button onClick={() => setShowUpgradeDialog(true)}>
+                  View Plans & Pricing
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -168,6 +239,33 @@ export default function UsersListClient({ users, currentUserId }: Readonly<Users
           </CardContent>
         </Card>
       )}
+
+      {/* Upgrade Confirmation Dialog */}
+      <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Upgrade Required</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Your current plan ({planName || 'Basic Plan'}) does not allow adding staff or admin users.
+              </p>
+              <p>
+                Would you like to upgrade your plan to unlock this feature?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                router.push('/dashboard/subscription?tab=plans');
+              }}
+            >
+              View Plans & Pricing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

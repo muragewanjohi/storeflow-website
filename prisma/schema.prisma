@@ -526,16 +526,19 @@ model plugins {
 }
 
 model price_plans {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name            String    @db.VarChar(255)
-  price           Decimal   @db.Decimal(10, 2)
-  duration_months Int
-  features        Json?     @default("{}")
-  status          String?   @default("active") @db.VarChar(50)
-  created_at      DateTime? @default(now()) @db.Timestamp(6)
-  updated_at      DateTime? @default(now()) @db.Timestamp(6)
-  trial_days      Int?      @default(0)
-  tenants         tenants[]
+  id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String                 @db.VarChar(255)
+  price                     Decimal                @db.Decimal(10, 2)
+  duration_months           Int
+  features                  Json?                  @default("{}")
+  status                    String?                @default("active") @db.VarChar(50)
+  created_at                DateTime?               @default(now()) @db.Timestamp(6)
+  updated_at                DateTime?               @default(now()) @db.Timestamp(6)
+  trial_days                Int?                    @default(0)
+  tenants                   tenants[]
+  scheduled_tenants         tenants[]               @relation("ScheduledPlan")
+  subscription_changes_from subscription_changes[] @relation("FromPlan")
+  subscription_changes_to   subscription_changes[] @relation("ToPlan")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -751,6 +754,19 @@ model trusted_devices {
   @@index([user_id, ip_pattern], map: "idx_trusted_devices_ip_pattern")
 }
 
+model mfa_otp_codes {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String     @db.Uuid
+  email      String     @db.VarChar(255)
+  code       String     @db.VarChar(6)
+  expires_at DateTime   @db.Timestamp(6)
+  used       Boolean?   @default(false)
+  created_at DateTime?  @default(now()) @db.Timestamp(6)
+
+  @@index([user_id, expires_at], map: "idx_mfa_otp_user_expires")
+  @@index([code, expires_at], map: "idx_mfa_otp_code")
+}
+
 model tenant_themes {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id        String    @db.Uuid
@@ -795,6 +811,9 @@ model tenants {
   deleted_at                 DateTime?                     @db.Timestamp(6)
   contact_email              String?                      @db.VarChar(255)
   country                    String?                      @db.VarChar(2)
+  scheduled_plan_id          String?                      @db.Uuid
+  scheduled_plan_change_date DateTime?                    @db.Timestamp(6)
+  upgrade_prorated_amount    Decimal?                     @db.Decimal(10, 2)
   attribute_values           attribute_values[]
   attributes                 attributes[]
   blog_categories            blog_categories[]
@@ -817,6 +836,8 @@ model tenants {
   payment_logs               payment_logs[]
   product_categories         product_categories[]
   product_reviews            product_reviews[]
+  subscription_changes       subscription_changes[]
+  scheduled_plan             price_plans?                  @relation("ScheduledPlan", fields: [scheduled_plan_id], references: [id])
   product_variant_attributes product_variant_attributes[]
   product_variants           product_variants[]
   product_wishlists          product_wishlists[]
@@ -913,4 +934,26 @@ model cron_job_logs {
   @@index([job_name], map: "idx_cron_job_logs_job_name")
   @@index([status], map: "idx_cron_job_logs_status")
   @@index([started_at], map: "idx_cron_job_logs_started_at")
+}
+
+model subscription_changes {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String      @db.Uuid
+  from_plan_id        String?     @db.Uuid
+  to_plan_id          String      @db.Uuid
+  change_type         String      @db.VarChar(20)
+  effective_date      DateTime    @db.Timestamp(6)
+  prorated_amount     Decimal?    @default(0) @db.Decimal(10, 2)
+  scheduled_change_date DateTime?  @db.Timestamp(6)
+  status              String      @default("completed") @db.VarChar(20)
+  metadata            Json?       @default("{}")
+  created_at          DateTime?    @default(now()) @db.Timestamp(6)
+  updated_at          DateTime?    @default(now()) @db.Timestamp(6)
+  tenants             tenants     @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  from_plan           price_plans? @relation("FromPlan", fields: [from_plan_id], references: [id])
+  to_plan             price_plans  @relation("ToPlan", fields: [to_plan_id], references: [id])
+
+  @@index([tenant_id], map: "idx_subscription_changes_tenant_id")
+  @@index([effective_date], map: "idx_subscription_changes_effective_date")
+  @@index([scheduled_change_date], map: "idx_subscription_changes_scheduled_date")
 }

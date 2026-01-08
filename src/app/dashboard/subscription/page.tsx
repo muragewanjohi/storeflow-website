@@ -25,11 +25,26 @@ export default async function TenantSubscriptionPage() {
     redirect('/login');
   }
 
-  // Fetch current plan and available plans
-  const [currentPlanData, availablePlansData, usage] = await Promise.all([
+  // Fetch tenant with scheduled plan fields
+  const tenantWithScheduled = await prisma.tenants.findUnique({
+    where: { id: tenant.id },
+    select: {
+      id: true,
+      scheduled_plan_id: true,
+      scheduled_plan_change_date: true,
+    },
+  });
+
+  // Fetch current plan, scheduled plan (if downgrade scheduled), and available plans
+  const [currentPlanData, scheduledPlanData, availablePlansData, usage] = await Promise.all([
     tenant.plan_id
       ? prisma.price_plans.findUnique({
           where: { id: tenant.plan_id },
+        })
+      : null,
+    tenantWithScheduled?.scheduled_plan_id
+      ? prisma.price_plans.findUnique({
+          where: { id: tenantWithScheduled.scheduled_plan_id },
         })
       : null,
     prisma.price_plans.findMany({
@@ -59,6 +74,13 @@ export default async function TenantSubscriptionPage() {
     price: Number(plan.price),
   }));
 
+  const scheduledPlan = scheduledPlanData
+    ? {
+        ...scheduledPlanData,
+        price: Number(scheduledPlanData.price),
+      }
+    : null;
+
   const usageStats = {
     products: usage[0],
     orders: usage[1],
@@ -85,6 +107,8 @@ export default async function TenantSubscriptionPage() {
     <TenantSubscriptionClient
       tenant={tenant}
       currentPlan={currentPlan}
+      scheduledPlan={scheduledPlan}
+      scheduledPlanChangeDate={tenantWithScheduled?.scheduled_plan_change_date || null}
       availablePlans={availablePlans}
       usageStats={usageStats}
       planLimits={planLimits}

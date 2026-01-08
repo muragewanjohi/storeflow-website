@@ -49,6 +49,7 @@ The Cron Jobs Monitoring Dashboard allows landlords to view, monitor, and manual
 | **Payment Reminders** | `/api/admin/subscriptions/payment-reminders` | Daily at 9 AM UTC | Sends subscription renewal and payment due reminder emails |
 | **Expiry Checker** | `/api/admin/subscriptions/expiry-checker` | Daily at midnight UTC | Checks for expired subscriptions and applies grace period logic |
 | **Analytics Aggregate** | `/api/admin/analytics/aggregate` | Daily at 1 AM UTC | Pre-computes daily analytics data for all tenants |
+| **Process Scheduled Downgrades** | `/api/admin/subscriptions/process-scheduled-downgrades` | Daily at 4 AM UTC | Processes scheduled plan downgrades that are due to take effect |
 | **Data Cleanup** | `/api/admin/cleanup` | Weekly on Sunday at 2 AM UTC | Cleans up old data and temporary files |
 | **Hard Delete Tenants** | `/api/admin/cleanup/hard-delete-tenants` | Weekly on Sunday at 3 AM UTC | Hard deletes tenants past retention period (90 days) |
 
@@ -76,8 +77,16 @@ All cron jobs are configured in `vercel.json` and run automatically on Vercel:
       "schedule": "0 1 * * *"
     },
     {
+      "path": "/api/admin/subscriptions/process-scheduled-downgrades",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/admin/cleanup",
       "schedule": "0 2 * * 0"
+    },
+    {
+      "path": "/api/admin/cleanup/hard-delete-tenants",
+      "schedule": "0 3 * * 0"
     }
   ]
 }
@@ -85,9 +94,11 @@ All cron jobs are configured in `vercel.json` and run automatically on Vercel:
 
 **Schedule Format:** `minute hour day month day-of-week`
 - `0 0 * * *` = Daily at midnight UTC
-- `0 9 * * *` = Daily at 9 AM UTC
 - `0 1 * * *` = Daily at 1 AM UTC
+- `0 4 * * *` = Daily at 4 AM UTC
+- `0 9 * * *` = Daily at 9 AM UTC
 - `0 2 * * 0` = Weekly on Sunday at 2 AM UTC
+- `0 3 * * 0` = Weekly on Sunday at 3 AM UTC
 
 ### ⚠️ Important: Authentication Setup
 
@@ -285,6 +296,69 @@ WHERE id = 'tenant-id';
 
 ---
 
+## Process Scheduled Downgrades Job
+
+### Overview
+
+The **Process Scheduled Downgrades** job processes plan downgrades that were scheduled for the next billing cycle. When a tenant downgrades their plan, the change is scheduled to take effect at the end of their current billing period (following industry best practices).
+
+### What It Does
+
+1. **Finds Scheduled Downgrades:**
+   - Queries tenants with `scheduled_plan_id` set
+   - Checks if `scheduled_plan_change_date` has passed or is today
+
+2. **Applies Downgrades:**
+   - Updates tenant's `plan_id` to the scheduled plan
+   - Calculates new expiration date based on new plan duration
+   - Clears scheduled downgrade fields (`scheduled_plan_id`, `scheduled_plan_change_date`)
+   - Updates subscription change history status to "completed"
+
+3. **Sends Notifications:**
+   - Sends email notification to tenant confirming downgrade took effect
+   - Includes details about new plan and effective date
+
+### Schedule
+
+- **Path:** `/api/admin/subscriptions/process-scheduled-downgrades`
+- **Schedule:** Daily at 4 AM UTC (`0 4 * * *`)
+- **Frequency:** Once per day
+
+### Why 4 AM UTC?
+
+- Runs after expiry checker (midnight) and analytics (1 AM)
+- Before payment reminders (9 AM)
+- Ensures downgrades are processed before business hours
+- Gives time for any issues to be resolved before users log in
+
+### Example Flow
+
+1. **Day 1:** Tenant downgrades from Pro to Basic Plan
+   - Downgrade scheduled for next billing cycle
+   - Tenant keeps Pro Plan features until expiration
+
+2. **Day 30:** Tenant's billing cycle ends
+   - `scheduled_plan_change_date` = Day 30
+
+3. **Day 31, 4 AM UTC:** Cron job runs
+   - Finds tenant with scheduled downgrade
+   - Applies Basic Plan
+   - Sends confirmation email
+   - Updates subscription history
+
+### Monitoring
+
+- **View Logs:** Check `/admin/cron-jobs` dashboard
+- **Manual Trigger:** Use "Restart" button in dashboard
+- **Error Handling:** Failed downgrades are logged with tenant ID and error details
+
+### Related Documentation
+
+- [Subscription Best Practices](./SUBSCRIPTION_BEST_PRACTICES.md)
+- [Subscription Implementation Status](./SUBSCRIPTION_IMPLEMENTATION_STATUS.md)
+
+---
+
 ## Summary
 
 | Feature | Status |
@@ -296,7 +370,8 @@ WHERE id = 'tenant-id';
 | **Manual Trigger/Restart** | ✅ Yes - Restart button for each job |
 | **Kenya Pricing Detection** | ✅ Yes - Based on tenant.country field |
 | **Tenant Store Payment Links** | ✅ Yes - Links to tenant's subdomain/custom domain |
+| **Scheduled Downgrades** | ✅ Yes - Processes downgrades at end of billing cycle |
 
 ---
 
-**Last Updated:** 2024
+**Last Updated:** 2025-01-08

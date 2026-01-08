@@ -9,7 +9,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,12 +22,24 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ArrowUpIcon,
+  ArrowDownIcon,
   CalendarIcon,
   CreditCardIcon,
   ClockIcon,
   ChartBarIcon,
   DocumentTextIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { Tenant } from '@/lib/tenant-context';
 
 interface PricePlan {
@@ -68,6 +81,8 @@ interface BillingHistoryItem {
 interface TenantSubscriptionClientProps {
   tenant: Tenant;
   currentPlan: PricePlan | null;
+  scheduledPlan?: PricePlan | null;
+  scheduledPlanChangeDate?: Date | string | null;
   availablePlans: PricePlan[];
   usageStats: UsageStats;
   planLimits: PlanLimits;
@@ -128,13 +143,31 @@ function getUsageColor(percentage: number): string {
 export default function TenantSubscriptionClient({
   tenant,
   currentPlan,
+  scheduledPlan,
+  scheduledPlanChangeDate,
   availablePlans,
   usageStats,
   planLimits,
 }: Readonly<TenantSubscriptionClientProps>) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedPlanName, setSelectedPlanName] = useState<string | null>(null);
+
+  // Handle tab navigation from URL query params
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['overview', 'usage', 'plans', 'billing'].includes(tabParam)) {
+      setActiveTab(tabParam);
+      // Clean up URL after setting tab
+      router.replace('/dashboard/subscription', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Fetch billing history
   const { data: billingData, isLoading: isLoadingBilling } = useQuery({
@@ -154,7 +187,7 @@ export default function TenantSubscriptionClient({
   // Calculate next billing date (renewal date)
   const nextBillingDate = renewalDate;
 
-  const handleUpgrade = async (planId: string) => {
+  const handleUpgrade = async (planId: string, isDowngrade: boolean = false) => {
     setIsUpgrading(true);
     setUpgradeError(null);
     setUpgradeSuccess(null);
@@ -174,16 +207,38 @@ export default function TenantSubscriptionClient({
       }
 
       const data = await response.json();
-      setUpgradeSuccess(data.message || 'Subscription activated successfully!');
+      
+      // Show detailed success message based on change type
+      if (data.changeType === 'downgrade') {
+        const effectiveDate = data.effectiveDate 
+          ? new Date(data.effectiveDate).toLocaleDateString()
+          : 'next billing cycle';
+        setUpgradeSuccess(
+          `Downgrade scheduled successfully! Your plan will change to ${data.plan?.name || 'the new plan'} on ${effectiveDate}. ` +
+          `You'll continue to have access to your current plan features until then.`
+        );
+      } else if (data.changeType === 'upgrade') {
+        const proratedMsg = data.proratedAmount && data.proratedAmount > 0
+          ? ` You've been charged a prorated amount of $${data.proratedAmount.toFixed(2)} for the remaining days in your billing cycle.`
+          : '';
+        setUpgradeSuccess(
+          `Upgrade successful! Your plan has been upgraded to ${data.plan?.name || 'the new plan'} and is now active.${proratedMsg}`
+        );
+      } else {
+        setUpgradeSuccess(data.message || 'Subscription activated successfully!');
+      }
       
       // Refresh the page after a short delay to show the success message
       setTimeout(() => {
         window.location.reload();
-      }, 2000);
+      }, 3000);
     } catch (error) {
       setUpgradeError(error instanceof Error ? error.message : 'Failed to activate subscription');
     } finally {
       setIsUpgrading(false);
+      setShowDowngradeDialog(false);
+      setSelectedPlanId(null);
+      setSelectedPlanName(null);
     }
   };
 
@@ -245,6 +300,31 @@ export default function TenantSubscriptionClient({
         </Card>
       )}
 
+      {/* Scheduled Downgrade Notice */}
+      {scheduledPlan && scheduledPlanChangeDate && (
+        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <InformationCircleIcon className="h-5 w-5 mt-0.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                  Plan Downgrade Scheduled
+                </p>
+                <p className="text-sm mt-1 text-blue-800 dark:text-blue-200">
+                  Your plan will downgrade from <strong>{currentPlan?.name || 'Current Plan'}</strong> to{' '}
+                  <strong>{scheduledPlan.name}</strong> on{' '}
+                  <strong>{formatDate(scheduledPlanChangeDate)}</strong>.
+                </p>
+                <p className="text-sm mt-2 text-blue-800 dark:text-blue-200">
+                  You&apos;ll continue to have access to your current plan features until then. 
+                  No refunds will be issued for the current billing period.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trial/Expiry Warning */}
       {isExpiringSoon && currentPlan && (
         <Card className={`${
@@ -288,7 +368,7 @@ export default function TenantSubscriptionClient({
       )}
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="usage">
@@ -594,23 +674,56 @@ export default function TenantSubscriptionClient({
                             Current Plan
                           </Button>
                         ) : (
-                          <Button
-                            onClick={() => handleUpgrade(plan.id)}
-                            disabled={isUpgrading}
-                            className="w-full"
-                            variant={isUpgrade ? 'default' : 'outline'}
-                          >
-                            {isUpgrading ? (
-                              'Processing...'
-                            ) : isUpgrade ? (
-                              <>
-                                <ArrowUpIcon className="mr-2 h-4 w-4" />
-                                Upgrade to {plan.name}
-                              </>
-                            ) : (
-                              `Switch to ${plan.name}`
+                          <>
+                            <Button
+                              onClick={() => {
+                                if (isDowngrade) {
+                                  setSelectedPlanId(plan.id);
+                                  setSelectedPlanName(plan.name);
+                                  setShowDowngradeDialog(true);
+                                } else {
+                                  handleUpgrade(plan.id, false);
+                                }
+                              }}
+                              disabled={isUpgrading}
+                              className="w-full"
+                              variant={isUpgrade ? 'default' : 'outline'}
+                            >
+                              {isUpgrading ? (
+                                'Processing...'
+                              ) : isUpgrade ? (
+                                <>
+                                  <ArrowUpIcon className="mr-2 h-4 w-4" />
+                                  Upgrade to {plan.name}
+                                </>
+                              ) : isDowngrade ? (
+                                <>
+                                  <ArrowDownIcon className="mr-2 h-4 w-4" />
+                                  Downgrade to {plan.name}
+                                </>
+                              ) : (
+                                `Switch to ${plan.name}`
+                              )}
+                            </Button>
+                            {isDowngrade && (
+                              <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1">
+                                <InformationCircleIcon className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                <span>
+                                  Downgrades take effect at the end of your current billing cycle. 
+                                  You&apos;ll keep current plan features until then.
+                                </span>
+                              </p>
                             )}
-                          </Button>
+                            {isUpgrade && (
+                              <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1">
+                                <InformationCircleIcon className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                <span>
+                                  Upgrades take effect immediately. You may be charged a prorated amount 
+                                  for the remaining days in your billing cycle.
+                                </span>
+                              </p>
+                            )}
+                          </>
                         )}
                       </CardContent>
                     </Card>
@@ -686,6 +799,40 @@ export default function TenantSubscriptionClient({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Downgrade Confirmation Dialog */}
+      <AlertDialog open={showDowngradeDialog} onOpenChange={setShowDowngradeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Plan Downgrade</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You&apos;re about to downgrade to <strong>{selectedPlanName}</strong>.
+              </p>
+              <p>
+                <strong>Important:</strong> Your downgrade will be scheduled for the end of your current billing cycle 
+                ({tenant.expire_date ? formatDate(tenant.expire_date) : 'next billing date'}).
+              </p>
+              <p>
+                You&apos;ll continue to have access to your current plan features until then. 
+                No refunds will be issued for the current billing period.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedPlanId) {
+                  handleUpgrade(selectedPlanId, true);
+                }
+              }}
+            >
+              Confirm Downgrade
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -83,6 +83,11 @@ export default function CreateUserForm() {
       const data = await response.json();
 
       if (!response.ok) {
+        // If it's a plan restriction error, redirect to users page with upgrade message
+        if (response.status === 403 && data.error === 'Plan restriction') {
+          router.push('/dashboard/users?error=upgrade_required');
+          return;
+        }
         throw new Error(data.message || data.error || 'Failed to create user');
       }
 

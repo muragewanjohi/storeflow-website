@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/prisma/client';
 import UsersListClient from './users-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,18 @@ export default async function UsersPage() {
   // Verify user belongs to tenant (unless landlord)
   if (user.role !== 'landlord' && user.tenant_id !== tenant.id) {
     redirect('/login');
+  }
+
+  // Fetch tenant's plan to check restrictions
+  let currentPlan = null;
+  if (tenant.plan_id) {
+    currentPlan = await prisma.price_plans.findUnique({
+      where: { id: tenant.plan_id },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
   }
 
   // Fetch users for this tenant
@@ -59,6 +72,16 @@ export default async function UsersPage() {
     last_sign_in_at: u.last_sign_in_at,
   }));
 
-  return <UsersListClient users={users} currentUserId={user.id} />;
+  // Check if plan is Basic Plan (case-insensitive)
+  const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+
+  return (
+    <UsersListClient 
+      users={users} 
+      currentUserId={user.id}
+      canAddUsers={!isBasicPlan}
+      planName={currentPlan?.name || null}
+    />
+  );
 }
 

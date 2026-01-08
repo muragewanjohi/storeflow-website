@@ -64,10 +64,22 @@ const CRON_JOBS = [
     description: 'Pre-computes daily analytics data for all tenants',
   },
   {
+    name: 'Process Scheduled Downgrades',
+    path: '/api/admin/subscriptions/process-scheduled-downgrades',
+    schedule: 'Daily at 4 AM UTC',
+    description: 'Processes scheduled plan downgrades that are due to take effect',
+  },
+  {
     name: 'Data Cleanup',
     path: '/api/admin/cleanup',
     schedule: 'Weekly on Sunday at 2 AM UTC',
     description: 'Cleans up old data and temporary files',
+  },
+  {
+    name: 'Hard Delete Tenants',
+    path: '/api/admin/cleanup/hard-delete-tenants',
+    schedule: 'Weekly on Sunday at 3 AM UTC',
+    description: 'Hard deletes tenants past retention period (90 days)',
   },
 ];
 

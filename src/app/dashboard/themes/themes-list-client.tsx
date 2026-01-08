@@ -10,10 +10,20 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Download, Eye, Sparkles } from 'lucide-react';
+import { CheckCircle2, Download, Eye, Sparkles, Edit } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 interface Theme {
@@ -39,7 +49,11 @@ interface CurrentTheme {
 
 export default function ThemesListClient() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [includeDemoContent, setIncludeDemoContent] = useState(false);
 
   // Fetch all themes
   const { data: themesData, isLoading: themesLoading } = useQuery({
@@ -71,11 +85,14 @@ export default function ThemesListClient() {
 
   // Install/activate theme mutation
   const installThemeMutation = useMutation({
-    mutationFn: async (themeId: string) => {
+    mutationFn: async ({ themeId, includeDemo }: { themeId: string; includeDemo: boolean }) => {
       const response = await fetch('/api/themes/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme_id: themeId }),
+        body: JSON.stringify({ 
+          theme_id: themeId,
+          include_demo_content: includeDemo,
+        }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -83,9 +100,60 @@ export default function ThemesListClient() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['current-theme'] });
-      toast.success('Theme installed and activated successfully');
+      setInstallDialogOpen(false);
+      setIncludeDemoContent(false);
+      
+      // Build success message
+      const messages: string[] = [];
+      if (data.homepage_created) messages.push('Homepage created');
+      if (data.additional_pages_created > 0) {
+        messages.push(`${data.additional_pages_created} additional pages created`);
+      }
+      if (data.demo_content_created) {
+        messages.push(`${data.demo_products_created} demo products and ${data.demo_categories_created} categories created`);
+      }
+      
+      // If homepage was created, offer to edit it
+      if (data.homepage_created) {
+        // Fetch homepage ID
+        try {
+          const pagesResponse = await fetch('/api/pages?search=home&status=published&limit=1');
+          if (pagesResponse.ok) {
+            const pagesData = await pagesResponse.json();
+            const homepage = pagesData.pages?.[0];
+            
+            if (homepage?.id) {
+              toast.success('Theme installed! Homepage created.', {
+                description: 'Would you like to customize your homepage?',
+                action: {
+                  label: 'Edit Homepage',
+                  onClick: () => router.push(`/dashboard/pages/${homepage.id}/edit`),
+                },
+                duration: 8000,
+              });
+            } else {
+              toast.success('Theme installed and homepage created successfully!', {
+                description: 'You can customize it in Pages → Home',
+                duration: 5000,
+              });
+            }
+          } else {
+            toast.success('Theme installed and homepage created successfully!', {
+              description: 'You can customize it in Pages → Home',
+              duration: 5000,
+            });
+          }
+        } catch {
+          toast.success('Theme installed and homepage created successfully!', {
+            description: 'You can customize it in Pages → Home',
+            duration: 5000,
+          });
+        }
+      } else {
+        toast.success('Theme activated successfully!');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to install theme');
@@ -93,7 +161,26 @@ export default function ThemesListClient() {
   });
 
   const handleInstallTheme = (themeId: string) => {
-    installThemeMutation.mutate(themeId);
+    // Check if this is a new installation (theme not currently active)
+    const isNewInstall = activeThemeId !== themeId;
+    
+    if (isNewInstall) {
+      // Show dialog for new installations
+      setSelectedThemeId(themeId);
+      setInstallDialogOpen(true);
+    } else {
+      // Direct install for re-activation (no demo content option)
+      installThemeMutation.mutate({ themeId, includeDemo: false });
+    }
+  };
+
+  const handleConfirmInstall = () => {
+    if (selectedThemeId) {
+      installThemeMutation.mutate({ 
+        themeId: selectedThemeId, 
+        includeDemo: includeDemoContent 
+      });
+    }
   };
 
   if (themesLoading) {
@@ -139,7 +226,7 @@ export default function ThemesListClient() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {themes.map((theme: any) => {
           const isActive = activeThemeId === theme.id;
-          const isInstalling = installThemeMutation.isPending && installThemeMutation.variables === theme.id;
+          const isInstalling = installThemeMutation.isPending && installThemeMutation.variables?.themeId === theme.id;
 
           return (
             <Card key={theme.id} className={isActive ? 'border-primary ring-2 ring-primary' : ''}>
@@ -206,13 +293,17 @@ export default function ThemesListClient() {
                   </Link>
                 </Button>
                 <Button
+                  variant="default"
                   size="sm"
                   className="flex-1"
                   onClick={() => handleInstallTheme(theme.id)}
                   disabled={isActive || isInstalling}
                 >
                   {isInstalling ? (
-                    <>Installing...</>
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Installing...
+                    </>
                   ) : isActive ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 mr-2" />

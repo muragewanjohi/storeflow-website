@@ -373,11 +373,13 @@ export async function sendPlanUpgradeConfirmationEmail({
   oldPlan,
   newPlan,
   expireDate,
+  proratedAmount,
 }: {
   tenant: Tenant;
   oldPlan: { name: string; price: number } | null;
   newPlan: { name: string; price: number; duration_months: number } | null;
   expireDate: Date;
+  proratedAmount?: number;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
@@ -415,6 +417,17 @@ export async function sendPlanUpgradeConfirmationEmail({
                 <td style="padding: 8px 0; font-weight: bold;">Expires:</td>
                 <td style="padding: 8px 0;">${expireDate.toLocaleDateString()}</td>
               </tr>
+              ${proratedAmount && proratedAmount > 0 ? `
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Prorated Charge:</td>
+                <td style="padding: 8px 0;">$${proratedAmount.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 8px 0; font-size: 12px; color: #6b7280;">
+                  You've been charged a prorated amount for the remaining days in your billing cycle.
+                </td>
+              </tr>
+              ` : ''}
             </table>
           </div>
 
@@ -440,6 +453,94 @@ export async function sendPlanUpgradeConfirmationEmail({
     });
   } catch (error) {
     console.error('Error sending plan upgrade confirmation email:', error);
+    throw error;
+  }
+}
+
+/**
+ * Send downgrade scheduled email
+ */
+export async function sendPlanDowngradeScheduledEmail({
+  tenant,
+  currentPlan,
+  newPlan,
+  effectiveDate,
+}: {
+  tenant: Tenant;
+  currentPlan: { name: string; price: number } | null;
+  newPlan: { name: string; price: number; duration_months: number } | null;
+  effectiveDate: Date;
+}) {
+  try {
+    const tenantEmail = getTenantContactEmail(tenant);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Plan Downgrade Scheduled</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h1 style="margin: 0; color: #1f2937;">Plan Downgrade Scheduled</h1>
+          </div>
+
+          <p>Hello,</p>
+
+          <p>Your plan downgrade has been scheduled and will take effect at the end of your current billing period.</p>
+
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h2 style="margin-top: 0; color: #1f2937;">Downgrade Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Current Plan:</td>
+                <td style="padding: 8px 0;">${currentPlan?.name || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">New Plan:</td>
+                <td style="padding: 8px 0;">${newPlan?.name || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Effective Date:</td>
+                <td style="padding: 8px 0;">${effectiveDate.toLocaleDateString()}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">New Price:</td>
+                <td style="padding: 8px 0;">$${newPlan?.price ? Number(newPlan.price).toFixed(2) : '0.00'}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>Important:</strong> You will continue to have access to your current plan features until ${effectiveDate.toLocaleDateString()}. 
+              No refunds will be issued for the current billing period.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+               style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              View Subscription
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
+            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return sendPlatformEmail({
+      to: tenantEmail,
+      subject: `Plan Downgrade Scheduled - Effective ${effectiveDate.toLocaleDateString()}`,
+      html,
+    });
+  } catch (error) {
+    console.error('Error sending plan downgrade scheduled email:', error);
     throw error;
   }
 }

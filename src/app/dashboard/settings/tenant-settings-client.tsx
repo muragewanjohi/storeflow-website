@@ -265,51 +265,6 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           {/* Trusted Devices */}
           <TrustedDevicesSettings />
 
-          {/* Contact Email */}
-          <Card>
-        <form onSubmit={handleContactEmailSubmit}>
-          <CardHeader>
-            <CardTitle>Contact Email</CardTitle>
-            <CardDescription>
-              This email will be used for customer inquiries, order notifications, and support.
-              Customers will see this email in order confirmations and can contact you directly.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="contactEmail">Support/Contact Email *</Label>
-              <Input
-                id="contactEmail"
-                type="email"
-                placeholder="support@example.com"
-                value={formData.contactEmail}
-                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                This can be different from your admin login email. Use an email address that you 
-                regularly check for customer inquiries and order notifications.
-              </p>
-            </div>
-          </CardContent>
-          <div className="px-6 pb-6 flex items-center gap-4">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
-            {contactEmailSuccess && (
-              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
-                {contactEmailSuccess}
-              </div>
-            )}
-            {contactEmailError && (
-              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
-                {contactEmailError}
-              </div>
-            )}
-          </div>
-        </form>
-      </Card>
-
           {/* Store Details */}
           <Card>
         <form onSubmit={handleSettingsSubmit}>
@@ -539,7 +494,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </div>
           </CardContent>
           <div className="px-6 pb-6 flex items-center gap-4">
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" variant="default" disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
             {settingsSuccess && (
@@ -550,6 +505,51 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             {settingsError && (
               <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
                 {settingsError}
+              </div>
+            )}
+          </div>
+        </form>
+      </Card>
+
+          {/* Contact Email */}
+          <Card>
+        <form onSubmit={handleContactEmailSubmit}>
+          <CardHeader>
+            <CardTitle>Contact Email</CardTitle>
+            <CardDescription>
+              This email will be used for customer inquiries, order notifications, and support.
+              Customers will see this email in order confirmations and can contact you directly.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">Support/Contact Email *</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                placeholder="support@example.com"
+                value={formData.contactEmail}
+                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This can be different from your admin login email. Use an email address that you 
+                regularly check for customer inquiries and order notifications.
+              </p>
+            </div>
+          </CardContent>
+          <div className="px-6 pb-6 flex items-center gap-4">
+            <Button type="submit" variant="default" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+            {contactEmailSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {contactEmailSuccess}
+              </div>
+            )}
+            {contactEmailError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {contactEmailError}
               </div>
             )}
           </div>

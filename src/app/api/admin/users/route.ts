@@ -12,6 +12,7 @@ import { requireAuth, requireAnyRole } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 
 const createUserSchema = z.object({
@@ -143,6 +144,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createUserSchema.parse(body);
     const { email, password, name, role } = validatedData;
+
+    // Check if tenant is on Basic Plan - block adding users
+    let currentPlan = null;
+    if (tenant.plan_id) {
+      currentPlan = await prisma.price_plans.findUnique({
+        where: { id: tenant.plan_id },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    }
+
+    const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+
+    if (isBasicPlan) {
+      return NextResponse.json(
+        { 
+          error: 'Plan restriction',
+          message: 'Your current plan does not allow adding staff or admin users. Please upgrade your plan to continue.'
+        },
+        { status: 403 }
+      );
+    }
 
     const supabase = await createClient();
     const adminClient = createAdminClient();

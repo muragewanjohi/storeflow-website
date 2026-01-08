@@ -10,6 +10,7 @@ import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server'
 import { getCronJobLogs, getCronJobStats, getCronJobLogsByName } from '@/lib/cron-jobs/logger';
 import { GET as paymentRemindersGET } from '../subscriptions/payment-reminders/route';
 import { GET as expiryCheckerGET } from '../subscriptions/expiry-checker/route';
+import { GET as processScheduledDowngradesGET } from '../subscriptions/process-scheduled-downgrades/route';
 
 /**
  * GET /api/admin/cron-jobs
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
     const jobHandlers: Record<string, (req: NextRequest) => Promise<Response>> = {
       '/api/admin/subscriptions/payment-reminders': paymentRemindersGET,
       '/api/admin/subscriptions/expiry-checker': expiryCheckerGET,
+      '/api/admin/subscriptions/process-scheduled-downgrades': processScheduledDowngradesGET,
     };
 
     const handler = jobHandlers[jobPath];

@@ -49,12 +49,12 @@ export default function MarketingHeader() {
             <Link href="#contact" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Contact
             </Link>
-            <Link 
+            {/* <Link 
               href="/customer-login"
               className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-6 py-2 rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
             >
               Login
-            </Link>
+            </Link> */}
           </div>
 
           {/* Mobile menu button */}
