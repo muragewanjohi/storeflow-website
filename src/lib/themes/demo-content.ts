@@ -9,6 +9,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import type { ThemeIndustry } from './theme-registry';
+import { generateSlug, generateSKU } from '@/lib/products/validation';
 
 /**
  * Demo Product type for preview/demo purposes
@@ -26,18 +27,6 @@ export interface DemoProduct {
   category?: string;
   stock_quantity?: number;
   metadata?: Record<string, unknown>;
-}
-
-/**
- * Generate a URL-friendly slug from a string
- */
-function createSlug(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
 /**
@@ -392,11 +381,29 @@ export async function createDemoCategories(
     const categoryData = config.categories[i];
     
     try {
+      // Generate slug using same method as API route
+      const slug = generateSlug(categoryData.name);
+
+      // Check if category already exists for this tenant (matching API route check)
+      const existingCategory = await prisma.categories.findFirst({
+        where: {
+          tenant_id: tenantId,
+          slug,
+        },
+      });
+
+      if (existingCategory) {
+        console.log(`[Demo Content] Category already exists with slug: ${slug}, using existing category`);
+        categoryMap[i] = existingCategory.id;
+        continue;
+      }
+
+      // Create category - matching API route structure
       const category = await prisma.categories.create({
         data: {
           tenant_id: tenantId,
           name: categoryData.name,
-          slug: createSlug(categoryData.name),
+          slug,
           image: categoryData.image || null,
           status: 'active',
         },
@@ -464,16 +471,72 @@ export async function createDemoProducts(
         continue;
       }
 
+      // Generate slug using same method as API route
+      const slug = generateSlug(productData.name);
+
+      // Check if product already exists for this tenant (matching API route check)
+      const existingProduct = await prisma.products.findFirst({
+        where: {
+          tenant_id: tenantId,
+          slug,
+        },
+      });
+
+      if (existingProduct) {
+        console.log(`[Demo Content] Product already exists with slug: ${slug}, skipping`);
+        continue;
+      }
+
+      // Generate SKU using same method as API route
+      let finalSKU: string;
+      if (productData.sku && productData.sku.trim() !== '') {
+        finalSKU = productData.sku.trim();
+      } else {
+        finalSKU = generateSKU(productData.name, tenantId);
+      }
+
+      // Check if SKU already exists for this tenant (matching API route check)
+      const existingSKU = await prisma.products.findFirst({
+        where: {
+          tenant_id: tenantId,
+          sku: finalSKU,
+        },
+      });
+
+      // If SKU collision, regenerate until we find a unique one (matching API route logic)
+      if (existingSKU) {
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (attempts < maxAttempts) {
+          finalSKU = generateSKU(productData.name, tenantId);
+          const collision = await prisma.products.findFirst({
+            where: {
+              tenant_id: tenantId,
+              sku: finalSKU,
+            },
+          });
+          if (!collision) {
+            break; // Found unique SKU
+          }
+          attempts++;
+        }
+        if (attempts >= maxAttempts) {
+          // Fallback: use timestamp-based SKU
+          finalSKU = `${tenantId.substring(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+        }
+      }
+
+      // Create product - matching API route structure
       const createdProduct = await prisma.products.create({
         data: {
           tenant_id: tenantId,
           name: productData.name,
-          slug: createSlug(productData.name),
+          slug,
           description: productData.description || null,
           short_description: productData.short_description || null,
           price: productData.price,
           sale_price: productData.sale_price || null,
-          sku: productData.sku || `DEM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          sku: finalSKU, // Use generated SKU matching API route
           stock_quantity: Math.floor(Math.random() * 50) + 10, // Random stock between 10-60
           status: 'active',
           image: productData.image || null,
@@ -645,27 +708,58 @@ export async function createDemoAttributes(
 
   for (const attrConfig of attributeConfigs) {
     try {
-      // Create attribute
-      const attribute = await prisma.attributes.create({
-        data: {
+      // Generate slug using same method as API route
+      const slug = attrConfig.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+      // Check if attribute already exists for this tenant (matching API route check)
+      const existingAttribute = await prisma.attributes.findFirst({
+        where: {
           tenant_id: tenantId,
-          name: attrConfig.name,
-          slug: createSlug(attrConfig.name),
-          type: attrConfig.type,
+          slug,
         },
       });
 
-      // Create attribute values
+      let attribute;
+      if (existingAttribute) {
+        console.log(`[Demo Content] Attribute already exists with slug: ${slug}, using existing attribute`);
+        attribute = existingAttribute;
+      } else {
+        // Create attribute - matching API route structure
+        attribute = await prisma.attributes.create({
+          data: {
+            tenant_id: tenantId,
+            name: attrConfig.name,
+            slug,
+            type: attrConfig.type || null,
+          },
+        });
+        attributesCreated++;
+      }
+
+      // Create attribute values (only if attribute was newly created, or check if values exist)
+      let valuesCreated = 0;
       for (const valueData of attrConfig.values) {
         try {
-          await prisma.attribute_values.create({
-            data: {
+          // Check if attribute value already exists
+          const existingValue = await prisma.attribute_values.findFirst({
+            where: {
               tenant_id: tenantId,
               attribute_id: attribute.id,
               value: valueData.value,
-              color_code: valueData.color_code || null,
             },
           });
+
+          if (!existingValue) {
+            await prisma.attribute_values.create({
+              data: {
+                tenant_id: tenantId,
+                attribute_id: attribute.id,
+                value: valueData.value,
+                color_code: valueData.color_code || null,
+              },
+            });
+            valuesCreated++;
+          }
         } catch (valueError: any) {
           console.error(`[Demo Content] Error creating attribute value ${valueData.value}:`, {
             error: valueError.message,
@@ -674,8 +768,7 @@ export async function createDemoAttributes(
         }
       }
 
-      attributesCreated++;
-      console.log(`[Demo Content] Created attribute: ${attrConfig.name} (${attribute.id}) with ${attrConfig.values.length} values`);
+      console.log(`[Demo Content] ${existingAttribute ? 'Using existing' : 'Created'} attribute: ${attrConfig.name} (${attribute.id}) with ${valuesCreated} new values`);
     } catch (error: any) {
       console.error(`[Demo Content] Error creating attribute ${attrConfig.name}:`, {
         error: error.message,
@@ -794,7 +887,7 @@ export function getDemoCategories(industry: ThemeIndustry | string): Array<{
 
   return config.categories.map((category) => ({
     name: category.name,
-    slug: createSlug(category.name),
+    slug: generateSlug(category.name),
     description: category.description || `${category.name} products`,
     image: category.image,
   }));

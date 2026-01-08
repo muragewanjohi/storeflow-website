@@ -22,6 +22,7 @@ import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoContent } from '@/lib/themes/demo-content';
 import { trackThemeInstallation } from '@/lib/themes/theme-installation-analytics';
+import { generateSlug } from '@/lib/content/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,7 +111,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If this is a new installation, create homepage template and additional pages
+    // Create homepage template and additional pages if they don't exist
+    // (for both new installs and theme switches, we want to ensure pages exist)
     let homepageCreated = false;
     let additionalPagesCreated = 0;
     let demoContentCreated = false;
@@ -118,73 +120,87 @@ export async function POST(request: NextRequest) {
     let demoProductsCreated = 0;
     let demoAttributesCreated = 0;
     
-    if (isNewInstall) {
-      try {
-        // Check if homepage already exists
-        const existingHomepage = await prisma.pages.findFirst({
-          where: {
+    // Always try to create pages if they don't exist (for both new installs and switches)
+    // Create homepage
+    try {
+      // Determine page title and slug
+      const templateData = getHomepageTemplateData(theme.slug);
+      const pageTitle = templateData?.title || `Home - ${theme.title}`;
+      const pageSlug = generateSlug('home'); // Use same slug generation as API route
+
+      // Check if homepage already exists for this tenant (matching API route check)
+      const existingHomepage = await prisma.pages.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          slug: pageSlug,
+        },
+      });
+
+      if (!existingHomepage) {
+        // Get homepage template data for this theme
+        const layoutData = getHomepageLayout(theme.slug);
+
+        // Convert layout to page builder format
+        let pageBuilderData;
+        if (layoutData && layoutData.length > 0) {
+          pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
+        } else {
+          // Use default template if theme-specific one doesn't exist
+          pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+        }
+
+        // Create homepage page - matching API route structure
+        const createdHomepage = await prisma.pages.create({
+          data: {
             tenant_id: tenant.id,
-            slug: 'home',
+            title: pageTitle,
+            slug: pageSlug,
+            content: JSON.stringify(pageBuilderData),
+            status: 'published',
+            meta_title: `${tenant.name} - Home`,
+            meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
           },
         });
-
-        if (!existingHomepage) {
-          // Get homepage template data for this theme
-          const templateData = getHomepageTemplateData(theme.slug);
-          const layoutData = getHomepageLayout(theme.slug);
-
-          // Determine page title and slug
-          const pageTitle = templateData?.title || `Home - ${theme.title}`;
-          const pageSlug = 'home';
-
-          // Convert layout to page builder format
-          let pageBuilderData;
-          if (layoutData && layoutData.length > 0) {
-            pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
-          } else {
-            // Use default template if theme-specific one doesn't exist
-            pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
-          }
-
-          // Create homepage page
-          const createdHomepage = await prisma.pages.create({
-            data: {
-              tenant_id: tenant.id,
-              title: pageTitle,
-              slug: pageSlug,
-              content: JSON.stringify(pageBuilderData),
-              status: 'published',
-              meta_title: `${tenant.name} - Home`,
-              meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
-            },
-          });
-          homepageCreated = true;
-          console.log('[Theme Install] Homepage created:', {
-            id: createdHomepage.id,
-            slug: createdHomepage.slug,
-            title: createdHomepage.title,
-            status: createdHomepage.status,
-          });
-        } else {
-          console.log('[Theme Install] Homepage already exists, skipping creation');
-        }
-      } catch (homepageError) {
-        // Log error but don't fail theme installation
-        console.error('Error creating homepage template:', homepageError);
-        // Continue with theme installation even if homepage creation fails
+        homepageCreated = true;
+        console.log('[Theme Install] Homepage created successfully:', {
+          id: createdHomepage.id,
+          slug: createdHomepage.slug,
+          title: createdHomepage.title,
+          status: createdHomepage.status,
+          tenant_id: createdHomepage.tenant_id,
+        });
+      } else {
+        console.log('[Theme Install] Homepage already exists with slug:', pageSlug, 'skipping creation');
       }
+    } catch (homepageError: any) {
+      // Log detailed error but don't fail theme installation
+      console.error('[Theme Install] Error creating homepage template:', {
+        error: homepageError.message,
+        code: homepageError.code,
+        meta: homepageError.meta,
+        stack: homepageError.stack,
+        themeSlug: theme.slug,
+        tenantId: tenant.id,
+      });
+      // Continue with theme installation even if homepage creation fails
+    }
 
-      // Create additional pages (About, Contact, Shop)
-      try {
+    // Create additional pages (About, Contact, Shop)
+    try {
         const additionalPageTemplates = getAdditionalPageTemplates(tenant.name);
+        
+        console.log('[Theme Install] Creating additional pages:', additionalPageTemplates.length);
         
         for (const pageConfig of additionalPageTemplates) {
           try {
-            // Check if page already exists
+            // Generate slug using same method as API route
+            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+            
+            // Check if page already exists for this tenant (matching API route check)
             const existingPage = await prisma.pages.findFirst({
               where: {
                 tenant_id: tenant.id,
-                slug: pageConfig.slug,
+                slug: pageSlug,
               },
             });
 
@@ -192,73 +208,95 @@ export async function POST(request: NextRequest) {
               // Generate page builder content
               const pageBuilderData = pageConfig.templateGenerator(tenant.name);
 
-              // Create the page
+              // Create the page - matching API route structure
               const createdPage = await prisma.pages.create({
                 data: {
                   tenant_id: tenant.id,
                   title: pageConfig.title,
-                  slug: pageConfig.slug,
+                  slug: pageSlug,
                   content: JSON.stringify(pageBuilderData),
                   status: 'published',
-                  meta_title: pageConfig.metaTitle,
-                  meta_description: pageConfig.metaDescription,
+                  meta_title: pageConfig.metaTitle || null,
+                  meta_description: pageConfig.metaDescription || null,
                 },
               });
               additionalPagesCreated++;
-              console.log('[Theme Install] Additional page created:', {
+              console.log('[Theme Install] Additional page created successfully:', {
                 id: createdPage.id,
                 slug: createdPage.slug,
                 title: createdPage.title,
                 status: createdPage.status,
+                tenant_id: createdPage.tenant_id,
               });
             } else {
-              console.log('[Theme Install] Page already exists, skipping:', pageConfig.slug);
+              console.log('[Theme Install] Page already exists with slug:', pageSlug, 'skipping creation');
             }
-          } catch (pageError) {
-            // Log error for individual page but continue with others
-            console.error(`Error creating ${pageConfig.slug} page:`, pageError);
+          } catch (pageError: any) {
+            // Log detailed error for individual page but continue with others
+            console.error(`[Theme Install] Error creating ${pageConfig.slug} page:`, {
+              error: pageError.message,
+              code: pageError.code,
+              meta: pageError.meta,
+              stack: pageError.stack,
+              pageConfig: {
+                title: pageConfig.title,
+                slug: pageConfig.slug,
+              },
+              tenantId: tenant.id,
+            });
           }
         }
-      } catch (additionalPagesError) {
-        // Log error but don't fail theme installation
-        console.error('Error creating additional pages:', additionalPagesError);
+        
+        console.log('[Theme Install] Additional pages creation completed:', {
+          attempted: additionalPageTemplates.length,
+          created: additionalPagesCreated,
+        });
+      } catch (additionalPagesError: any) {
+        // Log detailed error but don't fail theme installation
+        console.error('[Theme Install] Error creating additional pages:', {
+          error: additionalPagesError.message,
+          code: additionalPagesError.code,
+          meta: additionalPagesError.meta,
+          stack: additionalPagesError.stack,
+          themeSlug: theme.slug,
+          tenantId: tenant.id,
+        });
         // Continue with theme installation even if additional pages creation fails
       }
-
-      // Create demo content if requested
-      if (include_demo_content === true) {
-        try {
-          console.log('[Theme Install] Creating demo content for theme:', theme.slug, {
-            includeAttributes: include_demo_attributes === true,
-          });
-          const demoResult = await createDemoContent(
-            prisma, 
-            tenant.id, 
-            theme.slug,
-            include_demo_attributes === true
-          );
-          demoContentCreated = true;
-          demoCategoriesCreated = demoResult.categoriesCreated;
-          demoProductsCreated = demoResult.productsCreated;
-          demoAttributesCreated = demoResult.attributesCreated;
-          console.log('[Theme Install] Demo content created:', {
-            categories: demoCategoriesCreated,
-            products: demoProductsCreated,
-            attributes: demoAttributesCreated,
-          });
-        } catch (demoError: any) {
-          // Log detailed error but don't fail theme installation
-          console.error('[Theme Install] Error creating demo content:', {
-            error: demoError.message,
-            stack: demoError.stack,
-            themeSlug: theme.slug,
-            tenantId: tenant.id,
-          });
-          // Continue with theme installation even if demo content creation fails
-        }
-      } else {
-        console.log('[Theme Install] Demo content not requested (include_demo_content:', include_demo_content, ')');
+    
+    // Create demo content if requested (only for new installs to avoid duplicates)
+    if (isNewInstall && include_demo_content === true) {
+      try {
+        console.log('[Theme Install] Creating demo content for theme:', theme.slug, {
+          includeAttributes: include_demo_attributes === true,
+        });
+        const demoResult = await createDemoContent(
+          prisma, 
+          tenant.id, 
+          theme.slug,
+          include_demo_attributes === true
+        );
+        demoContentCreated = true;
+        demoCategoriesCreated = demoResult.categoriesCreated;
+        demoProductsCreated = demoResult.productsCreated;
+        demoAttributesCreated = demoResult.attributesCreated;
+        console.log('[Theme Install] Demo content created:', {
+          categories: demoCategoriesCreated,
+          products: demoProductsCreated,
+          attributes: demoAttributesCreated,
+        });
+      } catch (demoError: any) {
+        // Log detailed error but don't fail theme installation
+        console.error('[Theme Install] Error creating demo content:', {
+          error: demoError.message,
+          stack: demoError.stack,
+          themeSlug: theme.slug,
+          tenantId: tenant.id,
+        });
+        // Continue with theme installation even if demo content creation fails
       }
+    } else if (isNewInstall) {
+      console.log('[Theme Install] Demo content not requested (include_demo_content:', include_demo_content, ')');
     }
 
     installationSuccess = true;
