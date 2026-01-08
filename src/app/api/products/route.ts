@@ -422,19 +422,28 @@ export async function POST(request: NextRequest) {
       created_by: user.id,
     });
 
+    // Ensure image URL doesn't exceed VARCHAR(255) limit
+    let imageUrl = validatedData.image || null;
+    if (imageUrl && imageUrl.length > 255) {
+      console.warn('[Product Create] Image URL exceeds 255 characters, truncating');
+      imageUrl = imageUrl.substring(0, 255);
+    }
+    
     // Prepare product data
+    // Note: Prisma Decimal fields accept numbers, strings, or Prisma.Decimal
+    // We'll pass numbers directly as Prisma handles the conversion
     const productData = {
       tenant_id: tenant.id,
       name: validatedData.name,
       slug,
       description: validatedData.description || null,
       short_description: validatedData.short_description || null,
-      price: validatedData.price,
+      price: validatedData.price, // Prisma will convert number to Decimal
       sale_price: validatedData.sale_price || null,
       sku: finalSKU, // Always use generated SKU
       stock_quantity: validatedData.stock_quantity || 0,
       status: validatedData.status || 'active',
-      image: validatedData.image || null,
+      image: imageUrl,
       gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
       category_id: validatedData.category_id || null,
       brand_id: validatedData.brand_id || null,
@@ -443,11 +452,14 @@ export async function POST(request: NextRequest) {
     };
     
     console.log('[Product Create] Product data to insert:', JSON.stringify(productData, null, 2));
+    console.log('[Product Create] Price type:', typeof productData.price, 'Value:', productData.price);
+    console.log('[Product Create] Sale price type:', typeof productData.sale_price, 'Value:', productData.sale_price);
     
     // Create product
     // Note: If description is null/empty, we'll include a warning in the response
     let product;
     try {
+      console.log('[Product Create] Attempting Prisma create...');
       product = await prisma.products.create({
         data: productData,
       });
@@ -455,8 +467,27 @@ export async function POST(request: NextRequest) {
     } catch (createError: any) {
       console.error('[Product Create] Prisma create error:', createError);
       console.error('[Product Create] Error code:', createError?.code);
-      console.error('[Product Create] Error meta:', createError?.meta);
+      console.error('[Product Create] Error meta:', JSON.stringify(createError?.meta, null, 2));
       console.error('[Product Create] Error message:', createError?.message);
+      console.error('[Product Create] Error stack:', createError?.stack);
+      
+      // Log the exact data that failed
+      console.error('[Product Create] Failed data:', {
+        tenant_id: productData.tenant_id,
+        name: productData.name,
+        slug: productData.slug,
+        price: productData.price,
+        priceType: typeof productData.price,
+        sale_price: productData.sale_price,
+        salePriceType: typeof productData.sale_price,
+        sku: productData.sku,
+        image: productData.image,
+        imageLength: productData.image?.length,
+        gallery: productData.gallery,
+        category_id: productData.category_id,
+        brand_id: productData.brand_id,
+      });
+      
       throw createError; // Re-throw to be caught by outer catch
     }
 
@@ -533,20 +564,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return detailed error in development, generic in production
+    // Return detailed error - always include details for debugging
     const errorMessage = error instanceof Error 
       ? error.message 
       : 'Internal server error';
     
+    // Always return detailed error information to help with debugging
+    const errorResponse: any = {
+      error: errorMessage,
+    };
+    
+    // Include Prisma error details if available
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as any;
+      errorResponse.prismaError = {
+        code: prismaError.code,
+        meta: prismaError.meta,
+      };
+    }
+    
+    // Include stack trace in development
+    if (process.env.NODE_ENV === 'development' && error instanceof Error) {
+      errorResponse.stack = error.stack;
+    }
+    
     return NextResponse.json(
-      {
-        error: process.env.NODE_ENV === 'development'
-          ? errorMessage
-          : 'Failed to create product',
-        ...(process.env.NODE_ENV === 'development' && error instanceof Error && {
-          details: error.stack,
-        }),
-      },
+      errorResponse,
       { status: 500 }
     );
   }
