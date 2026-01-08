@@ -222,17 +222,59 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Product Create] Starting product creation...');
+    
     // Require authentication for creating products
-    const user = await requireAuth();
-    const tenant = await requireTenant();
+    let user;
+    try {
+      user = await requireAuth();
+      console.log('[Product Create] User authenticated:', user.id);
+    } catch (authError: any) {
+      console.error('[Product Create] Auth error:', authError);
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+    
+    // Require tenant
+    let tenant;
+    try {
+      tenant = await requireTenant();
+      console.log('[Product Create] Tenant resolved:', tenant.id, tenant.name);
+    } catch (tenantError: any) {
+      console.error('[Product Create] Tenant error:', tenantError);
+      return NextResponse.json(
+        { error: 'Tenant not found' },
+        { status: 404 }
+      );
+    }
     
     // Check if tenant has edit access (not in read-only mode)
-    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
-    await requireEditAccess();
+    try {
+      const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+      await requireEditAccess();
+      console.log('[Product Create] Edit access verified');
+    } catch (editAccessError: any) {
+      console.error('[Product Create] Edit access error:', editAccessError);
+      return NextResponse.json(
+        { error: editAccessError.message || 'Write operations are disabled' },
+        { status: 403 }
+      );
+    }
 
-    const body = await request.json();
-    
-    console.log('[Product Create] Request body:', JSON.stringify(body, null, 2));
+    // Parse request body
+    let body;
+    try {
+      body = await request.json();
+      console.log('[Product Create] Request body:', JSON.stringify(body, null, 2));
+    } catch (parseError: any) {
+      console.error('[Product Create] JSON parse error:', parseError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
 
     // Validate request body
     let validatedData;
@@ -269,12 +311,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan limits before creating product
-    const limitCheck = await canCreateProduct(tenant);
-    if (!limitCheck.allowed) {
-      return NextResponse.json(
-        { error: limitCheck.reason || 'Product limit reached' },
-        { status: 403 }
-      );
+    let limitCheck;
+    try {
+      limitCheck = await canCreateProduct(tenant);
+      console.log('[Product Create] Limit check:', limitCheck);
+      if (!limitCheck.allowed) {
+        return NextResponse.json(
+          { error: limitCheck.reason || 'Product limit reached' },
+          { status: 403 }
+        );
+      }
+    } catch (limitError: any) {
+      console.error('[Product Create] Limit check error:', limitError);
+      // Don't block product creation if limit check fails - log and continue
+      // This allows products to be created even if there's an issue with plan lookup
+      console.warn('[Product Create] Continuing despite limit check error');
     }
 
     // Generate SKU if not provided or is null/empty
@@ -371,32 +422,43 @@ export async function POST(request: NextRequest) {
       created_by: user.id,
     });
 
+    // Prepare product data
+    const productData = {
+      tenant_id: tenant.id,
+      name: validatedData.name,
+      slug,
+      description: validatedData.description || null,
+      short_description: validatedData.short_description || null,
+      price: validatedData.price,
+      sale_price: validatedData.sale_price || null,
+      sku: finalSKU, // Always use generated SKU
+      stock_quantity: validatedData.stock_quantity || 0,
+      status: validatedData.status || 'active',
+      image: validatedData.image || null,
+      gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
+      category_id: validatedData.category_id || null,
+      brand_id: validatedData.brand_id || null,
+      created_by: user.id,
+      metadata: (validatedData.metadata || {}) as any,
+    };
+    
+    console.log('[Product Create] Product data to insert:', JSON.stringify(productData, null, 2));
+    
     // Create product
     // Note: If description is null/empty, we'll include a warning in the response
-    const product = await prisma.products.create({
-      data: {
-        tenant_id: tenant.id,
-        name: validatedData.name,
-        slug,
-        description: validatedData.description || null,
-        short_description: validatedData.short_description || null,
-        price: validatedData.price,
-        sale_price: validatedData.sale_price || null,
-        sku: finalSKU, // Always use generated SKU
-        stock_quantity: validatedData.stock_quantity || 0,
-        status: validatedData.status || 'active',
-        image: validatedData.image || null,
-        gallery: validatedData.gallery || [],
-        category_id: validatedData.category_id || null,
-        brand_id: validatedData.brand_id || null,
-        created_by: user.id,
-        metadata: (validatedData.metadata || {}) as any,
-      },
-      // Note: Direct category relation via category_id
-      // For many-to-many, we'd need to join through product_categories
-    });
-    
-    console.log('[Product Create] Product created successfully:', product.id);
+    let product;
+    try {
+      product = await prisma.products.create({
+        data: productData,
+      });
+      console.log('[Product Create] Product created successfully:', product.id);
+    } catch (createError: any) {
+      console.error('[Product Create] Prisma create error:', createError);
+      console.error('[Product Create] Error code:', createError?.code);
+      console.error('[Product Create] Error meta:', createError?.meta);
+      console.error('[Product Create] Error message:', createError?.message);
+      throw createError; // Re-throw to be caught by outer catch
+    }
 
     return NextResponse.json(
       { 

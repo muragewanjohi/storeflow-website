@@ -21,7 +21,7 @@ export const createProductSchema = z.object({
   stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').default(0).optional(),
   status: z.enum(['active', 'inactive', 'draft', 'archived']).default('active').optional(),
   image: z.string().url().optional().nullable(),
-  gallery: z.array(z.string().url()).default([]).optional(),
+  gallery: z.array(z.string().url()).default([]).optional().or(z.literal(undefined).transform(() => [])),
   category_id: z.string().uuid().optional().nullable(),
   brand_id: z.string().uuid().optional().nullable(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
