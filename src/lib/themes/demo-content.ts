@@ -386,6 +386,8 @@ export async function createDemoCategories(
   const config = getDemoContentConfig(themeSlug);
   const categoryMap: Record<number, string> = {};
 
+  console.log(`[Demo Content] Creating ${config.categories.length} categories for theme: ${themeSlug}`);
+
   for (let i = 0; i < config.categories.length; i++) {
     const categoryData = config.categories[i];
     
@@ -401,12 +403,19 @@ export async function createDemoCategories(
       });
       
       categoryMap[i] = category.id;
-    } catch (error) {
-      console.error(`Error creating category ${categoryData.name}:`, error);
+      console.log(`[Demo Content] Created category: ${categoryData.name} (${category.id})`);
+    } catch (error: any) {
+      console.error(`[Demo Content] Error creating category ${categoryData.name}:`, {
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        tenantId,
+      });
       // Continue with other categories even if one fails
     }
   }
 
+  console.log(`[Demo Content] Created ${Object.keys(categoryMap).length} categories`);
   return categoryMap;
 }
 
@@ -422,16 +431,18 @@ export async function createDemoProducts(
   const config = getDemoContentConfig(themeSlug);
   let productsCreated = 0;
 
+  console.log(`[Demo Content] Creating ${config.products.length} products for theme: ${themeSlug}`);
+
   for (const productData of config.products) {
     try {
       const categoryId = categoryMap[productData.category_index];
       
       if (!categoryId) {
-        console.warn(`Category index ${productData.category_index} not found, skipping product ${productData.name}`);
+        console.warn(`[Demo Content] Category index ${productData.category_index} not found, skipping product ${productData.name}`);
         continue;
       }
 
-      await prisma.products.create({
+      const createdProduct = await prisma.products.create({
         data: {
           tenant_id: tenantId,
           name: productData.name,
@@ -449,12 +460,20 @@ export async function createDemoProducts(
       });
 
       productsCreated++;
-    } catch (error) {
-      console.error(`Error creating product ${productData.name}:`, error);
+      console.log(`[Demo Content] Created product: ${productData.name} (${createdProduct.id})`);
+    } catch (error: any) {
+      console.error(`[Demo Content] Error creating product ${productData.name}:`, {
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        tenantId,
+        categoryId: categoryMap[productData.category_index],
+      });
       // Continue with other products even if one fails
     }
   }
 
+  console.log(`[Demo Content] Created ${productsCreated} products`);
   return productsCreated;
 }
 

@@ -366,6 +366,46 @@ export default function ThemesListClient() {
           </CardContent>
         </Card>
       )}
+
+      {/* Install Theme Dialog */}
+      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Install Theme</DialogTitle>
+            <DialogDescription>
+              Would you like to install this theme with demo content? This will create sample products and categories to help you get started.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 py-4">
+            <Checkbox
+              id="demo-content"
+              checked={includeDemoContent}
+              onCheckedChange={(checked) => setIncludeDemoContent(checked === true)}
+            />
+            <label
+              htmlFor="demo-content"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Install with demo content (products & categories)
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setInstallDialogOpen(false)}
+              disabled={installThemeMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmInstall}
+              disabled={installThemeMutation.isPending || !selectedThemeId}
+            >
+              {installThemeMutation.isPending ? 'Installing...' : 'Install Theme'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

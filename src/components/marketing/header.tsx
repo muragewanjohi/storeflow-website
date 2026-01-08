@@ -46,7 +46,7 @@ export default function MarketingHeader() {
             {/* <Link href="#blog" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Blog
             </Link> */}
-            <Link href="#contact" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/contact" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Contact
             </Link>
             {/* <Link 
@@ -84,14 +84,8 @@ export default function MarketingHeader() {
             <Link href="#blog" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Blog
             </Link>
-            <Link href="#contact" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/contact" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Contact
-            </Link>
-            <Link 
-              href="/customer-login"
-              className="block w-full text-left text-gray-700 hover:text-[#0025cc] transition-colors"
-            >
-              Sign In
             </Link>
             <Link 
               href="/register"

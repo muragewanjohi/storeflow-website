@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
     const { theme_id, include_demo_content } = body;
+    
+    console.log('[Theme Install] Installation request:', {
+      theme_id,
+      include_demo_content,
+      tenant_id: tenant.id,
+      tenant_name: tenant.name,
+    });
 
     if (!theme_id) {
       return NextResponse.json(
@@ -139,7 +146,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Create homepage page
-          await prisma.pages.create({
+          const createdHomepage = await prisma.pages.create({
             data: {
               tenant_id: tenant.id,
               title: pageTitle,
@@ -151,6 +158,14 @@ export async function POST(request: NextRequest) {
             },
           });
           homepageCreated = true;
+          console.log('[Theme Install] Homepage created:', {
+            id: createdHomepage.id,
+            slug: createdHomepage.slug,
+            title: createdHomepage.title,
+            status: createdHomepage.status,
+          });
+        } else {
+          console.log('[Theme Install] Homepage already exists, skipping creation');
         }
       } catch (homepageError) {
         // Log error but don't fail theme installation
@@ -177,7 +192,7 @@ export async function POST(request: NextRequest) {
               const pageBuilderData = pageConfig.templateGenerator(tenant.name);
 
               // Create the page
-              await prisma.pages.create({
+              const createdPage = await prisma.pages.create({
                 data: {
                   tenant_id: tenant.id,
                   title: pageConfig.title,
@@ -189,6 +204,14 @@ export async function POST(request: NextRequest) {
                 },
               });
               additionalPagesCreated++;
+              console.log('[Theme Install] Additional page created:', {
+                id: createdPage.id,
+                slug: createdPage.slug,
+                title: createdPage.title,
+                status: createdPage.status,
+              });
+            } else {
+              console.log('[Theme Install] Page already exists, skipping:', pageConfig.slug);
             }
           } catch (pageError) {
             // Log error for individual page but continue with others
@@ -204,15 +227,27 @@ export async function POST(request: NextRequest) {
       // Create demo content if requested
       if (include_demo_content === true) {
         try {
+          console.log('[Theme Install] Creating demo content for theme:', theme.slug);
           const demoResult = await createDemoContent(prisma, tenant.id, theme.slug);
           demoContentCreated = true;
           demoCategoriesCreated = demoResult.categoriesCreated;
           demoProductsCreated = demoResult.productsCreated;
-        } catch (demoError) {
-          // Log error but don't fail theme installation
-          console.error('Error creating demo content:', demoError);
+          console.log('[Theme Install] Demo content created:', {
+            categories: demoCategoriesCreated,
+            products: demoProductsCreated,
+          });
+        } catch (demoError: any) {
+          // Log detailed error but don't fail theme installation
+          console.error('[Theme Install] Error creating demo content:', {
+            error: demoError.message,
+            stack: demoError.stack,
+            themeSlug: theme.slug,
+            tenantId: tenant.id,
+          });
           // Continue with theme installation even if demo content creation fails
         }
+      } else {
+        console.log('[Theme Install] Demo content not requested (include_demo_content:', include_demo_content, ')');
       }
     }
 
