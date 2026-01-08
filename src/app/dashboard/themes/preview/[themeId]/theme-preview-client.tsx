@@ -12,12 +12,22 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ArrowLeft, ExternalLink, Download, CheckCircle2 } from 'lucide-react';
 import { getThemeTemplate } from '@/lib/themes/theme-registry';
 import { loadThemeHeader, loadThemeFooter, loadThemeHero, loadThemeProductGrid, loadThemeHomepage } from '@/lib/themes/theme-loader';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DemoProduct } from '@/lib/themes/demo-content';
 import { PreviewProvider } from '@/lib/themes/preview-context';
+import { toast } from 'sonner';
 
 interface Theme {
   id: string;
@@ -43,8 +53,96 @@ export default function ThemePreviewClient({
   customizations,
 }: ThemePreviewClientProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState<'home' | 'products' | 'product-detail' | 'about' | 'contact' | 'sign-in'>('home');
   const [selectedProduct, setSelectedProduct] = useState<DemoProduct | null>(null);
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
+  const [includeDemoContent, setIncludeDemoContent] = useState(false);
+  
+  // Check if theme is active
+  const { data: currentThemeData } = useQuery({
+    queryKey: ['current-theme'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes/current');
+      if (!response.ok) throw new Error('Failed to fetch current theme');
+      return response.json();
+    },
+  });
+  
+  const isActive = currentThemeData?.theme?.id === theme.id;
+  
+  // Check if theme is installed
+  const { data: installedThemesData } = useQuery({
+    queryKey: ['installed-themes'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes/installed');
+      if (!response.ok) throw new Error('Failed to fetch installed themes');
+      const data = await response.json();
+      return data.installedThemes as Record<string, boolean>;
+    },
+  });
+  
+  const isInstalled = installedThemesData?.[theme.id] !== undefined;
+  
+  // Install/activate theme mutation
+  const installThemeMutation = useMutation({
+    mutationFn: async ({ includeDemo }: { includeDemo: boolean }) => {
+      const response = await fetch('/api/themes/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          theme_id: theme.id,
+          include_demo_content: includeDemo,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to install theme');
+      }
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      queryClient.invalidateQueries({ queryKey: ['current-theme'] });
+      queryClient.invalidateQueries({ queryKey: ['installed-themes'] });
+      setInstallDialogOpen(false);
+      setIncludeDemoContent(false);
+      
+      const action = isInstalled ? 'switched' : 'installed';
+      toast.success(`Theme ${action} successfully!`, {
+        description: isInstalled 
+          ? 'Your storefront is now using this theme.'
+          : 'Homepage and pages have been created.',
+        duration: 5000,
+      });
+      
+      // Navigate back to themes list after a short delay
+      setTimeout(() => {
+        router.push('/dashboard/themes');
+      }, 1500);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to install theme');
+    },
+  });
+  
+  const handleInstallClick = () => {
+    if (isActive) {
+      // Already active, do nothing
+      return;
+    }
+    
+    if (!isInstalled) {
+      // New installation - show dialog with demo content option
+      setInstallDialogOpen(true);
+    } else {
+      // Already installed - switch to it directly
+      installThemeMutation.mutate({ includeDemo: false });
+    }
+  };
+  
+  const handleConfirmInstall = () => {
+    installThemeMutation.mutate({ includeDemo: includeDemoContent });
+  };
   
   // Get theme template
   const template = getThemeTemplate(theme.slug);
@@ -155,12 +253,38 @@ export default function ThemePreviewClient({
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/dashboard/themes')}
-          >
-            Back to Themes
-          </Button>
+          <div className="flex items-center gap-2">
+            {isActive ? (
+              <Button variant="outline" disabled>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Active Theme
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                onClick={handleInstallClick}
+                disabled={installThemeMutation.isPending}
+              >
+                {installThemeMutation.isPending ? (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    {isInstalled ? 'Switching...' : 'Installing...'}
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    {isInstalled ? 'Switch to This Theme' : 'Install Theme'}
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard/themes')}
+            >
+              Back to Themes
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -654,6 +778,46 @@ export default function ThemePreviewClient({
           <ThemeFooter />
         </div>
       </PreviewProvider>
+
+      {/* Install Theme Dialog */}
+      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Install Theme</DialogTitle>
+            <DialogDescription>
+              Would you like to install this theme with demo content? This will create sample products and categories to help you get started.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 py-4">
+            <Checkbox
+              id="demo-content-preview"
+              checked={includeDemoContent}
+              onCheckedChange={(checked) => setIncludeDemoContent(checked === true)}
+            />
+            <label
+              htmlFor="demo-content-preview"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Install with demo content (products & categories)
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setInstallDialogOpen(false)}
+              disabled={installThemeMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmInstall}
+              disabled={installThemeMutation.isPending}
+            >
+              {installThemeMutation.isPending ? 'Installing...' : 'Install Theme'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

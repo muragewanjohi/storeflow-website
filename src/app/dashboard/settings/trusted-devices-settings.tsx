@@ -39,14 +39,34 @@ export default function TrustedDevicesSettings() {
       const response = await fetch('/api/auth/tenant/trusted-devices');
       
       if (!response.ok) {
-        throw new Error('Failed to fetch devices');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || errorData.error || 'Failed to fetch devices';
+        
+        // If it's a 401 (unauthorized), don't show error - user might not be logged in
+        if (response.status === 401) {
+          console.warn('Unauthorized access to trusted devices');
+          setDevices([]);
+          return;
+        }
+        
+        // For other errors, log but don't show toast on initial load
+        console.error('Error fetching trusted devices:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorMessage,
+        });
+        
+        // Only show toast if it's not the initial load (user initiated action)
+        setDevices([]);
+        return;
       }
 
       const data = await response.json();
       setDevices(data.devices || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching trusted devices:', error);
-      toast.error('Failed to load trusted devices');
+      // Don't show toast on initial load - just set empty array
+      setDevices([]);
     } finally {
       setIsLoading(false);
     }

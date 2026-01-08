@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,7 @@ export default function ThemesListClient() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
+  const [installedThemes, setInstalledThemes] = useState<Record<string, boolean>>({});
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
   const [includeDemoContent, setIncludeDemoContent] = useState(false);
@@ -77,11 +79,28 @@ export default function ThemesListClient() {
     },
   });
 
+  // Fetch all installed themes (active and inactive)
+  const { data: installedThemesData } = useQuery({
+    queryKey: ['installed-themes'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes/installed');
+      if (!response.ok) throw new Error('Failed to fetch installed themes');
+      const data = await response.json();
+      return data.installedThemes as Record<string, boolean>;
+    },
+  });
+
   useEffect(() => {
     if (currentThemeData?.theme) {
       setActiveThemeId(currentThemeData.theme.id);
     }
   }, [currentThemeData]);
+
+  useEffect(() => {
+    if (installedThemesData) {
+      setInstalledThemes(installedThemesData);
+    }
+  }, [installedThemesData]);
 
   // Install/activate theme mutation
   const installThemeMutation = useMutation({
@@ -102,6 +121,7 @@ export default function ThemesListClient() {
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['current-theme'] });
+      queryClient.invalidateQueries({ queryKey: ['installed-themes'] });
       setInstallDialogOpen(false);
       setIncludeDemoContent(false);
       
@@ -152,7 +172,11 @@ export default function ThemesListClient() {
           });
         }
       } else {
-        toast.success('Theme activated successfully!');
+        // Theme was switched (already installed, just activated)
+        toast.success('Theme switched successfully!', {
+          description: 'Your storefront is now using this theme.',
+          duration: 5000,
+        });
       }
     },
     onError: (error: Error) => {
@@ -161,15 +185,21 @@ export default function ThemesListClient() {
   });
 
   const handleInstallTheme = (themeId: string) => {
-    // Check if this is a new installation (theme not currently active)
-    const isNewInstall = activeThemeId !== themeId;
+    const isActive = activeThemeId === themeId;
+    const isInstalled = installedThemes[themeId] !== undefined;
+    const isNewInstall = !isInstalled;
+    
+    if (isActive) {
+      // Theme is already active, do nothing (button should be disabled)
+      return;
+    }
     
     if (isNewInstall) {
-      // Show dialog for new installations
+      // Show dialog for new installations (with demo content option)
       setSelectedThemeId(themeId);
       setInstallDialogOpen(true);
     } else {
-      // Direct install for re-activation (no demo content option)
+      // Theme is installed but not active - switch to it (no demo content option)
       installThemeMutation.mutate({ themeId, includeDemo: false });
     }
   };
@@ -226,7 +256,19 @@ export default function ThemesListClient() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {themes.map((theme: any) => {
           const isActive = activeThemeId === theme.id;
+          const isInstalled = installedThemes[theme.id] !== undefined;
           const isInstalling = installThemeMutation.isPending && installThemeMutation.variables?.themeId === theme.id;
+          
+          // Determine button text and icon
+          let buttonText = 'Install';
+          let ButtonIcon = Download;
+          if (isActive) {
+            buttonText = 'Active';
+            ButtonIcon = CheckCircle2;
+          } else if (isInstalled) {
+            buttonText = 'Switch';
+            ButtonIcon = Download;
+          }
 
           return (
             <Card key={theme.id} className={isActive ? 'border-primary ring-2 ring-primary' : ''}>
@@ -302,17 +344,12 @@ export default function ThemesListClient() {
                   {isInstalling ? (
                     <>
                       <Download className="h-4 w-4 mr-2" />
-                      Installing...
-                    </>
-                  ) : isActive ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Active
+                      {isInstalled ? 'Switching...' : 'Installing...'}
                     </>
                   ) : (
                     <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Install
+                      <ButtonIcon className="h-4 w-4 mr-2" />
+                      {buttonText}
                     </>
                   )}
                 </Button>

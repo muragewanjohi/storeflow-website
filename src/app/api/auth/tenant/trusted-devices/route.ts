@@ -18,24 +18,60 @@ export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth();
 
-    const devices = await getUserTrustedDevices(user.id);
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { error: 'Authentication required', message: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
 
-    return NextResponse.json({
-      success: true,
-      devices: devices.map((device) => ({
-        id: device.id,
-        deviceName: device.device_name,
-        browserInfo: device.browser_info,
-        osInfo: device.os_info,
-        lastUsedAt: device.last_used_at,
-        expiresAt: device.expires_at,
-        createdAt: device.created_at,
-      })),
-    });
+    try {
+      const devices = await getUserTrustedDevices(user.id);
+
+      return NextResponse.json({
+        success: true,
+        devices: devices.map((device) => ({
+          id: device.id,
+          deviceName: device.device_name,
+          browserInfo: device.browser_info,
+          osInfo: device.os_info,
+          lastUsedAt: device.last_used_at,
+          expiresAt: device.expires_at,
+          createdAt: device.created_at,
+        })),
+      });
+    } catch (dbError: any) {
+      console.error('Database error fetching trusted devices:', {
+        error: dbError.message,
+        stack: dbError.stack,
+        code: dbError.code,
+        meta: dbError.meta,
+      });
+      
+      // If table doesn't exist, return empty array instead of error
+      if (dbError.code === 'P2021' || dbError.code === '42P01' || dbError.message?.includes('does not exist')) {
+        console.warn('Trusted devices table does not exist, returning empty array');
+        return NextResponse.json({
+          success: true,
+          devices: [],
+        });
+      }
+      
+      throw dbError;
+    }
   } catch (error: any) {
-    console.error('Error fetching trusted devices:', error);
+    console.error('Error fetching trusted devices:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    
+    // Don't expose internal error details to client
     return NextResponse.json(
-      { error: 'Failed to fetch trusted devices', message: error.message },
+      { 
+        error: 'Failed to fetch trusted devices',
+        message: process.env.NODE_ENV === 'development' ? error.message : 'An error occurred while fetching devices'
+      },
       { status: 500 }
     );
   }

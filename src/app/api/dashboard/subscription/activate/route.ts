@@ -118,9 +118,10 @@ export async function POST(request: NextRequest) {
     const hasUpgradedBefore = previousUpgrades > 0;
 
     // Calculate days as paying customer
+    const tenantStartDate = (tenant as any).start_date || tenant.created_at;
     const daysAsPayingCustomer = calculateDaysAsPayingCustomer(
       tenant.created_at,
-      (tenant as any).start_date,
+      tenantStartDate,
       currentPlanPrice
     );
 
@@ -131,11 +132,12 @@ export async function POST(request: NextRequest) {
       
       // Calculate proration if upgrading mid-cycle
       if (currentPlan && tenant.expire_date && tenant.expire_date > now) {
+        const tenantStartDate = (tenant as any).start_date || tenant.created_at;
         const proration = calculateUpgradeProration(
           currentPlanPrice,
           newPlanPrice,
           tenant.expire_date,
-          (tenant as any).start_date
+          tenantStartDate
         );
         proratedAmount = proration.proratedAmount;
       }
@@ -172,27 +174,36 @@ export async function POST(request: NextRequest) {
       const currentData = (tenantWithData?.data as any) || {};
 
       // Update tenant subscription immediately
-      updatedTenant = await prisma.tenants.update({
-        where: { id: tenant.id },
+      const updateData: any = {
+        plan_id: plan_id,
+        expire_date: newExpireDate,
+        status: 'active',
+        upgrade_prorated_amount: proratedAmount > 0 ? proratedAmount : null,
+        // Clear any scheduled downgrade
+        scheduled_plan_id: null,
+        scheduled_plan_change_date: null,
         data: {
-          plan_id: plan_id,
-          expire_date: newExpireDate,
-          start_date: shouldUseTrial ? now : (tenant as any).start_date, // Update start date if using trial
-          status: 'active',
-          upgrade_prorated_amount: proratedAmount > 0 ? proratedAmount : null,
-          // Clear any scheduled downgrade
-          scheduled_plan_id: null,
-          scheduled_plan_change_date: null,
-          data: {
-            ...currentData,
-            subscription: {
-              currency: locationInfo.currency,
-              currencySymbol: locationInfo.currencySymbol,
-              price: getLocalizedPrice(newPlan.name, locationInfo.isKenya),
-              planName: newPlan.name,
-            },
+          ...currentData,
+          subscription: {
+            currency: locationInfo.currency,
+            currencySymbol: locationInfo.currencySymbol,
+            price: getLocalizedPrice(newPlan.name, locationInfo.isKenya),
+            planName: newPlan.name,
           },
         },
+      };
+
+      // Only update start_date if using trial
+      if (shouldUseTrial) {
+        updateData.start_date = now;
+      } else if ((tenant as any).start_date) {
+        // Preserve existing start_date if not using trial
+        updateData.start_date = (tenant as any).start_date;
+      }
+
+      updatedTenant = await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: updateData,
         include: {
           price_plans: {
             select: {
@@ -325,7 +336,7 @@ export async function POST(request: NextRequest) {
         await prisma.subscription_changes.create({
           data: {
             tenant_id: tenant.id,
-            from_plan_id: currentPlan.id,
+            from_plan_id: currentPlan?.id || null,
             to_plan_id: newPlan.id,
             change_type: 'downgrade',
             effective_date: scheduledChangeDate,
@@ -358,18 +369,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Ensure updatedTenant is defined
+    if (!updatedTenant) {
+      return NextResponse.json(
+        { error: 'Failed to update subscription' },
+        { status: 500 }
+      );
+    }
+
+    // For downgrades, return the scheduled plan (new plan), not the current plan
+    let planData = updatedTenant.price_plans;
+    if (changeType === 'downgrade') {
+      // Fetch the scheduled plan for downgrades
+      const scheduledPlan = await prisma.price_plans.findUnique({
+        where: { id: plan_id },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          duration_months: true,
+        },
+      });
+      planData = scheduledPlan || null;
+    }
+
     return NextResponse.json({
       message: changeType === 'downgrade'
         ? 'Downgrade scheduled for next billing cycle'
         : 'Subscription activated successfully',
       tenant: {
-        id: updatedTenant?.id,
-        plan_id: updatedTenant?.plan_id,
-        scheduled_plan_id: (updatedTenant as any)?.scheduled_plan_id || null,
-        expire_date: updatedTenant?.expire_date,
-        status: updatedTenant?.status,
+        id: updatedTenant.id,
+        plan_id: updatedTenant.plan_id,
+        scheduled_plan_id: updatedTenant.scheduled_plan_id || null,
+        expire_date: updatedTenant.expire_date,
+        status: updatedTenant.status,
       },
-      plan: updatedTenant?.price_plans,
+      plan: planData,
       changeType,
       proratedAmount: changeType === 'upgrade' ? proratedAmount : 0,
       effectiveDate: changeType === 'downgrade' ? effectiveDate : undefined,
