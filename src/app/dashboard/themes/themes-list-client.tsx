@@ -56,6 +56,7 @@ export default function ThemesListClient() {
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
   const [includeDemoContent, setIncludeDemoContent] = useState(false);
+  const [includeDemoAttributes, setIncludeDemoAttributes] = useState(false);
 
   // Fetch all themes
   const { data: themesData, isLoading: themesLoading } = useQuery({
@@ -104,13 +105,14 @@ export default function ThemesListClient() {
 
   // Install/activate theme mutation
   const installThemeMutation = useMutation({
-    mutationFn: async ({ themeId, includeDemo }: { themeId: string; includeDemo: boolean }) => {
+    mutationFn: async ({ themeId, includeDemo, includeAttributes }: { themeId: string; includeDemo: boolean; includeAttributes: boolean }) => {
       const response = await fetch('/api/themes/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           theme_id: themeId,
           include_demo_content: includeDemo,
+          include_demo_attributes: includeAttributes,
         }),
       });
       if (!response.ok) {
@@ -122,8 +124,13 @@ export default function ThemesListClient() {
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['current-theme'] });
       queryClient.invalidateQueries({ queryKey: ['installed-themes'] });
+      // Invalidate all queries to refresh lists
+      queryClient.invalidateQueries();
+      // Force router refresh to update server components
+      router.refresh();
       setInstallDialogOpen(false);
       setIncludeDemoContent(false);
+      setIncludeDemoAttributes(false);
       
       // Build success message
       const messages: string[] = [];
@@ -132,7 +139,19 @@ export default function ThemesListClient() {
         messages.push(`${data.additional_pages_created} additional pages created`);
       }
       if (data.demo_content_created) {
-        messages.push(`${data.demo_products_created} demo products and ${data.demo_categories_created} categories created`);
+        const contentParts: string[] = [];
+        if (data.demo_products_created > 0) {
+          contentParts.push(`${data.demo_products_created} product${data.demo_products_created !== 1 ? 's' : ''}`);
+        }
+        if (data.demo_categories_created > 0) {
+          contentParts.push(`${data.demo_categories_created} categor${data.demo_categories_created !== 1 ? 'ies' : 'y'}`);
+        }
+        if (data.demo_attributes_created > 0) {
+          contentParts.push(`${data.demo_attributes_created} attribute${data.demo_attributes_created !== 1 ? 's' : ''}`);
+        }
+        if (contentParts.length > 0) {
+          messages.push(`Demo content: ${contentParts.join(', ')} created`);
+        }
       }
       
       // If homepage was created, offer to edit it
@@ -200,7 +219,7 @@ export default function ThemesListClient() {
       setInstallDialogOpen(true);
     } else {
       // Theme is installed but not active - switch to it (no demo content option)
-      installThemeMutation.mutate({ themeId, includeDemo: false });
+      installThemeMutation.mutate({ themeId, includeDemo: false, includeAttributes: false });
     }
   };
 
@@ -208,7 +227,8 @@ export default function ThemesListClient() {
     if (selectedThemeId) {
       installThemeMutation.mutate({ 
         themeId: selectedThemeId, 
-        includeDemo: includeDemoContent 
+        includeDemo: includeDemoContent,
+        includeAttributes: includeDemoAttributes,
       });
     }
   };
@@ -376,18 +396,40 @@ export default function ThemesListClient() {
               Would you like to install this theme with demo content? This will create sample products and categories to help you get started.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center space-x-2 py-4">
-            <Checkbox
-              id="demo-content"
-              checked={includeDemoContent}
-              onCheckedChange={(checked) => setIncludeDemoContent(checked === true)}
-            />
-            <label
-              htmlFor="demo-content"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Install with demo content (products & categories)
-            </label>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="demo-content"
+                checked={includeDemoContent}
+                onCheckedChange={(checked) => {
+                  setIncludeDemoContent(checked === true);
+                  if (!checked) {
+                    setIncludeDemoAttributes(false); // Uncheck attributes if demo content is unchecked
+                  }
+                }}
+              />
+              <label
+                htmlFor="demo-content"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Install with demo content (products & categories)
+              </label>
+            </div>
+            {includeDemoContent && (
+              <div className="flex items-center space-x-2 pl-6">
+                <Checkbox
+                  id="demo-attributes"
+                  checked={includeDemoAttributes}
+                  onCheckedChange={(checked) => setIncludeDemoAttributes(checked === true)}
+                />
+                <label
+                  htmlFor="demo-attributes"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Include demo attributes (Size, Color, etc.)
+                </label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

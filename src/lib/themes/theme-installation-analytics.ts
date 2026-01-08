@@ -19,6 +19,7 @@ export interface ThemeInstallationMetrics {
   demo_content_created: boolean;
   demo_categories_created: number;
   demo_products_created: number;
+  demo_attributes_created?: number;
   defaults_applied: boolean;
   success: boolean;
   error_message?: string;
@@ -60,6 +61,7 @@ export async function trackThemeInstallation(
       demo_content_created: metrics.demo_content_created,
       demo_categories_created: metrics.demo_categories_created,
       demo_products_created: metrics.demo_products_created,
+      ...(metrics.demo_attributes_created !== undefined && { demo_attributes_created: metrics.demo_attributes_created }),
       defaults_applied: metrics.defaults_applied,
       installation_duration_ms: metrics.installation_duration_ms,
       ...(metrics.error_message && { error_message: metrics.error_message }),

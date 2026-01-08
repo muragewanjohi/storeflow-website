@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     const body = await request.json();
-    const { theme_id, include_demo_content } = body;
+    const { theme_id, include_demo_content, include_demo_attributes } = body;
     
     console.log('[Theme Install] Installation request:', {
       theme_id,
@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
     let demoContentCreated = false;
     let demoCategoriesCreated = 0;
     let demoProductsCreated = 0;
+    let demoAttributesCreated = 0;
     
     if (isNewInstall) {
       try {
@@ -227,14 +228,23 @@ export async function POST(request: NextRequest) {
       // Create demo content if requested
       if (include_demo_content === true) {
         try {
-          console.log('[Theme Install] Creating demo content for theme:', theme.slug);
-          const demoResult = await createDemoContent(prisma, tenant.id, theme.slug);
+          console.log('[Theme Install] Creating demo content for theme:', theme.slug, {
+            includeAttributes: include_demo_attributes === true,
+          });
+          const demoResult = await createDemoContent(
+            prisma, 
+            tenant.id, 
+            theme.slug,
+            include_demo_attributes === true
+          );
           demoContentCreated = true;
           demoCategoriesCreated = demoResult.categoriesCreated;
           demoProductsCreated = demoResult.productsCreated;
+          demoAttributesCreated = demoResult.attributesCreated;
           console.log('[Theme Install] Demo content created:', {
             categories: demoCategoriesCreated,
             products: demoProductsCreated,
+            attributes: demoAttributesCreated,
           });
         } catch (demoError: any) {
           // Log detailed error but don't fail theme installation
@@ -266,6 +276,7 @@ export async function POST(request: NextRequest) {
       demo_content_created: demoContentCreated,
       demo_categories_created: demoCategoriesCreated,
       demo_products_created: demoProductsCreated,
+      demo_attributes_created: demoAttributesCreated,
       defaults_applied: isNewInstall,
       success: true,
       installation_duration_ms: installationDuration,
@@ -280,6 +291,7 @@ export async function POST(request: NextRequest) {
         demo_content_created: demoContentCreated,
         demo_categories_created: demoCategoriesCreated,
         demo_products_created: demoProductsCreated,
+        demo_attributes_created: demoAttributesCreated,
       },
       { status: isNewInstall ? 201 : 200 }
     );
@@ -332,6 +344,7 @@ export async function POST(request: NextRequest) {
         demo_content_created: false,
         demo_categories_created: 0,
         demo_products_created: 0,
+        demo_attributes_created: 0,
         defaults_applied: false,
         success: false,
         error_message: errorMessage,

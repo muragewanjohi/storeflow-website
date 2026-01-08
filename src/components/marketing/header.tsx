@@ -31,19 +31,19 @@ export default function MarketingHeader() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="#home" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#home" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Home
             </Link>
-            {/* <Link href="#shops" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            {/* <Link href="/#shops" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Shops
             </Link> */}
-            <Link href="#pricing" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#pricing" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Pricing
             </Link>
-            <Link href="#themes" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#themes" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Templates
             </Link>
-            {/* <Link href="#blog" className="text-gray-700 hover:text-[#0025cc] transition-colors">
+            {/* <Link href="/#blog" className="text-gray-700 hover:text-[#0025cc] transition-colors">
               Blog
             </Link> */}
             <Link href="/contact" className="text-gray-700 hover:text-[#0025cc] transition-colors">
@@ -69,19 +69,19 @@ export default function MarketingHeader() {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <div className="md:hidden py-4 space-y-4">
-            <Link href="#home" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#home" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Home
             </Link>
-            <Link href="#shops" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#shops" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Shops
             </Link>
-            <Link href="#pricing" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#pricing" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Pricing
             </Link>
-            <Link href="#themes" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#themes" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Templates
             </Link>
-            <Link href="#blog" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
+            <Link href="/#blog" className="block text-gray-700 hover:text-[#0025cc] transition-colors">
               Blog
             </Link>
             <Link href="/contact" className="block text-gray-700 hover:text-[#0025cc] transition-colors">

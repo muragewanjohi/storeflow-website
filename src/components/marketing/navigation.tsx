@@ -22,19 +22,19 @@ export function Navigation() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link href="#home" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#home" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Home
             </Link>
-            <Link href="#shops" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#shops" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Shops
             </Link>
-            <Link href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            <Link href="#themes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#themes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Templates
             </Link>
-            <Link href="#blog" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/#blog" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
             <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -54,19 +54,19 @@ export function Navigation() {
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 space-y-4">
-            <Link href="#home" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/#home" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Home
             </Link>
-            <Link href="#shops" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/#shops" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Shops
             </Link>
-            <Link href="#pricing" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/#pricing" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Pricing
             </Link>
-            <Link href="#themes" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/#themes" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Templates
             </Link>
-            <Link href="#blog" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link href="/#blog" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
               Blog
             </Link>
             <Link href="/contact" className="block text-sm font-medium text-muted-foreground hover:text-foreground">

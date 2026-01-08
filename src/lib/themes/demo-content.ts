@@ -432,13 +432,35 @@ export async function createDemoProducts(
   let productsCreated = 0;
 
   console.log(`[Demo Content] Creating ${config.products.length} products for theme: ${themeSlug}`);
+  console.log(`[Demo Content] Category map received:`, JSON.stringify(categoryMap, null, 2));
+  console.log(`[Demo Content] Category map keys (indices):`, Object.keys(categoryMap).map(k => parseInt(k)).sort((a, b) => a - b));
+  console.log(`[Demo Content] Category map size:`, Object.keys(categoryMap).length);
+  console.log(`[Demo Content] Products to create:`, config.products.length);
 
-  for (const productData of config.products) {
+  for (let i = 0; i < config.products.length; i++) {
+    const productData = config.products[i];
     try {
       const categoryId = categoryMap[productData.category_index];
       
+      console.log(`[Demo Content] Product ${i + 1}/${config.products.length}: ${productData.name}`, {
+        category_index: productData.category_index,
+        categoryId: categoryId || 'NOT FOUND',
+        categoryMapKeys: Object.keys(categoryMap),
+      });
+      
       if (!categoryId) {
-        console.warn(`[Demo Content] Category index ${productData.category_index} not found, skipping product ${productData.name}`);
+        console.error(`[Demo Content] Category index ${productData.category_index} not found in categoryMap!`, {
+          productName: productData.name,
+          categoryIndex: productData.category_index,
+          availableIndices: Object.keys(categoryMap).map(k => parseInt(k)),
+          categoryMap: categoryMap,
+        });
+        continue;
+      }
+
+      // Ensure category_id is valid UUID
+      if (!categoryId || typeof categoryId !== 'string' || categoryId.length === 0) {
+        console.error(`[Demo Content] Invalid categoryId for product ${productData.name}:`, categoryId);
         continue;
       }
 
@@ -447,8 +469,8 @@ export async function createDemoProducts(
           tenant_id: tenantId,
           name: productData.name,
           slug: createSlug(productData.name),
-          description: productData.description,
-          short_description: productData.short_description,
+          description: productData.description || null,
+          short_description: productData.short_description || null,
           price: productData.price,
           sale_price: productData.sale_price || null,
           sku: productData.sku || `DEM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -478,26 +500,230 @@ export async function createDemoProducts(
 }
 
 /**
+ * Create demo attributes for a tenant
+ */
+export async function createDemoAttributes(
+  prisma: PrismaClient,
+  tenantId: string,
+  themeSlug: string
+): Promise<number> {
+  const config = getDemoContentConfig(themeSlug);
+  let attributesCreated = 0;
+
+  // Define common attributes based on theme industry
+  const attributeConfigs: Array<{
+    name: string;
+    type: 'color' | 'size' | 'text' | null;
+    values: Array<{ value: string; color_code?: string }>;
+  }> = [];
+
+  const slug = themeSlug.toLowerCase();
+  
+  // Grocery theme - weight/size attributes
+  if (slug === 'grocery') {
+    attributeConfigs.push(
+      {
+        name: 'Weight',
+        type: 'text',
+        values: [
+          { value: '500g' },
+          { value: '1kg' },
+          { value: '2kg' },
+          { value: '5kg' },
+        ],
+      },
+      {
+        name: 'Pack Size',
+        type: 'text',
+        values: [
+          { value: 'Single' },
+          { value: 'Pack of 2' },
+          { value: 'Pack of 4' },
+          { value: 'Pack of 6' },
+        ],
+      }
+    );
+  }
+  
+  // Fashion themes - size and color
+  if (slug === 'hexfashion' || slug === 'casual') {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'size',
+        values: [
+          { value: 'XS' },
+          { value: 'S' },
+          { value: 'M' },
+          { value: 'L' },
+          { value: 'XL' },
+          { value: 'XXL' },
+        ],
+      },
+      {
+        name: 'Color',
+        type: 'color',
+        values: [
+          { value: 'Black', color_code: '#000000' },
+          { value: 'White', color_code: '#FFFFFF' },
+          { value: 'Red', color_code: '#FF0000' },
+          { value: 'Blue', color_code: '#0000FF' },
+          { value: 'Green', color_code: '#008000' },
+        ],
+      }
+    );
+  }
+  
+  // Furniture theme - dimensions
+  if (slug === 'furnito') {
+    attributeConfigs.push(
+      {
+        name: 'Dimensions',
+        type: 'text',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+          { value: 'Extra Large' },
+        ],
+      },
+      {
+        name: 'Material',
+        type: 'text',
+        values: [
+          { value: 'Wood' },
+          { value: 'Metal' },
+          { value: 'Fabric' },
+          { value: 'Leather' },
+        ],
+      }
+    );
+  }
+  
+  // Electronics theme - storage/capacity
+  if (slug === 'electro') {
+    attributeConfigs.push(
+      {
+        name: 'Storage',
+        type: 'text',
+        values: [
+          { value: '64GB' },
+          { value: '128GB' },
+          { value: '256GB' },
+          { value: '512GB' },
+        ],
+      },
+      {
+        name: 'Color',
+        type: 'color',
+        values: [
+          { value: 'Black', color_code: '#000000' },
+          { value: 'Silver', color_code: '#C0C0C0' },
+          { value: 'Gold', color_code: '#FFD700' },
+          { value: 'Space Gray', color_code: '#717378' },
+        ],
+      }
+    );
+  }
+  
+  // Default attributes for any theme
+  if (attributeConfigs.length === 0) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'size',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      }
+    );
+  }
+
+  console.log(`[Demo Content] Creating ${attributeConfigs.length} attributes for theme: ${themeSlug}`);
+
+  for (const attrConfig of attributeConfigs) {
+    try {
+      // Create attribute
+      const attribute = await prisma.attributes.create({
+        data: {
+          tenant_id: tenantId,
+          name: attrConfig.name,
+          slug: createSlug(attrConfig.name),
+          type: attrConfig.type,
+        },
+      });
+
+      // Create attribute values
+      for (const valueData of attrConfig.values) {
+        try {
+          await prisma.attribute_values.create({
+            data: {
+              tenant_id: tenantId,
+              attribute_id: attribute.id,
+              value: valueData.value,
+              color_code: valueData.color_code || null,
+            },
+          });
+        } catch (valueError: any) {
+          console.error(`[Demo Content] Error creating attribute value ${valueData.value}:`, {
+            error: valueError.message,
+            code: valueError.code,
+          });
+        }
+      }
+
+      attributesCreated++;
+      console.log(`[Demo Content] Created attribute: ${attrConfig.name} (${attribute.id}) with ${attrConfig.values.length} values`);
+    } catch (error: any) {
+      console.error(`[Demo Content] Error creating attribute ${attrConfig.name}:`, {
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        tenantId,
+      });
+      // Continue with other attributes even if one fails
+    }
+  }
+
+  console.log(`[Demo Content] Created ${attributesCreated} attributes`);
+  return attributesCreated;
+}
+
+/**
  * Create all demo content for a tenant
  */
 export async function createDemoContent(
   prisma: PrismaClient,
   tenantId: string,
-  themeSlug: string
-): Promise<{ categoriesCreated: number; productsCreated: number }> {
+  themeSlug: string,
+  includeAttributes: boolean = false
+): Promise<{ categoriesCreated: number; productsCreated: number; attributesCreated: number }> {
   try {
     // First create categories
     const categoryMap = await createDemoCategories(prisma, tenantId, themeSlug);
     
+    console.log(`[Demo Content] Category map created:`, categoryMap);
+    console.log(`[Demo Content] Category map keys:`, Object.keys(categoryMap));
+    console.log(`[Demo Content] Category map entries:`, Object.entries(categoryMap));
+    
     // Then create products (which reference categories)
     const productsCreated = await createDemoProducts(prisma, tenantId, themeSlug, categoryMap);
+    
+    // Create attributes if requested
+    let attributesCreated = 0;
+    if (includeAttributes) {
+      attributesCreated = await createDemoAttributes(prisma, tenantId, themeSlug);
+    }
 
-  return {
+    return {
       categoriesCreated: Object.keys(categoryMap).length,
       productsCreated,
+      attributesCreated,
     };
   } catch (error) {
-    console.error('Error creating demo content:', error);
+    console.error('[Demo Content] Error creating demo content:', error);
     throw error;
   }
 }

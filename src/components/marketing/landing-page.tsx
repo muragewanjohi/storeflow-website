@@ -30,6 +30,29 @@ export default function MarketingLandingPage() {
     trackEvent('landing_page_view', {
       page_title: 'Landing Page',
     });
+
+    // Handle anchor links when navigating from another page
+    // This ensures smooth scrolling works when coming from /contact or other pages
+    const handleHashScroll = () => {
+      if (window.location.hash) {
+        const hash = window.location.hash.substring(1);
+        const element = document.getElementById(hash);
+        if (element) {
+          // Small delay to ensure page is fully rendered
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
+      }
+    };
+
+    // Run on mount and when hash changes
+    handleHashScroll();
+    window.addEventListener('hashchange', handleHashScroll);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashScroll);
+    };
   }, []);
 
   return (
