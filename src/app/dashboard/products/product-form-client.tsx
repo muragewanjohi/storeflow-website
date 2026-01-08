@@ -263,29 +263,65 @@ export default function ProductFormClient({
     setIsSubmitting(true);
 
     try {
+      // Validate and parse price
+      const parsedPrice = parseFloat(formData.price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        setValidationErrors({ price: 'Price must be a positive number' });
+        return;
+      }
+      
+      // Parse sale price if provided
+      let parsedSalePrice: number | null = null;
+      if (formData.sale_price && formData.sale_price.trim()) {
+        parsedSalePrice = parseFloat(formData.sale_price);
+        if (isNaN(parsedSalePrice) || parsedSalePrice <= 0) {
+          setValidationErrors({ sale_price: 'Sale price must be a positive number' });
+          return;
+        }
+        if (parsedSalePrice >= parsedPrice) {
+          setValidationErrors({ sale_price: 'Sale price must be less than regular price' });
+          return;
+        }
+      }
+      
+      // Validate category_id - ensure it's either null or a valid UUID
+      let categoryId: string | null = null;
+      if (formData.category_id && formData.category_id !== 'none') {
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(formData.category_id)) {
+          categoryId = formData.category_id;
+        } else {
+          setValidationErrors({ category_id: 'Invalid category selected' });
+          return;
+        }
+      }
+
       const payload: any = {
         name: formData.name.trim(),
         sku: formData.sku.trim() || null,
         short_description: formData.short_description.trim() || null,
         // Send null if description is empty (not empty string)
         description: formData.description.trim() || null,
-        price: parseFloat(formData.price),
+        price: parsedPrice,
         // When variants exist, product-level stock is calculated from variants (set to 0 or sum)
         // When no variants exist, use the product-level stock
         stock_quantity: variants.length > 0 
           ? totalVariantStock // Use calculated total when variants exist
-          : parseInt(formData.stock_quantity, 10), // Use product-level stock when no variants
+          : parseInt(formData.stock_quantity, 10) || 0, // Use product-level stock when no variants
         status: formData.status,
-        category_id: formData.category_id === 'none' || !formData.category_id ? null : formData.category_id,
+        category_id: categoryId,
       };
 
-      if (formData.sale_price) {
-        payload.sale_price = parseFloat(formData.sale_price);
+      if (parsedSalePrice !== null) {
+        payload.sale_price = parsedSalePrice;
       }
 
       if (formData.image) {
         payload.image = formData.image;
       }
+      
+      console.log('[Product Form] Submitting payload:', JSON.stringify(payload, null, 2));
 
       const url = isEditing ? `/api/products/${product.id}` : '/api/products';
       const method = isEditing ? 'PUT' : 'POST';

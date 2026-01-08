@@ -231,9 +231,24 @@ export async function POST(request: NextRequest) {
     await requireEditAccess();
 
     const body = await request.json();
+    
+    console.log('[Product Create] Request body:', JSON.stringify(body, null, 2));
 
     // Validate request body
-    const validatedData = createProductSchema.parse(body);
+    let validatedData;
+    try {
+      validatedData = createProductSchema.parse(body);
+      console.log('[Product Create] Validated data:', JSON.stringify(validatedData, null, 2));
+    } catch (validationError: any) {
+      console.error('[Product Create] Validation error:', validationError);
+      if (validationError && typeof validationError === 'object' && 'issues' in validationError) {
+        return NextResponse.json(
+          { error: 'Validation error', issues: validationError.issues },
+          { status: 400 }
+        );
+      }
+      throw validationError;
+    }
 
     // Generate slug if not provided
     const slug = validatedData.slug || generateSlug(validatedData.name);
@@ -308,6 +323,54 @@ export async function POST(request: NextRequest) {
       warnings.push('Product description is missing. Adding a detailed description will improve SEO and help customers understand your product better.');
     }
 
+    // Validate category_id if provided (must be valid UUID or null)
+    if (validatedData.category_id) {
+      // Check if category exists and belongs to tenant
+      const category = await prisma.categories.findFirst({
+        where: {
+          id: validatedData.category_id,
+          tenant_id: tenant.id,
+        },
+      });
+      
+      if (!category) {
+        return NextResponse.json(
+          { error: 'Category not found or does not belong to this tenant' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // Validate brand_id if provided (must be valid UUID or null)
+    if (validatedData.brand_id) {
+      // Check if brand exists and belongs to tenant (if brands table exists)
+      // For now, we'll just validate it's a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(validatedData.brand_id)) {
+        return NextResponse.json(
+          { error: 'Invalid brand ID format' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // Ensure price is a valid number
+    if (isNaN(validatedData.price) || validatedData.price <= 0) {
+      return NextResponse.json(
+        { error: 'Price must be a positive number' },
+        { status: 400 }
+      );
+    }
+    
+    console.log('[Product Create] Creating product with data:', {
+      tenant_id: tenant.id,
+      name: validatedData.name,
+      slug,
+      price: validatedData.price,
+      category_id: validatedData.category_id || null,
+      created_by: user.id,
+    });
+
     // Create product
     // Note: If description is null/empty, we'll include a warning in the response
     const product = await prisma.products.create({
@@ -332,6 +395,8 @@ export async function POST(request: NextRequest) {
       // Note: Direct category relation via category_id
       // For many-to-many, we'd need to join through product_categories
     });
+    
+    console.log('[Product Create] Product created successfully:', product.id);
 
     return NextResponse.json(
       { 
@@ -342,8 +407,48 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error creating product:', error);
-
+    
+    // Log detailed error information
     if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+      
+      // Check for Prisma errors
+      if (error && typeof error === 'object' && 'code' in error) {
+        const prismaError = error as any;
+        console.error('Prisma error details:', {
+          code: prismaError.code,
+          meta: prismaError.meta,
+          clientVersion: prismaError.clientVersion,
+        });
+        
+        // Handle specific Prisma errors
+        if (prismaError.code === 'P2002') {
+          // Unique constraint violation
+          return NextResponse.json(
+            { 
+              error: 'A product with this slug or SKU already exists',
+              details: prismaError.meta?.target 
+            },
+            { status: 400 }
+          );
+        }
+        
+        if (prismaError.code === 'P2003') {
+          // Foreign key constraint violation
+          return NextResponse.json(
+            { 
+              error: 'Invalid category or brand reference',
+              details: prismaError.meta 
+            },
+            { status: 400 }
+          );
+        }
+      }
+      
       if (error.message === 'Tenant not found') {
         return NextResponse.json(
           { error: 'Tenant not found' },
@@ -366,11 +471,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Return detailed error in development, generic in production
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Internal server error';
+    
     return NextResponse.json(
       {
         error: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : 'Internal server error')
-          : 'Failed to create product'
+          ? errorMessage
+          : 'Failed to create product',
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error && {
+          details: error.stack,
+        }),
       },
       { status: 500 }
     );
