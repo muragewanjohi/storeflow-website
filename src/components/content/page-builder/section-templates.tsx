@@ -632,7 +632,7 @@ function CategoriesSectionComponent({
                     />
                   </div>
                 </div>
-                <h3 className="font-bold text-sm mb-1 group-hover:text-green-600 transition-colors">
+                <h3 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
                   {category.name}
                 </h3>
                 {section.show_count && (
@@ -1139,13 +1139,9 @@ function ProductTabsSectionComponent({
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-4 py-2 rounded-md font-semibold transition-colors ${
                     activeTab === tab.id
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
-                  style={activeTab === tab.id ? {
-                    backgroundColor: 'var(--color-primary, hsl(var(--primary)))',
-                    color: 'white',
-                  } : {}}
                 >
                   {tab.label}
                 </button>

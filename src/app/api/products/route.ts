@@ -110,13 +110,53 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
-    // Category filter - support multiple categories (comma-separated)
+    // Category filter - support multiple categories (comma-separated) and slugs
     if (category_id) {
-      const categoryIds = category_id.split(',').filter(id => id.trim());
-      if (categoryIds.length === 1) {
-        where.category_id = categoryIds[0];
-      } else if (categoryIds.length > 1) {
-        where.category_id = { in: categoryIds };
+      // Split by comma and clean up each param
+      const categoryParams = category_id
+        .split(',')
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+      const categoryIds: string[] = [];
+      
+      // Check if params are UUIDs or slugs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      for (const param of categoryParams) {
+        // Ensure param is a single value, not comma-separated
+        if (param.includes(',')) {
+          console.warn('[Products API] Invalid category param with comma:', param);
+          continue;
+        }
+        
+        if (uuidRegex.test(param)) {
+          // It's a UUID, use directly
+          categoryIds.push(param);
+        } else {
+          // It's a slug, look up the category
+          const category = await prisma.categories.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: param,
+              status: 'active',
+            },
+            select: {
+              id: true,
+            },
+          });
+          
+          if (category) {
+            categoryIds.push(category.id);
+          }
+        }
+      }
+      
+      if (categoryIds.length > 0) {
+        if (categoryIds.length === 1) {
+          where.category_id = categoryIds[0];
+        } else {
+          where.category_id = { in: categoryIds };
+        }
       }
     }
 
@@ -319,8 +359,8 @@ export async function POST(request: NextRequest) {
     
     // Check if tenant has edit access (not in read-only mode)
     try {
-      const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
-      await requireEditAccess();
+    const { requireEditAccess } = await import('@/lib/tenant-context/access-control-server');
+    await requireEditAccess();
       console.log('[Product Create] Edit access verified');
     } catch (editAccessError: any) {
       console.error('[Product Create] Edit access error:', editAccessError);
@@ -423,11 +463,11 @@ export async function POST(request: NextRequest) {
     try {
       limitCheck = await canCreateProduct(tenant);
       console.log('[Product Create] Limit check:', limitCheck);
-      if (!limitCheck.allowed) {
-        return NextResponse.json(
-          { error: limitCheck.reason || 'Product limit reached' },
-          { status: 403 }
-        );
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { error: limitCheck.reason || 'Product limit reached' },
+        { status: 403 }
+      );
       }
     } catch (limitError: any) {
       console.error('[Product Create] Limit check error:', limitError);
@@ -522,12 +562,12 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('[Product Create] Creating product with data:', {
-      tenant_id: tenant.id,
-      name: validatedData.name,
-      slug,
-      price: validatedData.price,
-      category_id: validatedData.category_id || null,
-      created_by: user.id,
+        tenant_id: tenant.id,
+        name: validatedData.name,
+        slug,
+        price: validatedData.price,
+        category_id: validatedData.category_id || null,
+        created_by: user.id,
     });
 
     // Ensure image URL doesn't exceed VARCHAR(255) limit
@@ -767,7 +807,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error creating product:', error);
-    
+
     // Log detailed error information
     if (error instanceof Error) {
       console.error('Error details:', {
@@ -854,7 +894,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NODE_ENV === 'development' && error instanceof Error) {
       errorResponse.stack = error.stack;
     }
-    
+
     return NextResponse.json(
       errorResponse,
       { status: 500 }

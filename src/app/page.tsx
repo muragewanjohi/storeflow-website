@@ -114,17 +114,19 @@ export default async function HomePage() {
       const pageData: PageBuilderData = JSON.parse(homepage.content);
       if (pageData.sections && pageData.sections.length > 0) {
         return (
-          <div className="min-h-screen flex flex-col">
-            <StorefrontHeader />
-            <main className="flex-1">
-              {pageData.sections
-                .sort((a: any, b: any) => a.order - b.order)
-                .map((section: any) => (
-                  <SectionRenderer key={section.id} section={section} isPreview={false} />
-                ))}
-            </main>
-            <StorefrontFooter />
-          </div>
+          <ThemeProviderWrapper>
+            <div className="min-h-screen flex flex-col">
+              <StorefrontHeader />
+              <main className="flex-1">
+                {pageData.sections
+                  .sort((a: any, b: any) => a.order - b.order)
+                  .map((section: any) => (
+                    <SectionRenderer key={section.id} section={section} isPreview={false} />
+                  ))}
+              </main>
+              <StorefrontFooter />
+            </div>
+          </ThemeProviderWrapper>
         );
       }
     } catch {
@@ -159,15 +161,14 @@ export default async function HomePage() {
   }));
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <StorefrontHeader />
-      <main className="flex-1">
-        <HomepageClient featuredProducts={featuredProducts} tenantName={tenant.name} />
-      </main>
-      <StorefrontFooter />
-      <ThemeProviderWrapper>
-        <></>
-      </ThemeProviderWrapper>
-    </div>
+    <ThemeProviderWrapper>
+      <div className="min-h-screen flex flex-col">
+        <StorefrontHeader />
+        <main className="flex-1">
+          <HomepageClient featuredProducts={featuredProducts} tenantName={tenant.name} />
+        </main>
+        <StorefrontFooter />
+      </div>
+    </ThemeProviderWrapper>
   );
 }

@@ -48,7 +48,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
   };
 
   return (
-    <Card className={`group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-green-200 ${className}`}>
+    <Card className={`group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 ${className}`}>
       <div className="relative">
         {isPreview ? (
           <div
@@ -63,7 +63,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
               }
             }}
           >
-            <div className="relative aspect-square bg-green-50 overflow-hidden">
+            <div className="relative aspect-square bg-primary/5 overflow-hidden">
               {product.image ? (
                 <Image
                   src={product.image}
@@ -78,7 +78,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
                 </div>
               )}
               {isOnSale && (
-                <Badge className="absolute top-3 left-3 z-10 bg-green-600 text-white font-bold px-3 py-1">
+                <Badge className="absolute top-3 left-3 z-10 bg-primary text-primary-foreground font-bold px-3 py-1">
                   {discountPercent}% OFF
                 </Badge>
               )}
@@ -89,7 +89,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
               )}
               {/* Organic badge overlay */}
               <div className="absolute top-3 right-3 z-10">
-                <Badge className="bg-green-100 text-green-800 border-green-300 font-semibold">
+                <Badge className="bg-primary/10 text-primary border-primary/30 font-semibold">
                   Organic
                 </Badge>
               </div>
@@ -97,7 +97,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           </div>
         ) : (
           <Link href={`/products/${product.slug || product.id}`}>
-            <div className="relative aspect-square bg-green-50 overflow-hidden">
+            <div className="relative aspect-square bg-primary/5 overflow-hidden">
               {product.image ? (
                 <Image
                   src={product.image}
@@ -112,7 +112,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
                 </div>
               )}
               {isOnSale && (
-                <Badge className="absolute top-3 left-3 z-10 bg-green-600 text-white font-bold px-3 py-1">
+                <Badge className="absolute top-3 left-3 z-10 bg-primary text-primary-foreground font-bold px-3 py-1">
                   {discountPercent}% OFF
                 </Badge>
               )}
@@ -123,7 +123,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
               )}
               {/* Organic badge overlay */}
               <div className="absolute top-3 right-3 z-10">
-                <Badge className="bg-green-100 text-green-800 border-green-300 font-semibold">
+                <Badge className="bg-primary/10 text-primary border-primary/30 font-semibold">
                   Organic
                 </Badge>
               </div>
@@ -150,7 +150,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           </h3>
         ) : (
           <Link href={`/products/${product.slug || product.id}`}>
-            <h3 className="font-semibold mb-2 hover:text-green-600 transition-colors line-clamp-2 text-gray-900">
+            <h3 className="font-semibold mb-2 hover:text-primary transition-colors line-clamp-2 text-gray-900">
               {product.name}
             </h3>
           </Link>
@@ -168,7 +168,6 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           
           <Button
             size="sm"
-            className="bg-green-600 hover:bg-green-700 text-white"
             disabled={isOutOfStock}
             onClick={(e) => {
               e.preventDefault();

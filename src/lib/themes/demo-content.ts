@@ -39,13 +39,13 @@ interface DemoContentConfig {
     image?: string;
   }>;
   products: Array<{
-    name: string;
-    description: string;
+  name: string;
+  description: string;
     short_description: string;
     price: number;
     sale_price?: number;
     category_index: number; // Index in categories array
-    image?: string;
+  image?: string;
     sku?: string;
   }>;
 }
@@ -206,7 +206,7 @@ function getDemoContentConfig(themeSlug: string): DemoContentConfig {
           name: 'Running Shoes',
           description: 'Comfortable running shoes with excellent support and cushioning.',
           short_description: 'Comfortable running shoes',
-          price: 89.99,
+    price: 89.99,
           category_index: 3,
           image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop',
           sku: 'FAS-SHO-001',
@@ -247,7 +247,7 @@ function getDemoContentConfig(themeSlug: string): DemoContentConfig {
           name: 'Coffee Table',
           description: 'Stylish wooden coffee table with storage. Great addition to any living room.',
           short_description: 'Stylish wooden coffee table',
-          price: 199.99,
+    price: 199.99,
           category_index: 0,
           image: 'https://images.unsplash.com/photo-1532372320572-cda25653a26d?w=400&h=400&fit=crop',
           sku: 'FUR-TBL-001',

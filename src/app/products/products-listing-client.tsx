@@ -78,8 +78,32 @@ export default function ProductsListingClient({
   const [total, setTotal] = useState(initialTotal);
   const [isSearching, setIsSearching] = useState(false);
   
+  // Initialize selected categories - map slugs to IDs if needed
+  const getInitialSelectedCategories = () => {
+    if (!initialCategory) return [];
+    
+    const categoryParams = initialCategory.split(',').filter(p => p.trim());
+    const categoryIds: string[] = [];
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    for (const param of categoryParams) {
+      if (uuidRegex.test(param)) {
+        // It's a UUID, use directly
+        categoryIds.push(param);
+      } else {
+        // It's a slug, find matching category ID
+        const category = initialCategories.find(cat => cat.slug === param);
+        if (category) {
+          categoryIds.push(category.id);
+        }
+      }
+    }
+    
+    return categoryIds;
+  };
+
   // Filter states
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategory ? [initialCategory] : []);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(getInitialSelectedCategories());
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [selectedAttributeValues, setSelectedAttributeValues] = useState<Record<string, string[]>>({});
   const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
@@ -131,9 +155,31 @@ export default function ProductsListingClient({
         params.delete('search');
       }
 
-      // Multiple categories support
+      // Multiple categories support - use slugs for better SEO
       if (selectedCategories.length > 0) {
-        params.set('category', selectedCategories.join(','));
+        // Map category IDs to slugs for URL
+        const categorySlugs = selectedCategories
+          .map(id => {
+            const category = initialCategories.find(cat => cat.id === id);
+            // Only use slug if it exists, otherwise skip (don't use ID as fallback)
+            return category?.slug || null;
+          })
+          .filter((slug): slug is string => !!slug);
+        
+        if (categorySlugs.length > 0) {
+          params.set('category', categorySlugs.join(','));
+        } else {
+          // If no slugs available, use IDs but ensure they're properly formatted
+          const validIds = selectedCategories.filter(id => {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            return uuidRegex.test(id) && !id.includes(',');
+          });
+          if (validIds.length > 0) {
+            params.set('category', validIds.join(','));
+          } else {
+            params.delete('category');
+          }
+        }
       } else {
         params.delete('category');
       }

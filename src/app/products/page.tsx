@@ -45,7 +45,7 @@ export default async function ProductsPage({
   const page = parseInt(params.page as string) || 1;
   const limit = 12;
   const search = (params.search as string) || '';
-  const category_id = (params.category as string) || '';
+  const categoryParam = (params.category as string) || '';
   const sort_by = (params.sort as string) || 'created_at';
   const sort_order = (params.order as string) || 'desc';
 
@@ -63,12 +63,82 @@ export default async function ProductsPage({
     ];
   }
 
-  // Handle multiple categories (comma-separated)
-  if (category_id) {
-    const categoryIds = category_id.split(',').filter(id => id.trim());
+  // Resolve category slugs to IDs
+  let categoryIds: string[] = [];
+  let currentCategory = null;
+  
+  if (categoryParam && typeof categoryParam === 'string') {
+    // Split by comma and clean up each param - be very explicit about splitting
+    const rawParams = categoryParam.split(',');
+    const categoryParams: string[] = [];
+    
+    for (const rawParam of rawParams) {
+      const trimmed = rawParam.trim();
+      // Only add if it's non-empty and doesn't contain a comma (shouldn't happen after split, but be safe)
+      if (trimmed.length > 0 && !trimmed.includes(',')) {
+        categoryParams.push(trimmed);
+      }
+    }
+    
+    // Check if params are UUIDs or slugs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    for (const param of categoryParams) {
+      // Final validation: ensure param is a single value
+      if (!param || param.length === 0 || param.includes(',')) {
+        console.warn('[Products Page] Skipping invalid category param:', param);
+        continue;
+      }
+      
+      if (uuidRegex.test(param)) {
+        // It's a valid UUID, add to array (double-check it's a single UUID)
+        if (param.split(',').length === 1 && !param.includes(',')) {
+          categoryIds.push(param);
+        } else {
+          console.warn('[Products Page] Rejecting UUID with comma:', param);
+        }
+      } else {
+        // It's a slug, look up the category
+        try {
+          const category = await prisma.categories.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: param,
+              status: 'active',
+            },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          });
+          
+          if (category && category.id) {
+            // Ensure category.id is a valid single UUID before adding
+            if (uuidRegex.test(category.id) && 
+                !category.id.includes(',') && 
+                category.id.split(',').length === 1) {
+              categoryIds.push(category.id);
+              // Set currentCategory to the first matching category (for breadcrumbs)
+              if (!currentCategory) {
+                currentCategory = category;
+              }
+            } else {
+              console.warn('[Products Page] Rejecting category.id with invalid format:', category.id);
+            }
+          }
+        } catch (error) {
+          console.error('[Products Page] Error looking up category by slug:', param, error);
+        }
+      }
+    }
+  }
+
+  // Apply category filter
+  if (categoryIds.length > 0) {
     if (categoryIds.length === 1) {
       where.category_id = categoryIds[0];
-    } else if (categoryIds.length > 1) {
+    } else {
       where.category_id = { in: categoryIds };
     }
   }
@@ -133,7 +203,52 @@ export default async function ProductsPage({
   }
 
   try {
-    const [productsRaw, total, categories, currentCategory] = await Promise.all([
+    // Fetch categories list (for filters)
+    const categories = await prisma.categories.findMany({
+      where: {
+        tenant_id: tenant.id,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    // If currentCategory wasn't set from slug lookup, try to get it from first categoryId
+    // Only do this if we have valid categoryIds (safety check)
+    if (!currentCategory && categoryIds.length > 0) {
+      // Filter categoryIds to ensure they're all valid single UUIDs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const validCategoryIds = categoryIds.filter(id => {
+        return id && 
+               typeof id === 'string' && 
+               !id.includes(',') &&
+               id.split(',').length === 1 &&
+               uuidRegex.test(id);
+      });
+      
+      // Only proceed if we have valid IDs
+      if (validCategoryIds.length > 0) {
+        try {
+          currentCategory = await prisma.categories.findUnique({
+            where: { id: validCategoryIds[0] },
+            select: { id: true, name: true, slug: true },
+          });
+        } catch (error) {
+          console.error('[Products Page] Error looking up category by ID:', validCategoryIds[0], error);
+          // Don't throw, just log the error
+        }
+      } else {
+        console.warn('[Products Page] No valid category IDs found after filtering');
+      }
+    }
+
+    const [productsRaw, total] = await Promise.all([
       prisma.products.findMany({
         where,
         skip: (page - 1) * limit,
@@ -152,24 +267,6 @@ export default async function ProductsPage({
         },
       }),
       prisma.products.count({ where }),
-      prisma.categories.findMany({
-        where: {
-          tenant_id: tenant.id,
-          status: 'active',
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-        },
-        orderBy: {
-          name: 'asc',
-        },
-      }),
-      category_id ? prisma.categories.findUnique({
-        where: { id: category_id },
-        select: { id: true, name: true, slug: true },
-      }) : null,
     ]);
 
     // Convert Decimal to number for client components
@@ -179,47 +276,46 @@ export default async function ProductsPage({
     }));
 
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <StorefrontHeader />
-        <main className="flex-1">
-          <Suspense fallback={
-            <div className="container mx-auto px-4 py-8">
-              <div className="space-y-6">
-                <div className="h-8 bg-muted rounded animate-pulse w-1/4" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {Array.from({ length: 8 }).map((_: any, i: any) => (
-                    <div key={i} className="border rounded-lg overflow-hidden">
-                      <div className="aspect-square w-full bg-muted animate-pulse" />
-                      <div className="p-4 space-y-2">
-                        <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                        <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
-                        <div className="h-6 bg-muted rounded animate-pulse w-1/3" />
+      <ThemeProviderWrapper>
+        <div className="min-h-screen bg-background flex flex-col">
+          <StorefrontHeader />
+          <main className="flex-1">
+            <Suspense fallback={
+              <div className="container mx-auto px-4 py-8">
+                <div className="space-y-6">
+                  <div className="h-8 bg-muted rounded animate-pulse w-1/4" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {Array.from({ length: 8 }).map((_: any, i: any) => (
+                      <div key={i} className="border rounded-lg overflow-hidden">
+                        <div className="aspect-square w-full bg-muted animate-pulse" />
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                          <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+                          <div className="h-6 bg-muted rounded animate-pulse w-1/3" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          }>
-            <ProductsListingClient
-              initialProducts={products}
-              initialTotal={total}
-              initialCategories={categories}
-              initialPage={page}
-              initialLimit={limit}
-              initialSearch={search}
-              initialCategory={category_id}
-              initialSortBy={sort_by}
-              initialSortOrder={sort_order}
-              currentCategory={currentCategory}
-            />
-          </Suspense>
-        </main>
-        <StorefrontFooter />
-        <ThemeProviderWrapper>
-          <></>
-        </ThemeProviderWrapper>
-      </div>
+            }>
+              <ProductsListingClient
+                initialProducts={products}
+                initialTotal={total}
+                initialCategories={categories}
+                initialPage={page}
+                initialLimit={limit}
+                initialSearch={search}
+                initialCategory={categoryParam}
+                initialSortBy={sort_by}
+                initialSortOrder={sort_order}
+                currentCategory={currentCategory}
+              />
+            </Suspense>
+          </main>
+          <StorefrontFooter />
+        </div>
+      </ThemeProviderWrapper>
     );
   } catch (error) {
     console.error('Error fetching products:', error);

@@ -14,6 +14,7 @@ import { SectionRenderer } from '@/components/content/page-builder/section-templ
 import { PageBuilderData } from '@/lib/content/page-builder-types';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 import Image from 'next/image';
 
@@ -106,9 +107,10 @@ export default async function DynamicPage({ params }: PageProps) {
   const shouldShowBanner = page.banner_image && !(isPageBuilder && hasHeroSectionFirst);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <StorefrontHeader />
-      <main className="flex-1">
+    <ThemeProviderWrapper>
+      <div className="min-h-screen flex flex-col">
+        <StorefrontHeader />
+        <main className="flex-1">
         {/* Banner Image - Displayed at the top of the page (only if no hero section first) */}
         {shouldShowBanner && (
           <section className="relative w-full">
@@ -169,8 +171,9 @@ export default async function DynamicPage({ params }: PageProps) {
             </div>
           )}
         </div>
-      </main>
-      <StorefrontFooter />
-    </div>
+        </main>
+        <StorefrontFooter />
+      </div>
+    </ThemeProviderWrapper>
   );
 }
