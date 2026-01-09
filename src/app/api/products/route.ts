@@ -14,6 +14,7 @@ import { createProductSchema, productQuerySchema, generateSlug, generateSKU } fr
 import { requireAuth } from '@/lib/auth/server';
 import { Prisma } from '@prisma/client';
 import { canCreateProduct } from '@/lib/subscriptions/limits';
+import { z } from 'zod';
 
 /**
  * GET /api/products
@@ -277,7 +278,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate request body and strip unknown fields
-    let validatedData;
+    let validatedData: z.infer<typeof createProductSchema>;
     try {
       // Use safeParse to handle validation errors gracefully
       const validationResult = createProductSchema.safeParse(body);
@@ -294,6 +295,26 @@ export async function POST(request: NextRequest) {
       console.log('[Product Create] Validated data:', JSON.stringify(validatedData, null, 2));
       console.log('[Product Create] Original body keys:', Object.keys(body));
       console.log('[Product Create] Validated keys:', Object.keys(validatedData));
+      
+      // Explicitly check for any unexpected fields that might have slipped through
+      const allowedFields = [
+        'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+        'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id',
+        'brand_id', 'metadata'
+      ];
+      const unexpectedFields = Object.keys(validatedData).filter(key => !allowedFields.includes(key));
+      if (unexpectedFields.length > 0) {
+        console.warn('[Product Create] Unexpected fields in validated data (will be ignored):', unexpectedFields);
+        // Remove unexpected fields explicitly - create a new clean object
+        const cleanedData: Partial<z.infer<typeof createProductSchema>> = {};
+        allowedFields.forEach(field => {
+          if (field in validatedData) {
+            (cleanedData as any)[field] = (validatedData as any)[field];
+          }
+        });
+        validatedData = cleanedData as z.infer<typeof createProductSchema>;
+        console.log('[Product Create] Cleaned validated data:', JSON.stringify(validatedData, null, 2));
+      }
     } catch (validationError: any) {
       console.error('[Product Create] Validation error:', validationError);
       if (validationError && typeof validationError === 'object' && 'issues' in validationError) {
@@ -446,41 +467,49 @@ export async function POST(request: NextRequest) {
     // Note: Prisma Decimal fields accept numbers, strings, or Prisma.Decimal
     // We'll pass numbers directly as Prisma handles the conversion
     // IMPORTANT: Only include fields that exist in the Prisma schema to avoid "column does not exist" errors
-    const productData: {
-      tenant_id: string;
-      name: string;
-      slug: string;
-      description: string | null;
-      short_description: string | null;
-      price: number;
-      sale_price: number | null;
-      sku: string;
-      stock_quantity: number;
-      status: string;
-      image: string | null;
-      gallery: string[];
-      category_id: string | null;
-      brand_id: string | null;
-      created_by: string;
-      metadata: any;
-    } = {
+    // Explicitly construct the object to ensure no unexpected fields are included
+    const productData = {
       tenant_id: tenant.id,
-      name: validatedData.name,
-      slug,
-      description: validatedData.description || null,
-      short_description: validatedData.short_description || null,
-      price: validatedData.price, // Prisma will convert number to Decimal
-      sale_price: validatedData.sale_price || null,
-      sku: finalSKU, // Always use generated SKU
-      stock_quantity: validatedData.stock_quantity || 0,
-      status: validatedData.status || 'active',
-      image: imageUrl,
+      name: String(validatedData.name),
+      slug: String(slug),
+      description: validatedData.description ? String(validatedData.description) : null,
+      short_description: validatedData.short_description ? String(validatedData.short_description) : null,
+      price: Number(validatedData.price), // Prisma will convert number to Decimal
+      sale_price: validatedData.sale_price ? Number(validatedData.sale_price) : null,
+      sku: String(finalSKU), // Always use generated SKU
+      stock_quantity: Number(validatedData.stock_quantity || 0),
+      status: String(validatedData.status || 'active'),
+      image: imageUrl ? String(imageUrl) : null,
       gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
-      category_id: validatedData.category_id || null,
-      brand_id: validatedData.brand_id || null,
-      created_by: user.id,
-      metadata: (validatedData.metadata || {}) as any,
+      category_id: validatedData.category_id ? String(validatedData.category_id) : null,
+      brand_id: validatedData.brand_id ? String(validatedData.brand_id) : null,
+      created_by: String(user.id),
+      metadata: validatedData.metadata && typeof validatedData.metadata === 'object' ? validatedData.metadata : {},
     };
+    
+    // Final safety check: ensure no unexpected keys exist
+    const allowedProductFields = [
+      'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+      'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
+      'created_by', 'metadata'
+    ];
+    const productDataKeys = Object.keys(productData);
+    const unexpectedProductFields = productDataKeys.filter(key => !allowedProductFields.includes(key));
+    if (unexpectedProductFields.length > 0) {
+      console.error('[Product Create] CRITICAL: Unexpected fields in productData:', unexpectedProductFields);
+      // Remove unexpected fields
+      const cleanedProductData: any = {};
+      allowedProductFields.forEach(field => {
+        if (field in productData) {
+          cleanedProductData[field] = (productData as any)[field];
+        }
+      });
+      Object.assign(productData, cleanedProductData);
+      // Delete unexpected fields
+      unexpectedProductFields.forEach(field => {
+        delete (productData as any)[field];
+      });
+    }
     
     console.log('[Product Create] Product data to insert:', JSON.stringify(productData, null, 2));
     console.log('[Product Create] Price type:', typeof productData.price, 'Value:', productData.price);
@@ -490,9 +519,61 @@ export async function POST(request: NextRequest) {
     // Note: If description is null/empty, we'll include a warning in the response
     let product;
     try {
-      console.log('[Product Create] Attempting Prisma create...');
+      // Final safety check: create a completely clean object with only allowed fields
+      const finalProductData: {
+        tenant_id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        short_description: string | null;
+        price: number;
+        sale_price: number | null;
+        sku: string;
+        stock_quantity: number;
+        status: string;
+        image: string | null;
+        gallery: string[];
+        category_id: string | null;
+        brand_id: string | null;
+        created_by: string;
+        metadata: any;
+      } = {
+        tenant_id: productData.tenant_id,
+        name: productData.name,
+        slug: productData.slug,
+        description: productData.description,
+        short_description: productData.short_description,
+        price: productData.price,
+        sale_price: productData.sale_price,
+        sku: productData.sku,
+        stock_quantity: productData.stock_quantity,
+        status: productData.status,
+        image: productData.image,
+        gallery: productData.gallery,
+        category_id: productData.category_id,
+        brand_id: productData.brand_id,
+        created_by: productData.created_by,
+        metadata: productData.metadata,
+      };
+      
+      // Verify finalProductData has no unexpected fields
+      const finalKeys = Object.keys(finalProductData);
+      const allowedFinalFields = [
+        'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+        'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
+        'created_by', 'metadata'
+      ];
+      const unexpectedFinalFields = finalKeys.filter(key => !allowedFinalFields.includes(key));
+      if (unexpectedFinalFields.length > 0) {
+        console.error('[Product Create] CRITICAL ERROR: Unexpected fields in finalProductData:', unexpectedFinalFields);
+        throw new Error(`Unexpected fields detected: ${unexpectedFinalFields.join(', ')}. This should never happen.`);
+      }
+      
+      console.log('[Product Create] Attempting Prisma create with final data...');
+      console.log('[Product Create] Final data keys:', Object.keys(finalProductData));
+      console.log('[Product Create] Final data:', JSON.stringify(finalProductData, null, 2));
       product = await prisma.products.create({
-        data: productData,
+        data: finalProductData,
       });
       console.log('[Product Create] Product created successfully:', product.id);
     } catch (createError: any) {
