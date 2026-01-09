@@ -166,6 +166,22 @@ export async function PUT(
       // Note: Direct category relation via category_id
     });
 
+    // Manually update search_vector since trigger is disabled
+    // This ensures full-text search still works when product name/description/sku changes
+    try {
+      await prisma.$executeRaw`
+        UPDATE products
+        SET search_vector = 
+          setweight(to_tsvector('english', COALESCE(name, '')), 'A') ||
+          setweight(to_tsvector('english', COALESCE(description, '')), 'B') ||
+          setweight(to_tsvector('english', COALESCE(sku, '')), 'A')
+        WHERE id = ${id}::uuid
+      `;
+    } catch (searchVectorError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[Product Update] Failed to update search_vector (non-critical):', searchVectorError);
+    }
+
     return NextResponse.json({
       message: 'Product updated successfully',
       product,

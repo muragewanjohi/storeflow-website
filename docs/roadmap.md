@@ -2075,6 +2075,16 @@ vercel env add VERCEL_TOKEN
   - [x] Product listing page
   - [x] Product filtering and sorting
   - [x] Product search functionality
+  - [ ] **Future Enhancement: Improve Search Performance** ⏳
+    - [ ] Fix PostgreSQL trigger for automatic `search_vector` updates (currently disabled due to Prisma conflict)
+    - [ ] Re-enable `products_search_vector_trigger` after resolving trigger/Prisma compatibility issue
+    - [ ] Optimize full-text search for large catalogs (10k+ products)
+    - [ ] Consider alternative search solutions (MeiliSearch, Algolia) for very large catalogs
+    - [ ] Add search analytics (popular searches, no-results queries)
+    - [ ] Implement search suggestions/autocomplete
+    - **Current Status:** Manual `search_vector` updates implemented in API (see `TRIGGER_DISABLED_IMPACT.md`)
+    - **Priority:** Medium (performance impact on large catalogs)
+    - **Estimated Time:** 8-12 hours
 - [x] **Day 30 Afternoon (4h):** Product detail page ✅
   - [x] Product detail page with images
   - [x] Product variants selection

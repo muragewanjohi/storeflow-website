@@ -648,6 +648,23 @@ export async function POST(request: NextRequest) {
         data: prismaCreateData,
       });
       console.log('[Product Create] Product created successfully:', product.id);
+      
+      // Manually update search_vector since trigger is disabled
+      // This ensures full-text search still works
+      try {
+        await prisma.$executeRaw`
+          UPDATE products
+          SET search_vector = 
+            setweight(to_tsvector('english', COALESCE(name, '')), 'A') ||
+            setweight(to_tsvector('english', COALESCE(description, '')), 'B') ||
+            setweight(to_tsvector('english', COALESCE(sku, '')), 'A')
+          WHERE id = ${product.id}::uuid
+        `;
+        console.log('[Product Create] Search vector updated successfully');
+      } catch (searchVectorError) {
+        // Non-critical: log but don't fail the request
+        console.warn('[Product Create] Failed to update search_vector (non-critical):', searchVectorError);
+      }
     } catch (createError: any) {
       console.error('[Product Create] Prisma create error:', createError);
       console.error('[Product Create] Error code:', createError?.code);
