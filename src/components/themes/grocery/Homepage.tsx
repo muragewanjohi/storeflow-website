@@ -8,6 +8,7 @@
 
 import { memo, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, ShoppingCart, Leaf, Shield, Truck, Thermometer, Zap } from 'lucide-react';
@@ -71,10 +72,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
             {/* Main Hero Banner (Left - 2 columns) */}
             <div className="lg:col-span-2 relative rounded-lg overflow-hidden shadow-lg">
               <div className="relative h-full min-h-[400px] bg-gradient-to-br from-orange-50 to-yellow-50">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=600&fit=crop"
                   alt="Organic Food"
-                  className="w-full h-full object-cover opacity-90"
+                  fill
+                  className="object-cover opacity-90"
+                  sizes="(max-width: 1024px) 100vw, 66vw"
+                  priority
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-center p-8 text-white">
@@ -114,10 +118,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
               {/* Top Right Banner */}
               <div className="relative rounded-lg overflow-hidden shadow-lg h-[190px]">
                 <div className="relative h-full bg-gradient-to-br from-orange-100 to-yellow-100">
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&h=400&fit=crop"
                     alt="Fresh Fruits"
-                    className="w-full h-full object-cover opacity-80"
+                    fill
+                    className="object-cover opacity-80"
+                    sizes="(max-width: 1024px) 100vw, 33vw"
                   />
                   <div className="absolute inset-0 flex flex-col justify-center p-6">
                     <p className="text-sm text-gray-700 mb-2">Organic fruits provider</p>
@@ -147,10 +153,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
               {/* Bottom Right Banner */}
               <div className="relative rounded-lg overflow-hidden shadow-lg h-[190px]">
                 <div className="relative h-full bg-gradient-to-br from-green-100 to-emerald-100">
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop"
                     alt="Fresh Vegetables"
-                    className="w-full h-full object-cover opacity-80"
+                    fill
+                    className="object-cover opacity-80"
+                    sizes="(max-width: 1024px) 100vw, 33vw"
                   />
                   <div className="absolute inset-0 flex flex-col justify-center p-6">
                     <p className="text-sm text-gray-700 mb-2">Trusted food partner</p>
@@ -213,12 +221,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                         className="w-full text-center group"
                       >
                         <div className="relative mb-4">
-                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors">
-                            <img
+                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors relative">
+                            <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              loading="lazy"
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
+                              sizes="96px"
                             />
                           </div>
                         </div>
@@ -232,12 +241,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     ) : (
                       <Link href={`/products?category=${category.slug}`} className="block text-center group">
                         <div className="relative mb-4">
-                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors">
-                            <img
+                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors relative">
+                            <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              loading="lazy"
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
+                              sizes="96px"
                             />
                           </div>
                         </div>
@@ -263,10 +273,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Banner 1 */}
             <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-orange-50 to-yellow-50">
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&h=400&fit=crop"
                 alt="Fruits"
-                className="w-full h-full object-cover opacity-60"
+                fill
+                className="object-cover opacity-60"
+                sizes="(max-width: 768px) 100vw, 33vw"
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -293,10 +305,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
 
             {/* Banner 2 */}
             <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-green-50 to-emerald-50">
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop"
                 alt="Vegetables"
-                className="w-full h-full object-cover opacity-60"
+                fill
+                className="object-cover opacity-60"
+                sizes="(max-width: 768px) 100vw, 33vw"
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -323,10 +337,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
 
             {/* Banner 3 */}
             <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-pink-50 to-purple-50">
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=400&fit=crop"
                 alt="Beauty"
-                className="w-full h-full object-cover opacity-60"
+                fill
+                className="object-cover opacity-60"
+                sizes="(max-width: 768px) 100vw, 33vw"
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -491,10 +507,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               {/* Left Side - Banner */}
               <div className="relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px] bg-gradient-to-br from-green-50 to-emerald-50">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop"
                   alt="Organic Vegetables"
-                  className="w-full h-full object-cover opacity-70"
+                  fill
+                  className="object-cover opacity-70"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                 />
                 <div className="absolute inset-0 flex flex-col justify-center p-8 text-center">
                   <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -537,11 +555,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {featuredProducts.slice(0, 4).map((product: any) => (
                       <div key={product.id} className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
+                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <Image
                             src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop'}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
+                            sizes="80px"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -581,11 +601,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {featuredProducts.slice(4, 8).map((product: any) => (
                       <div key={product.id} className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                          <img
+                        <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                          <Image
                             src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop'}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
+                            sizes="80px"
                           />
                         </div>
                         <div className="flex-1 min-w-0">

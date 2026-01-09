@@ -143,19 +143,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Get homepage template data for this theme
+      const layoutData = getHomepageLayout(theme.slug);
+
+      // Convert layout to page builder format
+      let pageBuilderData;
+      if (layoutData && layoutData.length > 0) {
+        pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
+      } else {
+        // Use default template if theme-specific one doesn't exist
+        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+      }
+
       if (!existingHomepage) {
-        // Get homepage template data for this theme
-        const layoutData = getHomepageLayout(theme.slug);
-
-        // Convert layout to page builder format
-        let pageBuilderData;
-        if (layoutData && layoutData.length > 0) {
-          pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
-        } else {
-          // Use default template if theme-specific one doesn't exist
-          pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
-        }
-
         // Create homepage page - matching API route structure
         const createdHomepage = await prisma.pages.create({
           data: {
@@ -177,7 +177,30 @@ export async function POST(request: NextRequest) {
           tenant_id: createdHomepage.tenant_id,
         });
       } else {
-        console.log('[Theme Install] Homepage already exists with slug:', pageSlug, 'skipping creation');
+        console.log('[Theme Install] Homepage already exists, updating with new theme content:', {
+          slug: pageSlug,
+          existingId: existingHomepage.id,
+        });
+        
+        // Update existing homepage with new theme's content
+        const updatedHomepage = await prisma.pages.update({
+          where: { id: existingHomepage.id },
+          data: {
+            title: pageTitle,
+            content: JSON.stringify(pageBuilderData),
+            status: 'published',
+            meta_title: `${tenant.name} - Home`,
+            meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+            updated_at: new Date(),
+          },
+        });
+        homepageCreated = true; // Mark as created/updated
+        console.log('[Theme Install] Homepage updated successfully:', {
+          id: updatedHomepage.id,
+          slug: updatedHomepage.slug,
+          title: updatedHomepage.title,
+          status: updatedHomepage.status,
+        });
       }
     } catch (homepageError: any) {
       // Log detailed error but don't fail theme installation
@@ -243,18 +266,18 @@ export async function POST(request: NextRequest) {
               },
             });
 
+            // Generate page builder content (use tenantName variable)
+            console.log('[Theme Install] Generating page builder content...');
+            const pageBuilderData = pageConfig.templateGenerator(tenantName);
+          
+            console.log('[Theme Install] Page builder data generated:', {
+              sectionsCount: pageBuilderData.sections?.length || 0,
+              hasSections: !!pageBuilderData.sections,
+            });
+
             if (!existingPage) {
               console.log('[Theme Install] ✅ Page does NOT exist, proceeding to create:', pageSlug);
               
-              // Generate page builder content (use tenantName variable)
-              console.log('[Theme Install] Generating page builder content...');
-              const pageBuilderData = pageConfig.templateGenerator(tenantName);
-            
-              console.log('[Theme Install] Page builder data generated:', {
-                sectionsCount: pageBuilderData.sections?.length || 0,
-                hasSections: !!pageBuilderData.sections,
-              });
-
               // Create the page - matching API route structure
               console.log('[Theme Install] Creating page in database...');
               const createdPage = await prisma.pages.create({
@@ -279,11 +302,32 @@ export async function POST(request: NextRequest) {
                 totalCreated: additionalPagesCreated,
               });
             } else {
-              console.log('[Theme Install] ⏭️  Page already exists, skipping creation:', {
+              console.log('[Theme Install] ⚠️  Page already exists, updating with new theme content:', {
                 slug: pageSlug,
                 existingId: existingPage.id,
                 existingTitle: existingPage.title,
-                existingStatus: existingPage.status,
+              });
+              
+              // Update existing page with new theme's content
+              const updatedPage = await prisma.pages.update({
+                where: { id: existingPage.id },
+                data: {
+                  title: pageConfig.title,
+                  content: JSON.stringify(pageBuilderData),
+                  status: 'published', // Ensure it's published
+                  meta_title: pageConfig.metaTitle || null,
+                  meta_description: pageConfig.metaDescription || null,
+                  updated_at: new Date(),
+                },
+              });
+              
+              additionalPagesCreated++;
+              console.log('[Theme Install] ✅✅✅ Additional page updated successfully:', {
+                id: updatedPage.id,
+                slug: updatedPage.slug,
+                title: updatedPage.title,
+                status: updatedPage.status,
+                totalUpdated: additionalPagesCreated,
               });
             }
           } catch (pageError: any) {

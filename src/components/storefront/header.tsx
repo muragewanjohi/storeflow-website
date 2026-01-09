@@ -9,9 +9,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { usePreview } from '@/lib/themes/preview-context';
 
 interface StorefrontHeaderProps {
@@ -31,11 +32,23 @@ export default function StorefrontHeader({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Prevent hydration mismatch by only showing logo after mount
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Initialize search query from URL params (if on products page)
+  useEffect(() => {
+    if (!isPreview && pathname === '/products') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchParam = urlParams.get('search');
+      if (searchParam) {
+        setSearchQuery(searchParam);
+      }
+    }
+  }, [pathname, isPreview]);
 
   // Fetch cart item count using lightweight endpoint
   // Optimized: Only fetch when needed, use event-driven updates, reduce redundant calls
@@ -146,12 +159,11 @@ export default function StorefrontHeader({
     };
   }, [isPreview]);
 
+  // Ecommerce storefront navigation (not marketing site)
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'Shops', href: '/products' },
-    { name: 'Pricing', href: '/pricing' },
-    { name: 'Templates', href: '/templates' },
-    { name: 'Blog', href: '/blog' },
+    { name: 'Shop', href: '/products' },
+    { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -198,38 +210,67 @@ export default function StorefrontHeader({
             )}
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:gap-6">
-            {navigation.map((item: any) => {
-              const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
-              if (isPreview && onNavigate) {
+          {/* Desktop Navigation & Search */}
+          <div className="hidden md:flex md:items-center md:flex-1 md:justify-center md:gap-8 md:max-w-2xl md:mx-8">
+            {/* Navigation Links */}
+            <div className="flex items-center gap-6">
+              {navigation.map((item: any) => {
+                const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+                if (isPreview && onNavigate) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onNavigate(item.href);
+                      }}
+                      className={`text-sm font-medium transition-colors hover:text-primary ${
+                        isActive ? 'text-primary' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  );
+                }
                 return (
-                  <button
+                  <Link
                     key={item.name}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigate(item.href);
-                    }}
+                    href={item.href}
                     className={`text-sm font-medium transition-colors hover:text-primary ${
                       isActive ? 'text-primary' : 'text-muted-foreground'
                     }`}
                   >
                     {item.name}
-                  </button>
+                  </Link>
                 );
-              }
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    isActive ? 'text-primary' : 'text-muted-foreground'
-                  }`}
-                >
-                  {item.name}
-                </Link>
-              );
-            })}
+              })}
+            </div>
+            
+            {/* Search Bar */}
+            <form
+              className="flex-1 max-w-md"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchQuery.trim()) {
+                  if (isPreview && onNavigate) {
+                    onNavigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+                  } else {
+                    router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+                  }
+                }
+              }}
+            >
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4"
+                />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+            </form>
           </div>
 
           {/* Right side - Account, Cart and Mobile Menu */}
@@ -339,6 +380,34 @@ export default function StorefrontHeader({
         {mobileMenuOpen && (
           <div className="md:hidden">
             <div className="space-y-1 border-t pb-3 pt-4">
+              {/* Mobile Search */}
+              <div className="px-3 pb-3">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      setMobileMenuOpen(false);
+                      if (isPreview && onNavigate) {
+                        onNavigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+                      } else {
+                        router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+                      }
+                    }
+                  }}
+                >
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Search products..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4"
+                    />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  </div>
+                </form>
+              </div>
+              
               {navigation.map((item: any) => {
                 const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
                 if (isPreview && onNavigate) {
