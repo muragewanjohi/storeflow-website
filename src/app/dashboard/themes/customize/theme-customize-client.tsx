@@ -401,11 +401,15 @@ export default function ThemeCustomizeClient() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => importFileInputRef.current?.click()}
-            disabled={updateMutation.isPending}
+            onClick={() => {
+              toast.info('Import functionality is coming soon');
+            }}
+            disabled={true}
+            title="Coming soon"
           >
             <UploadIcon className="h-4 w-4 mr-2" />
             Import
+            <span className="ml-2 text-xs bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
           </Button>
           <input
             ref={importFileInputRef}
@@ -427,7 +431,10 @@ export default function ThemeCustomizeClient() {
           <TabsTrigger value="typography">Typography</TabsTrigger>
           <TabsTrigger value="layout">Layout</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+          <TabsTrigger value="advanced" disabled title="Coming soon">
+            Advanced
+            <span className="ml-1.5 text-xs">🚧</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Colors Tab */}
@@ -438,16 +445,42 @@ export default function ThemeCustomizeClient() {
               <CardDescription>
                 Customize your theme colors. Leave empty to use theme defaults.
               </CardDescription>
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+                <h4 className="text-sm font-semibold mb-2">Color Application Status:</h4>
+                <ul className="text-xs space-y-1 text-muted-foreground">
+                  <li>✅ <strong>Primary:</strong> Applied via CSS variables (--primary, --color-primary) - Used in buttons, links, active states</li>
+                  <li>✅ <strong>Secondary:</strong> Applied via CSS variables (--secondary, --color-secondary) - Used in secondary buttons, hover states</li>
+                  <li>✅ <strong>Accent:</strong> Applied via CSS variables (--accent, --color-accent) - Available for custom use</li>
+                  <li>✅ <strong>Background:</strong> Applied via CSS variables (--background) - Page background</li>
+                  <li>✅ <strong>Text:</strong> Applied via CSS variables (--foreground) - Main text color</li>
+                  <li>⚠️ <strong>Muted:</strong> Applied via CSS variables (--color-muted) - Note: Some theme components may use hardcoded colors</li>
+                </ul>
+                <p className="text-xs mt-3 text-muted-foreground">
+                  <strong>Note:</strong> Colors are set as CSS custom properties and applied via ThemeProviderWrapper. 
+                  Components using Tailwind classes like <code className="bg-muted px-1 rounded">text-primary</code>, <code className="bg-muted px-1 rounded">bg-primary</code> will automatically use these colors.
+                  Some theme-specific components may need updates to fully utilize custom colors.
+                </p>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {['primary', 'secondary', 'accent', 'background', 'text', 'muted'].map((colorKey) => {
+              {[
+                { key: 'primary', description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements' },
+                { key: 'secondary', description: 'Used for: Secondary buttons, hover states, complementary UI elements' },
+                { key: 'accent', description: 'Used for: Highlights, special features, decorative elements' },
+                { key: 'background', description: 'Used for: Page background color (applied via CSS variables)' },
+                { key: 'text', description: 'Used for: Main text color, headings, body text (applied via CSS variables)' },
+                { key: 'muted', description: 'Used for: Muted text, placeholders, secondary text, borders' },
+              ].map(({ key: colorKey, description }) => {
                 const defaultValue = (defaultColors as ThemeColors)[colorKey] || '#000000';
                 const currentValue = customColors[colorKey] || defaultValue;
                 return (
                   <div key={colorKey} className="space-y-2">
-                    <Label htmlFor={`color-${colorKey}`} className="capitalize">
-                      {colorKey} Color
-                    </Label>
+                    <div>
+                      <Label htmlFor={`color-${colorKey}`} className="capitalize">
+                        {colorKey} Color
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                    </div>
                     <div className="flex items-center gap-3">
                       <Input
                         id={`color-${colorKey}`}
@@ -856,7 +889,20 @@ export default function ThemeCustomizeClient() {
 
         {/* Advanced Tab */}
         <TabsContent value="advanced">
-          <div className="space-y-6">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="space-y-4">
+                <div className="text-4xl">🚧</div>
+                <h3 className="text-xl font-semibold">Coming Soon</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  The Advanced section with Custom CSS and JavaScript customization will be available soon.
+                  This will allow you to add custom styling and functionality to your theme.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          {/* Keep the content but hide it for now */}
+          <div className="hidden space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Custom CSS</CardTitle>
@@ -934,6 +980,7 @@ export default function ThemeCustomizeClient() {
               </Card>
             )}
           </div>
+          {/* End of hidden content */}
         </TabsContent>
       </Tabs>
     </div>

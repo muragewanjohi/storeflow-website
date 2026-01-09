@@ -281,6 +281,66 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
                     <span className="text-2xl">🖼️</span>
                     <span className="text-xs">Image</span>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('categories')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📂</span>
+                    <span className="text-xs">Categories</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('banners')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">🎨</span>
+                    <span className="text-xs">Banners</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('flash_sale')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">⚡</span>
+                    <span className="text-xs">Flash Sale</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('split_layout')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📊</span>
+                    <span className="text-xs">Split Layout</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('cta')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📢</span>
+                    <span className="text-xs">CTA</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('product_tabs')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📑</span>
+                    <span className="text-xs">Product Tabs</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -475,12 +535,114 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         image: '',
         alt_text: '',
       };
+    case 'categories':
+      return {
+        id,
+        type: 'categories',
+        order,
+        title: 'Browse By Categories',
+        limit: 8,
+        columns: 8,
+        show_count: false,
+      };
+    case 'banners':
+      return {
+        id,
+        type: 'banners',
+        order,
+        banners: [
+          {
+            id: `banner-${Date.now()}-1`,
+            title: 'Banner Title',
+            image: '',
+            cta_text: 'Buy Now',
+            cta_link: '/products',
+          },
+        ],
+        columns: 3,
+      };
+    case 'flash_sale':
+      return {
+        id,
+        type: 'flash_sale',
+        order,
+        title: 'Super Flash Sale',
+        badge_text: '20% OFF',
+        limit: 4,
+        columns: 4,
+        cta_text: 'Shop More',
+        cta_link: '/products',
+      };
+    case 'split_layout':
+      return {
+        id,
+        type: 'split_layout',
+        order,
+        left_side: {
+          type: 'banner',
+          title: 'Banner Title',
+          image: '',
+          cta_text: 'Order Now',
+          cta_link: '/products',
+        },
+        right_side: {
+          type: 'products',
+          title: 'Top Rated',
+          limit: 4,
+          columns: 2,
+        },
+      };
+    case 'cta':
+      return {
+        id,
+        type: 'cta',
+        order,
+        title: 'We Make Your Daily Life More Easy',
+        subtitle: 'Fresh, Affordable, and Delivered to Your Door!',
+        cta_text: 'Continue Your Shopping',
+        cta_link: '/products',
+        background_gradient: 'linear-gradient(to right, #16a34a, #059669)',
+        text_color: '#ffffff',
+      };
+    case 'product_tabs':
+      return {
+        id,
+        type: 'product_tabs',
+        order,
+        title: 'Weekly Best Selling Organic Items',
+        tabs: [
+          {
+            id: `tab-${Date.now()}-1`,
+            label: 'Popular',
+            filter: 'popular',
+          },
+          {
+            id: `tab-${Date.now()}-2`,
+            label: 'Newly Added',
+            filter: 'new',
+          },
+          {
+            id: `tab-${Date.now()}-3`,
+            label: 'Low Price',
+            filter: 'low_price',
+          },
+        ],
+        limit: 8,
+        columns: 4,
+        default_tab: `tab-${Date.now()}-1`,
+      };
   }
 }
 
 function getSectionTypeLabel(type: SectionType): string {
   const labels: Record<SectionType, string> = {
     hero: 'Hero',
+    categories: 'Categories',
+    banners: 'Banners',
+    flash_sale: 'Flash Sale',
+    split_layout: 'Split Layout',
+    cta: 'CTA',
+    product_tabs: 'Product Tabs',
     features: 'Features',
     products: 'Products',
     testimonials: 'Testimonials',

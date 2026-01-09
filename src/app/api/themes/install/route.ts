@@ -26,6 +26,61 @@ import { generateSlug } from '@/lib/content/validation';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Remove blob URLs from page builder content
+ * This ensures no temporary blob URLs are saved to the database
+ */
+function cleanBlobUrlsFromPageBuilder(pageBuilderData: any): any {
+  if (!pageBuilderData || !pageBuilderData.sections) {
+    return pageBuilderData;
+  }
+
+  const cleanedSections = pageBuilderData.sections.map((section: any) => {
+    const cleaned = { ...section };
+
+    // Remove blob URLs from hero section images
+    if (cleaned.type === 'hero' && cleaned.image && cleaned.image.startsWith('blob:')) {
+      console.warn('[Theme Install] Removing blob URL from hero section image:', cleaned.image);
+      delete cleaned.image;
+    }
+
+    // Remove blob URLs from image section
+    if (cleaned.type === 'image' && cleaned.image && cleaned.image.startsWith('blob:')) {
+      console.warn('[Theme Install] Removing blob URL from image section:', cleaned.image);
+      delete cleaned.image;
+    }
+
+    // Remove blob URLs from features section images
+    if (cleaned.type === 'features' && cleaned.features) {
+      cleaned.features = cleaned.features.map((feature: any) => {
+        if (feature.image && feature.image.startsWith('blob:')) {
+          console.warn('[Theme Install] Removing blob URL from feature image:', feature.image);
+          delete feature.image;
+        }
+        return feature;
+      });
+    }
+
+    // Remove blob URLs from testimonials section images
+    if (cleaned.type === 'testimonials' && cleaned.testimonials) {
+      cleaned.testimonials = cleaned.testimonials.map((testimonial: any) => {
+        if (testimonial.image && testimonial.image.startsWith('blob:')) {
+          console.warn('[Theme Install] Removing blob URL from testimonial image:', testimonial.image);
+          delete testimonial.image;
+        }
+        return testimonial;
+      });
+    }
+
+    return cleaned;
+  });
+
+  return {
+    ...pageBuilderData,
+    sections: cleanedSections,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   let installationSuccess = false;
@@ -155,6 +210,9 @@ export async function POST(request: NextRequest) {
         pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
       }
 
+      // Clean any blob URLs from page builder content
+      pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
       if (!existingHomepage) {
         // Create homepage page - matching API route structure
         const createdHomepage = await prisma.pages.create({
@@ -164,6 +222,7 @@ export async function POST(request: NextRequest) {
             slug: pageSlug,
             content: JSON.stringify(pageBuilderData),
             status: 'published',
+            banner_image: null, // Explicitly set to null to prevent blob URLs
             meta_title: `${tenant.name} - Home`,
             meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
           },
@@ -189,6 +248,7 @@ export async function POST(request: NextRequest) {
             title: pageTitle,
             content: JSON.stringify(pageBuilderData),
             status: 'published',
+            banner_image: existingHomepage.banner_image?.startsWith('blob:') ? null : existingHomepage.banner_image, // Remove blob URLs if present
             meta_title: `${tenant.name} - Home`,
             meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
             updated_at: new Date(),
@@ -268,7 +328,10 @@ export async function POST(request: NextRequest) {
 
             // Generate page builder content (use tenantName variable)
             console.log('[Theme Install] Generating page builder content...');
-            const pageBuilderData = pageConfig.templateGenerator(tenantName);
+            let pageBuilderData = pageConfig.templateGenerator(tenantName);
+          
+            // Clean any blob URLs from page builder content
+            pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
           
             console.log('[Theme Install] Page builder data generated:', {
               sectionsCount: pageBuilderData.sections?.length || 0,
@@ -287,6 +350,7 @@ export async function POST(request: NextRequest) {
                   slug: pageSlug,
                   content: JSON.stringify(pageBuilderData),
                   status: 'published',
+                  banner_image: null, // Explicitly set to null to prevent blob URLs
                   meta_title: pageConfig.metaTitle || null,
                   meta_description: pageConfig.metaDescription || null,
                 },
@@ -315,6 +379,7 @@ export async function POST(request: NextRequest) {
                   title: pageConfig.title,
                   content: JSON.stringify(pageBuilderData),
                   status: 'published', // Ensure it's published
+                  banner_image: existingPage.banner_image?.startsWith('blob:') ? null : existingPage.banner_image, // Remove blob URLs if present
                   meta_title: pageConfig.metaTitle || null,
                   meta_description: pageConfig.metaDescription || null,
                   updated_at: new Date(),

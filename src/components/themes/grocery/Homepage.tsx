@@ -16,6 +16,7 @@ import type { DemoProduct } from '@/lib/themes/demo-content';
 import GroceryProductGrid from './ProductGrid';
 import GroceryHero from './Hero';
 import { usePreview } from '@/lib/themes/preview-context';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface GroceryHomepageProps {
   products?: DemoProduct[];
@@ -24,6 +25,7 @@ interface GroceryHomepageProps {
 
 function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProps) {
   const { onProductClick: onProductClickPreview, onNavigate } = usePreview();
+  const { formatCurrency } = useCurrency();
   
   // Memoize product mapping
   const featuredProducts = useMemo(() => {
@@ -574,9 +576,9 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                             <span className="text-xs text-gray-500">(2)</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-green-600">${product.price.toFixed(2)}</span>
+                            <span className="font-bold text-green-600">{formatCurrency(product.price)}</span>
                             {product.compareAtPrice && (
-                              <span className="text-xs text-gray-500 line-through">${product.compareAtPrice.toFixed(2)}</span>
+                              <span className="text-xs text-gray-500 line-through">{formatCurrency(product.compareAtPrice)}</span>
                             )}
                           </div>
                         </div>
@@ -620,9 +622,9 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                             <span className="text-xs text-gray-500">(3)</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-green-600">${product.price.toFixed(2)}</span>
+                            <span className="font-bold text-green-600">{formatCurrency(product.price)}</span>
                             {product.compareAtPrice && (
-                              <span className="text-xs text-gray-500 line-through">${product.compareAtPrice.toFixed(2)}</span>
+                              <span className="text-xs text-gray-500 line-through">{formatCurrency(product.compareAtPrice)}</span>
                             )}
                           </div>
                         </div>

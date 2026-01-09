@@ -180,9 +180,190 @@ export function convertLegacyLayoutToPageBuilder(
 }
 
 /**
+ * Create grocery theme homepage template matching GroceryHomepage component
+ */
+export function createGroceryHomepageTemplate(tenantName: string): PageBuilderData {
+  return {
+    sections: [
+      {
+        id: 'hero-1',
+        type: 'hero' as const,
+        order: 1,
+        title: 'Organic Food For Health',
+        subtitle: 'We collect pure natural organic healthy food and provide you through packaging.',
+        description: '',
+        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=600&fit=crop',
+        cta_text: 'Order Now',
+        cta_link: '/products',
+        background_color: '#fef3c7',
+      },
+      {
+        id: 'categories-1',
+        type: 'categories' as const,
+        order: 2,
+        title: 'Browse By Categories',
+        limit: 8,
+        columns: 8,
+        show_count: true,
+      },
+      {
+        id: 'banners-1',
+        type: 'banners' as const,
+        order: 3,
+        banners: [
+          {
+            id: 'banner-1',
+            title: 'Now Get 20% Off For Fruits',
+            image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=600&h=400&fit=crop',
+            cta_text: 'Buy Now',
+            cta_link: '/products?category=pure-fruits',
+            background_color: '#fef3c7',
+          },
+          {
+            id: 'banner-2',
+            title: 'Pure Vegetables For Health',
+            image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop',
+            cta_text: 'Buy Now',
+            cta_link: '/products?category=vegetables',
+            background_color: '#d1fae5',
+          },
+          {
+            id: 'banner-3',
+            title: 'Face Nourishing Beauty creams',
+            image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=400&fit=crop',
+            cta_text: 'Buy Now',
+            cta_link: '/products',
+            background_color: '#fce7f3',
+          },
+        ],
+        columns: 3,
+      },
+      {
+        id: 'flash-sale-1',
+        type: 'flash_sale' as const,
+        order: 4,
+        title: 'Super Flash Sale',
+        badge_text: '20% OFF',
+        limit: 4,
+        columns: 4,
+        cta_text: 'Shop More',
+        cta_link: '/products?on_sale=flash_sale',
+      },
+      {
+        id: 'features-1',
+        type: 'features' as const,
+        order: 5,
+        title: '',
+        subtitle: '',
+        features: [
+          {
+            id: 'feature-1',
+            title: 'Handmade Products',
+            description: 'We collect fresh natural fruits for your healthy life.',
+            icon: '🌿',
+          },
+          {
+            id: 'feature-2',
+            title: 'Organic and Fresh',
+            description: 'Our all products 100% natural and fresh.',
+            icon: '🛒',
+          },
+          {
+            id: 'feature-3',
+            title: '150+ Organic Items',
+            description: 'We have 150+ organic food for our trusted customers.',
+            icon: '⚡',
+          },
+          {
+            id: 'feature-4',
+            title: '100% Secure Payment',
+            description: 'We make sure our all client\'s payment method secure.',
+            icon: '🛡️',
+          },
+          {
+            id: 'feature-5',
+            title: 'Temperature Control',
+            description: 'We always try to control our items for healthy.',
+            icon: '🌡️',
+          },
+          {
+            id: 'feature-6',
+            title: 'Super Fast Delivery',
+            description: 'Our all delivery services fast and secure from damage.',
+            icon: '🚚',
+          },
+        ],
+        columns: 3,
+      },
+      {
+        id: 'product-tabs-1',
+        type: 'product_tabs' as const,
+        order: 6,
+        title: 'Weekly Best Selling Organic Items',
+        tabs: [
+          {
+            id: 'tab-popular',
+            label: 'Popular',
+            filter: 'popular',
+          },
+          {
+            id: 'tab-new',
+            label: 'Newly Added',
+            filter: 'new',
+          },
+          {
+            id: 'tab-low-price',
+            label: 'Low Price',
+            filter: 'low_price',
+          },
+        ],
+        limit: 8,
+        columns: 4,
+        default_tab: 'tab-popular',
+      },
+      {
+        id: 'split-layout-1',
+        type: 'split_layout' as const,
+        order: 7,
+        left_side: {
+          type: 'banner',
+          title: 'Enjoy Our Organic Vegetables',
+          image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop',
+          cta_text: 'Order Now',
+          cta_link: '/products?category=vegetables',
+          background_color: '#d1fae5',
+        },
+        right_side: {
+          type: 'products',
+          title: 'Top Rated',
+          limit: 4,
+          columns: 2,
+        },
+      },
+      {
+        id: 'cta-1',
+        type: 'cta' as const,
+        order: 8,
+        title: 'We Make Your Daily Life More Easy',
+        subtitle: 'Fresh, Affordable, and Delivered to Your Door!',
+        cta_text: 'Continue Your Shopping',
+        cta_link: '/products',
+        background_gradient: 'linear-gradient(to right, #16a34a, #059669)',
+        text_color: '#ffffff',
+      },
+    ] as PageSection[],
+  };
+}
+
+/**
  * Create a simple default homepage template if theme-specific one doesn't exist
  */
 export function createDefaultHomepageTemplate(themeSlug: string, tenantName: string): PageBuilderData {
+  // Use grocery template for grocery theme
+  if (themeSlug === 'grocery') {
+    return createGroceryHomepageTemplate(tenantName);
+  }
+
   return {
     sections: [
       {

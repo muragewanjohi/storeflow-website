@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { ChevronRightIcon, ChevronDownIcon, XMarkIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency/currency-context';
 import HexFashionProductCard from '@/components/themes/hexfashion/ProductCard';
 import '@/styles/themes/hexfashion.css';
@@ -79,10 +81,25 @@ export default function ProductsListingClient({
   // Filter states
   const [selectedCategories, setSelectedCategories] = useState<string[]>(initialCategory ? [initialCategory] : []);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [selectedSize, setSelectedSize] = useState<string>('');
-  const [selectedDressStyle, setSelectedDressStyle] = useState<string>('');
+  const [selectedAttributeValues, setSelectedAttributeValues] = useState<Record<string, string[]>>({});
+  const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
+  
+  // Fetch attributes on mount
+  useEffect(() => {
+    const fetchAttributes = async () => {
+      try {
+        const response = await fetch('/api/attributes');
+        if (response.ok) {
+          const data = await response.json();
+          setAttributes(data.attributes || []);
+        }
+      } catch (error) {
+        console.error('Error fetching attributes:', error);
+      }
+    };
+    fetchAttributes();
+  }, []);
 
   const totalPages = Math.ceil(total / initialLimit);
   const startItem = (initialPage - 1) * initialLimit + 1;
@@ -114,12 +131,30 @@ export default function ProductsListingClient({
         params.delete('search');
       }
 
-      const activeCategory = selectedCategories.length > 0 ? selectedCategories[0] : '';
-      if (activeCategory) {
-        params.set('category', activeCategory);
+      // Multiple categories support
+      if (selectedCategories.length > 0) {
+        params.set('category', selectedCategories.join(','));
       } else {
         params.delete('category');
       }
+
+      // Price range filter
+      if (priceRange[0] > 0 || priceRange[1] < 1000) {
+        params.set('min_price', priceRange[0].toString());
+        params.set('max_price', priceRange[1].toString());
+      } else {
+        params.delete('min_price');
+        params.delete('max_price');
+      }
+
+      // Attribute filters
+      Object.entries(selectedAttributeValues).forEach(([attributeId, values]) => {
+        if (values.length > 0) {
+          params.set(`attr_${attributeId}`, values.join(','));
+        } else {
+          params.delete(`attr_${attributeId}`);
+        }
+      });
 
       if (sortBy !== 'created_at') {
         params.set('sort', sortBy);
@@ -154,7 +189,7 @@ export default function ProductsListingClient({
           setIsSearching(false);
         });
     });
-  }, [debouncedSearch, selectedCategories, sortBy, sortOrder, searchParams, router]);
+  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router]);
 
   // Debounce search input (500ms delay)
   useEffect(() => {
@@ -189,45 +224,36 @@ export default function ProductsListingClient({
     updateFilters();
   };
 
-  const handleApplyFilters = () => {
-    setCategory(selectedCategories.length > 0 ? selectedCategories[0] : '');
-    updateFilters();
-  };
-
   const toggleCategory = (catId: string) => {
     setSelectedCategories(prev => 
       prev.includes(catId) 
         ? prev.filter(id => id !== catId)
-        : [catId] // Only allow one category at a time
+        : [...prev, catId] // Allow multiple categories
     );
   };
 
-  const toggleColor = (color: string) => {
-    setSelectedColors(prev => 
-      prev.includes(color)
-        ? prev.filter(c => c !== color)
-        : [...prev, color]
-    );
+  const toggleAttributeValue = (attributeId: string, valueId: string) => {
+    setSelectedAttributeValues(prev => {
+      const currentValues = prev[attributeId] || [];
+      const newValues = currentValues.includes(valueId)
+        ? currentValues.filter(id => id !== valueId)
+        : [...currentValues, valueId];
+      
+      return {
+        ...prev,
+        [attributeId]: newValues,
+      };
+    });
   };
 
-  // Color options matching Figma
-  const colorOptions = [
-    { name: 'Green', value: 'green', hex: '#2DD4BF' },
-    { name: 'Red', value: 'red', hex: '#F87171' },
-    { name: 'Orange', value: 'orange', hex: '#FB923C' },
-    { name: 'Yellow', value: 'yellow', hex: '#FBBF24' },
-    { name: 'Blue', value: 'blue', hex: '#60A5FA' },
-    { name: 'Purple', value: 'purple', hex: '#A78BFA' },
-    { name: 'Pink', value: 'pink', hex: '#F472B6' },
-    { name: 'White', value: 'white', hex: '#FFFFFF' },
-    { name: 'Black', value: 'black', hex: '#000000' },
-  ];
+  // Debounce filter updates (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateFilters();
+    }, 300);
 
-  // Size options
-  const sizeOptions = ['XX-Small', 'X-Small', 'Small', 'Medium', 'Large', 'X-Large', 'XX-Large', '3X-Large', '4X-Large'];
-
-  // Dress style options
-  const dressStyleOptions = ['Casual', 'Formal', 'Party', 'Gym'];
+    return () => clearTimeout(timer);
+  }, [selectedCategories, priceRange, selectedAttributeValues, updateFilters]);
 
   return (
     <div className="container mx-auto px-4 md:px-4 py-6 md:py-8 max-w-[1440px]">
@@ -298,16 +324,25 @@ export default function ProductsListingClient({
 
             {/* Categories Filter */}
             <div className="mb-6">
-              <div className="space-y-5">
-                {initialCategories.slice(0, 5).map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => toggleCategory(cat.id)}
-                    className="w-full flex items-center justify-between text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors"
-                  >
-                    <span>{cat.name}</span>
-                    <ChevronRightIcon className={`w-4 h-4 rotate-[-90deg] transition-transform ${selectedCategories.includes(cat.id) ? 'rotate-90' : ''}`} />
-                  </button>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[20px] font-bold text-black">Categories</h3>
+                <ChevronDownIcon className="w-4 h-4" />
+              </div>
+              <div className="space-y-3">
+                {initialCategories.map((cat) => (
+                  <div key={cat.id} className="flex items-center space-x-3">
+                    <Checkbox
+                      id={`category-${cat.id}`}
+                      checked={selectedCategories.includes(cat.id)}
+                      onCheckedChange={() => toggleCategory(cat.id)}
+                    />
+                    <Label
+                      htmlFor={`category-${cat.id}`}
+                      className="text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors cursor-pointer flex-1"
+                    >
+                      {cat.name}
+                    </Label>
+                  </div>
                 ))}
               </div>
             </div>
@@ -338,91 +373,33 @@ export default function ProductsListingClient({
 
             <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
 
-            {/* Colors Filter */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[20px] font-bold text-black">Colors</h3>
-                <ChevronDownIcon className="w-4 h-4" />
+            {/* Attributes Filters */}
+            {attributes.map((attribute) => (
+              <div key={attribute.id} className="mb-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-[20px] font-bold text-black">{attribute.name}</h3>
+                  <ChevronDownIcon className="w-4 h-4" />
+                </div>
+                <div className="space-y-3">
+                  {attribute.attribute_values.map((value) => (
+                    <div key={value.id} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`attr-${attribute.id}-${value.id}`}
+                        checked={(selectedAttributeValues[attribute.id] || []).includes(value.id)}
+                        onCheckedChange={() => toggleAttributeValue(attribute.id, value.id)}
+                      />
+                      <Label
+                        htmlFor={`attr-${attribute.id}-${value.id}`}
+                        className="text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors cursor-pointer flex-1"
+                      >
+                        {value.value}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <div className="h-px bg-[rgba(0,0,0,0.1)] mt-6" />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => toggleColor(color.value)}
-                    className={`w-full aspect-square rounded-full border-2 transition-all ${
-                      selectedColors.includes(color.value)
-                        ? 'border-black scale-110'
-                        : 'border-[rgba(0,0,0,0.1)]'
-                    }`}
-                    style={{ backgroundColor: color.hex }}
-                    aria-label={color.name}
-                  >
-                    {selectedColors.includes(color.value) && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-3 h-3 bg-white rounded-full" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Size Filter */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[20px] font-bold text-black">Size</h3>
-                <ChevronDownIcon className="w-4 h-4" />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {sizeOptions.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size === selectedSize ? '' : size)}
-                    className={`px-5 py-2.5 rounded-[62px] text-[14px] transition-colors ${
-                      selectedSize === size
-                        ? 'bg-black text-white font-medium'
-                        : 'bg-[#f0f0f0] text-[rgba(0,0,0,0.6)]'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Dress Style Filter */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[20px] font-bold text-black">Dress Style</h3>
-                <ChevronDownIcon className="w-4 h-4" />
-              </div>
-              <div className="space-y-5">
-                {dressStyleOptions.map((style) => (
-                  <button
-                    key={style}
-                    onClick={() => setSelectedDressStyle(style === selectedDressStyle ? '' : style)}
-                    className="w-full flex items-center justify-between text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors"
-                  >
-                    <span>{style}</span>
-                    <ChevronRightIcon className={`w-4 h-4 rotate-[-90deg] transition-transform ${selectedDressStyle === style ? 'rotate-90' : ''}`} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Apply Filter Button */}
-            <Button
-              onClick={handleApplyFilters}
-              className="w-full h-12 bg-black text-white rounded-[62px] text-[14px] font-medium hover:bg-black/90"
-            >
-              Apply Filter
-            </Button>
+            ))}
           </div>
         </aside>
 

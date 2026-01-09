@@ -63,8 +63,73 @@ export default async function ProductsPage({
     ];
   }
 
+  // Handle multiple categories (comma-separated)
   if (category_id) {
-    where.category_id = category_id;
+    const categoryIds = category_id.split(',').filter(id => id.trim());
+    if (categoryIds.length === 1) {
+      where.category_id = categoryIds[0];
+    } else if (categoryIds.length > 1) {
+      where.category_id = { in: categoryIds };
+    }
+  }
+
+  // Handle attribute filters
+  const attributeFilters: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof key === 'string' && key.startsWith('attr_')) {
+      const attributeId = key.replace('attr_', '');
+      const valueIds = (value as string).split(',').filter(id => id.trim());
+      if (valueIds.length > 0) {
+        attributeFilters[attributeId] = valueIds;
+      }
+    }
+  }
+
+  // Apply attribute filters if any
+  if (Object.keys(attributeFilters).length > 0) {
+    const productIdsWithAttributes: string[] = [];
+    
+    for (const [attributeId, valueIds] of Object.entries(attributeFilters)) {
+      const variants = await prisma.product_variant_attributes.findMany({
+        where: {
+          tenant_id: tenant.id,
+          attribute_id: attributeId,
+          attribute_value_id: { in: valueIds },
+        },
+        include: {
+          product_variants: {
+            select: {
+              product_id: true,
+            },
+          },
+        },
+      });
+
+      const productIds = variants
+        .map(v => v.product_variants?.product_id)
+        .filter((id): id is string => !!id);
+
+      if (productIdsWithAttributes.length === 0) {
+        productIdsWithAttributes.push(...productIds);
+      } else {
+        // Intersection: products must match ALL attribute filters
+        productIdsWithAttributes.splice(0, productIdsWithAttributes.length, 
+          ...productIdsWithAttributes.filter(id => productIds.includes(id))
+        );
+      }
+    }
+
+      if (productIdsWithAttributes.length > 0) {
+        if (where.id) {
+          const existingIds = Array.isArray(where.id.in) ? where.id.in : [where.id];
+          where.id = { in: existingIds.filter((id: string) => productIdsWithAttributes.includes(id)) };
+        } else {
+          where.id = { in: productIdsWithAttributes };
+        }
+      } else {
+        // No products match the attribute filters
+        where.id = { in: [] };
+      }
   }
 
   try {

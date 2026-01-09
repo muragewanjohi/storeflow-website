@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -32,6 +33,7 @@ interface GroceryProductCardProps {
 
 export default function GroceryProductCard({ product, className }: GroceryProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
+  const { formatCurrency } = useCurrency();
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
   const discountPercent = isOnSale && product.compareAtPrice 
@@ -156,10 +158,10 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
         
         <div className="flex items-center justify-between mt-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-green-600">${product.price.toFixed(2)}</span>
+            <span className="text-xl font-bold text-green-600">{formatCurrency(product.price)}</span>
             {isOnSale && product.compareAtPrice && (
               <span className="text-sm text-gray-500 line-through">
-                ${product.compareAtPrice.toFixed(2)}
+                {formatCurrency(product.compareAtPrice)}
               </span>
             )}
           </div>

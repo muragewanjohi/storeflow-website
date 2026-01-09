@@ -7,9 +7,15 @@
 
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
+import { useCurrency } from '@/lib/currency/currency-context';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 interface Product {
   id: string;
@@ -29,6 +35,9 @@ interface HexFashionProductCardProps {
 
 export default function HexFashionProductCard({ product, className }: HexFashionProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
+  const router = useRouter();
+  const { formatCurrency } = useCurrency();
+  const [addingToCart, setAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
 
@@ -36,6 +45,64 @@ export default function HexFashionProductCard({ product, className }: HexFashion
     if (isPreview && onProductClick) {
       e.preventDefault();
       onProductClick(product.id);
+    }
+  };
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isPreview) return;
+    if (isOutOfStock) {
+      toast.error('Product is out of stock');
+      return;
+    }
+
+    setAddingToCart(true);
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: product.id,
+          quantity: 1,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        if (response.status === 401) {
+          toast.error('Please login to add items to cart', {
+            description: 'You need to be logged in to add items to your cart',
+            action: {
+              label: 'Login',
+              onClick: () => router.push('/login?redirect=/products'),
+            },
+          });
+        } else {
+          throw new Error(data.error || 'Failed to add to cart');
+        }
+        return;
+      }
+
+      const data = await response.json();
+      window.dispatchEvent(new Event('cartUpdated'));
+      toast.success('Item added to cart!', {
+        description: `${product.name} has been added to your cart`,
+        action: {
+          label: 'View Cart',
+          onClick: () => router.push('/cart'),
+        },
+      });
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -168,17 +235,31 @@ export default function HexFashionProductCard({ product, className }: HexFashion
           </div>
         </div>
         
-        {/* Price */}
-        <div className="product-price">
-          <span className="product-price-current">
-            ${product.price.toFixed(0)}
-          </span>
-          {isOnSale && product.compareAtPrice && (
-            <>
-              <span className="product-price-old">
-                ${product.compareAtPrice.toFixed(0)}
-              </span>
-            </>
+        {/* Price and Cart */}
+        <div className="flex items-center justify-between">
+          <div className="product-price">
+            <span className="product-price-current">
+              {formatCurrency(product.price)}
+            </span>
+            {isOnSale && product.compareAtPrice && (
+              <>
+                <span className="product-price-old">
+                  {formatCurrency(product.compareAtPrice)}
+                </span>
+              </>
+            )}
+          </div>
+          {!isPreview && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 rounded-full hover:bg-gray-100"
+              onClick={handleAddToCart}
+              disabled={isOutOfStock || addingToCart}
+              title={isOutOfStock ? 'Out of stock' : 'Add to cart'}
+            >
+              <ShoppingCartIcon className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -32,6 +33,7 @@ interface DefaultProductCardProps {
 
 export default function DefaultProductCard({ product, className }: DefaultProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
+  const { formatCurrency } = useCurrency();
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
 
@@ -165,10 +167,10 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+            <span className="text-lg font-bold">{formatCurrency(product.price)}</span>
             {isOnSale && product.compareAtPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                ${product.compareAtPrice.toFixed(2)}
+                {formatCurrency(product.compareAtPrice)}
               </span>
             )}
           </div>
