@@ -276,11 +276,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate request body
+    // Validate request body and strip unknown fields
     let validatedData;
     try {
-      validatedData = createProductSchema.parse(body);
+      // Use safeParse to handle validation errors gracefully
+      const validationResult = createProductSchema.safeParse(body);
+      
+      if (!validationResult.success) {
+        console.error('[Product Create] Validation error:', validationResult.error.issues);
+        return NextResponse.json(
+          { error: 'Validation error', issues: validationResult.error.issues },
+          { status: 400 }
+        );
+      }
+      
+      validatedData = validationResult.data;
       console.log('[Product Create] Validated data:', JSON.stringify(validatedData, null, 2));
+      console.log('[Product Create] Original body keys:', Object.keys(body));
+      console.log('[Product Create] Validated keys:', Object.keys(validatedData));
     } catch (validationError: any) {
       console.error('[Product Create] Validation error:', validationError);
       if (validationError && typeof validationError === 'object' && 'issues' in validationError) {
@@ -429,10 +442,28 @@ export async function POST(request: NextRequest) {
       imageUrl = imageUrl.substring(0, 255);
     }
     
-    // Prepare product data
+    // Prepare product data - explicitly define only allowed fields
     // Note: Prisma Decimal fields accept numbers, strings, or Prisma.Decimal
     // We'll pass numbers directly as Prisma handles the conversion
-    const productData = {
+    // IMPORTANT: Only include fields that exist in the Prisma schema to avoid "column does not exist" errors
+    const productData: {
+      tenant_id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      short_description: string | null;
+      price: number;
+      sale_price: number | null;
+      sku: string;
+      stock_quantity: number;
+      status: string;
+      image: string | null;
+      gallery: string[];
+      category_id: string | null;
+      brand_id: string | null;
+      created_by: string;
+      metadata: any;
+    } = {
       tenant_id: tenant.id,
       name: validatedData.name,
       slug,

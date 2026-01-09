@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import AttributesListClient from './attributes-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -21,26 +22,31 @@ export default async function AttributesPage() {
     redirect('/login');
   }
 
-  // Fetch attributes
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  // Fetch attributes directly from database (matching categories pattern)
   let attributes: any[] = [];
+  let dbError: string | null = null;
 
   try {
-    const response = await fetch(`${baseUrl}/api/attributes`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+    attributes = await prisma.attributes.findMany({
+      where: {
+        tenant_id: tenant.id,
       },
-      cache: 'no-store',
+      include: {
+        attribute_values: {
+          orderBy: {
+            value: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        name: 'asc',
+      },
     });
-
-    if (response.ok) {
-      const data = await response.json();
-      attributes = data.attributes || [];
-    }
   } catch (error) {
     console.error('Error fetching attributes:', error);
+    dbError = 'Failed to load attributes. Please try again later.';
   }
 
-  return <AttributesListClient initialAttributes={attributes} />;
+  return <AttributesListClient initialAttributes={attributes} dbError={dbError} />;
 }
 

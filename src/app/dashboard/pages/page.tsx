@@ -7,6 +7,7 @@
 
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import PagesListClient from './pages-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -30,51 +31,69 @@ export default async function PagesPage({
 
   // Parse search params
   const params = await searchParams;
-  const page = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
-  const limit = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 20;
+  const pageNum = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
+  const limitNum = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 20;
   const search = typeof params.search === 'string' ? params.search : undefined;
   const status = typeof params.status === 'string' ? params.status : undefined;
 
-  // Build query string
-  const queryParams = new URLSearchParams();
-  if (page > 1) queryParams.set('page', page.toString());
-  if (limit !== 20) queryParams.set('limit', limit.toString());
-  if (search) queryParams.set('search', search);
-  if (status) queryParams.set('status', status);
-
-  // Use API route for pages
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const pagesUrl = `${baseUrl}/api/pages?${queryParams.toString()}`;
-  
+  // Fetch pages directly from database (matching categories pattern)
   let pages: any[] = [];
   let pagination: any = null;
   let dbError: string | null = null;
 
   try {
-    // Check if this is a refresh request (cache busting)
-    const isRefresh = typeof params.refresh === 'string';
-    
-    const pagesResponse = await fetch(pagesUrl, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+    // Build where clause
+    const where: any = {
+      tenant_id: tenant.id,
+    };
+
+    // Search filter
+    if (search) {
+      where.OR = [
+        { title: { contains: search.trim(), mode: 'insensitive' } },
+        { slug: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Status filter
+    if (status) {
+      where.status = status;
+    }
+
+    // Calculate pagination
+    const skip = (pageNum - 1) * limitNum;
+
+    // Fetch pages with pagination
+    pages = await prisma.pages.findMany({
+      where,
+      skip,
+      take: limitNum,
+      orderBy: {
+        created_at: 'desc',
       },
-      // Completely bypass cache on refresh, use shorter cache otherwise
-      ...(isRefresh 
-        ? { cache: 'no-store' as const }
-        : { next: { revalidate: 5 } }
-      ),
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
 
-    if (pagesResponse.ok) {
-      const pagesData = await pagesResponse.json();
-      pages = pagesData.pages || [];
-      pagination = pagesData.pagination || null;
-    } else {
-      const errorData = await pagesResponse.json().catch(() => ({}));
-      if (pagesResponse.status === 500 && errorData.error?.includes('database')) {
-        dbError = 'Unable to connect to the database. Please check your database connection.';
-      }
-    }
+    // Get total count for pagination
+    const total = await prisma.pages.count({ where });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limitNum);
+    pagination = {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
+    };
   } catch (error) {
     console.error('Error fetching pages:', error);
     dbError = 'Failed to load pages. Please try again later.';
@@ -86,8 +105,8 @@ export default async function PagesPage({
       initialPagination={pagination}
       dbError={dbError}
       currentSearchParams={{
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         search: search || '',
         status: status || '',
       }}

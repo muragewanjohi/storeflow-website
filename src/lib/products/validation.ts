@@ -25,7 +25,7 @@ export const createProductSchema = z.object({
   category_id: z.string().uuid().optional().nullable(),
   brand_id: z.string().uuid().optional().nullable(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
-});
+}).strip(); // Strip unknown fields to prevent Prisma errors
 
 /**
  * Product update schema (all fields optional, strips unknown fields)

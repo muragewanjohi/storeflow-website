@@ -45,10 +45,12 @@ interface Attribute {
 
 interface AttributesListClientProps {
   initialAttributes: Attribute[];
+  dbError?: string | null;
 }
 
 export default function AttributesListClient({
   initialAttributes,
+  dbError,
 }: Readonly<AttributesListClientProps>) {
   const router = useRouter();
   const [attributes, setAttributes] = useState(initialAttributes);
@@ -86,6 +88,29 @@ export default function AttributesListClient({
       setAttributeToDelete(null);
     }
   };
+
+  // Display error if database fetch failed
+  if (dbError) {
+    return (
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Attributes</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage product attributes (Size, Color, Weight, etc.)
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-destructive">
+              <p className="font-medium">{dbError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>

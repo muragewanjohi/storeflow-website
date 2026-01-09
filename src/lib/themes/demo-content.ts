@@ -533,22 +533,46 @@ export async function createDemoProducts(
         }
       }
 
-      // Create product - matching API route structure
+      // Create product - matching API route structure exactly
+      // Ensure all required fields are included to match Prisma schema
+      const productCreateData: {
+        tenant_id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        short_description: string | null;
+        price: number;
+        sale_price: number | null;
+        sku: string;
+        stock_quantity: number;
+        status: string;
+        image: string | null;
+        gallery: string[];
+        category_id: string | null;
+        brand_id: string | null;
+        created_by: string | null;
+        metadata: any;
+      } = {
+        tenant_id: tenantId,
+        name: productData.name,
+        slug,
+        description: productData.description || null,
+        short_description: productData.short_description || null,
+        price: productData.price,
+        sale_price: productData.sale_price || null,
+        sku: finalSKU, // Use generated SKU matching API route
+        stock_quantity: Math.floor(Math.random() * 50) + 10, // Random stock between 10-60
+        status: 'active',
+        image: productData.image || null,
+        gallery: [], // Empty gallery array for demo products
+        category_id: categoryId,
+        brand_id: null, // No brand for demo products
+        created_by: null, // Demo products don't have a specific creator
+        metadata: {}, // Empty metadata object
+      };
+      
       const createdProduct = await prisma.products.create({
-        data: {
-          tenant_id: tenantId,
-          name: productData.name,
-          slug,
-          description: productData.description || null,
-          short_description: productData.short_description || null,
-          price: productData.price,
-          sale_price: productData.sale_price || null,
-          sku: finalSKU, // Use generated SKU matching API route
-          stock_quantity: Math.floor(Math.random() * 50) + 10, // Random stock between 10-60
-          status: 'active',
-          image: productData.image || null,
-          category_id: categoryId,
-        },
+        data: productCreateData,
       });
 
       productsCreated++;
