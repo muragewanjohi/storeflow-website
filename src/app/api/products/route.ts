@@ -268,7 +268,15 @@ export async function POST(request: NextRequest) {
     let body;
     try {
       body = await request.json();
-      console.log('[Product Create] Request body:', JSON.stringify(body, null, 2));
+      console.log('[Product Create] Raw request body:', JSON.stringify(body, null, 2));
+      console.log('[Product Create] Request body keys:', Object.keys(body));
+      
+      // Check for 'new' field immediately
+      if ('new' in body) {
+        console.error('[Product Create] CRITICAL: Found "new" field in raw request body!', body.new);
+        delete body.new;
+        console.log('[Product Create] Removed "new" field from body');
+      }
     } catch (parseError: any) {
       console.error('[Product Create] JSON parse error:', parseError);
       return NextResponse.json(
@@ -572,8 +580,42 @@ export async function POST(request: NextRequest) {
       console.log('[Product Create] Attempting Prisma create with final data...');
       console.log('[Product Create] Final data keys:', Object.keys(finalProductData));
       console.log('[Product Create] Final data:', JSON.stringify(finalProductData, null, 2));
+      
+      // CRITICAL: Use Object.fromEntries to create a completely clean object with ONLY allowed fields
+      // This is the most aggressive way to ensure no unexpected fields exist
+      const allowedFieldsMap = new Map<string, any>();
+      allowedFinalFields.forEach(field => {
+        if (field in finalProductData) {
+          allowedFieldsMap.set(field, (finalProductData as any)[field]);
+        }
+      });
+      
+      const ultraCleanData = Object.fromEntries(allowedFieldsMap);
+      
+      // Final verification
+      const ultraCleanKeys = Object.keys(ultraCleanData);
+      if (ultraCleanKeys.length !== allowedFinalFields.length) {
+        console.warn('[Product Create] Field count mismatch:', {
+          expected: allowedFinalFields.length,
+          actual: ultraCleanKeys.length,
+          keys: ultraCleanKeys,
+        });
+      }
+      
+      const unexpectedUltraCleanFields = ultraCleanKeys.filter(key => !allowedFinalFields.includes(key));
+      if (unexpectedUltraCleanFields.length > 0) {
+        console.error('[Product Create] CRITICAL: Unexpected fields in ultraCleanData:', unexpectedUltraCleanFields);
+        throw new Error(`Unexpected fields in ultraCleanData: ${unexpectedUltraCleanFields.join(', ')}`);
+      }
+      
+      console.log('[Product Create] Using ultra-clean data (Object.fromEntries):', JSON.stringify(ultraCleanData, null, 2));
+      console.log('[Product Create] Ultra-clean data keys:', Object.keys(ultraCleanData));
+      console.log('[Product Create] Ultra-clean data type:', typeof ultraCleanData);
+      console.log('[Product Create] Ultra-clean data constructor:', ultraCleanData.constructor.name);
+      
+      // Use Prisma's create with the ultra-clean data
       product = await prisma.products.create({
-        data: finalProductData,
+        data: ultraCleanData as any, // Type assertion needed due to strict typing
       });
       console.log('[Product Create] Product created successfully:', product.id);
     } catch (createError: any) {
