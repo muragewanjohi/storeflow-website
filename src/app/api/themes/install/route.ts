@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create homepage template and additional pages if they don't exist
-    // (for both new installs and theme switches, we want to ensure pages exist)
+    // For new installs: Always create pages
+    // For theme switches: Only create if they don't exist
     let homepageCreated = false;
     let additionalPagesCreated = 0;
     let demoContentCreated = false;
@@ -186,83 +187,117 @@ export async function POST(request: NextRequest) {
     }
 
     // Create additional pages (About, Contact, Shop)
+    // Always create pages for new installs, or if they don't exist
     try {
-        const additionalPageTemplates = getAdditionalPageTemplates(tenant.name);
-        
-        console.log('[Theme Install] Creating additional pages:', additionalPageTemplates.length);
-        
-        for (const pageConfig of additionalPageTemplates) {
-          try {
-            // Generate slug using same method as API route
-            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
-            
-            // Check if page already exists for this tenant (matching API route check)
-            const existingPage = await prisma.pages.findFirst({
-              where: {
-                tenant_id: tenant.id,
-                slug: pageSlug,
-              },
-            });
+      // Ensure tenant.name is available
+      const tenantName = tenant.name || 'Store';
+      
+      const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+      
+      console.log('[Theme Install] Starting additional pages creation:', {
+        templateCount: additionalPageTemplates.length,
+        tenantId: tenant.id,
+        tenantName: tenantName,
+        isNewInstall,
+        originalTenantName: tenant.name,
+      });
+      
+      if (!additionalPageTemplates || additionalPageTemplates.length === 0) {
+        console.warn('[Theme Install] No additional page templates returned from getAdditionalPageTemplates');
+      }
+      
+      for (const pageConfig of additionalPageTemplates) {
+        try {
+          // Generate slug using same method as API route
+          const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+          
+          console.log('[Theme Install] Processing page:', {
+            title: pageConfig.title,
+            slug: pageConfig.slug,
+            generatedSlug: pageSlug,
+          });
+          
+          // Check if page already exists for this tenant (matching API route check)
+          const existingPage = await prisma.pages.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: pageSlug,
+            },
+          });
 
             if (!existingPage) {
-              // Generate page builder content
-              const pageBuilderData = pageConfig.templateGenerator(tenant.name);
+              console.log('[Theme Install] Page does not exist, creating:', pageSlug);
+              
+              // Generate page builder content (use tenantName variable)
+              const pageBuilderData = pageConfig.templateGenerator(tenantName);
+            
+            console.log('[Theme Install] Page builder data generated:', {
+              sectionsCount: pageBuilderData.sections?.length || 0,
+            });
 
-              // Create the page - matching API route structure
-              const createdPage = await prisma.pages.create({
-                data: {
-                  tenant_id: tenant.id,
-                  title: pageConfig.title,
-                  slug: pageSlug,
-                  content: JSON.stringify(pageBuilderData),
-                  status: 'published',
-                  meta_title: pageConfig.metaTitle || null,
-                  meta_description: pageConfig.metaDescription || null,
-                },
-              });
-              additionalPagesCreated++;
-              console.log('[Theme Install] Additional page created successfully:', {
-                id: createdPage.id,
-                slug: createdPage.slug,
-                title: createdPage.title,
-                status: createdPage.status,
-                tenant_id: createdPage.tenant_id,
-              });
-            } else {
-              console.log('[Theme Install] Page already exists with slug:', pageSlug, 'skipping creation');
-            }
-          } catch (pageError: any) {
-            // Log detailed error for individual page but continue with others
-            console.error(`[Theme Install] Error creating ${pageConfig.slug} page:`, {
-              error: pageError.message,
-              code: pageError.code,
-              meta: pageError.meta,
-              stack: pageError.stack,
-              pageConfig: {
+            // Create the page - matching API route structure
+            const createdPage = await prisma.pages.create({
+              data: {
+                tenant_id: tenant.id,
                 title: pageConfig.title,
-                slug: pageConfig.slug,
+                slug: pageSlug,
+                content: JSON.stringify(pageBuilderData),
+                status: 'published',
+                meta_title: pageConfig.metaTitle || null,
+                meta_description: pageConfig.metaDescription || null,
               },
-              tenantId: tenant.id,
+            });
+            
+            additionalPagesCreated++;
+            console.log('[Theme Install] ✅ Additional page created successfully:', {
+              id: createdPage.id,
+              slug: createdPage.slug,
+              title: createdPage.title,
+              status: createdPage.status,
+              tenant_id: createdPage.tenant_id,
+            });
+          } else {
+            console.log('[Theme Install] ⏭️  Page already exists with slug:', {
+              slug: pageSlug,
+              existingId: existingPage.id,
+              existingTitle: existingPage.title,
+              'skipping creation': true,
             });
           }
+        } catch (pageError: any) {
+          // Log detailed error for individual page but continue with others
+          console.error(`[Theme Install] ❌ Error creating ${pageConfig.slug} page:`, {
+            error: pageError.message,
+            code: pageError.code,
+            meta: pageError.meta,
+            stack: pageError.stack,
+            pageConfig: {
+              title: pageConfig.title,
+              slug: pageConfig.slug,
+            },
+            tenantId: tenant.id,
+          });
+          // Continue with next page even if this one fails
         }
-        
-        console.log('[Theme Install] Additional pages creation completed:', {
-          attempted: additionalPageTemplates.length,
-          created: additionalPagesCreated,
-        });
-      } catch (additionalPagesError: any) {
-        // Log detailed error but don't fail theme installation
-        console.error('[Theme Install] Error creating additional pages:', {
-          error: additionalPagesError.message,
-          code: additionalPagesError.code,
-          meta: additionalPagesError.meta,
-          stack: additionalPagesError.stack,
-          themeSlug: theme.slug,
-          tenantId: tenant.id,
-        });
-        // Continue with theme installation even if additional pages creation fails
       }
+      
+      console.log('[Theme Install] Additional pages creation completed:', {
+        attempted: additionalPageTemplates.length,
+        created: additionalPagesCreated,
+        skipped: additionalPageTemplates.length - additionalPagesCreated,
+      });
+    } catch (additionalPagesError: any) {
+      // Log detailed error but don't fail theme installation
+      console.error('[Theme Install] ❌ Error in additional pages creation block:', {
+        error: additionalPagesError.message,
+        code: additionalPagesError.code,
+        meta: additionalPagesError.meta,
+        stack: additionalPagesError.stack,
+        themeSlug: theme.slug,
+        tenantId: tenant.id,
+      });
+      // Continue with theme installation even if additional pages creation fails
+    }
     
     // Create demo content if requested (only for new installs to avoid duplicates)
     if (isNewInstall && include_demo_content === true) {
