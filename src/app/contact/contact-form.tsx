@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -267,9 +268,9 @@ export default function ContactForm() {
 
               <p className="text-xs text-muted-foreground text-center">
                 By submitting this form, you agree to our{' '}
-                <a href="/privacy-policy" className="text-[#0025cc] hover:underline">
+                <Link href="/privacy-policy" className="text-[#0025cc] hover:underline">
                   Privacy Policy
-                </a>
+                </Link>
                 .
               </p>
             </form>

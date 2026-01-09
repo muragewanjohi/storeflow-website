@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import { 
   ChevronDownIcon, 
@@ -492,19 +493,19 @@ export default function UserGuideContent({ tenantName }: UserGuideContentProps) 
             Can&apos;t find what you&apos;re looking for? We&apos;re here to help!
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
+            <Link
               href="/support"
               className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition"
             >
               <EnvelopeIcon className="w-5 h-5 mr-2" />
               Contact Support
-            </a>
-            <a
+            </Link>
+            <Link
               href="/support"
               className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition"
             >
               Create Support Ticket
-            </a>
+            </Link>
           </div>
         </div>
       </section>
