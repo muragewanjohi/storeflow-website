@@ -613,9 +613,39 @@ export async function POST(request: NextRequest) {
       console.log('[Product Create] Ultra-clean data type:', typeof ultraCleanData);
       console.log('[Product Create] Ultra-clean data constructor:', ultraCleanData.constructor.name);
       
-      // Use Prisma's create with the ultra-clean data
+      // CRITICAL: Use Prisma's create with explicit field selection
+      // This ensures Prisma only uses the exact fields we specify
+      // We explicitly list each field to prevent any unexpected fields from being passed
+      // This is the most defensive approach to prevent the 'new' column error
+      const prismaCreateData = {
+        tenant_id: String(ultraCleanData.tenant_id),
+        name: String(ultraCleanData.name),
+        slug: String(ultraCleanData.slug),
+        description: ultraCleanData.description ? String(ultraCleanData.description) : null,
+        short_description: ultraCleanData.short_description ? String(ultraCleanData.short_description) : null,
+        price: Number(ultraCleanData.price),
+        sale_price: ultraCleanData.sale_price ? Number(ultraCleanData.sale_price) : null,
+        sku: String(ultraCleanData.sku),
+        stock_quantity: Number(ultraCleanData.stock_quantity),
+        status: String(ultraCleanData.status),
+        image: ultraCleanData.image ? String(ultraCleanData.image) : null,
+        gallery: Array.isArray(ultraCleanData.gallery) ? ultraCleanData.gallery : [],
+        category_id: ultraCleanData.category_id ? String(ultraCleanData.category_id) : null,
+        brand_id: ultraCleanData.brand_id ? String(ultraCleanData.brand_id) : null,
+        created_by: String(ultraCleanData.created_by),
+        metadata: ultraCleanData.metadata && typeof ultraCleanData.metadata === 'object' ? ultraCleanData.metadata : {},
+      };
+      
+      // Final verification - ensure no 'new' field exists
+      if ('new' in prismaCreateData) {
+        console.error('[Product Create] CRITICAL: "new" field found in prismaCreateData!');
+        delete (prismaCreateData as any).new;
+      }
+      
+      console.log('[Product Create] Prisma create data keys (final):', Object.keys(prismaCreateData));
+      
       product = await prisma.products.create({
-        data: ultraCleanData as any, // Type assertion needed due to strict typing
+        data: prismaCreateData,
       });
       console.log('[Product Create] Product created successfully:', product.id);
     } catch (createError: any) {
