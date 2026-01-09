@@ -25,7 +25,11 @@ export const createPageSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
   slug: z.string().optional(),
   content: z.string().optional().nullable(),
-  banner_image: z.string().url().optional().nullable(),
+  banner_image: z.union([
+    z.string().url('Banner image must be a valid URL'),
+    z.literal(''),
+    z.null(),
+  ]).optional().nullable().transform((val) => val === '' ? null : val),
   meta_title: z.string().max(255, 'Meta title must be less than 255 characters').optional().nullable(),
   meta_description: z.string().optional().nullable(),
   meta_tags: z.string().optional().nullable(),

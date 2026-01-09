@@ -121,6 +121,12 @@ export async function POST(request: NextRequest) {
     let demoProductsCreated = 0;
     let demoAttributesCreated = 0;
     
+    console.log('[Theme Install] Starting page creation process:', {
+      isNewInstall,
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+    });
+    
     // Always try to create pages if they don't exist (for both new installs and switches)
     // Create homepage
     try {
@@ -192,93 +198,112 @@ export async function POST(request: NextRequest) {
       // Ensure tenant.name is available
       const tenantName = tenant.name || 'Store';
       
-      const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
-      
-      console.log('[Theme Install] Starting additional pages creation:', {
-        templateCount: additionalPageTemplates.length,
-        tenantId: tenant.id,
+      console.log('[Theme Install] ===== STARTING ADDITIONAL PAGES CREATION =====');
+      console.log('[Theme Install] Tenant info:', {
+        id: tenant.id,
+        name: tenant.name,
         tenantName: tenantName,
         isNewInstall,
-        originalTenantName: tenant.name,
+      });
+      
+      const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+      
+      console.log('[Theme Install] getAdditionalPageTemplates returned:', {
+        templateCount: additionalPageTemplates?.length || 0,
+        templates: additionalPageTemplates?.map(t => ({ slug: t.slug, title: t.title })) || [],
       });
       
       if (!additionalPageTemplates || additionalPageTemplates.length === 0) {
-        console.warn('[Theme Install] No additional page templates returned from getAdditionalPageTemplates');
+        console.error('[Theme Install] ❌ CRITICAL: No additional page templates returned from getAdditionalPageTemplates!');
+        console.error('[Theme Install] This means pages will NOT be created.');
+      } else {
+        console.log('[Theme Install] ✅ Found', additionalPageTemplates.length, 'page templates to create');
       }
       
-      for (const pageConfig of additionalPageTemplates) {
-        try {
-          // Generate slug using same method as API route
-          const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
-          
-          console.log('[Theme Install] Processing page:', {
-            title: pageConfig.title,
-            slug: pageConfig.slug,
-            generatedSlug: pageSlug,
-          });
-          
-          // Check if page already exists for this tenant (matching API route check)
-          const existingPage = await prisma.pages.findFirst({
-            where: {
-              tenant_id: tenant.id,
-              slug: pageSlug,
-            },
-          });
-
-            if (!existingPage) {
-              console.log('[Theme Install] Page does not exist, creating:', pageSlug);
-              
-              // Generate page builder content (use tenantName variable)
-              const pageBuilderData = pageConfig.templateGenerator(tenantName);
+      if (additionalPageTemplates && additionalPageTemplates.length > 0) {
+        for (const pageConfig of additionalPageTemplates) {
+          try {
+            console.log('[Theme Install] --- Processing page:', pageConfig.title, '---');
             
-            console.log('[Theme Install] Page builder data generated:', {
-              sectionsCount: pageBuilderData.sections?.length || 0,
+            // Generate slug using same method as API route
+            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+            
+            console.log('[Theme Install] Page details:', {
+              title: pageConfig.title,
+              originalSlug: pageConfig.slug,
+              generatedSlug: pageSlug,
             });
-
-            // Create the page - matching API route structure
-            const createdPage = await prisma.pages.create({
-              data: {
+            
+            // Check if page already exists for this tenant (matching API route check)
+            console.log('[Theme Install] Checking if page exists with slug:', pageSlug);
+            const existingPage = await prisma.pages.findFirst({
+              where: {
                 tenant_id: tenant.id,
-                title: pageConfig.title,
                 slug: pageSlug,
-                content: JSON.stringify(pageBuilderData),
-                status: 'published',
-                meta_title: pageConfig.metaTitle || null,
-                meta_description: pageConfig.metaDescription || null,
               },
             });
+
+            if (!existingPage) {
+              console.log('[Theme Install] ✅ Page does NOT exist, proceeding to create:', pageSlug);
+              
+              // Generate page builder content (use tenantName variable)
+              console.log('[Theme Install] Generating page builder content...');
+              const pageBuilderData = pageConfig.templateGenerator(tenantName);
             
-            additionalPagesCreated++;
-            console.log('[Theme Install] ✅ Additional page created successfully:', {
-              id: createdPage.id,
-              slug: createdPage.slug,
-              title: createdPage.title,
-              status: createdPage.status,
-              tenant_id: createdPage.tenant_id,
+              console.log('[Theme Install] Page builder data generated:', {
+                sectionsCount: pageBuilderData.sections?.length || 0,
+                hasSections: !!pageBuilderData.sections,
+              });
+
+              // Create the page - matching API route structure
+              console.log('[Theme Install] Creating page in database...');
+              const createdPage = await prisma.pages.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: pageConfig.title,
+                  slug: pageSlug,
+                  content: JSON.stringify(pageBuilderData),
+                  status: 'published',
+                  meta_title: pageConfig.metaTitle || null,
+                  meta_description: pageConfig.metaDescription || null,
+                },
+              });
+              
+              additionalPagesCreated++;
+              console.log('[Theme Install] ✅✅✅ Additional page created successfully:', {
+                id: createdPage.id,
+                slug: createdPage.slug,
+                title: createdPage.title,
+                status: createdPage.status,
+                tenant_id: createdPage.tenant_id,
+                totalCreated: additionalPagesCreated,
+              });
+            } else {
+              console.log('[Theme Install] ⏭️  Page already exists, skipping creation:', {
+                slug: pageSlug,
+                existingId: existingPage.id,
+                existingTitle: existingPage.title,
+                existingStatus: existingPage.status,
+              });
+            }
+          } catch (pageError: any) {
+            // Log detailed error for individual page but continue with others
+            console.error(`[Theme Install] ❌❌❌ ERROR creating ${pageConfig.slug} page:`, {
+              error: pageError.message,
+              code: pageError.code,
+              meta: pageError.meta,
+              stack: pageError.stack,
+              pageConfig: {
+                title: pageConfig.title,
+                slug: pageConfig.slug,
+              },
+              tenantId: tenant.id,
             });
-          } else {
-            console.log('[Theme Install] ⏭️  Page already exists with slug:', {
-              slug: pageSlug,
-              existingId: existingPage.id,
-              existingTitle: existingPage.title,
-              'skipping creation': true,
-            });
+            // Continue with next page even if this one fails
           }
-        } catch (pageError: any) {
-          // Log detailed error for individual page but continue with others
-          console.error(`[Theme Install] ❌ Error creating ${pageConfig.slug} page:`, {
-            error: pageError.message,
-            code: pageError.code,
-            meta: pageError.meta,
-            stack: pageError.stack,
-            pageConfig: {
-              title: pageConfig.title,
-              slug: pageConfig.slug,
-            },
-            tenantId: tenant.id,
-          });
-          // Continue with next page even if this one fails
         }
+      } else {
+        console.error('[Theme Install] ❌ Cannot create pages - no templates available!');
       }
       
       console.log('[Theme Install] Additional pages creation completed:', {
@@ -286,6 +311,19 @@ export async function POST(request: NextRequest) {
         created: additionalPagesCreated,
         skipped: additionalPageTemplates.length - additionalPagesCreated,
       });
+      
+      // If no pages were created, log a warning
+      if (additionalPagesCreated === 0) {
+        console.warn('[Theme Install] ⚠️  No additional pages were created!', {
+          possibleReasons: [
+            'Pages may already exist',
+            'All pages failed to create',
+            'getAdditionalPageTemplates returned empty array',
+          ],
+          tenantId: tenant.id,
+          isNewInstall,
+        });
+      }
     } catch (additionalPagesError: any) {
       // Log detailed error but don't fail theme installation
       console.error('[Theme Install] ❌ Error in additional pages creation block:', {
@@ -298,6 +336,13 @@ export async function POST(request: NextRequest) {
       });
       // Continue with theme installation even if additional pages creation fails
     }
+    
+    // Final summary log
+    console.log('[Theme Install] ===== PAGE CREATION SUMMARY =====');
+    console.log('[Theme Install] Homepage created:', homepageCreated);
+    console.log('[Theme Install] Additional pages created:', additionalPagesCreated);
+    console.log('[Theme Install] Is new install:', isNewInstall);
+    console.log('[Theme Install] =================================');
     
     // Create demo content if requested (only for new installs to avoid duplicates)
     if (isNewInstall && include_demo_content === true) {
@@ -355,17 +400,24 @@ export async function POST(request: NextRequest) {
       installation_duration_ms: installationDuration,
     });
 
+    // Final response summary
+    const responseData = {
+      tenant_theme: tenantTheme,
+      homepage_created: homepageCreated,
+      additional_pages_created: additionalPagesCreated,
+      defaults_applied: isNewInstall,
+      demo_content_created: demoContentCreated,
+      demo_categories_created: demoCategoriesCreated,
+      demo_products_created: demoProductsCreated,
+      demo_attributes_created: demoAttributesCreated,
+    };
+    
+    console.log('[Theme Install] ===== FINAL RESPONSE DATA =====');
+    console.log('[Theme Install] Response:', JSON.stringify(responseData, null, 2));
+    console.log('[Theme Install] ===============================');
+    
     return NextResponse.json(
-      { 
-        tenant_theme: tenantTheme,
-        homepage_created: homepageCreated,
-        additional_pages_created: additionalPagesCreated,
-        defaults_applied: isNewInstall,
-        demo_content_created: demoContentCreated,
-        demo_categories_created: demoCategoriesCreated,
-        demo_products_created: demoProductsCreated,
-        demo_attributes_created: demoAttributesCreated,
-      },
+      responseData,
       { status: isNewInstall ? 201 : 200 }
     );
   } catch (error: any) {

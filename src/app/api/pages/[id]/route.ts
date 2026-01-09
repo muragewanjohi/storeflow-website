@@ -129,7 +129,7 @@ export async function PUT(
         title: validatedData.title,
         slug: slug || undefined,
         content: validatedData.content !== undefined ? validatedData.content : undefined,
-        banner_image: validatedData.banner_image !== undefined ? validatedData.banner_image : undefined,
+        banner_image: validatedData.banner_image !== undefined ? (validatedData.banner_image || null) : undefined,
         meta_title: validatedData.meta_title !== undefined ? validatedData.meta_title : undefined,
         meta_description: validatedData.meta_description !== undefined ? validatedData.meta_description : undefined,
         meta_tags: validatedData.meta_tags !== undefined ? validatedData.meta_tags : undefined,

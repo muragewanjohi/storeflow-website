@@ -22,6 +22,8 @@ import ImageUploadField from '@/components/content/image-upload-field';
 import PageBuilder from '@/components/content/page-builder/page-builder';
 import SEOPreview from '@/components/content/seo-preview';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface Page {
   id: string;
@@ -91,6 +93,68 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
       const url = isEditing ? `/api/pages/${page.id}` : '/api/pages';
       const method = isEditing ? 'PUT' : 'POST';
+
+      // Helper function to check if URL is a blob URL
+      const isBlobUrl = (url: string | null | undefined): boolean => {
+        return !!url && url.startsWith('blob:');
+      };
+
+      // Helper function to extract blob URLs from page builder content
+      const extractBlobUrlsFromContent = (content: string): string[] => {
+        const blobUrls: string[] = [];
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed && parsed.sections && Array.isArray(parsed.sections)) {
+            parsed.sections.forEach((section: any) => {
+              // Check hero section image
+              if (section.type === 'hero' && section.image && isBlobUrl(section.image)) {
+                blobUrls.push(section.image);
+              }
+              // Check image section
+              if (section.type === 'image' && section.image && isBlobUrl(section.image)) {
+                blobUrls.push(section.image);
+              }
+              // Check features section images
+              if (section.type === 'features' && section.features) {
+                section.features.forEach((feature: any) => {
+                  if (feature.image && isBlobUrl(feature.image)) {
+                    blobUrls.push(feature.image);
+                  }
+                });
+              }
+              // Check testimonials section images
+              if (section.type === 'testimonials' && section.testimonials) {
+                section.testimonials.forEach((testimonial: any) => {
+                  if (testimonial.image && isBlobUrl(testimonial.image)) {
+                    blobUrls.push(testimonial.image);
+                  }
+                });
+              }
+            });
+          }
+        } catch {
+          // Not JSON, ignore
+        }
+        return blobUrls;
+      };
+
+      // Check for blob URLs in content and warn user
+      if (formData.content) {
+        const blobUrls = extractBlobUrlsFromContent(formData.content);
+        if (blobUrls.length > 0) {
+          console.warn('Found blob URLs in page content. These will not work on the homepage:', blobUrls);
+          setError('Please re-upload images in the page builder. Some images are using temporary URLs that will not work on the homepage.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Check banner_image for blob URL
+      if (formData.banner_image && isBlobUrl(formData.banner_image)) {
+        setError('Please re-upload the banner image. The current image is using a temporary URL that will not work.');
+        setIsSubmitting(false);
+        return;
+      }
 
       // Prepare data, ensuring all fields are properly formatted
       const submitData: any = {
@@ -230,6 +294,22 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                 aspectRatio={16 / 9}
                 helpText="Upload a banner image for this page (max 5MB)"
               />
+              
+              {/* Guidance on when to use Banner Image */}
+              <Alert className="mt-2">
+                <InformationCircleIcon className="h-4 w-4" />
+                <AlertTitle className="text-sm font-semibold">When to Use Banner Image</AlertTitle>
+                <AlertDescription className="text-xs mt-1">
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Simple pages (About, Contact, Terms) - Just need a header image</li>
+                    <li>Rich Text pages - When using the rich text editor (not page builder)</li>
+                    <li>Quick setup - Fast way to add a header image without building sections</li>
+                  </ul>
+                  <p className="mt-2 text-muted-foreground">
+                    <strong>Note:</strong> Banner is automatically hidden if you use a Hero Section as the first section in Page Builder (to avoid redundancy).
+                  </p>
+                </AlertDescription>
+              </Alert>
 
               <div className="space-y-2">
                 <Label htmlFor="content">Content</Label>
@@ -258,6 +338,22 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.
                     </p>
+                    
+                    {/* Guidance on when to use Hero Section */}
+                    <Alert className="mt-3">
+                      <InformationCircleIcon className="h-4 w-4" />
+                      <AlertTitle className="text-sm font-semibold">When to Use Hero Section</AlertTitle>
+                      <AlertDescription className="text-xs mt-1">
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          <li>Homepage - Full-featured hero with title, subtitle, CTA buttons</li>
+                          <li>Landing pages - Need interactive elements (buttons, descriptions)</li>
+                          <li>Complex layouts - Want more control over design and content</li>
+                        </ul>
+                        <p className="mt-2 text-muted-foreground">
+                          <strong>Tip:</strong> If you add a Hero Section as the first section, the Banner Image above will be automatically hidden to avoid redundancy.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
                   </TabsContent>
                 </Tabs>
               </div>

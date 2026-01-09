@@ -185,6 +185,7 @@ export default function ImageUploadField({
           onCropComplete={handleCropComplete}
           onCancel={handleCropCancel}
           open={showCropDialog}
+          uploadEndpoint={uploadEndpoint}
         />
       )}
     </div>

@@ -8,10 +8,13 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Image from 'next/image';
+import Link from 'next/link';
+import DefaultProductCard from '@/components/themes/default/ProductCard';
 
 interface SectionRendererProps {
   section: PageSection;
@@ -100,11 +103,36 @@ function HeroSectionComponent({
           </div>
           {section.image && (
             <div className="relative aspect-video rounded-lg overflow-hidden">
-              <img
-                src={section.image}
-                alt={section.title || 'Hero image'}
-                className="w-full h-full object-cover"
-              />
+              {section.image.startsWith('blob:') ? (
+                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-sm font-medium">Image not available</p>
+                    <p className="text-xs mt-1">Please re-upload this image</p>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={section.image}
+                  alt={section.title || 'Hero image'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                          <div class="text-center">
+                            <p class="text-sm font-medium">Image not available</p>
+                            <p class="text-xs mt-1">Please check the image URL</p>
+                          </div>
+                        </div>
+                      `;
+                    }
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
@@ -173,6 +201,15 @@ function FeaturesSectionComponent({
   );
 }
 
+interface Product {
+  id: string;
+  name: string;
+  slug: string | null;
+  price: number;
+  image: string | null;
+  stock_quantity: number | null;
+}
+
 function ProductsSectionComponent({ 
   section, 
   isPreview 
@@ -184,6 +221,62 @@ function ProductsSectionComponent({
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4';
   const headingFont = 'var(--font-heading, inherit)';
   const bodyFont = 'var(--font-body, inherit)';
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Don't fetch in preview mode
+    if (isPreview) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Build query parameters
+        const params = new URLSearchParams();
+        params.append('status', 'active');
+        params.append('limit', String(section.limit || 8));
+        
+        if (section.category_id) {
+          params.append('category_id', section.category_id);
+        }
+        
+        // Fetch products from API
+        const response = await fetch(`/api/products?${params.toString()}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        
+        const data = await response.json();
+        
+        // Convert products to match Product interface
+        const fetchedProducts: Product[] = (data.products || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          price: typeof p.price === 'number' ? p.price : Number(p.price),
+          image: p.image,
+          stock_quantity: p.stock_quantity,
+        }));
+        
+        setProducts(fetchedProducts);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load products');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [section.category_id, section.limit, isPreview]);
 
   return (
     <section className="py-16" style={{ fontFamily: bodyFont }}>
@@ -205,7 +298,7 @@ function ProductsSectionComponent({
           </p>
         )}
         <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-          {isPreview && (
+          {isPreview ? (
             <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg">
               Products will be displayed here
               {section.product_ids && section.product_ids.length > 0 && (
@@ -215,6 +308,22 @@ function ProductsSectionComponent({
                 <p className="text-sm mt-2">Category: {section.category_id}</p>
               )}
             </div>
+          ) : isLoading ? (
+            <div className="col-span-full text-center text-muted-foreground py-12">
+              Loading products...
+            </div>
+          ) : error ? (
+            <div className="col-span-full text-center text-destructive py-12">
+              {error}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="col-span-full text-center text-muted-foreground py-12">
+              No products found
+            </div>
+          ) : (
+            products.map((product) => (
+              <DefaultProductCard key={product.id} product={product} />
+            ))
           )}
         </div>
       </div>
