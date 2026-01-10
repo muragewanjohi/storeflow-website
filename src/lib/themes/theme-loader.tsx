@@ -233,3 +233,42 @@ export function loadThemeProductDetail(themeSlug: string) {
   }
 }
 
+/**
+ * Load theme-specific product card component
+ */
+export function loadThemeProductCard(themeSlug: string) {
+  const template = getThemeTemplate(themeSlug);
+  
+  if (!template) {
+    return null;
+  }
+
+  switch (themeSlug) {
+    case 'grocery':
+      return dynamic(() => import('@/components/themes/grocery/ProductCard'), {
+        ssr: true,
+      });
+    case 'hexfashion':
+      return dynamic(() => import('@/components/themes/hexfashion/ProductCard'), {
+        ssr: true,
+      });
+    case 'modern':
+      return dynamic(() => import('@/components/themes/modern/ProductCard'), {
+        ssr: true,
+      });
+    case 'furniture':
+      return dynamic(() => import('@/components/themes/furniture/ProductCard'), {
+        ssr: true,
+      });
+    case 'minimal':
+      return dynamic(() => import('@/components/themes/minimal/ProductCard'), {
+        ssr: true,
+      });
+    case 'default':
+    default:
+      return dynamic(() => import('@/components/themes/default/ProductCard'), {
+        ssr: true,
+      });
+  }
+}
+

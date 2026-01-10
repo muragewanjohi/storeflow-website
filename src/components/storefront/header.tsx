@@ -311,6 +311,7 @@ export default function StorefrontHeader({
                 {isPreview && onNavigate ? (
                   <Button
                     size="sm"
+                    variant="default"
                     className="bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={(e) => {
                       e.preventDefault();
@@ -321,7 +322,11 @@ export default function StorefrontHeader({
                   </Button>
                 ) : (
                   <Link href="/customer-login">
-                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
                       Login
                     </Button>
                   </Link>

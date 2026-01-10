@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRightIcon, ChevronDownIcon, XMarkIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useCurrency } from '@/lib/currency/currency-context';
-import HexFashionProductCard from '@/components/themes/hexfashion/ProductCard';
-import '@/styles/themes/hexfashion.css';
+import { loadThemeProductCard } from '@/lib/themes/theme-loader';
+import DefaultProductCard from '@/components/themes/default/ProductCard';
 
 interface Product {
   id: string;
@@ -50,6 +50,7 @@ interface ProductsListingClientProps {
   initialSortBy: string;
   initialSortOrder: string;
   currentCategory?: Category | null;
+  themeSlug?: string;
 }
 
 export default function ProductsListingClient({
@@ -63,11 +64,18 @@ export default function ProductsListingClient({
   initialSortBy,
   initialSortOrder,
   currentCategory,
+  themeSlug = 'default',
 }: Readonly<ProductsListingClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const { formatCurrency } = useCurrency();
+  
+  // Load theme-specific product card
+  const ThemeProductCard = useMemo(() => {
+    const CardComponent = loadThemeProductCard(themeSlug);
+    return CardComponent || DefaultProductCard;
+  }, [themeSlug]);
 
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
@@ -459,12 +467,9 @@ export default function ProductsListingClient({
             <>
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
                 {products.map((product: any) => (
-                  <HexFashionProductCard
+                  <ThemeProductCard
                     key={product.id}
-                    product={{
-                      ...product,
-                      compareAtPrice: product.compareAtPrice || (product.metadata as any)?.compareAtPrice,
-                    }}
+                    product={product}
                   />
                 ))}
               </div>

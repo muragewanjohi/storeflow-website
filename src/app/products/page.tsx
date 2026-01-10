@@ -261,6 +261,7 @@ export default async function ProductsPage({
           name: true,
           slug: true,
           price: true,
+          sale_price: true, // Include sale_price for compareAtPrice mapping
           image: true,
           stock_quantity: true, // Already synced with variant totals
           category_id: true,
@@ -269,11 +270,29 @@ export default async function ProductsPage({
       prisma.products.count({ where }),
     ]);
 
-    // Convert Decimal to number for client components
-    const products = productsRaw.map((product: any) => ({
-      ...product,
-      price: Number(product.price),
-    }));
+    // Convert Decimal to number for client components and map sale_price correctly
+    // When sale_price exists: price = sale_price (discounted), compareAtPrice = price (original)
+    // When no sale_price: price = price (normal), compareAtPrice = undefined
+    const products = productsRaw.map((product: any) => {
+      const regularPrice = Number(product.price);
+      const salePrice = product.sale_price ? Number(product.sale_price) : null;
+      
+      if (salePrice && salePrice < regularPrice) {
+        // Product is on sale: use sale_price as price, regular price as compareAtPrice
+        return {
+          ...product,
+          price: salePrice,
+          compareAtPrice: regularPrice,
+        };
+      } else {
+        // No sale: use regular price as price
+        return {
+          ...product,
+          price: regularPrice,
+          compareAtPrice: undefined,
+        };
+      }
+    });
 
     return (
       <ThemeProviderWrapper>
@@ -310,6 +329,7 @@ export default async function ProductsPage({
                 initialSortBy={sort_by}
                 initialSortOrder={sort_order}
                 currentCategory={currentCategory}
+                themeSlug={tenant.theme_slug || 'default'}
               />
             </Suspense>
           </main>
