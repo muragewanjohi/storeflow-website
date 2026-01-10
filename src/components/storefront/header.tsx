@@ -311,6 +311,7 @@ export default function StorefrontHeader({
                 {isPreview && onNavigate ? (
                   <Button
                     size="sm"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={(e) => {
                       e.preventDefault();
                       onNavigate('/customer-login');
@@ -320,7 +321,7 @@ export default function StorefrontHeader({
                   </Button>
                 ) : (
                   <Link href="/customer-login">
-                    <Button size="sm">
+                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
                       Login
                     </Button>
                   </Link>
@@ -330,8 +331,8 @@ export default function StorefrontHeader({
 
             {/* Cart Icon */}
             {isPreview ? (
-              <Button variant="ghost" size="icon" className="relative" title="Cart (Preview Mode)">
-                <ShoppingCartIcon className="h-6 w-6" />
+              <Button variant="ghost" size="icon" className="relative group" title="Cart (Preview Mode)">
+                <ShoppingCartIcon className="h-6 w-6 transition-all duration-300 group-hover:text-primary group-hover:scale-110" />
                 {cartItemCount > 0 && (
                   <Badge
                     variant="destructive"
@@ -344,8 +345,8 @@ export default function StorefrontHeader({
               </Button>
             ) : (
               <Link href="/cart">
-                <Button variant="ghost" size="icon" className="relative">
-                  <ShoppingCartIcon className="h-6 w-6" />
+                <Button variant="ghost" size="icon" className="relative group">
+                  <ShoppingCartIcon className="h-6 w-6 transition-all duration-300 group-hover:text-primary group-hover:scale-110" />
                   {cartItemCount > 0 && (
                     <Badge
                       variant="destructive"

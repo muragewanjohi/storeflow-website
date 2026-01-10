@@ -269,6 +269,7 @@ export async function GET(request: NextRequest) {
         image: true,
         stock_quantity: true, // Already synced with variant totals
         category_id: true,
+        created_at: true, // Include for sorting by newest
       },
     });
 

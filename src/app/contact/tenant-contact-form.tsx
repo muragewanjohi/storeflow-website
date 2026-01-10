@@ -86,8 +86,8 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-20">
         <div className="max-w-md w-full text-center">
           <div className="mb-6 flex justify-center">
-            <div className="rounded-full bg-green-100 p-4">
-              <CheckCircle2 className="w-12 h-12 text-green-600" />
+            <div className="rounded-full bg-primary/10 p-4">
+              <CheckCircle2 className="w-12 h-12 text-primary" />
             </div>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -98,7 +98,7 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
           </p>
           <Button
             onClick={() => setIsSubmitted(false)}
-            className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             Send Another Message
           </Button>
@@ -108,7 +108,7 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-20 px-4 sm:px-6 lg:px-8">
+    <div className="bg-gradient-to-br from-slate-50 via-primary/5 to-primary/10 py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
@@ -135,14 +135,14 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
 
             <div className="space-y-6">
               <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-[#0025cc]/10 p-3">
-                  <Mail className="w-6 h-6 text-[#0025cc]" />
+                <div className="rounded-lg bg-primary/10 p-3">
+                  <Mail className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
                   <a
                     href={`mailto:${tenantContactEmail}`}
-                    className="text-[#0025cc] hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {tenantContactEmail}
                   </a>
@@ -150,8 +150,8 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-[#0025cc]/10 p-3">
-                  <MessageSquare className="w-6 h-6 text-[#0025cc]" />
+                <div className="rounded-lg bg-primary/10 p-3">
+                  <MessageSquare className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Response Time</h3>
@@ -162,8 +162,8 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="rounded-lg bg-[#0025cc]/10 p-3">
-                  <Phone className="w-6 h-6 text-[#0025cc]" />
+                <div className="rounded-lg bg-primary/10 p-3">
+                  <Phone className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Business Hours</h3>
@@ -174,13 +174,13 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
               </div>
             </div>
 
-            <div className="mt-8 p-6 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="mt-8 p-6 bg-primary/5 rounded-lg border border-primary/20">
               <h3 className="font-semibold text-gray-900 mb-2">Need Immediate Help?</h3>
               <p className="text-sm text-muted-foreground">
                 For urgent matters, please send an email to{' '}
                 <a
                   href={`mailto:${tenantContactEmail}`}
-                  className="text-[#0025cc] hover:underline font-medium"
+                  className="text-primary hover:underline font-medium"
                 >
                   {tenantContactEmail}
                 </a>{' '}
@@ -259,7 +259,7 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
               >
                 {isSubmitting ? (
                   <>
@@ -276,7 +276,7 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
 
               <p className="text-xs text-muted-foreground text-center">
                 By submitting this form, you agree to our{' '}
-                <Link href="/privacy-policy" className="text-[#0025cc] hover:underline">
+                <Link href="/privacy-policy" className="text-primary hover:underline">
                   Privacy Policy
                 </Link>
                 .

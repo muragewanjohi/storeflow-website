@@ -72,13 +72,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Hero Banner (Left - 2 columns) */}
-            <div className="lg:col-span-2 relative rounded-lg overflow-hidden shadow-lg">
+            <div className="lg:col-span-2 relative rounded-lg overflow-hidden shadow-lg group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
               <div className="relative h-full min-h-[400px] bg-gradient-to-br from-orange-50 to-yellow-50">
                 <Image
                   src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=600&fit=crop"
                   alt="Organic Food"
                   fill
-                  className="object-cover opacity-90"
+                  className="object-cover opacity-90 group-hover:scale-110 transition-transform duration-500"
                   sizes="(max-width: 1024px) 100vw, 66vw"
                   priority
                 />
@@ -153,13 +153,13 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
               </div>
 
               {/* Bottom Right Banner */}
-              <div className="relative rounded-lg overflow-hidden shadow-lg h-[190px]">
+              <div className="relative rounded-lg overflow-hidden shadow-lg h-[190px] group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                 <div className="relative h-full bg-gradient-to-br from-green-100 to-emerald-100">
                   <Image
                     src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop"
                     alt="Fresh Vegetables"
                     fill
-                    className="object-cover opacity-80"
+                    className="object-cover opacity-80 group-hover:scale-110 transition-transform duration-500"
                     sizes="(max-width: 1024px) 100vw, 33vw"
                   />
                   <div className="absolute inset-0 flex flex-col justify-center p-6">
@@ -223,7 +223,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                         className="w-full text-center group"
                       >
                         <div className="relative mb-4">
-                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors relative">
+                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-primary/20 group-hover:border-primary transition-colors relative">
                             <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
@@ -243,7 +243,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     ) : (
                       <Link href={`/products?category=${category.slug}`} className="block text-center group">
                         <div className="relative mb-4">
-                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors relative">
+                          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-primary/20 group-hover:border-primary transition-colors relative">
                             <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
@@ -306,12 +306,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
             </div>
 
             {/* Banner 2 */}
-            <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-green-50 to-emerald-50">
+            <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-green-50 to-emerald-50 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
               <Image
                 src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop"
                 alt="Vegetables"
                 fill
-                className="object-cover opacity-60"
+                className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
                 sizes="(max-width: 768px) 100vw, 33vw"
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
@@ -338,12 +338,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
             </div>
 
             {/* Banner 3 */}
-            <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-pink-50 to-purple-50">
+            <div className="relative rounded-lg overflow-hidden shadow-lg h-48 bg-gradient-to-br from-pink-50 to-purple-50 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
               <Image
                 src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=400&fit=crop"
                 alt="Beauty"
                 fill
-                className="object-cover opacity-60"
+                className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
                 sizes="(max-width: 768px) 100vw, 33vw"
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
@@ -508,12 +508,12 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
               {/* Left Side - Banner */}
-              <div className="relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px] bg-gradient-to-br from-green-50 to-emerald-50">
+              <div className="relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px] bg-gradient-to-br from-green-50 to-emerald-50 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                 <Image
                   src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop"
                   alt="Organic Vegetables"
                   fill
-                  className="object-cover opacity-70"
+                  className="object-cover opacity-70 group-hover:scale-110 transition-transform duration-500"
                   sizes="(max-width: 1024px) 100vw, 50vw"
                 />
                 <div className="absolute inset-0 flex flex-col justify-center p-8 text-center">

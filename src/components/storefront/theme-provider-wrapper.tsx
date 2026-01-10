@@ -41,7 +41,11 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         root.style.setProperty(`--color-${cssKey}`, value);
         // Also set as Tailwind CSS variables
-        if (key === 'primary') root.style.setProperty('--primary', value);
+        if (key === 'primary') {
+          root.style.setProperty('--primary', value);
+          // Set primary-foreground to white for good contrast
+          root.style.setProperty('--primary-foreground', '0 0% 100%');
+        }
         if (key === 'secondary') root.style.setProperty('--secondary', value);
         if (key === 'accent') root.style.setProperty('--accent', value);
         if (key === 'background') root.style.setProperty('--background', value);

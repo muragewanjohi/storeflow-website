@@ -8,6 +8,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,10 +16,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 // Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
+import { useQuery } from '@tanstack/react-query';
 
 interface SectionEditorProps {
   section: PageSection;
@@ -590,6 +593,47 @@ function CategoriesSectionEditor({
   section: Extract<PageSection, { type: 'categories' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  // Fetch categories
+  const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['categories', 'active'],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('status', 'active');
+      params.append('include_children', 'false');
+      
+      const response = await fetch(`/api/categories?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      return await response.json();
+    },
+  });
+
+  const categories = categoriesData?.categories || [];
+  const selectedCategoryIds = section.category_ids || [];
+
+  const handleCategoryToggle = (categoryId: string) => {
+    const currentIds = selectedCategoryIds;
+    if (currentIds.includes(categoryId)) {
+      onUpdate({ category_ids: currentIds.filter((id) => id !== categoryId) });
+    } else {
+      onUpdate({ category_ids: [...currentIds, categoryId] });
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedCategoryIds.length === categories.length) {
+      // Deselect all
+      onUpdate({ category_ids: [] });
+    } else {
+      // Select all
+      onUpdate({ category_ids: categories.map((c: any) => c.id) });
+    }
+  };
+
+  const allSelected = categories.length > 0 && selectedCategoryIds.length === categories.length;
+  const someSelected = selectedCategoryIds.length > 0 && selectedCategoryIds.length < categories.length;
+
   return (
     <Card>
       <CardHeader>
@@ -612,6 +656,52 @@ function CategoriesSectionEditor({
             placeholder="Section subtitle"
           />
         </div>
+
+        {/* Category Selection */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label>Select Categories</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              disabled={isLoadingCategories || categories.length === 0}
+            >
+              {allSelected ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {selectedCategoryIds.length === 0
+              ? 'No categories selected. All categories will be displayed (up to limit).'
+              : `${selectedCategoryIds.length} categor${selectedCategoryIds.length === 1 ? 'y' : 'ies'} selected.`}
+          </p>
+          
+          {isLoadingCategories ? (
+            <div className="text-sm text-muted-foreground py-4">Loading categories...</div>
+          ) : categories.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-4">No categories available. Create categories first.</div>
+          ) : (
+            <div className="border rounded-lg p-4 max-h-64 overflow-y-auto space-y-2">
+              {categories.map((category: any) => (
+                <div key={category.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`category-${category.id}`}
+                    checked={selectedCategoryIds.includes(category.id)}
+                    onCheckedChange={() => handleCategoryToggle(category.id)}
+                  />
+                  <Label
+                    htmlFor={`category-${category.id}`}
+                    className="cursor-pointer flex-1 text-sm font-normal"
+                  >
+                    {category.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2">
           <Label>Limit</Label>
           <Input
@@ -621,6 +711,9 @@ function CategoriesSectionEditor({
             min={1}
             max={20}
           />
+          <p className="text-xs text-muted-foreground">
+            Maximum number of categories to display. Only applies if no specific categories are selected above.
+          </p>
         </div>
         <div className="space-y-2">
           <Label>Columns</Label>
@@ -640,12 +733,10 @@ function CategoriesSectionEditor({
           </Select>
         </div>
         <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
+          <Checkbox
             id="show-count"
             checked={section.show_count || false}
-            onChange={(e) => onUpdate({ show_count: e.target.checked })}
-            className="rounded border-gray-300"
+            onCheckedChange={(checked) => onUpdate({ show_count: checked as boolean })}
           />
           <Label htmlFor="show-count" className="cursor-pointer">
             Show Item Count
@@ -663,11 +754,58 @@ function BannersSectionEditor({
   section: Extract<PageSection, { type: 'banners' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  // Track which banners are using custom URLs
+  const [customUrlBanners, setCustomUrlBanners] = useState<Set<string>>(new Set());
+
+  // Fetch published pages for CTA link selection
+  const { data: pagesData, isLoading: isLoadingPages } = useQuery({
+    queryKey: ['pages', 'published'],
+    queryFn: async () => {
+      const response = await fetch('/api/pages?status=published&limit=100');
+      if (!response.ok) {
+        throw new Error('Failed to fetch pages');
+      }
+      return await response.json();
+    },
+  });
+
+  const pages = pagesData?.pages || [];
+
+  // Check if a banner's CTA link matches any page
+  const getPageSlugForLink = (link: string | undefined): string | null => {
+    if (!link) return null;
+    const page = pages.find((p: any) => {
+      const pageSlug = p.slug ? `/${p.slug}` : `#${p.id}`;
+      return pageSlug === link;
+    });
+    return page ? (page.slug ? `/${page.slug}` : `#${page.id}`) : null;
+  };
+
+  const isCustomUrl = (bannerId: string, link: string | undefined): boolean => {
+    if (customUrlBanners.has(bannerId)) return true;
+    if (!link) return false;
+    return !getPageSlugForLink(link);
+  };
+
   const updateBanner = (bannerId: string, updates: Partial<typeof section.banners[0]>) => {
     const newBanners = section.banners.map((b: any) =>
       b.id === bannerId ? { ...b, ...updates } : b
     );
     onUpdate({ banners: newBanners });
+  };
+
+  const handleCtaLinkChange = (bannerId: string, value: string) => {
+    if (value === '__custom__') {
+      setCustomUrlBanners((prev) => new Set(prev).add(bannerId));
+      updateBanner(bannerId, { cta_link: '' });
+    } else {
+      setCustomUrlBanners((prev) => {
+        const next = new Set(prev);
+        next.delete(bannerId);
+        return next;
+      });
+      updateBanner(bannerId, { cta_link: value });
+    }
   };
 
   const addBanner = () => {
@@ -756,11 +894,60 @@ function BannersSectionEditor({
                   </div>
                   <div className="space-y-2">
                     <Label>CTA Link</Label>
-                    <Input
-                      value={banner.cta_link || ''}
-                      onChange={(e) => updateBanner(banner.id, { cta_link: e.target.value })}
-                      placeholder="/products"
-                    />
+                    {isLoadingPages ? (
+                      <div className="text-sm text-muted-foreground py-2">Loading pages...</div>
+                    ) : isCustomUrl(banner.id, banner.cta_link) ? (
+                      <div className="space-y-2">
+                        <Input
+                          value={banner.cta_link || ''}
+                          onChange={(e) => updateBanner(banner.id, { cta_link: e.target.value })}
+                          placeholder="/products or https://example.com"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCustomUrlBanners((prev) => {
+                              const next = new Set(prev);
+                              next.delete(banner.id);
+                              return next;
+                            });
+                            updateBanner(banner.id, { cta_link: '' });
+                          }}
+                        >
+                          Select a page instead
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Custom URL (e.g., /products, /about, or external URL)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Select
+                          value={banner.cta_link || ''}
+                          onValueChange={(value) => handleCtaLinkChange(banner.id, value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a page" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {pages.map((page: any) => {
+                              const pageSlug = page.slug ? `/${page.slug}` : `#${page.id}`;
+                              return (
+                                <SelectItem key={page.id} value={pageSlug}>
+                                  {page.title}
+                                </SelectItem>
+                              );
+                            })}
+                            <SelectItem value="__custom__">Custom URL...</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Select a page or choose &quot;Custom URL...&quot; for external links
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">

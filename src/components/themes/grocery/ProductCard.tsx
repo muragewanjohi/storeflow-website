@@ -48,7 +48,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
   };
 
   return (
-    <Card className={`group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 ${className}`}>
+    <Card className={`group overflow-hidden hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 transform hover:-translate-y-1 ${className}`}>
       <div className="relative">
         {isPreview ? (
           <div
@@ -73,8 +73,8 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-green-50">
-                  <span className="text-5xl">🥬</span>
+                <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                  <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🥬</span>
                 </div>
               )}
               {isOnSale && (
@@ -107,8 +107,8 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-green-50">
-                  <span className="text-5xl">🥬</span>
+                <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                  <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🥬</span>
                 </div>
               )}
               {isOnSale && (
@@ -135,7 +135,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
       <CardContent className="p-4 bg-white">
         {isPreview ? (
           <h3 
-            className="font-semibold mb-2 hover:text-green-600 transition-colors line-clamp-2 cursor-pointer text-gray-900" 
+            className="font-semibold mb-2 hover:text-primary transition-colors line-clamp-2 cursor-pointer text-gray-900" 
             onClick={handleClick}
             role="button"
             tabIndex={0}
@@ -158,17 +158,22 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
         
         <div className="flex items-center justify-between mt-3">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-green-600">{formatCurrency(product.price)}</span>
-            {isOnSale && product.compareAtPrice && (
-              <span className="text-sm text-gray-500 line-through">
-                {formatCurrency(product.compareAtPrice)}
-              </span>
+            {isOnSale && product.compareAtPrice ? (
+              <>
+                <span className="text-xl font-bold text-primary">{formatCurrency(product.price)}</span>
+                <span className="text-sm text-gray-500 line-through">
+                  {formatCurrency(product.compareAtPrice)}
+                </span>
+              </>
+            ) : (
+              <span className="text-xl font-bold text-primary">{formatCurrency(product.price)}</span>
             )}
           </div>
           
           <Button
             size="sm"
             disabled={isOutOfStock}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

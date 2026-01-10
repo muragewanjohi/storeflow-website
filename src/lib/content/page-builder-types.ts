@@ -83,6 +83,7 @@ export interface CategoriesSection extends BaseSection {
   type: 'categories';
   title?: string;
   subtitle?: string;
+  category_ids?: string[]; // IDs of specific categories to display (if empty, shows all up to limit)
   limit?: number;
   columns?: 2 | 4 | 6 | 8;
   show_count?: boolean;

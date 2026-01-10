@@ -23,9 +23,12 @@ import { Label } from '@/components/ui/label';
 interface PageBuilderProps {
   value: string; // JSON string of PageBuilderData
   onChange: (value: string) => void;
+  pageSlug?: string; // Page slug for preview
+  pageId?: string; // Page ID for preview
+  pageStatus?: string; // Page status (draft, published, archived)
 }
 
-export default function PageBuilder({ value, onChange }: Readonly<PageBuilderProps>) {
+export default function PageBuilder({ value, onChange, pageSlug, pageId, pageStatus }: Readonly<PageBuilderProps>) {
   // Parse initial data
   const parseData = (): PageBuilderData => {
     if (!value || value.trim() === '') {
@@ -145,13 +148,36 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
           </p>
         </div>
         <div className="flex gap-2">
+          {pageSlug && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              disabled={pageStatus !== 'published'}
+              title={pageStatus !== 'published' ? 'Publish the page first to preview it on the frontend' : 'Preview this page on the frontend'}
+            >
+              <a 
+                href={pageStatus === 'published' ? `/${pageSlug}` : '#'} 
+                target={pageStatus === 'published' ? '_blank' : undefined}
+                rel={pageStatus === 'published' ? 'noopener noreferrer' : undefined}
+                onClick={(e) => {
+                  if (pageStatus !== 'published') {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <EyeIcon className="mr-2 h-4 w-4" />
+                Preview Page
+              </a>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setPreviewMode(!previewMode)}
           >
             <EyeIcon className="mr-2 h-4 w-4" />
-            {previewMode ? 'Edit' : 'Preview'}
+            {previewMode ? 'Edit Sections' : 'Preview Sections'}
           </Button>
         </div>
       </div>
@@ -426,7 +452,7 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
           <TabsContent value="editor">
             {selectedSection ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
                     <h4 className="text-base font-semibold">
                       Editing: {getSectionTypeLabel(selectedSection.type)} Section
@@ -435,16 +461,21 @@ export default function PageBuilder({ value, onChange }: Readonly<PageBuilderPro
                       Configure the content and settings for this section below
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedSectionId(null);
-                      setActiveTab('sections');
-                    }}
-                  >
-                    Back to Sections
-                  </Button>
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedSectionId(null);
+                        setActiveTab('sections');
+                      }}
+                    >
+                      Back to Sections
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Back to edit page
+                    </p>
+                  </div>
                 </div>
                 <SectionEditor
                   section={selectedSection}
@@ -541,6 +572,7 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         type: 'categories',
         order,
         title: 'Browse By Categories',
+        category_ids: [], // Empty array means show all (up to limit)
         limit: 8,
         columns: 8,
         show_count: false,

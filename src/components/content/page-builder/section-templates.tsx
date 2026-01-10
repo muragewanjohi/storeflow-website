@@ -541,14 +541,22 @@ function CategoriesSectionComponent({
         
         const data = await response.json();
         
-        const fetchedCategories: Category[] = (data.categories || [])
-          .slice(0, section.limit || 8)
-          .map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            slug: c.slug,
-            image: c.image,
-          }));
+        let fetchedCategories: Category[] = (data.categories || []).map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          image: c.image,
+        }));
+        
+        // Filter by selected category_ids if provided
+        if (section.category_ids && section.category_ids.length > 0) {
+          fetchedCategories = fetchedCategories.filter((c) =>
+            section.category_ids!.includes(c.id)
+          );
+        } else {
+          // If no specific categories selected, apply limit
+          fetchedCategories = fetchedCategories.slice(0, section.limit || 8);
+        }
         
         setCategories(fetchedCategories);
       } catch (err) {
@@ -560,7 +568,7 @@ function CategoriesSectionComponent({
     };
 
     fetchCategories();
-  }, [section.limit, isPreview]);
+  }, [section.limit, section.category_ids, isPreview]);
 
   // Helper to get category image or default
   const getCategoryImage = (category: Category) => {
@@ -597,9 +605,11 @@ function CategoriesSectionComponent({
         {isPreview ? (
           <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg">
             Categories will be displayed here
-            {section.limit && (
+            {section.category_ids && section.category_ids.length > 0 ? (
+              <p className="text-sm mt-2">{section.category_ids.length} categor{section.category_ids.length === 1 ? 'y' : 'ies'} selected</p>
+            ) : section.limit ? (
               <p className="text-sm mt-2">Limit: {section.limit} categories</p>
-            )}
+            ) : null}
           </div>
         ) : isLoading ? (
           <div className="text-center text-muted-foreground py-12">
@@ -666,7 +676,7 @@ function BannersSectionComponent({
           {section.banners.map((banner) => (
             <div
               key={banner.id}
-              className="relative rounded-lg overflow-hidden shadow-lg h-48"
+              className="relative rounded-lg overflow-hidden shadow-lg h-48 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
               style={{
                 backgroundColor: banner.background_color || 'var(--color-background, #f3f4f6)',
               }}
@@ -676,7 +686,7 @@ function BannersSectionComponent({
                   src={banner.image}
                   alt={banner.title}
                   fill
-                  className="object-cover opacity-60"
+                  className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
               )}
@@ -1081,10 +1091,25 @@ function ProductTabsSectionComponent({
 
         const params = new URLSearchParams();
         params.append('status', 'active');
-        params.append('limit', String(section.limit || 8));
+        // Fetch more products to allow proper sorting/filtering
+        params.append('limit', '100');
         
         if (activeTabConfig.filter === 'category' && activeTabConfig.category_id) {
           params.append('category_id', activeTabConfig.category_id);
+        }
+        
+        // Set sort parameters based on filter
+        if (activeTabConfig.filter === 'new') {
+          params.append('sort_by', 'created_at');
+          params.append('sort_order', 'desc');
+        } else if (activeTabConfig.filter === 'low_price') {
+          params.append('sort_by', 'price');
+          params.append('sort_order', 'asc');
+        } else if (activeTabConfig.filter === 'popular') {
+          // For popular, we'll sort by created_at desc as a proxy (in real app, would use views/sales)
+          // Since we don't have views/sales data, we'll use recently created as "popular"
+          params.append('sort_by', 'created_at');
+          params.append('sort_order', 'desc');
         }
         
         const response = await fetch(`/api/products?${params.toString()}`);
@@ -1097,14 +1122,24 @@ function ProductTabsSectionComponent({
             price: typeof p.price === 'number' ? p.price : Number(p.price),
             image: p.image,
             stock_quantity: p.stock_quantity,
+            created_at: p.created_at || p.createdAt, // Include for sorting (handle both formats)
           }));
 
-          // Apply filters
-          if (activeTabConfig.filter === 'new') {
-            fetchedProducts = fetchedProducts.sort((a: Product, b: Product) => 0); // Sort by newest (would need created_at)
-          } else if (activeTabConfig.filter === 'low_price') {
+          // Apply additional client-side filtering if needed
+          // The API already handles sorting, but we can refine here
+          if (activeTabConfig.filter === 'low_price') {
+            // Ensure ascending price order
             fetchedProducts = fetchedProducts.sort((a: Product, b: Product) => a.price - b.price);
+          } else if (activeTabConfig.filter === 'new') {
+            // Sort by newest (created_at desc) - API should handle this, but ensure it
+            fetchedProducts = fetchedProducts.sort((a: any, b: any) => {
+              if (!a.created_at || !b.created_at) return 0;
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
           }
+
+          // Apply limit after sorting
+          fetchedProducts = fetchedProducts.slice(0, section.limit || 8);
 
           setProducts(fetchedProducts);
         }
@@ -1132,18 +1167,29 @@ function ProductTabsSectionComponent({
             >
               {section.title}
             </h2>
-            <div className="flex justify-center gap-4 mb-8">
+            <div className="flex justify-center gap-8 mb-8">
               {section.tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-md font-semibold transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className="relative pb-2 transition-colors"
                 >
-                  {tab.label}
+                  <span
+                    className={`font-semibold transition-colors ${
+                      activeTab === tab.id
+                        ? 'text-primary'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                  <div
+                    className={`absolute bottom-0 left-0 right-0 h-0.5 transition-colors ${
+                      activeTab === tab.id
+                        ? 'bg-primary'
+                        : 'bg-gray-300'
+                    }`}
+                  />
                 </button>
               ))}
             </div>

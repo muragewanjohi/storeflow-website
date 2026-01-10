@@ -13,6 +13,7 @@ import MarketingHeader from '@/components/marketing/header';
 import { Footer as MarketingFooter } from '@/components/marketing/footer';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import ContactForm from './contact-form';
 import TenantContactForm from './tenant-contact-form';
 
@@ -75,16 +76,18 @@ export default async function ContactPage() {
     const tenantContactEmail = getTenantContactEmail(tenant);
     
     return (
-      <div className="min-h-screen flex flex-col">
-        <StorefrontHeader />
-        <main className="flex-1">
-          <TenantContactForm 
-            tenantName={tenant.name || tenant.subdomain}
-            tenantContactEmail={tenantContactEmail}
-          />
-        </main>
-        <StorefrontFooter />
-      </div>
+      <ThemeProviderWrapper>
+        <div className="min-h-screen flex flex-col">
+          <StorefrontHeader />
+          <main className="flex-1">
+            <TenantContactForm 
+              tenantName={tenant.name || tenant.subdomain}
+              tenantContactEmail={tenantContactEmail}
+            />
+          </main>
+          <StorefrontFooter />
+        </div>
+      </ThemeProviderWrapper>
     );
   }
 

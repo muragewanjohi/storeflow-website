@@ -23,6 +23,7 @@ import PageBuilder from '@/components/content/page-builder/page-builder';
 import SEOPreview from '@/components/content/seo-preview';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface Page {
@@ -46,20 +47,6 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
   const router = useRouter();
   const isEditing = !!page;
 
-  const [formData, setFormData] = useState({
-    title: page?.title || '',
-    slug: page?.slug || '',
-    content: page?.content || '',
-    banner_image: page?.banner_image || '',
-    meta_title: page?.meta_title || '',
-    meta_description: page?.meta_description || '',
-    meta_tags: page?.meta_tags || '',
-    status: page?.status || ('draft' as 'draft' | 'published' | 'archived'),
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
   // Detect content mode: if content is valid JSON with sections, use page builder
   const detectContentMode = (content: string | null | undefined): 'rich-text' | 'page-builder' => {
     if (!content || content.trim() === '') return 'rich-text';
@@ -74,9 +61,52 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     return 'rich-text';
   };
   
+  // Detect if first section is hero to determine default use_banner value
+  const detectUseBanner = (content: string | null | undefined, currentBanner: string | null | undefined): boolean => {
+    if (!content || content.trim() === '') {
+      // If no content, use banner if it exists
+      return !!currentBanner;
+    }
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+        const firstSection = parsed.sections.sort((a: any, b: any) => a.order - b.order)[0];
+        // If first section is hero, don't use banner
+        return firstSection?.type !== 'hero';
+      }
+    } catch {
+      // Not JSON, assume rich text - use banner if it exists
+      return !!currentBanner;
+    }
+    return !!currentBanner;
+  };
+
+  const [formData, setFormData] = useState({
+    title: page?.title || '',
+    slug: page?.slug || '',
+    content: page?.content || '',
+    banner_image: page?.banner_image || '',
+    meta_title: page?.meta_title || '',
+    meta_description: page?.meta_description || '',
+    meta_tags: page?.meta_tags || '',
+    status: page?.status || ('draft' as 'draft' | 'published' | 'archived'),
+    use_banner: detectUseBanner(page?.content || '', page?.banner_image || ''),
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
   const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
     detectContentMode(page?.content)
   );
+  
+  // Update use_banner when content changes
+  const handleContentChange = (newContent: string) => {
+    setFormData((prev) => {
+      const newUseBanner = detectUseBanner(newContent, prev.banner_image);
+      return { ...prev, content: newContent, use_banner: newUseBanner };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,8 +199,12 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
       if (formData.content) {
         submitData.content = formData.content;
       }
-      if (formData.banner_image) {
+      // Only include banner_image if use_banner is true
+      if (formData.use_banner && formData.banner_image) {
         submitData.banner_image = formData.banner_image;
+      } else if (!formData.use_banner) {
+        // Clear banner_image if not using banner
+        submitData.banner_image = null;
       }
       if (formData.meta_title && formData.meta_title.trim()) {
         submitData.meta_title = formData.meta_title.trim();
@@ -287,29 +321,76 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                 </p>
               </div>
 
-              <ImageUploadField
-                label="Banner Image"
-                value={formData.banner_image || null}
-                onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
-                aspectRatio={16 / 9}
-                helpText="Upload a banner image for this page (max 5MB)"
-              />
-              
-              {/* Guidance on when to use Banner Image */}
-              <Alert className="mt-2">
-                <InformationCircleIcon className="h-4 w-4" />
-                <AlertTitle className="text-sm font-semibold">When to Use Banner Image</AlertTitle>
-                <AlertDescription className="text-xs mt-1">
-                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    <li>Simple pages (About, Contact, Terms) - Just need a header image</li>
-                    <li>Rich Text pages - When using the rich text editor (not page builder)</li>
-                    <li>Quick setup - Fast way to add a header image without building sections</li>
-                  </ul>
-                  <p className="mt-2 text-muted-foreground">
-                    <strong>Note:</strong> Banner is automatically hidden if you use a Hero Section as the first section in Page Builder (to avoid redundancy).
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Header Image Type</Label>
+                  <RadioGroup
+                    value={formData.use_banner ? 'banner' : 'hero'}
+                    onValueChange={(value) => {
+                      setFormData((prev) => ({ 
+                        ...prev, 
+                        use_banner: value === 'banner',
+                        // Clear banner_image if switching to hero, or clear hero section if switching to banner
+                        banner_image: value === 'banner' ? prev.banner_image : '',
+                      }));
+                    }}
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="banner" id="banner" />
+                      <Label htmlFor="banner" className="font-normal cursor-pointer">
+                        Use Banner Image
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="hero" id="hero" />
+                      <Label htmlFor="hero" className="font-normal cursor-pointer">
+                        Use Hero Section (in Page Builder)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    Choose whether to use a simple banner image or a Hero Section from the Page Builder
                   </p>
-                </AlertDescription>
-              </Alert>
+                </div>
+
+                {formData.use_banner && (
+                  <>
+                    <ImageUploadField
+                      label="Banner Image"
+                      value={formData.banner_image || null}
+                      onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
+                      aspectRatio={16 / 9}
+                      helpText="Upload a banner image for this page (max 5MB)"
+                    />
+                    
+                    {/* Guidance on when to use Banner Image */}
+                    <Alert className="mt-2">
+                      <InformationCircleIcon className="h-4 w-4" />
+                      <AlertTitle className="text-sm font-semibold">When to Use Banner Image</AlertTitle>
+                      <AlertDescription className="text-xs mt-1">
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          <li>Simple pages (About, Contact, Terms) - Just need a header image</li>
+                          <li>Rich Text pages - When using the rich text editor (not page builder)</li>
+                          <li>Quick setup - Fast way to add a header image without building sections</li>
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                )}
+
+                {!formData.use_banner && (
+                  <Alert className="mt-2">
+                    <InformationCircleIcon className="h-4 w-4" />
+                    <AlertTitle className="text-sm font-semibold">Using Hero Section</AlertTitle>
+                    <AlertDescription className="text-xs mt-1">
+                      <p className="text-muted-foreground">
+                        When using Page Builder, add a Hero Section as the first section to display a header image with title, subtitle, and CTA buttons. The banner image will be hidden when a Hero Section is used.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="content">Content</Label>
@@ -333,7 +414,10 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                   <TabsContent value="page-builder" className="mt-0">
                     <PageBuilder
                       value={contentMode === 'page-builder' ? (formData.content || '') : ''}
-                      onChange={(value) => setFormData((prev) => ({ ...prev, content: value }))}
+                      onChange={handleContentChange}
+                      pageSlug={(formData.slug || page?.slug) || undefined}
+                      pageId={page?.id}
+                      pageStatus={formData.status}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.
