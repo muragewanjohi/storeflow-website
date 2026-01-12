@@ -85,6 +85,7 @@ export default function ProductsListingClient({
   const [products, setProducts] = useState(initialProducts);
   const [total, setTotal] = useState(initialTotal);
   const [isSearching, setIsSearching] = useState(false);
+  const [isInitialMount, setIsInitialMount] = useState(true);
   
   // Initialize selected categories - map slugs to IDs if needed
   const getInitialSelectedCategories = () => {
@@ -116,6 +117,23 @@ export default function ProductsListingClient({
   const [selectedAttributeValues, setSelectedAttributeValues] = useState<Record<string, string[]>>({});
   const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
+
+  // Mark initial mount as complete after first render
+  useEffect(() => {
+    // Use a small delay to ensure initialProducts are set
+    const timer = setTimeout(() => {
+      setIsInitialMount(false);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Update products when initialProducts change (e.g., from server-side navigation)
+  useEffect(() => {
+    if (initialProducts && initialProducts.length >= 0) {
+      setProducts(initialProducts);
+      setTotal(initialTotal);
+    }
+  }, [initialProducts, initialTotal]);
   
   // Fetch attributes on mount
   useEffect(() => {
@@ -223,27 +241,54 @@ export default function ProductsListingClient({
       }
 
       params.set('page', '1'); // Reset to first page
-      router.push(`/products?${params.toString()}`);
       
-      // Fetch updated products from API
+      // Fetch updated products from API first, then navigate
       fetch(`/api/products?${params.toString()}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch products: ${res.statusText}`);
+          }
+          return res.json();
+        })
         .then(data => {
           if (data.products) {
-            setProducts(data.products.map((p: any) => ({
-              ...p,
-              price: Number(p.price),
-            })));
+            // Map sale_price to compareAtPrice correctly
+            const mappedProducts = data.products.map((p: any) => {
+              const regularPrice = Number(p.price) || 0;
+              const salePrice = p.sale_price ? Number(p.sale_price) : null;
+              
+              if (salePrice && salePrice < regularPrice && salePrice > 0) {
+                return {
+                  ...p,
+                  price: salePrice,
+                  compareAtPrice: regularPrice,
+                };
+              } else {
+                return {
+                  ...p,
+                  price: regularPrice,
+                };
+              }
+            });
+            setProducts(mappedProducts);
             setTotal(data.pagination?.total || 0);
+          } else {
+            setProducts([]);
+            setTotal(0);
           }
           setIsSearching(false);
         })
         .catch(err => {
           console.error('Error fetching products:', err);
+          setProducts([]);
+          setTotal(0);
           setIsSearching(false);
         });
+      
+      // Navigate after fetching to update URL
+      router.push(`/products?${params.toString()}`);
     });
-  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router]);
+  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router, initialCategories]);
 
   // Debounce search input (500ms delay)
   useEffect(() => {
@@ -300,14 +345,20 @@ export default function ProductsListingClient({
     });
   };
 
-  // Debounce filter updates (300ms delay)
+  // Debounce filter updates (300ms delay) - but only after initial mount
   useEffect(() => {
+    // Don't trigger on initial mount - use initialProducts from server
+    if (isInitialMount) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       updateFilters();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [selectedCategories, priceRange, selectedAttributeValues, updateFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
 
   return (
     <div className="container mx-auto px-4 md:px-4 py-6 md:py-8 max-w-[1440px]">
@@ -459,7 +510,24 @@ export default function ProductsListingClient({
 
         {/* Product Grid */}
         <div className="flex-1">
-          {products.length === 0 ? (
+          {isSearching ? (
+            <div className="text-center py-12">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="border rounded-lg overflow-hidden animate-pulse">
+                      <div className="aspect-square w-full bg-gray-200" />
+                      <div className="p-4 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4" />
+                        <div className="h-4 bg-gray-200 rounded w-1/2" />
+                        <div className="h-6 bg-gray-200 rounded w-1/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : products.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
             </div>

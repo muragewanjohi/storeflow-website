@@ -76,11 +76,16 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
         // Also set as Tailwind CSS variables (convert hex to HSL format)
         if (key === 'primary') {
           const hslValue = hexToHsl(value);
-          root.style.setProperty('--primary', hslValue);
-          // Use text color for primary-foreground (button text)
-          const textColor = colors.text || '#FFFFFF';
-          const textHsl = hexToHsl(textColor);
-          root.style.setProperty('--primary-foreground', textHsl);
+          // Only set primary if buttonBackground is not set (buttonBackground will override)
+          if (!colors.buttonBackground) {
+            root.style.setProperty('--primary', hslValue);
+          }
+          // Use buttonText if available, otherwise use text color for primary-foreground (button text)
+          if (!colors.buttonText) {
+            const textColor = colors.text || '#FFFFFF';
+            const textHsl = hexToHsl(textColor);
+            root.style.setProperty('--primary-foreground', textHsl);
+          }
         }
         if (key === 'secondary') {
           const hslValue = hexToHsl(value);
@@ -93,6 +98,10 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
         if (key === 'accent') {
           const hslValue = hexToHsl(value);
           root.style.setProperty('--accent', hslValue);
+          // Use text color for accent-foreground
+          const textColor = colors.text || '#FFFFFF';
+          const textHsl = hexToHsl(textColor);
+          root.style.setProperty('--accent-foreground', textHsl);
         }
         if (key === 'background') {
           const hslValue = hexToHsl(value);
@@ -107,8 +116,28 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
           root.style.setProperty('--muted', hslValue);
           root.style.setProperty('--muted-foreground', hslValue);
         }
+        if (key === 'buttonBackground') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--button-background', hslValue);
+        }
+        if (key === 'buttonText') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--button-text', hslValue);
+        }
       }
     });
+
+    // After processing all colors, apply button colors to primary/primary-foreground for buttons
+    // This ensures buttons use buttonBackground and buttonText when available
+    // This makes buttons automatically use the customized button colors
+    if (colors.buttonBackground) {
+      const buttonBgHsl = hexToHsl(colors.buttonBackground);
+      root.style.setProperty('--primary', buttonBgHsl);
+    }
+    if (colors.buttonText) {
+      const buttonTextHsl = hexToHsl(colors.buttonText);
+      root.style.setProperty('--primary-foreground', buttonTextHsl);
+    }
 
     // Apply typography
     const themeTypography = (theme?.typography || {}) as Record<string, string | number>;

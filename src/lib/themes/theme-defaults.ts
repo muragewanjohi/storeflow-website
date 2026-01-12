@@ -29,6 +29,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',   // White background
         text: '#212121',         // Dark gray text
         muted: '#757575',        // Medium gray
+        buttonBackground: '#4CAF50', // Green button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Inter',
@@ -48,6 +50,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#1A1A1A',
         muted: '#666666',
+        buttonBackground: '#F04751', // Fashion red button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Playfair Display',
@@ -67,6 +71,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FAF5F0',   // Warm beige
         text: '#3E2723',         // Dark brown
         muted: '#795548',        // Brown gray
+        buttonBackground: '#8B4513', // Brown button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Merriweather',
@@ -86,6 +92,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#212121',
         muted: '#607D8B',        // Blue gray
+        buttonBackground: '#2196F3', // Medical blue button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Roboto',
@@ -105,6 +113,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFF8E1',   // Warm yellow
         text: '#3E2723',         // Dark brown
         muted: '#6D4C41',        // Brown
+        buttonBackground: '#5D4037', // Brown button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Crimson Text',
@@ -124,6 +134,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#2C3E50',         // Dark blue gray
         muted: '#7F8C8D',        // Gray
+        buttonBackground: '#FF6B6B', // Coral red button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Nunito',
@@ -143,6 +155,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FCE4EC',   // Light pink
         text: '#1A1A1A',
         muted: '#880E4F',        // Deep pink
+        buttonBackground: '#9C27B0', // Purple button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Dancing Script',
@@ -162,6 +176,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#212121',
         muted: '#546E7A',        // Blue gray
+        buttonBackground: '#1976D2', // Blue button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Roboto',
@@ -181,6 +197,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#1A1A1A',
         muted: '#999999',
+        buttonBackground: '#000000', // Black button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Inter',
@@ -200,6 +218,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#2C3E50',
         muted: '#7F8C8D',
+        buttonBackground: '#2C3E50', // Dark blue gray button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Inter',
@@ -219,6 +239,8 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
         background: '#FFFFFF',
         text: '#1E293B',         // Dark slate
         muted: '#64748B',        // Slate gray
+        buttonBackground: '#0066CC', // Blue button background
+        buttonText: '#FFFFFF',   // White button text
       },
       fonts: {
         headingFont: 'Inter',

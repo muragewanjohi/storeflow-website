@@ -499,6 +499,8 @@ export default function ThemeCustomizeClient() {
                   <li>✅ <strong>Background:</strong> Applied via CSS variables (--background) - Page background</li>
                   <li>✅ <strong>Text:</strong> Applied via CSS variables (--foreground) - Main text color</li>
                   <li>⚠️ <strong>Muted:</strong> Applied via CSS variables (--color-muted) - Note: Some theme components may use hardcoded colors</li>
+                  <li>✅ <strong>Button Background:</strong> Applied via CSS variables (--button-background, --primary) - Overrides primary color for buttons when set</li>
+                  <li>✅ <strong>Button Text:</strong> Applied via CSS variables (--button-text, --primary-foreground) - Overrides primary-foreground for buttons when set</li>
                 </ul>
                 <p className="text-xs mt-3 text-muted-foreground">
                   <strong>Note:</strong> Colors are set as CSS custom properties and applied via ThemeProviderWrapper. 
@@ -515,6 +517,8 @@ export default function ThemeCustomizeClient() {
                 { key: 'background', description: 'Used for: Page background color (applied via CSS variables)' },
                 { key: 'text', description: 'Used for: Main text color, headings, body text (applied via CSS variables)' },
                 { key: 'muted', description: 'Used for: Muted text, placeholders, secondary text, borders' },
+                { key: 'buttonBackground', description: 'Used for: Button background color (applied via CSS variables --button-background)' },
+                { key: 'buttonText', description: 'Used for: Button text color (applied via CSS variables --button-text)' },
               ].map(({ key: colorKey, description }) => {
                 const defaultValue = (defaultColors as ThemeColors)[colorKey] || '#000000';
                 const currentValue = customColors[colorKey] || defaultValue;

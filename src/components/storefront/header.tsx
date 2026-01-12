@@ -225,7 +225,7 @@ export default function StorefrontHeader({
                         onNavigate(item.href);
                       }}
                       className={`text-sm font-medium transition-colors ${
-                        isActive ? 'text-primary' : 'text-primary'
+                        isActive ? 'text-accent' : 'text-primary hover:text-accent'
                       }`}
                     >
                       {item.name}
@@ -237,7 +237,7 @@ export default function StorefrontHeader({
                     key={item.name}
                     href={item.href}
                     className={`text-sm font-medium transition-colors ${
-                      isActive ? 'text-primary' : 'text-primary'
+                      isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
                   >
                     {item.name}
@@ -266,7 +266,7 @@ export default function StorefrontHeader({
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4"
+                  className="w-full pl-10 pr-4 focus:border-primary focus:ring-primary"
                 />
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
@@ -407,7 +407,7 @@ export default function StorefrontHeader({
                       placeholder="Search products..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4"
+                      className="w-full pl-10 pr-4 focus:border-primary focus:ring-primary"
                     />
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   </div>
