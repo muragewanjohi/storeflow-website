@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 // Lazy load rich text editor for better performance
@@ -46,8 +46,8 @@ export function SectionEditor({ section, onUpdate }: Readonly<SectionEditorProps
       return <CategoriesSectionEditor section={section} onUpdate={onUpdate} />;
     case 'banners':
       return <BannersSectionEditor section={section} onUpdate={onUpdate} />;
-    case 'flash_sale':
-      return <FlashSaleSectionEditor section={section} onUpdate={onUpdate} />;
+    case 'sales_tab':
+      return <SalesTabSectionEditor section={section} onUpdate={onUpdate} />;
     case 'split_layout':
       return <SplitLayoutSectionEditor section={section} onUpdate={onUpdate} />;
     case 'cta':
@@ -976,85 +976,388 @@ function BannersSectionEditor({
   );
 }
 
-function FlashSaleSectionEditor({
+function SalesTabSectionEditor({
   section,
   onUpdate,
 }: {
-  section: Extract<PageSection, { type: 'flash_sale' }>;
+  section: Extract<PageSection, { type: 'sales_tab' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  // Fetch sales for dropdown
+  const { data: salesData, isLoading: isLoadingSales } = useQuery({
+    queryKey: ['sales', 'all'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard/sales?limit=100');
+      if (!response.ok) {
+        throw new Error('Failed to fetch sales');
+      }
+      return await response.json();
+    },
+  });
+
+  const sales = salesData?.sales || [];
+  const displayMode = section.display_mode || 'single_sale';
+  const layout = section.layout || 'grid';
+  const bannerStyle = section.banner_style || 'contained';
+  const productCardStyle = section.product_card_style || 'default';
+  const ctaPosition = section.cta_position || 'top_right';
+
+  // Auto-update CTA link based on display mode and selected sale
+  useEffect(() => {
+    if (displayMode === 'single_sale' && section.sale_id) {
+      const selectedSale = sales.find((s: any) => s.id === section.sale_id);
+      if (selectedSale && !section.cta_link) {
+        onUpdate({ cta_link: `/sales/${selectedSale.slug}` });
+      }
+    } else if (displayMode === 'all_active' && !section.cta_link) {
+      onUpdate({ cta_link: '/sales' });
+    }
+  }, [displayMode, section.sale_id, section.cta_link, sales, onUpdate]);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Flash Sale Section</CardTitle>
+        <CardTitle>Edit Sales Tab Section</CardTitle>
+        <CardDescription>
+          Configure how sales are displayed in this section
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {/* Display Mode */}
         <div className="space-y-2">
-          <Label>Title</Label>
-          <Input
-            value={section.title || ''}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            placeholder="Super Flash Sale"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Badge Text</Label>
-          <Input
-            value={section.badge_text || ''}
-            onChange={(e) => onUpdate({ badge_text: e.target.value })}
-            placeholder="20% OFF"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Columns</Label>
+          <Label>Display Mode *</Label>
           <Select
-            value={String(section.columns || 4)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
+            value={displayMode}
+            onValueChange={(value: 'single_sale' | 'featured_sales' | 'all_active') =>
+              onUpdate({ display_mode: value })
+            }
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="3">3 Columns</SelectItem>
-              <SelectItem value="4">4 Columns</SelectItem>
+              <SelectItem value="single_sale">Single Sale</SelectItem>
+              <SelectItem value="featured_sales">Featured Sales</SelectItem>
+              <SelectItem value="all_active">All Active Sales</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            {displayMode === 'single_sale' && 'Display products from one specific sale'}
+            {displayMode === 'featured_sales' && 'Display multiple featured sales as tabs'}
+            {displayMode === 'all_active' && 'Automatically show all currently active sales'}
+          </p>
         </div>
-        <div className="space-y-2">
-          <Label>Limit</Label>
-          <Input
-            type="number"
-            value={section.limit || 4}
-            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 4 })}
-            min={1}
-            max={20}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Category ID (Optional)</Label>
-          <Input
-            value={section.category_id || ''}
-            onChange={(e) => onUpdate({ category_id: e.target.value || undefined })}
-            placeholder="Filter by category"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+
+        {/* Single Sale Mode - Sale Selection */}
+        {displayMode === 'single_sale' && (
           <div className="space-y-2">
-            <Label>CTA Text</Label>
-            <Input
-              value={section.cta_text || ''}
-              onChange={(e) => onUpdate({ cta_text: e.target.value })}
-              placeholder="Shop More"
-            />
+            <Label>Select Sale *</Label>
+            {isLoadingSales ? (
+              <div className="text-sm text-muted-foreground">Loading sales...</div>
+            ) : (
+              <Select
+                value={section.sale_id || ''}
+                onValueChange={(value) => {
+                  const selectedSale = sales.find((s: any) => s.id === value);
+                  onUpdate({
+                    sale_id: value,
+                    cta_link: selectedSale ? `/sales/${selectedSale.slug}` : section.cta_link,
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a sale" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sales.length === 0 ? (
+                    <SelectItem value="" disabled>No sales available</SelectItem>
+                  ) : (
+                    sales.map((sale: any) => (
+                      <SelectItem key={sale.id} value={sale.id}>
+                        {sale.name} ({sale.status})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            )}
           </div>
+        )}
+
+        {/* Featured Sales Mode - Multi-select */}
+        {displayMode === 'featured_sales' && (
           <div className="space-y-2">
-            <Label>CTA Link</Label>
-            <Input
-              value={section.cta_link || ''}
-              onChange={(e) => onUpdate({ cta_link: e.target.value })}
-              placeholder="/products"
-            />
+            <Label>Featured Sales</Label>
+            <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border p-3">
+              {isLoadingSales ? (
+                <div className="text-sm text-muted-foreground">Loading sales...</div>
+              ) : sales.filter((s: any) => s.is_featured || s.status === 'active').length === 0 ? (
+                <div className="text-sm text-muted-foreground">No featured sales available</div>
+              ) : (
+                sales
+                  .filter((s: any) => s.is_featured || s.status === 'active')
+                  .map((sale: any) => {
+                    const isSelected = section.featured_sale_ids?.includes(sale.id) || false;
+                    return (
+                      <div key={sale.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sale-${sale.id}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            const currentIds = section.featured_sale_ids || [];
+                            const maxSales = section.max_featured_sales || 5;
+                            if (checked) {
+                              if (currentIds.length < maxSales) {
+                                onUpdate({ featured_sale_ids: [...currentIds, sale.id] });
+                              }
+                            } else {
+                              onUpdate({ featured_sale_ids: currentIds.filter((id) => id !== sale.id) });
+                            }
+                          }}
+                          disabled={!isSelected && (section.featured_sale_ids?.length || 0) >= (section.max_featured_sales || 5)}
+                        />
+                        <Label
+                          htmlFor={`sale-${sale.id}`}
+                          className="flex-1 cursor-pointer text-sm font-normal"
+                        >
+                          {sale.name} ({sale.status})
+                        </Label>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {section.featured_sale_ids?.length || 0} of {section.max_featured_sales || 5} selected
+            </p>
+          </div>
+        )}
+
+        {/* Layout Options */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Layout</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Layout Type</Label>
+              <Select
+                value={layout}
+                onValueChange={(value: 'grid' | 'carousel' | 'tabs') =>
+                  onUpdate({ layout: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grid">Grid</SelectItem>
+                  <SelectItem value="carousel">Carousel</SelectItem>
+                  {displayMode === 'featured_sales' && (
+                    <SelectItem value="tabs">Tabs</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            {layout === 'grid' && (
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 4)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                    <SelectItem value="4">4 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Content</h3>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={section.title || ''}
+                onChange={(e) => onUpdate({ title: e.target.value })}
+                placeholder="Super Flash Sale"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subtitle</Label>
+              <Input
+                value={section.subtitle || ''}
+                onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                placeholder="Optional subtitle"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Product Limit</Label>
+              <Input
+                type="number"
+                value={section.limit || 8}
+                onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
+                min={1}
+                max={20}
+              />
+              <p className="text-xs text-muted-foreground">Number of products to show per sale</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Features</h3>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_countdown"
+                checked={section.show_countdown !== false}
+                onCheckedChange={(checked) => onUpdate({ show_countdown: !!checked })}
+              />
+              <Label htmlFor="show_countdown" className="font-normal cursor-pointer">
+                Show countdown timer
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_badge"
+                checked={section.show_badge !== false}
+                onCheckedChange={(checked) => onUpdate({ show_badge: !!checked })}
+              />
+              <Label htmlFor="show_badge" className="font-normal cursor-pointer">
+                Show sale badges on products
+              </Label>
+            </div>
+            {section.show_badge && (
+              <div className="grid grid-cols-2 gap-4 pl-6">
+                <div className="space-y-2">
+                  <Label htmlFor="badge_text">Badge Text (Override)</Label>
+                  <Input
+                    id="badge_text"
+                    value={section.badge_text || ''}
+                    onChange={(e) => onUpdate({ badge_text: e.target.value })}
+                    placeholder="Leave empty to use sale badge"
+                    maxLength={50}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="badge_color">Badge Color (Override)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="badge_color"
+                      type="color"
+                      value={section.badge_color || '#EF4444'}
+                      onChange={(e) => onUpdate({ badge_color: e.target.value })}
+                      className="w-20 h-10"
+                    />
+                    <Input
+                      value={section.badge_color || '#EF4444'}
+                      onChange={(e) => onUpdate({ badge_color: e.target.value })}
+                      placeholder="#EF4444"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Styling */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Styling</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Banner Style</Label>
+              <Select
+                value={bannerStyle}
+                onValueChange={(value: 'full_width' | 'contained' | 'none') =>
+                  onUpdate({ banner_style: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full_width">Full Width</SelectItem>
+                  <SelectItem value="contained">Contained</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Product Card Style</Label>
+              <Select
+                value={productCardStyle}
+                onValueChange={(value: 'default' | 'compact' | 'detailed') =>
+                  onUpdate({ product_card_style: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="compact">Compact</SelectItem>
+                  <SelectItem value="detailed">Detailed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Call-to-Action</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>CTA Text</Label>
+                <Input
+                  value={section.cta_text || ''}
+                  onChange={(e) => onUpdate({ cta_text: e.target.value })}
+                  placeholder="Shop More"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CTA Link</Label>
+                <Input
+                  value={section.cta_link || ''}
+                  onChange={(e) => onUpdate({ cta_link: e.target.value })}
+                  placeholder={displayMode === 'single_sale' ? '/sales/[slug]' : '/sales'}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {displayMode === 'single_sale' && 'Auto-filled based on selected sale'}
+                  {displayMode === 'all_active' && 'Defaults to /sales'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>CTA Position</Label>
+              <Select
+                value={ctaPosition}
+                onValueChange={(value: 'top_right' | 'bottom_center' | 'none') =>
+                  onUpdate({ cta_position: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="top_right">Top Right</SelectItem>
+                  <SelectItem value="bottom_center">Bottom Center</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </CardContent>

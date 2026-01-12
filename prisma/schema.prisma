@@ -663,6 +663,7 @@ model products {
   product_reviews    product_reviews[]
   product_variants   product_variants[]
   product_wishlists  product_wishlists[]
+  product_sales      product_sales[]
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([slug], map: "idx_products_slug")
@@ -849,6 +850,8 @@ model tenants {
   price_plans                price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses    user_delivery_addresses[]
   wallets                    wallets[]
+  sales                      sales[]
+  product_sales              product_sales[]
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
@@ -956,4 +959,51 @@ model subscription_changes {
   @@index([tenant_id], map: "idx_subscription_changes_tenant_id")
   @@index([effective_date], map: "idx_subscription_changes_effective_date")
   @@index([scheduled_change_date], map: "idx_subscription_changes_scheduled_date")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model sales {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String         @db.Uuid
+  name        String         @db.VarChar(255)
+  slug        String         @db.VarChar(255)
+  description String?
+  banner_image String?       @db.VarChar(255)
+  badge_text  String?        @default("SALE") @db.VarChar(50)
+  badge_color String?        @default("#EF4444") @db.VarChar(7)
+  start_date  DateTime?      @db.Timestamp(6)
+  end_date    DateTime?      @db.Timestamp(6)
+  status      String?        @default("draft") @db.VarChar(50)
+  is_featured Boolean?       @default(false)
+  metadata    Json?          @default("{}")
+  created_at  DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?      @default(now()) @db.Timestamp(6)
+  tenants     tenants        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_sales product_sales[]
+
+  @@unique([tenant_id, slug], map: "idx_sales_tenant_slug")
+  @@index([tenant_id], map: "idx_sales_tenant_id")
+  @@index([tenant_id, status], map: "idx_sales_tenant_status")
+  @@index([start_date, end_date], map: "idx_sales_dates")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model product_sales {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String    @db.Uuid
+  product_id      String    @db.Uuid
+  sale_id         String    @db.Uuid
+  sale_price      Decimal?  @db.Decimal(10, 2)
+  discount_percent Decimal? @db.Decimal(5, 2)
+  order_index     Int?      @default(0)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  products        products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sales           sales     @relation(fields: [sale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenants         tenants    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, product_id, sale_id], map: "idx_product_sales_unique")
+  @@index([tenant_id], map: "idx_product_sales_tenant")
+  @@index([product_id], map: "idx_product_sales_product")
+  @@index([sale_id], map: "idx_product_sales_sale")
+  @@index([tenant_id, sale_id, order_index], map: "idx_product_sales_active")
 }

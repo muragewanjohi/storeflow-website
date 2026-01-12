@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PhotoIcon } from '@heroicons/react/24/solid';
 import { generateVariantName } from '@/lib/products/variant-helpers';
+import ProductSalesSection from './product-sales-section';
 
 interface Product {
   id: string;
@@ -1075,6 +1076,19 @@ export default function ProductFormClient({
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sales */}
+            {isEditing && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sales</CardTitle>
+                  <CardDescription>Assign this product to sales campaigns</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ProductSalesSection productId={product.id} />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

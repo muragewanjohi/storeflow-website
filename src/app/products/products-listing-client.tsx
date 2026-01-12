@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect, useCallback, useMemo } from 'react';
+import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRightIcon, ChevronDownIcon, XMarkIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
@@ -136,16 +136,25 @@ export default function ProductsListingClient({
   }, [initialProducts, initialTotal]);
 
   // Ensure URL has page=1 when page parameter is missing (fixes loading issue)
+  // Use a ref to prevent multiple updates and ensure products are displayed first
+  const urlUpdatedRef = useRef(false);
   useEffect(() => {
-    const currentPage = searchParams.get('page');
-    // If page parameter is missing and we're on page 1, update URL to include it
-    if (!currentPage && initialPage === 1) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('page', '1');
-      // Use replace to avoid adding to history
-      router.replace(`/products?${params.toString()}`, { scroll: false });
+    // Only update URL after products are set to avoid blocking render
+    if (products.length > 0 || initialProducts.length > 0) {
+      const currentPage = searchParams.get('page');
+      // If page parameter is missing and we're on page 1, update URL to include it
+      // Only do this once to avoid infinite loops
+      if (!urlUpdatedRef.current && !currentPage && initialPage === 1) {
+        urlUpdatedRef.current = true;
+        // Use setTimeout to ensure this happens after render
+        setTimeout(() => {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set('page', '1');
+          router.replace(`/products?${params.toString()}`, { scroll: false });
+        }, 0);
+      }
     }
-  }, [searchParams, initialPage, router]);
+  }, [searchParams, initialPage, router, products.length, initialProducts.length]);
   
   // Fetch attributes on mount
   useEffect(() => {
@@ -183,6 +192,11 @@ export default function ProductsListingClient({
   })?.label || 'Most Popular';
 
   const updateFilters = useCallback(() => {
+    // Don't update filters on initial mount - use initialProducts from server
+    if (isInitialMount) {
+      return;
+    }
+    
     startTransition(() => {
       setIsSearching(true);
       const params = new URLSearchParams(searchParams.toString());
@@ -252,7 +266,12 @@ export default function ProductsListingClient({
         params.delete('order');
       }
 
-      params.set('page', '1'); // Reset to first page
+      // Always ensure page parameter is set (defaults to 1 if missing)
+      if (!params.get('page')) {
+        params.set('page', '1');
+      } else {
+        params.set('page', params.get('page') || '1'); // Ensure it's always set
+      }
       
       // Fetch updated products from API first, then navigate
       fetch(`/api/products?${params.toString()}`)
@@ -300,7 +319,7 @@ export default function ProductsListingClient({
       // Navigate after fetching to update URL
       router.push(`/products?${params.toString()}`);
     });
-  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router, initialCategories]);
+  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router, initialCategories, isInitialMount]);
 
   // Debounce search input (500ms delay)
   useEffect(() => {

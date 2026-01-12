@@ -50,6 +50,7 @@ The Cron Jobs Monitoring Dashboard allows landlords to view, monitor, and manual
 | **Expiry Checker** | `/api/admin/subscriptions/expiry-checker` | Daily at midnight UTC | Checks for expired subscriptions and applies grace period logic |
 | **Analytics Aggregate** | `/api/admin/analytics/aggregate` | Daily at 1 AM UTC | Pre-computes daily analytics data for all tenants |
 | **Process Scheduled Downgrades** | `/api/admin/subscriptions/process-scheduled-downgrades` | Daily at 4 AM UTC | Processes scheduled plan downgrades that are due to take effect |
+| **Sales Automation** | `/api/admin/sales/automate` | Every 15 minutes | Activates/deactivates sales based on dates and calculates discount percentages |
 | **Data Cleanup** | `/api/admin/cleanup` | Weekly on Sunday at 2 AM UTC | Cleans up old data and temporary files |
 | **Hard Delete Tenants** | `/api/admin/cleanup/hard-delete-tenants` | Weekly on Sunday at 3 AM UTC | Hard deletes tenants past retention period (90 days) |
 
@@ -81,6 +82,10 @@ All cron jobs are configured in `vercel.json` and run automatically on Vercel:
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/admin/sales/automate",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/admin/cleanup",
       "schedule": "0 2 * * 0"
     },
@@ -97,6 +102,7 @@ All cron jobs are configured in `vercel.json` and run automatically on Vercel:
 - `0 1 * * *` = Daily at 1 AM UTC
 - `0 4 * * *` = Daily at 4 AM UTC
 - `0 9 * * *` = Daily at 9 AM UTC
+- `*/15 * * * *` = Every 15 minutes
 - `0 2 * * 0` = Weekly on Sunday at 2 AM UTC
 - `0 3 * * 0` = Weekly on Sunday at 3 AM UTC
 
@@ -359,13 +365,77 @@ The **Process Scheduled Downgrades** job processes plan downgrades that were sch
 
 ---
 
+---
+
+## Sales Automation
+
+### Overview
+
+The Sales Automation cron job handles automated sale management tasks:
+- Activates sales when they reach their `start_date`
+- Deactivates sales when they pass their `end_date`
+- Auto-calculates discount percentages for products in sales
+- Updates discount percentages when product prices change
+
+### What It Does
+
+1. **Activates Scheduled Sales:**
+   - Finds all sales with `status = 'scheduled'` and `start_date <= now`
+   - Updates status to `'active'`
+
+2. **Deactivates Ended Sales:**
+   - Finds all sales with `status IN ('active', 'scheduled')` and `end_date <= now`
+   - Updates status to `'ended'`
+
+3. **Auto-Calculates Discount Percentages:**
+   - Finds product_sales without `discount_percent` but with `sale_price`
+   - Calculates discount: `((regular_price - sale_price) / regular_price) * 100`
+   - Rounds to nearest integer
+
+4. **Updates Discount Percentages:**
+   - Recalculates discounts for all product_sales when product prices change
+   - Ensures discount percentages stay accurate
+
+### Schedule
+
+- **Path:** `/api/admin/sales/automate`
+- **Schedule:** Every 15 minutes (`*/15 * * * *`)
+- **Frequency:** 96 times per day (every 15 minutes)
+
+### Why Every 15 Minutes?
+
+- Sales can start/end at any time of day
+- Ensures sales activate/deactivate within 15 minutes of their scheduled time
+- Frequent enough to feel "real-time" without overloading the system
+- Discount calculations stay up-to-date when prices change
+
+### Example Flow
+
+1. **10:00 AM:** Sale created with `start_date = 10:30 AM`, `status = 'scheduled'`
+2. **10:30 AM:** Cron job runs, finds sale, activates it (`status = 'active'`)
+3. **11:00 PM:** Sale has `end_date = 11:00 PM`
+4. **11:15 PM:** Cron job runs, finds sale, ends it (`status = 'ended'`)
+
+### Monitoring
+
+- **View Logs:** Check `/admin/cron-jobs` dashboard
+- **Manual Trigger:** Use "Restart" button in dashboard
+- **Error Handling:** Failed operations are logged with sale/product IDs and error details
+
+### Related Documentation
+
+- [Flash Sale Implementation Plan](./FLASH_SALE_IMPLEMENTATION_PLAN.md)
+
+---
+
 ## Summary
 
 | Feature | Status |
 |---------|--------|
-| **Automatic Cron Jobs** | ✅ Yes - Runs daily/weekly automatically |
+| **Automatic Cron Jobs** | ✅ Yes - Runs daily/weekly/15-minutely automatically |
 | **Cron Job Monitoring** | ✅ Yes - Dashboard at `/admin/cron-jobs` |
 | **View Execution Logs** | ✅ Yes - Last 50 executions with details |
+| **Sales Automation** | ✅ Yes - Activates/deactivates sales and calculates discounts |
 | **View Failed Jobs** | ✅ Yes - Error messages displayed |
 | **Manual Trigger/Restart** | ✅ Yes - Restart button for each job |
 | **Kenya Pricing Detection** | ✅ Yes - Based on tenant.country field |

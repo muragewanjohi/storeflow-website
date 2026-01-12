@@ -24,12 +24,20 @@ if (!process.env.DIRECT_URL) {
 const databaseUrl = process.env.DATABASE_URL;
 const directUrl = process.env.DIRECT_URL;
 
+// Debug: Log which URLs are being used (remove in production)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[Prisma Config] DATABASE_URL port:', databaseUrl?.match(/:(\d+)\//)?.[1] || 'unknown');
+  console.log('[Prisma Config] DIRECT_URL port:', directUrl?.match(/:(\d+)\//)?.[1] || 'unknown');
+  console.log('[Prisma Config] DIRECT_URL set:', !!directUrl);
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: databaseUrl, // Connection URL
+    url: databaseUrl, // Connection URL for queries
+    // Note: directUrl is set via DIRECT_URL env var in schema.prisma
   },
 });

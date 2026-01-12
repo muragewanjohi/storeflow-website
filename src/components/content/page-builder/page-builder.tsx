@@ -331,11 +331,11 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => addSection('flash_sale')}
+                    onClick={() => addSection('sales_tab')}
                     className="flex flex-col items-center gap-1 h-auto py-3"
                   >
                     <span className="text-2xl">⚡</span>
-                    <span className="text-xs">Flash Sale</span>
+                    <span className="text-xs">Sales Tab</span>
                   </Button>
                   <Button
                     type="button"
@@ -593,17 +593,22 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         ],
         columns: 3,
       };
-    case 'flash_sale':
+    case 'sales_tab':
       return {
         id,
-        type: 'flash_sale',
+        type: 'sales_tab',
         order,
-        title: 'Super Flash Sale',
-        badge_text: '20% OFF',
-        limit: 4,
+        display_mode: 'single_sale',
+        layout: 'grid',
         columns: 4,
+        title: 'Super Flash Sale',
+        limit: 8,
+        show_countdown: true,
+        show_badge: true,
+        banner_style: 'contained',
+        product_card_style: 'default',
         cta_text: 'Shop More',
-        cta_link: '/products',
+        cta_position: 'top_right',
       };
     case 'split_layout':
       return {
@@ -671,7 +676,7 @@ function getSectionTypeLabel(type: SectionType): string {
     hero: 'Hero',
     categories: 'Categories',
     banners: 'Banners',
-    flash_sale: 'Flash Sale',
+    sales_tab: 'Sales Tab',
     split_layout: 'Split Layout',
     cta: 'CTA',
     product_tabs: 'Product Tabs',

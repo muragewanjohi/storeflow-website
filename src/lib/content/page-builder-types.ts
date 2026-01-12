@@ -6,7 +6,7 @@
  * Day 28: Content Management - Simple Page Builder
  */
 
-export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'flash_sale' | 'split_layout' | 'cta' | 'product_tabs';
+export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs';
 
 export interface BaseSection {
   id: string;
@@ -103,16 +103,44 @@ export interface BannersSection extends BaseSection {
   columns?: 1 | 2 | 3;
 }
 
-export interface FlashSaleSection extends BaseSection {
-  type: 'flash_sale';
+export interface SalesTabSection extends BaseSection {
+  type: 'sales_tab';
+  
+  // Display Mode
+  display_mode: 'single_sale' | 'featured_sales' | 'all_active';
+  
+  // Single Sale Mode
+  sale_id?: string; // Required if display_mode is 'single_sale'
+  
+  // Featured Sales Mode
+  featured_sale_ids?: string[]; // Array of sale IDs for featured mode
+  max_featured_sales?: number; // Limit for featured sales (default: 5)
+  
+  // Layout
+  layout: 'grid' | 'carousel' | 'tabs';
+  columns: 2 | 3 | 4;
+  
+  // Content
   title?: string;
   subtitle?: string;
-  badge_text?: string;
-  limit?: number;
-  columns?: 2 | 3 | 4;
-  category_id?: string;
+  limit?: number; // Products per sale
+  
+  // Features
+  show_countdown: boolean;
+  show_badge: boolean;
+  badge_text?: string; // Override sale badge_text
+  badge_color?: string; // Override sale badge_color
+  
+  // Styling
+  background_color?: string;
+  text_color?: string;
+  banner_style: 'full_width' | 'contained' | 'none';
+  product_card_style: 'default' | 'compact' | 'detailed';
+  
+  // CTA
   cta_text?: string;
   cta_link?: string;
+  cta_position: 'top_right' | 'bottom_center' | 'none';
 }
 
 export interface SplitLayoutSection extends BaseSection {
@@ -170,7 +198,7 @@ export type PageSection =
   | ImageSection
   | CategoriesSection
   | BannersSection
-  | FlashSaleSection
+  | SalesTabSection
   | SplitLayoutSection
   | CTASection
   | ProductTabsSection;

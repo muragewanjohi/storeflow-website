@@ -12,9 +12,11 @@ import { useState, useEffect } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import Link from 'next/link';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
+import CountdownTimer from '@/components/storefront/countdown-timer';
 
 interface SectionRendererProps {
   section: PageSection;
@@ -39,8 +41,8 @@ export function SectionRenderer({ section, isPreview = false }: Readonly<Section
       return <CategoriesSectionComponent section={section} isPreview={isPreview} />;
     case 'banners':
       return <BannersSectionComponent section={section} isPreview={isPreview} />;
-    case 'flash_sale':
-      return <FlashSaleSectionComponent section={section} isPreview={isPreview} />;
+    case 'sales_tab':
+      return <SalesTabSectionComponent section={section} isPreview={isPreview} />;
     case 'split_layout':
       return <SplitLayoutSectionComponent section={section} isPreview={isPreview} />;
     case 'cta':
@@ -218,8 +220,12 @@ interface Product {
   name: string;
   slug: string | null;
   price: number;
+  compareAtPrice?: number;
   image: string | null;
   stock_quantity: number | null;
+  saleBadge?: string;
+  saleBadgeColor?: string;
+  discountPercent?: number;
 }
 
 function ProductsSectionComponent({ 
@@ -726,21 +732,25 @@ function BannersSectionComponent({
   );
 }
 
-function FlashSaleSectionComponent({ 
+function SalesTabSectionComponent({ 
   section, 
   isPreview 
 }: { 
-  section: Extract<PageSection, { type: 'flash_sale' }>; 
+  section: Extract<PageSection, { type: 'sales_tab' }>; 
   isPreview: boolean;
 }) {
+  const displayMode = section.display_mode || 'single_sale';
+  const layout = section.layout || 'grid';
   const columns = section.columns || 4;
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4';
   const headingFont = 'var(--font-heading, inherit)';
   const bodyFont = 'var(--font-body, inherit)';
   
+  const [sales, setSales] = useState<any[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     if (isPreview) {
@@ -748,64 +758,266 @@ function FlashSaleSectionComponent({
       return;
     }
 
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        
-        const params = new URLSearchParams();
-        params.append('status', 'active');
-        params.append('limit', String(section.limit || 4));
-        
-        if (section.category_id) {
-          params.append('category_id', section.category_id);
+
+        if (displayMode === 'single_sale' && section.sale_id) {
+          // First get sale details to get slug
+          const saleDetailsResponse = await fetch(`/api/dashboard/sales/${section.sale_id}`);
+          if (!saleDetailsResponse.ok) {
+            throw new Error('Failed to fetch sale details');
+          }
+          const saleDetails = await saleDetailsResponse.json();
+          
+          // Then fetch sale with products using slug
+          const saleResponse = await fetch(`/api/sales/${saleDetails.sale.slug}`);
+          if (!saleResponse.ok) {
+            throw new Error('Failed to fetch sale');
+          }
+          const saleData = await saleResponse.json();
+          
+          const saleProducts: Product[] = (saleData.sale?.products || []).map((ps: any) => {
+            const product = ps.product;
+            const regularPrice = Number(product.price);
+            const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
+            const discountPercent = ps.discount_percent 
+              ? Number(ps.discount_percent)
+              : salePrice < regularPrice
+              ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+              : 0;
+
+            return {
+              id: product.id,
+              name: product.name,
+              slug: product.slug,
+              price: salePrice,
+              compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+              image: product.image,
+              stock_quantity: product.stock_quantity,
+              saleBadge: section.badge_text || saleData.sale?.badge_text || 'SALE',
+              saleBadgeColor: section.badge_color || saleData.sale?.badge_color || '#EF4444',
+              discountPercent,
+            };
+          }).slice(0, section.limit || 8);
+
+          setProducts(saleProducts);
+          setSales([saleData.sale]);
+        } else if (displayMode === 'featured_sales' && section.featured_sale_ids && section.featured_sale_ids.length > 0) {
+          // Fetch multiple featured sales - first get details to get slugs
+          const salesDetailsPromises = section.featured_sale_ids.map((saleId: string) =>
+            fetch(`/api/dashboard/sales/${saleId}`).then(res => res.json())
+          );
+          const salesDetails = await Promise.all(salesDetailsPromises);
+          
+          // Then fetch each sale with products using slugs
+          const salesPromises = salesDetails
+            .filter(s => s.sale && s.sale.slug)
+            .map((s: any) => fetch(`/api/sales/${s.sale.slug}`).then(res => res.json()));
+          const salesData = await Promise.all(salesPromises);
+          const validSales = salesData.filter(s => s.sale).map(s => s.sale);
+          setSales(validSales);
+
+          // Load products from first sale or active tab
+          if (validSales.length > 0) {
+            const activeSale = validSales[activeTab] || validSales[0];
+            const saleProducts: Product[] = (activeSale.products || []).map((ps: any) => {
+              const product = ps.product;
+              const regularPrice = Number(product.price);
+              const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
+              const discountPercent = ps.discount_percent 
+                ? Number(ps.discount_percent)
+                : salePrice < regularPrice
+                ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+                : 0;
+
+              return {
+                id: product.id,
+                name: product.name,
+                slug: product.slug,
+                price: salePrice,
+                compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+                image: product.image,
+                stock_quantity: product.stock_quantity,
+                saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
+                saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
+                discountPercent,
+              };
+            }).slice(0, section.limit || 8);
+            setProducts(saleProducts);
+          }
+        } else if (displayMode === 'all_active') {
+          // Fetch all active sales
+          const salesResponse = await fetch('/api/sales?status=active&limit=10');
+          if (!salesResponse.ok) {
+            throw new Error('Failed to fetch sales');
+          }
+          const salesData = await salesResponse.json();
+          const allSales = salesData.sales || [];
+          setSales(allSales);
+
+          // Get products from all sales (combined)
+          const allProducts: Product[] = [];
+          for (const sale of allSales.slice(0, 3)) { // Limit to first 3 sales
+            const saleResponse = await fetch(`/api/sales/${sale.slug}`);
+            if (saleResponse.ok) {
+              const saleData = await saleResponse.json();
+              const saleProducts = (saleData.sale?.products || []).map((ps: any) => {
+                const product = ps.product;
+                const regularPrice = Number(product.price);
+                const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
+                const discountPercent = ps.discount_percent 
+                  ? Number(ps.discount_percent)
+                  : salePrice < regularPrice
+                  ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+                  : 0;
+
+                return {
+                  id: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  price: salePrice,
+                  compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+                  image: product.image,
+                  stock_quantity: product.stock_quantity,
+                  saleBadge: section.badge_text || sale.badge_text || 'SALE',
+                  saleBadgeColor: section.badge_color || sale.badge_color || '#EF4444',
+                  discountPercent,
+                };
+              });
+              allProducts.push(...saleProducts);
+            }
+          }
+          setProducts(allProducts.slice(0, section.limit || 8));
+        } else {
+          setProducts([]);
         }
-        
-        const response = await fetch(`/api/products?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch products');
-        }
-        
-        const data = await response.json();
-        
-        const fetchedProducts: Product[] = (data.products || []).map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          price: typeof p.price === 'number' ? p.price : Number(p.price),
-          image: p.image,
-          stock_quantity: p.stock_quantity,
-        }));
-        
-        setProducts(fetchedProducts);
       } catch (err) {
-        console.error('Error fetching products:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load products');
+        console.error('Error fetching sales data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load sales');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchProducts();
-  }, [section.category_id, section.limit, isPreview]);
+    fetchData();
+  }, [displayMode, section.sale_id, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview]);
+
+  // Update products when active tab changes (for featured_sales mode)
+  useEffect(() => {
+    if (displayMode === 'featured_sales' && sales.length > 0 && !isPreview) {
+      const activeSale = sales[activeTab] || sales[0];
+      if (activeSale) {
+        fetch(`/api/sales/${activeSale.slug}`)
+          .then(res => res.json())
+          .then(data => {
+            const saleProducts: Product[] = (data.sale?.products || []).map((ps: any) => {
+              const product = ps.product;
+              const regularPrice = Number(product.price);
+              const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
+              const discountPercent = ps.discount_percent 
+                ? Number(ps.discount_percent)
+                : salePrice < regularPrice
+                ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+                : 0;
+
+              return {
+                id: product.id,
+                name: product.name,
+                slug: product.slug,
+                price: salePrice,
+                compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+                image: product.image,
+                stock_quantity: product.stock_quantity,
+                saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
+                saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
+                discountPercent,
+              };
+            }).slice(0, section.limit || 8);
+            setProducts(saleProducts);
+          })
+          .catch(err => console.error('Error fetching sale products:', err));
+      }
+    }
+  }, [activeTab, displayMode, sales, section.limit, section.badge_text, section.badge_color, isPreview]);
+
+  const renderProducts = () => {
+    if (isPreview) {
+      return (
+        <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
+          Sales Tab products will be displayed here
+        </div>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <div className="col-span-full text-center text-muted-foreground py-12">
+          Loading products...
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="col-span-full text-center text-destructive py-12">
+          {error}
+        </div>
+      );
+    }
+
+    if (products.length === 0) {
+      return (
+        <div className="col-span-full text-center text-muted-foreground py-12">
+          No products found
+        </div>
+      );
+    }
+
+    return products.map((product) => (
+      <div key={product.id} className="relative">
+        {section.show_badge !== false && product.saleBadge && (
+          <Badge
+            className="absolute top-2 left-2 z-10"
+            style={{
+              backgroundColor: product.saleBadgeColor || '#EF4444',
+              color: '#FFFFFF',
+            }}
+          >
+            {product.saleBadge}
+            {product.discountPercent && product.discountPercent > 0 && (
+              <span className="ml-1">-{product.discountPercent}%</span>
+            )}
+          </Badge>
+        )}
+        <DefaultProductCard product={product} />
+      </div>
+    ));
+  };
 
   return (
     <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          {section.title && (
-            <h2 
-              className="text-3xl md:text-4xl font-bold"
-              style={{ 
-                fontFamily: headingFont,
-                color: 'var(--color-text, currentColor)',
-              }}
-            >
-              {section.title}
-            </h2>
-          )}
-          {section.cta_text && section.cta_link && (
+          <div>
+            {section.title && (
+              <h2 
+                className="text-3xl md:text-4xl font-bold mb-2"
+                style={{ 
+                  fontFamily: headingFont,
+                  color: 'var(--color-text, currentColor)',
+                }}
+              >
+                {section.title}
+              </h2>
+            )}
+            {section.subtitle && (
+              <p className="text-muted-foreground">{section.subtitle}</p>
+            )}
+          </div>
+          {section.cta_position === 'top_right' && section.cta_text && section.cta_link && (
             <Link href={section.cta_link}>
               <Button variant="outline">
                 {section.cta_text}
@@ -813,36 +1025,71 @@ function FlashSaleSectionComponent({
             </Link>
           )}
         </div>
-        <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-          {isPreview ? (
-            <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
-              Flash sale products will be displayed here
+
+        {/* Banner (if enabled) */}
+        {section.banner_style !== 'none' && sales.length > 0 && sales[0]?.banner_image && (
+          <div className={`mb-8 ${section.banner_style === 'full_width' ? 'w-full' : 'max-w-4xl mx-auto'}`}>
+            <div className="relative aspect-video overflow-hidden rounded-lg">
+              <img
+                src={sales[0].banner_image}
+                alt={sales[0].name}
+                className="w-full h-full object-cover"
+              />
             </div>
-          ) : isLoading ? (
-            <div className="col-span-full text-center text-muted-foreground py-12">
-              Loading products...
+          </div>
+        )}
+
+        {/* Countdown Timer (if enabled) */}
+        {section.show_countdown && sales.length > 0 && sales[0]?.end_date && (
+          <div className="mb-8 flex justify-center">
+            <CountdownTimer endDate={sales[0].end_date} />
+          </div>
+        )}
+
+        {/* Tabs (for featured_sales mode) */}
+        {displayMode === 'featured_sales' && layout === 'tabs' && sales.length > 1 && (
+          <div className="mb-8 border-b">
+            <div className="flex gap-4 overflow-x-auto">
+              {sales.map((sale, index) => (
+                <button
+                  key={sale.id}
+                  onClick={() => setActiveTab(index)}
+                  className={`px-4 py-2 border-b-2 transition-colors ${
+                    activeTab === index
+                      ? 'border-primary text-primary font-semibold'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {sale.name}
+                </button>
+              ))}
             </div>
-          ) : error ? (
-            <div className="col-span-full text-center text-destructive py-12">
-              {error}
+          </div>
+        )}
+
+        {/* Products Grid/Carousel */}
+        {layout === 'carousel' ? (
+          <div className="overflow-x-auto">
+            <div className={`flex gap-6 min-w-max ${gridCols}`}>
+              {renderProducts()}
             </div>
-          ) : products.length === 0 ? (
-            <div className="col-span-full text-center text-muted-foreground py-12">
-              No products found
-            </div>
-          ) : (
-            products.map((product) => (
-              <div key={product.id} className="relative">
-                {section.badge_text && (
-                  <div className="absolute top-3 left-3 z-10 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                    {section.badge_text}
-                  </div>
-                )}
-                <DefaultProductCard product={product} />
-              </div>
-            ))
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
+            {renderProducts()}
+          </div>
+        )}
+
+        {/* Bottom CTA */}
+        {section.cta_position === 'bottom_center' && section.cta_text && section.cta_link && (
+          <div className="mt-8 text-center">
+            <Link href={section.cta_link}>
+              <Button variant="outline" size="lg">
+                {section.cta_text}
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

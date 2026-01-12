@@ -71,14 +71,21 @@ export default function GroceryHero({
               {isPreview && onNavigate ? (
                 <Button 
                   size="lg" 
-                  className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:bg-accent transition-colors"
+                  className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:!bg-accent hover:!text-accent-foreground transition-colors"
+                  style={{
+                    backgroundColor: 'hsl(var(--primary))',
+                    color: 'hsl(var(--primary-foreground))',
+                  }}
                   onClick={handleCTAClick}
                 >
                   {ctaText}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               ) : (
-                <Button asChild size="lg" className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:bg-accent transition-colors">
+                <Button asChild size="lg" className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:!bg-accent hover:!text-accent-foreground transition-colors" style={{
+                  backgroundColor: 'hsl(var(--primary))',
+                  color: 'hsl(var(--primary-foreground))',
+                }}>
                   <Link href={ctaLink}>
                     {ctaText}
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
