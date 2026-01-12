@@ -274,22 +274,54 @@ export default async function ProductsPage({
     // When sale_price exists: price = sale_price (discounted), compareAtPrice = price (original)
     // When no sale_price: price = price (normal), compareAtPrice = undefined
     const products = productsRaw.map((product: any) => {
-      const regularPrice = Number(product.price);
-      const salePrice = product.sale_price ? Number(product.sale_price) : null;
-      
-      if (salePrice && salePrice < regularPrice) {
-        // Product is on sale: use sale_price as price, regular price as compareAtPrice
+      try {
+        // Ensure price is converted to number (handle Prisma Decimal)
+        const regularPrice = typeof product.price === 'object' && product.price !== null 
+          ? Number(product.price.toString()) 
+          : Number(product.price) || 0;
+        
+        // Ensure sale_price is converted to number if it exists
+        const salePrice = product.sale_price 
+          ? (typeof product.sale_price === 'object' && product.sale_price !== null
+              ? Number(product.sale_price.toString())
+              : Number(product.sale_price))
+          : null;
+        
+        if (salePrice && salePrice < regularPrice && salePrice > 0) {
+          // Product is on sale: use sale_price as price, regular price as compareAtPrice
+          return {
+            id: String(product.id),
+            name: String(product.name || ''),
+            slug: product.slug ? String(product.slug) : null,
+            price: Number(salePrice),
+            compareAtPrice: Number(regularPrice),
+            image: product.image ? String(product.image) : null,
+            stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
+            category_id: product.category_id ? String(product.category_id) : null,
+          };
+        } else {
+          // No sale: use regular price as price
+          return {
+            id: String(product.id),
+            name: String(product.name || ''),
+            slug: product.slug ? String(product.slug) : null,
+            price: Number(regularPrice),
+            image: product.image ? String(product.image) : null,
+            stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
+            category_id: product.category_id ? String(product.category_id) : null,
+          };
+        }
+      } catch (error) {
+        console.error('[Products Page] Error mapping product:', product?.id, error);
+        // Fallback to simple mapping if price conversion fails
         return {
-          ...product,
-          price: salePrice,
-          compareAtPrice: regularPrice,
-        };
-      } else {
-        // No sale: use regular price as price
-        return {
-          ...product,
-          price: regularPrice,
-          compareAtPrice: undefined,
+          id: String(product?.id || ''),
+          name: String(product?.name || ''),
+          slug: product?.slug ? String(product.slug) : null,
+          price: 0,
+          image: product?.image ? String(product.image) : null,
+          stock_quantity: product?.stock_quantity !== null ? Number(product.stock_quantity) : null,
+          category_id: product?.category_id ? String(product.category_id) : null,
         };
       }
     });

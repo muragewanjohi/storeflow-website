@@ -168,7 +168,7 @@ export default function StorefrontHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-white">
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -189,7 +189,7 @@ export default function StorefrontHeader({
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
-                <span className="text-lg md:text-xl font-bold" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary" suppressHydrationWarning>
                   {storeName}
                 </span>
               </button>
@@ -203,7 +203,7 @@ export default function StorefrontHeader({
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
-                <span className="text-lg md:text-xl font-bold" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary" suppressHydrationWarning>
                   {storeName}
                 </span>
               </Link>
@@ -224,8 +224,8 @@ export default function StorefrontHeader({
                         e.preventDefault();
                         onNavigate(item.href);
                       }}
-                      className={`text-sm font-medium transition-colors hover:text-primary ${
-                        isActive ? 'text-primary' : 'text-muted-foreground'
+                      className={`text-sm font-medium transition-colors ${
+                        isActive ? 'text-primary' : 'text-primary'
                       }`}
                     >
                       {item.name}
@@ -236,8 +236,8 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`text-sm font-medium transition-colors hover:text-primary ${
-                      isActive ? 'text-primary' : 'text-muted-foreground'
+                    className={`text-sm font-medium transition-colors ${
+                      isActive ? 'text-primary' : 'text-primary'
                     }`}
                   >
                     {item.name}

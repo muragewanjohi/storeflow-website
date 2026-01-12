@@ -15,8 +15,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code } from 'lucide-react';
+import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code, Undo2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
 
@@ -87,6 +88,7 @@ const FONT_WEIGHTS = [
 
 export default function ThemeCustomizeClient() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Fetch current theme and customizations
   const { data: currentThemeData, isLoading } = useQuery({
@@ -116,19 +118,48 @@ export default function ThemeCustomizeClient() {
   const faviconFileInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Store initial values for cancel/undo functionality
+  const [initialValues, setInitialValues] = useState<{
+    colors: ThemeColors;
+    fonts: ThemeTypography;
+    layouts: ThemeLayout;
+    css: string;
+    js: string;
+    logoUrl: string;
+    faviconUrl: string;
+    metaTitle: string;
+    metaDescription: string;
+  } | null>(null);
+
   // Initialize form with current customizations
   useEffect(() => {
     if (currentThemeData) {
       const customizations = currentThemeData.customizations || {};
-      setCustomColors(customizations.custom_colors || {});
-      setCustomFonts(customizations.custom_fonts || {});
-      setCustomLayouts(customizations.custom_layouts || {});
-      setCustomCss(customizations.custom_css || '');
-      setCustomJs((customizations as any).custom_js || '');
-      setLogoUrl(customizations.logo_url || '');
-      setFaviconUrl(customizations.favicon_url || '');
-      setMetaTitle(customizations.meta_title || '');
-      setMetaDescription(customizations.meta_description || '');
+      const initial = {
+        colors: customizations.custom_colors || {},
+        fonts: customizations.custom_fonts || {},
+        layouts: customizations.custom_layouts || {},
+        css: customizations.custom_css || '',
+        js: (customizations as any).custom_js || '',
+        logoUrl: customizations.logo_url || '',
+        faviconUrl: customizations.favicon_url || '',
+        metaTitle: customizations.meta_title || '',
+        metaDescription: customizations.meta_description || '',
+      };
+      
+      // Store initial values
+      setInitialValues(initial);
+      
+      // Set form state
+      setCustomColors(initial.colors);
+      setCustomFonts(initial.fonts);
+      setCustomLayouts(initial.layouts);
+      setCustomCss(initial.css);
+      setCustomJs(initial.js);
+      setLogoUrl(initial.logoUrl);
+      setFaviconUrl(initial.faviconUrl);
+      setMetaTitle(initial.metaTitle);
+      setMetaDescription(initial.metaDescription);
     }
   }, [currentThemeData]);
 
@@ -350,6 +381,24 @@ export default function ThemeCustomizeClient() {
     }
   };
 
+  // Handle cancel/undo - reset to initial values and navigate back
+  const handleCancel = () => {
+    if (initialValues) {
+      setCustomColors(initialValues.colors);
+      setCustomFonts(initialValues.fonts);
+      setCustomLayouts(initialValues.layouts);
+      setCustomCss(initialValues.css);
+      setCustomJs(initialValues.js);
+      setLogoUrl(initialValues.logoUrl);
+      setFaviconUrl(initialValues.faviconUrl);
+      setMetaTitle(initialValues.metaTitle);
+      setMetaDescription(initialValues.metaDescription);
+      setLogoPreview(initialValues.logoUrl || null);
+      setFaviconPreview(initialValues.faviconUrl || null);
+    }
+    router.push('/dashboard/themes');
+  };
+
   const defaultColors = currentThemeData?.theme?.colors || {};
   const defaultFonts = currentThemeData?.theme?.typography || {};
 
@@ -418,10 +467,6 @@ export default function ThemeCustomizeClient() {
             className="hidden"
             onChange={handleImport}
           />
-          <Button onClick={handleSave} disabled={updateMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-          </Button>
         </div>
       </div>
 
@@ -983,6 +1028,22 @@ export default function ThemeCustomizeClient() {
           {/* End of hidden content */}
         </TabsContent>
       </Tabs>
+
+      {/* Save and Cancel buttons at the bottom */}
+      <div className="mt-8 pt-6 border-t flex items-center justify-end gap-4">
+        <Button
+          variant="outline"
+          onClick={handleCancel}
+          disabled={updateMutation.isPending}
+        >
+          <Undo2 className="h-4 w-4 mr-2" />
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={updateMutation.isPending}>
+          <Save className="h-4 w-4 mr-2" />
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
     </div>
   );
 }

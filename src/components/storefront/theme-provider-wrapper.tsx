@@ -24,6 +24,38 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
   const theme = themeData?.theme;
   const customizations = themeData?.customizations;
 
+  // Helper function to convert hex to HSL for Tailwind CSS variables
+  const hexToHsl = (hex: string): string => {
+    // Remove # if present
+    hex = hex.replace('#', '');
+    
+    // Parse RGB
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
+    }
+    
+    h = Math.round(h * 360);
+    s = Math.round(s * 100);
+    l = Math.round(l * 100);
+    
+    return `${h} ${s}% ${l}%`;
+  };
+
   // Apply theme colors and fonts
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -40,16 +72,41 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
       if (value) {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         root.style.setProperty(`--color-${cssKey}`, value);
-        // Also set as Tailwind CSS variables
+        
+        // Also set as Tailwind CSS variables (convert hex to HSL format)
         if (key === 'primary') {
-          root.style.setProperty('--primary', value);
-          // Set primary-foreground to white for good contrast
-          root.style.setProperty('--primary-foreground', '0 0% 100%');
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--primary', hslValue);
+          // Use text color for primary-foreground (button text)
+          const textColor = colors.text || '#FFFFFF';
+          const textHsl = hexToHsl(textColor);
+          root.style.setProperty('--primary-foreground', textHsl);
         }
-        if (key === 'secondary') root.style.setProperty('--secondary', value);
-        if (key === 'accent') root.style.setProperty('--accent', value);
-        if (key === 'background') root.style.setProperty('--background', value);
-        if (key === 'text') root.style.setProperty('--foreground', value);
+        if (key === 'secondary') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--secondary', hslValue);
+          // Use text color for secondary-foreground
+          const textColor = colors.text || '#FFFFFF';
+          const textHsl = hexToHsl(textColor);
+          root.style.setProperty('--secondary-foreground', textHsl);
+        }
+        if (key === 'accent') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--accent', hslValue);
+        }
+        if (key === 'background') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--background', hslValue);
+        }
+        if (key === 'text') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--foreground', hslValue);
+        }
+        if (key === 'muted') {
+          const hslValue = hexToHsl(value);
+          root.style.setProperty('--muted', hslValue);
+          root.style.setProperty('--muted-foreground', hslValue);
+        }
       }
     });
 
