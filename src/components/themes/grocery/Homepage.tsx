@@ -98,7 +98,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                   {onNavigate ? (
                     <Button
                       size="lg"
-                      className="w-fit"
+                      className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate('/products');
@@ -107,7 +107,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                       Order Now
                     </Button>
                   ) : (
-                    <Button size="lg" className="w-fit" asChild>
+                    <Button size="lg" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                       <Link href="/products">Order Now</Link>
                     </Button>
                   )}
@@ -135,7 +135,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     {onNavigate ? (
                       <Button
                         size="sm"
-                        className="w-fit"
+                        className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                         onClick={(e) => {
                           e.preventDefault();
                           onNavigate('/products?category=pure-fruits');
@@ -144,7 +144,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                         Buy Now
                       </Button>
                     ) : (
-                      <Button size="sm" className="w-fit" asChild>
+                      <Button size="sm" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                         <Link href="/products?category=pure-fruits">Buy Now</Link>
                       </Button>
                     )}
@@ -170,7 +170,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     {onNavigate ? (
                       <Button
                         size="sm"
-                        className="w-fit"
+                        className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                         onClick={(e) => {
                           e.preventDefault();
                           onNavigate('/products?category=vegetables');
@@ -179,7 +179,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                         Buy Now
                       </Button>
                     ) : (
-                      <Button size="sm" className="w-fit" asChild>
+                      <Button size="sm" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                         <Link href="/products?category=vegetables">Buy Now</Link>
                       </Button>
                     )}
@@ -289,7 +289,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                 {onNavigate ? (
                   <Button
                     size="sm"
-                    className="w-fit"
+                    className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       onNavigate('/products?category=pure-fruits');
@@ -298,7 +298,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     Buy Now
                   </Button>
                 ) : (
-                  <Button size="sm" className="w-fit" asChild>
+                  <Button size="sm" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                     <Link href="/products?category=pure-fruits">Buy Now</Link>
                   </Button>
                 )}
@@ -321,7 +321,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                 {onNavigate ? (
                   <Button
                     size="sm"
-                    className="w-fit"
+                    className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       onNavigate('/products?category=vegetables');
@@ -330,7 +330,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     Buy Now
                   </Button>
                 ) : (
-                  <Button size="sm" className="w-fit" asChild>
+                  <Button size="sm" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                     <Link href="/products?category=vegetables">Buy Now</Link>
                   </Button>
                 )}
@@ -353,7 +353,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                 {onNavigate ? (
                   <Button
                     size="sm"
-                    className="w-fit"
+                    className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       onNavigate('/products');
@@ -362,7 +362,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     Buy Now
                   </Button>
                 ) : (
-                  <Button size="sm" className="w-fit" asChild>
+                  <Button size="sm" className="w-fit bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                     <Link href="/products">Buy Now</Link>
                   </Button>
                 )}
@@ -523,7 +523,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                   {onNavigate ? (
                     <Button
                       size="lg"
-                      className="w-fit mx-auto"
+                      className="w-fit mx-auto bg-primary text-primary-foreground hover:bg-accent transition-colors"
                       onClick={(e) => {
                         e.preventDefault();
                         onNavigate('/products?category=vegetables');
@@ -532,7 +532,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                       Order Now
                     </Button>
                   ) : (
-                    <Button size="lg" className="w-fit mx-auto" asChild>
+                    <Button size="lg" className="w-fit mx-auto bg-primary text-primary-foreground hover:bg-accent transition-colors" asChild>
                       <Link href="/products?category=vegetables">Order Now</Link>
                     </Button>
                   )}

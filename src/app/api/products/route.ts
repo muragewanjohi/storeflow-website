@@ -41,6 +41,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Ensure page and limit have defaults if not provided
+    if (!queryParams.page) {
+      queryParams.page = 1;
+    }
+    if (!queryParams.limit) {
+      queryParams.limit = 20;
+    }
+
     const validatedQuery = productQuerySchema.parse(queryParams);
 
     const {

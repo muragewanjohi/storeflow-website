@@ -33,7 +33,21 @@ interface GroceryProductCardProps {
 
 export default function GroceryProductCard({ product, className }: GroceryProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currency } = useCurrency();
+  
+  // Format currency with space between symbol and amount
+  const formatCurrencyWithSpace = (amount: number): string => {
+    const formatted = formatCurrency(amount);
+    // Add space between currency symbol and number
+    // Handles both left and right positioned symbols
+    if (currency.symbolPosition === 'left') {
+      // Match currency symbol (letters/symbols) followed by a digit, add space
+      return formatted.replace(/([^\d\s.,-]+)([\d-])/, '$1 $2');
+    } else {
+      // Match digit followed by currency symbol, add space
+      return formatted.replace(/([\d.,-]+)([^\d\s.,-]+)/, '$1 $2');
+    }
+  };
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
   const discountPercent = isOnSale && product.compareAtPrice 
@@ -160,20 +174,25 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           <div className="flex items-center gap-2">
             {isOnSale && product.compareAtPrice ? (
               <>
-                <span className="text-xl font-bold text-primary">{formatCurrency(product.price)}</span>
+                <span className="text-xl font-bold text-primary">
+                  {formatCurrencyWithSpace(product.price)}
+                </span>
                 <span className="text-sm text-gray-500 line-through">
-                  {formatCurrency(product.compareAtPrice)}
+                  {formatCurrencyWithSpace(product.compareAtPrice)}
                 </span>
               </>
             ) : (
-              <span className="text-xl font-bold text-primary">{formatCurrency(product.price)}</span>
+              <span className="text-xl font-bold text-primary">
+                {formatCurrencyWithSpace(product.price)}
+              </span>
             )}
           </div>
           
           <Button
             size="sm"
             disabled={isOutOfStock}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            variant="ghost"
+            className="text-primary hover:bg-primary/10 hover:text-primary"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

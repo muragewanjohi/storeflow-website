@@ -189,7 +189,7 @@ export default function StorefrontHeader({
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
-                <span className="text-lg md:text-xl font-bold text-primary" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
                 </span>
               </button>
@@ -203,7 +203,7 @@ export default function StorefrontHeader({
                     onError={() => setLogoError(true)}
                   />
                 ) : null}
-                <span className="text-lg md:text-xl font-bold text-primary" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
                 </span>
               </Link>
@@ -266,7 +266,7 @@ export default function StorefrontHeader({
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 focus:border-primary focus:ring-primary"
+                  className="w-full pl-10 pr-4 focus-visible:!border-primary focus-visible:!ring-primary"
                 />
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
@@ -277,42 +277,19 @@ export default function StorefrontHeader({
           <div className="flex items-center gap-2">
             {/* Account / Login */}
             {isAuthenticated ? (
-              <div className="flex items-center gap-2">
-                <Link href="/account">
-                  <Button variant="ghost" size="sm">
-                    <UserIcon className="h-5 w-5 mr-2" />
-                    <span className="hidden sm:inline">Account</span>
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch('/api/customers/auth/logout', {
-                        method: 'POST',
-                      });
-                      if (response.ok) {
-                        router.push('/');
-                        router.refresh();
-                        setIsAuthenticated(false);
-                      }
-                    } catch (error) {
-                      console.error('Error logging out:', error);
-                    }
-                  }}
-                  className="hidden sm:inline-flex"
-                >
-                  Sign Out
+              <Link href="/account">
+                <Button variant="ghost" size="sm" className="text-primary hover:text-accent transition-colors">
+                  <UserIcon className="h-5 w-5 mr-2" />
+                  <span className="hidden sm:inline">Account</span>
                 </Button>
-              </div>
+              </Link>
             ) : (
               <div className="flex items-center gap-2">
                 {isPreview && onNavigate ? (
                   <Button
                     size="sm"
                     variant="default"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="bg-primary text-primary-foreground hover:bg-accent transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       onNavigate('/customer-login');
@@ -325,7 +302,7 @@ export default function StorefrontHeader({
                     <Button 
                       size="sm" 
                       variant="default"
-                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="bg-primary text-primary-foreground hover:bg-accent transition-colors"
                     >
                       Login
                     </Button>
@@ -337,7 +314,7 @@ export default function StorefrontHeader({
             {/* Cart Icon */}
             {isPreview ? (
               <Button variant="ghost" size="icon" className="relative group" title="Cart (Preview Mode)">
-                <ShoppingCartIcon className="h-6 w-6 transition-all duration-300 group-hover:text-primary group-hover:scale-110" />
+                <ShoppingCartIcon className="h-6 w-6 text-primary transition-all duration-300 group-hover:scale-110" />
                 {cartItemCount > 0 && (
                   <Badge
                     variant="destructive"
@@ -351,7 +328,7 @@ export default function StorefrontHeader({
             ) : (
               <Link href="/cart">
                 <Button variant="ghost" size="icon" className="relative group">
-                  <ShoppingCartIcon className="h-6 w-6 transition-all duration-300 group-hover:text-primary group-hover:scale-110" />
+                  <ShoppingCartIcon className="h-6 w-6 text-primary transition-all duration-300 group-hover:scale-110" />
                   {cartItemCount > 0 && (
                     <Badge
                       variant="destructive"
@@ -407,7 +384,7 @@ export default function StorefrontHeader({
                       placeholder="Search products..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 focus:border-primary focus:ring-primary"
+                      className="w-full pl-10 pr-4 focus-visible:!border-primary focus-visible:!ring-primary"
                     />
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   </div>
@@ -451,40 +428,18 @@ export default function StorefrontHeader({
               })}
               <div className="border-t mt-2 pt-2">
                 {isAuthenticated ? (
-                  <>
-                    <Link
-                      href="/account"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      My Account
-                    </Link>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/customers/auth/logout', {
-                            method: 'POST',
-                          });
-                          if (response.ok) {
-                            setMobileMenuOpen(false);
-                            router.push('/');
-                            router.refresh();
-                            setIsAuthenticated(false);
-                          }
-                        } catch (error) {
-                          console.error('Error logging out:', error);
-                        }
-                      }}
-                      className="block w-full text-left px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      Sign Out
-                    </button>
-                  </>
+                  <Link
+                    href="/account"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
+                  >
+                    My Account
+                  </Link>
                 ) : (
                   <Link
                     href="/customer-login"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-base font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
                     Login
                   </Link>

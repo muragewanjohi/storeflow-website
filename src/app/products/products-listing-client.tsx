@@ -134,6 +134,18 @@ export default function ProductsListingClient({
       setTotal(initialTotal);
     }
   }, [initialProducts, initialTotal]);
+
+  // Ensure URL has page=1 when page parameter is missing (fixes loading issue)
+  useEffect(() => {
+    const currentPage = searchParams.get('page');
+    // If page parameter is missing and we're on page 1, update URL to include it
+    if (!currentPage && initialPage === 1) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('page', '1');
+      // Use replace to avoid adding to history
+      router.replace(`/products?${params.toString()}`, { scroll: false });
+    }
+  }, [searchParams, initialPage, router]);
   
   // Fetch attributes on mount
   useEffect(() => {

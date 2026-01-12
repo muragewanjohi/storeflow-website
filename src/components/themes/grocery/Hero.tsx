@@ -71,14 +71,14 @@ export default function GroceryHero({
               {isPreview && onNavigate ? (
                 <Button 
                   size="lg" 
-                  className="group text-lg px-8 py-6 bg-green-600 hover:bg-green-700 text-white"
+                  className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:bg-accent transition-colors"
                   onClick={handleCTAClick}
                 >
                   {ctaText}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               ) : (
-                <Button asChild size="lg" className="group text-lg px-8 py-6 bg-green-600 hover:bg-green-700 text-white">
+                <Button asChild size="lg" className="group text-lg px-8 py-6 bg-primary text-primary-foreground hover:bg-accent transition-colors">
                   <Link href={ctaLink}>
                     {ctaText}
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
