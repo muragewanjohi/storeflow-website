@@ -29,13 +29,24 @@ export default function StorefrontHeader({
   const router = useRouter();
   const { isPreview, onNavigate } = usePreview();
 
-  // Debug: Log router state
+  // Debug: Log router state and detect mismatches
   useEffect(() => {
-    console.log('[Header] Router state:', {
-      pathname,
-      isPreview,
-      hasOnNavigate: !!onNavigate,
-    });
+    if (typeof window !== 'undefined') {
+      const actualPath = window.location.pathname;
+      const routerMatches = pathname === actualPath;
+      console.log('[Header] Router state:', {
+        pathname,
+        actualPath,
+        routerMatches,
+        isPreview,
+        hasOnNavigate: !!onNavigate,
+      });
+      
+      // Warn if router doesn't match actual URL
+      if (!routerMatches) {
+        console.warn('[Header] Router pathname mismatch! Router thinks:', pathname, 'but URL is:', actualPath);
+      }
+    }
   }, [pathname, isPreview, onNavigate]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
@@ -299,6 +310,15 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
+                    onClick={(e) => {
+                      // Debug: Log navigation attempts
+                      console.log('[Header] Link clicked:', item.name, item.href, {
+                        currentPathname: pathname,
+                        targetHref: item.href,
+                        willNavigate: true,
+                      });
+                      // Let Next.js Link handle navigation naturally
+                    }}
                     // Best practice: Let Next.js Link handle navigation naturally
                     // Don't preventDefault - Link handles prefetching, client-side routing, and optimizations
                   >

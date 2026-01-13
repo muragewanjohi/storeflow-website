@@ -10,7 +10,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRightIcon, ChevronDownIcon, XMarkIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -68,8 +68,26 @@ export default function ProductsListingClient({
 }: Readonly<ProductsListingClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const { formatCurrency } = useCurrency();
+  
+  // Debug: Log pathname to verify routing and detect mismatches
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const actualPath = window.location.pathname;
+      console.log('[ProductsListing] Router pathname:', pathname, 'Actual URL pathname:', actualPath, {
+        match: pathname === actualPath,
+        shouldBeOnProducts: actualPath === '/products',
+        componentRendering: true,
+      });
+      
+      // If there's a mismatch and we're actually on /products, log a warning
+      if (pathname !== actualPath && actualPath === '/products') {
+        console.warn('[ProductsListing] Router pathname mismatch detected! Router thinks:', pathname, 'but URL is:', actualPath);
+      }
+    }
+  }, [pathname]);
   
   // Load theme-specific product card
   const ThemeProductCard = useMemo(() => {
