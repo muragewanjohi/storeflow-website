@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import Link from 'next/link';
+import * as LucideIcons from 'lucide-react';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 import CountdownTimer from '@/components/storefront/countdown-timer';
 
@@ -140,27 +141,31 @@ function HeroSectionComponent({
                   </div>
                 </div>
               ) : (
-                <img
-                  src={section.image}
-                  alt={section.title || 'Hero image'}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    // Fallback if image fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `
-                        <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-                          <div class="text-center">
-                            <p class="text-sm font-medium">Image not available</p>
-                            <p class="text-xs mt-1">Please check the image URL</p>
+                <div className="relative w-full h-full">
+                  <Image
+                    src={section.image}
+                    alt={section.title || 'Hero image'}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `
+                          <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                            <div class="text-center">
+                              <p class="text-sm font-medium">Image not available</p>
+                              <p class="text-xs mt-1">Please check the image URL</p>
+                            </div>
                           </div>
-                        </div>
-                      `;
-                    }
-                  }}
-                />
+                        `;
+                      }
+                    }}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -226,15 +231,31 @@ function FeaturesSectionComponent({
               <CardContent className="pt-6">
                 {feature.image && (
                   <div className="relative aspect-video mb-4 rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src={feature.image}
                       alt={feature.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
                 )}
                 {feature.icon && (
-                  <div className="text-4xl mb-4">{feature.icon}</div>
+                  <div className="text-4xl mb-4 flex items-center justify-center">
+                    {feature.icon.startsWith('icon:') ? (
+                      (() => {
+                        const iconName = feature.icon.replace('icon:', '');
+                        const IconComponent = (LucideIcons as any)[iconName];
+                        return IconComponent ? (
+                          <IconComponent className="h-12 w-12 text-primary" />
+                        ) : (
+                          <span className="text-4xl">📦</span>
+                        );
+                      })()
+                    ) : (
+                      <span>{feature.icon}</span>
+                    )}
+                  </div>
                 )}
                 <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                 {feature.description && (
@@ -473,10 +494,12 @@ function TestimonialsSectionComponent({
                 <div className="flex items-center gap-4">
                   {testimonial.image && (
                     <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                      <img
+                      <Image
                         src={testimonial.image}
                         alt={testimonial.name}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="48px"
                       />
                     </div>
                   )}
@@ -552,26 +575,30 @@ function ImageSectionComponent({
               </div>
             </div>
           ) : (
-            <img
-              src={section.image}
-              alt={section.alt_text || section.caption || 'Image'}
-              className="w-full h-auto"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  parent.innerHTML = `
-                    <div class="w-full h-64 flex items-center justify-center bg-muted text-muted-foreground">
-                      <div class="text-center">
-                        <p class="text-sm font-medium">Image not available</p>
-                        <p class="text-xs mt-1">Please check the image URL</p>
+            <div className="relative w-full" style={{ minHeight: '200px' }}>
+              <Image
+                src={section.image}
+                alt={section.alt_text || section.caption || 'Image'}
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = `
+                      <div class="w-full h-64 flex items-center justify-center bg-muted text-muted-foreground">
+                        <div class="text-center">
+                          <p class="text-sm font-medium">Image not available</p>
+                          <p class="text-xs mt-1">Please check the image URL</p>
+                        </div>
                       </div>
-                    </div>
-                  `;
-                }
-              }}
-            />
+                    `;
+                  }
+                }}
+              />
+            </div>
           )}
           {section.caption && (
             <p className="text-sm text-muted-foreground text-center mt-2">{section.caption}</p>
@@ -800,6 +827,32 @@ function BannersSectionComponent({
       }}
     >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+        {(section.title || section.subtitle) && (
+          <div className="mb-8 text-center">
+            {section.title && (
+              <h2 
+                className="text-3xl font-bold mb-4"
+                style={{ 
+                  fontFamily: 'var(--font-heading)',
+                  color: 'var(--banners-title-color)',
+                }}
+              >
+                {section.title}
+              </h2>
+            )}
+            {section.subtitle && (
+              <p 
+                className="text-lg mb-4"
+                style={{ 
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--banners-subtitle-color)',
+                }}
+              >
+                {section.subtitle}
+              </p>
+            )}
+          </div>
+        )}
         <div className={`grid ${gridCols} gap-6`}>
           {section.banners.map((banner) => {
             // Set banner-specific CSS variables
@@ -1166,10 +1219,12 @@ function SalesTabSectionComponent({
         {section.banner_style !== 'none' && sales.length > 0 && sales[0]?.banner_image && (
           <div className={`mb-8 ${section.banner_style === 'full_width' ? 'w-full' : 'max-w-4xl mx-auto'}`}>
             <div className="relative aspect-video overflow-hidden rounded-lg">
-              <img
+              <Image
                 src={sales[0].banner_image}
                 alt={sales[0].name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
               />
             </div>
           </div>

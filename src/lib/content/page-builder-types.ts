@@ -109,6 +109,8 @@ export interface CategoriesSection extends BaseSection {
 
 export interface BannersSection extends BaseSection {
   type: 'banners';
+  title?: string;
+  subtitle?: string;
   banners: Array<{
     id: string;
     title: string;

@@ -7,6 +7,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Star, Shield, Truck } from 'lucide-react';
 import { usePreview } from '@/lib/themes/preview-context';

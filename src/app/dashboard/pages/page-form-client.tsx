@@ -422,22 +422,6 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.
                     </p>
-                    
-                    {/* Guidance on when to use Hero Section */}
-                    <Alert className="mt-3">
-                      <InformationCircleIcon className="h-4 w-4" />
-                      <AlertTitle className="text-sm font-semibold">When to Use Hero Section</AlertTitle>
-                      <AlertDescription className="text-xs mt-1">
-                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                          <li>Homepage - Full-featured hero with title, subtitle, CTA buttons</li>
-                          <li>Landing pages - Need interactive elements (buttons, descriptions)</li>
-                          <li>Complex layouts - Want more control over design and content</li>
-                        </ul>
-                        <p className="mt-2 text-muted-foreground">
-                          <strong>Tip:</strong> If you add a Hero Section as the first section, the Banner Image above will be automatically hidden to avoid redundancy.
-                        </p>
-                      </AlertDescription>
-                    </Alert>
                   </TabsContent>
                 </Tabs>
               </div>

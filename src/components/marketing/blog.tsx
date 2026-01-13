@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Calendar, User, Tag } from 'lucide-react';
 import Link from 'next/link';
 
@@ -94,10 +95,12 @@ export function Blog() {
               {/* Post Image */}
               <div className="relative h-48 bg-[#e7e9eb] overflow-hidden">
                 {post.image ? (
-                <img
+                <Image
                   src={post.image}
                   alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#0025cc] to-[#001a99] flex items-center justify-center">

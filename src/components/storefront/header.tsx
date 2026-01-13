@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -182,12 +183,17 @@ export default function StorefrontHeader({
                 className="flex items-center gap-3 md:gap-4"
               >
                 {isMounted && storeLogo && !logoError ? (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-12 md:h-16 w-auto object-contain max-w-[220px] md:max-w-[300px]"
-                    onError={() => setLogoError(true)}
-                  />
+                  <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 220px, 300px"
+                      onError={() => setLogoError(true)}
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                    />
+                  </div>
                 ) : null}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
@@ -196,12 +202,17 @@ export default function StorefrontHeader({
             ) : (
               <Link href="/" className="flex items-center gap-3 md:gap-4">
                 {isMounted && storeLogo && !logoError ? (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-12 md:h-16 w-auto object-contain max-w-[220px] md:max-w-[300px]"
-                    onError={() => setLogoError(true)}
-                  />
+                  <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 220px, 300px"
+                      onError={() => setLogoError(true)}
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                    />
+                  </div>
                 ) : null}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}

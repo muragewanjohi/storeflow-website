@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,10 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 // Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
+import { IconEmojiPicker } from '@/components/content/icon-emoji-picker';
 import { useQuery } from '@tanstack/react-query';
 
 interface SectionEditorProps {
@@ -345,6 +347,15 @@ function FeaturesSectionEditor({
             </SelectContent>
           </Select>
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the features section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label>Features</Label>
@@ -376,15 +387,12 @@ function FeaturesSectionEditor({
                     rows={2}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Icon (Emoji)</Label>
-                  <Input
-                    value={feature.icon || ''}
-                    onChange={(e) => updateFeature(feature.id, { icon: e.target.value })}
-                    placeholder="✨"
-                    maxLength={2}
-                  />
-                </div>
+                <IconEmojiPicker
+                  value={feature.icon || ''}
+                  onChange={(value) => updateFeature(feature.id, { icon: value })}
+                  label="Icon/Emoji"
+                  description="Select an emoji or icon for this feature"
+                />
                 <div className="space-y-2">
                   <Label>Image</Label>
                   <ImageUploadField
@@ -406,15 +414,6 @@ function FeaturesSectionEditor({
             </Card>
           ))}
         </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the features section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
       </CardContent>
     </Card>
   );
@@ -1145,20 +1144,36 @@ function BannersSectionEditor({
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <Label>Section Title</Label>
+          <Input
+            value={section.title || ''}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+            placeholder="Banners section title (optional)"
+          />
+        </div>
         <ColorPicker
           label="Section Title Color"
           colorKey="title_color"
           defaultValue="#000000"
-          description="Color for section-level title (if used)"
+          description="Color for section-level title"
           section={section}
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}
         />
+        <div className="space-y-2">
+          <Label>Section Subtitle</Label>
+          <Input
+            value={section.subtitle || ''}
+            onChange={(e) => onUpdate({ subtitle: e.target.value })}
+            placeholder="Banners section subtitle (optional)"
+          />
+        </div>
         <ColorPicker
           label="Section Subtitle Color"
           colorKey="subtitle_color"
           defaultValue="#666666"
-          description="Color for section-level subtitle (if used)"
+          description="Color for section-level subtitle"
           section={section}
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}
@@ -1871,6 +1886,68 @@ function CTASectionEditor({
     onUpdate({ [colorKey]: undefined });
   };
 
+  // Track if using custom URL
+  const [useCustomUrl, setUseCustomUrl] = useState(false);
+
+  // Fetch published pages for CTA link selection
+  const { data: pagesData, isLoading: isLoadingPages } = useQuery({
+    queryKey: ['pages', 'published'],
+    queryFn: async () => {
+      const response = await fetch('/api/pages?status=published&limit=100');
+      if (!response.ok) {
+        throw new Error('Failed to fetch pages');
+      }
+      return await response.json();
+    },
+  });
+
+  const pages = useMemo(() => pagesData?.pages || [], [pagesData?.pages]);
+
+  // Check if CTA link matches any page
+  const getPageSlugForLink = useCallback((link: string | undefined): string | null => {
+    if (!link) return null;
+    const page = pages.find((p: any) => {
+      const pageSlug = p.slug ? `/${p.slug}` : `#${p.id}`;
+      return pageSlug === link;
+    });
+    return page ? (page.slug ? `/${page.slug}` : `#${page.id}`) : null;
+  }, [pages]);
+
+  // Check if current link is a custom URL
+  const isCustomUrl = useCustomUrl || (section.cta_link && !getPageSlugForLink(section.cta_link));
+
+  const handleCtaLinkChange = (value: string) => {
+    if (value === '__custom__') {
+      setUseCustomUrl(true);
+      onUpdate({ cta_link: '' });
+    } else {
+      setUseCustomUrl(false);
+      onUpdate({ cta_link: value });
+    }
+  };
+
+  // Initialize custom URL state on mount
+  useEffect(() => {
+    if (section.cta_link && !getPageSlugForLink(section.cta_link)) {
+      setUseCustomUrl(true);
+    }
+  }, [section.cta_link, getPageSlugForLink]);
+
+  // Determine background type: 'color' or 'gradient'
+  const backgroundType = section.background_gradient ? 'gradient' : 'color';
+
+  const handleBackgroundTypeChange = (value: string) => {
+    if (value === 'gradient') {
+      // Switch to gradient - clear color if no gradient exists
+      if (!section.background_gradient) {
+        onUpdate({ background_gradient: 'linear-gradient(to right, #16a34a, #059669)' });
+      }
+    } else {
+      // Switch to color - clear gradient
+      onUpdate({ background_gradient: undefined });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -1922,11 +1999,56 @@ function CTASectionEditor({
           </div>
           <div className="space-y-2">
             <Label>CTA Link *</Label>
-            <Input
-              value={section.cta_link}
-              onChange={(e) => onUpdate({ cta_link: e.target.value })}
-              placeholder="/products"
-            />
+            {isLoadingPages ? (
+              <div className="text-sm text-muted-foreground py-2">Loading pages...</div>
+            ) : isCustomUrl ? (
+              <div className="space-y-2">
+                <Input
+                  value={section.cta_link || ''}
+                  onChange={(e) => onUpdate({ cta_link: e.target.value })}
+                  placeholder="/products or https://example.com"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setUseCustomUrl(false);
+                    onUpdate({ cta_link: '' });
+                  }}
+                >
+                  Select a page instead
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Custom URL (e.g., /products, /about, or external URL)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Select
+                  value={section.cta_link || ''}
+                  onValueChange={handleCtaLinkChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a page" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pages.map((page: any) => {
+                      const pageSlug = page.slug ? `/${page.slug}` : `#${page.id}`;
+                      return (
+                        <SelectItem key={page.id} value={pageSlug}>
+                          {page.title}
+                        </SelectItem>
+                      );
+                    })}
+                    <SelectItem value="__custom__">Custom URL...</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select a page or choose &quot;Custom URL...&quot; for external links
+                </p>
+              </div>
+            )}
           </div>
         </div>
         <ColorPicker
@@ -1947,34 +2069,55 @@ function CTASectionEditor({
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}
         />
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the CTA section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#16A34A"
-          description="Background color for the CTA section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Background Gradient (CSS gradient)</Label>
-          <Input
-            value={section.background_gradient || ''}
-            onChange={(e) => onUpdate({ background_gradient: e.target.value })}
-            placeholder="linear-gradient(to right, #16a34a, #059669)"
-          />
-          <p className="text-xs text-muted-foreground">
-            If provided, gradient will override background color
-          </p>
+        
+        {/* Background Style Selection */}
+        <div className="space-y-3 border-t pt-4">
+          <div className="space-y-2">
+            <Label>Background Style</Label>
+            <RadioGroup
+              value={backgroundType}
+              onValueChange={handleBackgroundTypeChange}
+              className="flex gap-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="color" id="bg-color" />
+                <Label htmlFor="bg-color" className="font-normal cursor-pointer">
+                  Solid Color
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="gradient" id="bg-gradient" />
+                <Label htmlFor="bg-gradient" className="font-normal cursor-pointer">
+                  Gradient
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {backgroundType === 'color' ? (
+            <ColorPicker
+              label="Background Color"
+              colorKey="background_color"
+              defaultValue="#16A34A"
+              description="Solid background color for the CTA section"
+              section={section}
+              onColorChange={handleColorChange}
+              onColorReset={handleColorReset}
+            />
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="background-gradient">Background Gradient</Label>
+              <Input
+                id="background-gradient"
+                value={section.background_gradient || ''}
+                onChange={(e) => onUpdate({ background_gradient: e.target.value })}
+                placeholder="linear-gradient(to right, #16a34a, #059669)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter a CSS gradient string. Example: <code className="text-xs bg-muted px-1 py-0.5 rounded">linear-gradient(to right, #16a34a, #059669)</code>
+              </p>
+            </div>
+          )}
         </div>
         <ColorPicker
           label="Text Color"

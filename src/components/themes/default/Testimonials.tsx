@@ -6,6 +6,7 @@
 
 'use client';
 
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Star } from 'lucide-react';
 
@@ -98,11 +99,12 @@ export default function DefaultTestimonials({ testimonials = defaultTestimonials
                 <div className="flex items-center gap-4">
                   {testimonial.image ? (
                     <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
-                      <img
+                      <Image
                         src={testimonial.image}
                         alt={testimonial.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        sizes="56px"
                       />
                     </div>
                   ) : (

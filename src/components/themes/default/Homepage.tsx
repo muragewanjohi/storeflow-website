@@ -9,6 +9,7 @@
 
 import { memo, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, Laptop, Smartphone, Headphones, MousePointer2 } from 'lucide-react';
@@ -115,11 +116,12 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
                       >
                         <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full border-2 hover:border-primary/50">
                           <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                            <img
+                            <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              loading="lazy"
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
+                              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                             <div className="absolute bottom-4 left-4 right-4">
@@ -142,11 +144,12 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
                       <a href={`/products?category=${category.slug}`} className="block">
                         <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full border-2 hover:border-primary/50">
                           <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                            <img
+                            <Image
                               src={getCategoryImage(category.name)}
                               alt={category.name}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              loading="lazy"
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-500"
+                              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                             <div className="absolute bottom-4 left-4 right-4">

@@ -8,6 +8,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -118,11 +119,14 @@ export default function ImageUploadField({
     <div className="space-y-2">
       <Label>{label}</Label>
       {imagePreview ? (
-        <div className="relative">
-          <img
+        <div className="relative w-full h-48 rounded-md border overflow-hidden">
+          <Image
             src={imagePreview}
             alt="Image preview"
-            className="w-full h-48 object-cover rounded-md border"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 400px"
+            unoptimized={imagePreview.startsWith('blob:') || imagePreview.startsWith('data:')}
           />
           <div className="absolute top-2 right-2 flex gap-2">
             <Button

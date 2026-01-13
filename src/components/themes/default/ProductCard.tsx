@@ -62,12 +62,12 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
           >
             <div className="relative aspect-square bg-muted overflow-hidden">
               {product.image ? (
-                <img
+                <Image
                   src={product.image}
                   alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                  decoding="async"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                   onError={(e) => {
                     // Fallback on image error
                     const target = e.target as HTMLImageElement;
@@ -80,6 +80,7 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                       parent.appendChild(fallback);
                     }
                   }}
+                  unoptimized={product.image.startsWith('blob:') || product.image.startsWith('data:')}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -102,12 +103,12 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
           <Link href={`/products/${product.slug || product.id}`}>
             <div className="relative aspect-square bg-muted overflow-hidden">
               {product.image ? (
-                <img
+                <Image
                   src={product.image}
                   alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                  decoding="async"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                   onError={(e) => {
                     // Fallback on image error
                     const target = e.target as HTMLImageElement;
@@ -120,6 +121,7 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                       parent.appendChild(fallback);
                     }
                   }}
+                  unoptimized={product.image.startsWith('blob:') || product.image.startsWith('data:')}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">

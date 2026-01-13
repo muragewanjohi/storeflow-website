@@ -7,6 +7,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Calendar, User } from 'lucide-react';
@@ -103,11 +104,12 @@ export default function DefaultBlogs({ posts = defaultPosts }: DefaultBlogsProps
           {posts.map((post) => (
             <Card key={post.id} className="group overflow-hidden hover:shadow-xl transition-all duration-300">
               <div className="relative aspect-video overflow-hidden">
-                <img
+                <Image
                   src={post.image}
                   alt={post.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  loading="lazy"
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 <div className="absolute top-4 left-4">
                   <span className="px-3 py-1 bg-primary text-primary-foreground text-sm font-semibold rounded-full">

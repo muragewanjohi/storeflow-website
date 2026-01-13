@@ -89,6 +89,17 @@ export default function ProductsListingClient({
   const initialProductsRef = useRef(initialProducts);
   const hasInitializedRef = useRef(false);
 
+  // Ensure products are set immediately from initialProducts
+  useEffect(() => {
+    if (initialProducts.length > 0 && products.length === 0) {
+      console.log('[ProductsListing] Setting products from initialProducts', {
+        initialProductsCount: initialProducts.length,
+      });
+      setProducts(initialProducts);
+      setTotal(initialTotal);
+    }
+  }, [initialProducts, initialTotal, products.length]);
+
   // Log initial state
   useEffect(() => {
     console.log('[ProductsListing] Component mounted', {
@@ -685,42 +696,57 @@ export default function ProductsListingClient({
 
         {/* Product Grid */}
         <div className="flex-1">
-          {isSearching ? (
-            <div className="text-center py-12">
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="border rounded-lg overflow-hidden animate-pulse">
-                      <div className="aspect-square w-full bg-gray-200" />
-                      <div className="p-4 space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-3/4" />
-                        <div className="h-4 bg-gray-200 rounded w-1/2" />
-                        <div className="h-6 bg-gray-200 rounded w-1/3" />
-                      </div>
+          {(() => {
+            // Determine which products to display - prioritize products state, fallback to initialProducts
+            const productsToDisplay = products.length > 0 ? products : initialProducts;
+            
+            // Show loading skeleton only if actively searching AND no products available
+            if (isSearching && productsToDisplay.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="border rounded-lg overflow-hidden animate-pulse">
+                          <div className="aspect-square w-full bg-gray-200" />
+                          <div className="p-4 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                            <div className="h-4 bg-gray-200 rounded w-1/2" />
+                            <div className="h-6 bg-gray-200 rounded w-1/3" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
+                  </div>
+                </div>
+              );
+            }
+            
+            // Show "No products" message only if we have no products at all
+            if (productsToDisplay.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
+                  {process.env.NODE_ENV === 'development' && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}, isSearching={isSearching.toString()}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+            
+            // Show products
+            return (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                  {productsToDisplay.map((product: any) => (
+                    <ThemeProductCard
+                      key={product.id}
+                      product={product}
+                    />
                   ))}
                 </div>
-              </div>
-            </div>
-          ) : (products.length === 0 && initialProducts.length === 0) ? (
-            <div className="text-center py-12">
-              <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
-              {process.env.NODE_ENV === 'development' && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-                {(products.length > 0 ? products : initialProducts).map((product: any) => (
-                  <ThemeProductCard
-                    key={product.id}
-                    product={product}
-                  />
-                ))}
-              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -796,8 +822,9 @@ export default function ProductsListingClient({
                   </Button>
                 </div>
               )}
-            </>
-          )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

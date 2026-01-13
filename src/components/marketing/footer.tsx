@@ -1,5 +1,6 @@
 import { Mail } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function Footer() {
   return (
@@ -8,8 +9,14 @@ export function Footer() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Company Info */}
           <div>
-            <div className="mb-4">
-              <img src="/logo_with_name_white.png" alt="DukaNest" className="h-10 w-auto brightness-0 invert" />
+            <div className="relative h-10 w-auto mb-4">
+              <Image 
+                src="/logo_with_name_white.png" 
+                alt="DukaNest" 
+                fill
+                className="object-contain brightness-0 invert"
+                sizes="200px"
+              />
             </div>
             <p className="text-gray-400 leading-relaxed mb-6">
               Build your dream online store with powerful tools and beautiful templates. No coding required.
