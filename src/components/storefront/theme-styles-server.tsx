@@ -5,7 +5,7 @@
  * This runs server-side and applies colors before the page renders
  */
 
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 
 // Helper function to convert hex to HSL for Tailwind CSS variables
@@ -42,7 +42,14 @@ function hexToHsl(hex: string): string {
 
 export default async function ThemeStylesServer() {
   try {
-    const tenant = await requireTenant();
+    // Use getTenant() instead of requireTenant() to gracefully handle marketing sites
+    // Marketing sites (like storeflow-website) don't have tenants and should skip theme styles
+    const tenant = await getTenant();
+    
+    // If no tenant (e.g., marketing site), return null - no theme styles needed
+    if (!tenant) {
+      return null;
+    }
 
     const tenantTheme = await prisma.tenant_themes.findFirst({
       where: {

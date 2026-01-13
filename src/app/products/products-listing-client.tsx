@@ -82,10 +82,21 @@ export default function ProductsListingClient({
   const [category, setCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState(initialSortBy);
   const [sortOrder, setSortOrder] = useState(initialSortOrder);
+  // Initialize state with initialProducts - this ensures products are available immediately
   const [products, setProducts] = useState(initialProducts);
   const [total, setTotal] = useState(initialTotal);
   const [isSearching, setIsSearching] = useState(false);
   const [isInitialMount, setIsInitialMount] = useState(true);
+  
+  // Log initial state immediately to help debug
+  if (typeof window !== 'undefined') {
+    console.log('[ProductsListing] Initial render', {
+      initialProductsCount: initialProducts.length,
+      productsStateCount: products.length,
+      initialTotal,
+      hasProducts: products.length > 0 || initialProducts.length > 0,
+    });
+  }
   const initialProductsRef = useRef(initialProducts);
   const hasInitializedRef = useRef(false);
 
@@ -93,19 +104,30 @@ export default function ProductsListingClient({
   // Use a ref to track the last synced initialProducts to avoid infinite loops
   const lastSyncedInitialProductsRef = useRef<string>('');
   useEffect(() => {
-    if (initialProducts.length > 0) {
-      // Create a stable key from initialProducts to detect changes
-      const initialProductsKey = initialProducts.map(p => p.id).join(',');
-      
-      // Only sync if initialProducts actually changed
-      if (lastSyncedInitialProductsRef.current !== initialProductsKey) {
-        console.log('[ProductsListing] Setting products from initialProducts', {
+    // Create a stable key from initialProducts to detect changes
+    const initialProductsKey = initialProducts.length > 0 
+      ? initialProducts.map(p => p.id).join(',')
+      : 'empty';
+    
+    // Only sync if initialProducts actually changed
+    if (lastSyncedInitialProductsRef.current !== initialProductsKey) {
+      console.log('[ProductsListing] Syncing products from initialProducts', {
+        initialProductsCount: initialProducts.length,
+        currentProductsCount: products.length,
+        initialTotal,
+        willUpdate: true,
+      });
+      setProducts(initialProducts);
+      setTotal(initialTotal);
+      lastSyncedInitialProductsRef.current = initialProductsKey;
+    } else {
+      // Log when we skip sync (for debugging)
+      if (initialProducts.length > 0 || products.length > 0) {
+        console.log('[ProductsListing] Skipping sync - no change detected', {
           initialProductsCount: initialProducts.length,
           currentProductsCount: products.length,
+          key: initialProductsKey.substring(0, 50),
         });
-        setProducts(initialProducts);
-        setTotal(initialTotal);
-        lastSyncedInitialProductsRef.current = initialProductsKey;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -728,6 +750,16 @@ export default function ProductsListingClient({
           {(() => {
             // Determine which products to display - prioritize products state, fallback to initialProducts
             const productsToDisplay = products.length > 0 ? products : initialProducts;
+            
+            // Debug logging for rendering decision
+            if (typeof window !== 'undefined' && productsToDisplay.length === 0) {
+              console.log('[ProductsListing] No products to display', {
+                productsStateCount: products.length,
+                initialProductsCount: initialProducts.length,
+                isSearching,
+                total,
+              });
+            }
             
             // Show loading skeleton only if actively searching AND no products available
             if (isSearching && productsToDisplay.length === 0) {
