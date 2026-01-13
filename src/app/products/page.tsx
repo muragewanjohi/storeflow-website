@@ -12,11 +12,9 @@ import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
-import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { ReactErrorBoundary } from '@/components/storefront/react-error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
-import { Suspense } from 'react';
 
 /**
  * Caching Strategy: Dynamic Rendering with Response Caching
@@ -53,14 +51,16 @@ export default async function ProductsPage({
   } catch (error) {
     console.error('[Products Page] Error getting tenant:', error);
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <StorefrontHeader />
-        <ErrorState
-          title="Store Not Found"
-          message="Unable to load the store. Please check the URL and try again."
-          actionLabel="Go Home"
-          actionHref="/"
-        />
+        <main className="flex-1">
+          <ErrorState
+            title="Store Not Found"
+            message="Unable to load the store. Please check the URL and try again."
+            actionLabel="Go Home"
+            actionHref="/"
+          />
+        </main>
         <StorefrontFooter />
       </div>
     );
@@ -393,31 +393,27 @@ export default async function ProductsPage({
     });
 
     return (
-      <ThemeProviderWrapper>
-        <div className="min-h-screen bg-background flex flex-col">
-          <StorefrontHeader />
-          <main className="flex-1">
-            <ReactErrorBoundary>
-              {/* ProductsListingClient is a client component - no need for Suspense */}
-              {/* Suspense is only needed for async server components */}
-              <ProductsListingClient
-                initialProducts={products}
-                initialTotal={total}
-                initialCategories={categories}
-                initialPage={page}
-                initialLimit={limit}
-                initialSearch={search}
-                initialCategory={categoryParam}
-                initialSortBy={sort_by}
-                initialSortOrder={sort_order}
-                currentCategory={currentCategory}
-                themeSlug={tenant.theme_slug || 'default'}
-              />
-            </ReactErrorBoundary>
-          </main>
-          <StorefrontFooter />
-        </div>
-      </ThemeProviderWrapper>
+      <div className="min-h-screen bg-background flex flex-col">
+        <StorefrontHeader />
+        <main className="flex-1">
+          <ReactErrorBoundary>
+            <ProductsListingClient
+              initialProducts={products}
+              initialTotal={total}
+              initialCategories={categories}
+              initialPage={page}
+              initialLimit={limit}
+              initialSearch={search}
+              initialCategory={categoryParam}
+              initialSortBy={sort_by}
+              initialSortOrder={sort_order}
+              currentCategory={currentCategory}
+              themeSlug={tenant.theme_slug || 'default'}
+            />
+          </ReactErrorBoundary>
+        </main>
+        <StorefrontFooter />
+      </div>
     );
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -441,14 +437,16 @@ export default async function ProductsPage({
 
     // Generic error
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <StorefrontHeader />
-        <ErrorState
-          title="Error Loading Products"
-          message={error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
-          actionLabel="Go Home"
-          actionHref="/"
-        />
+        <main className="flex-1">
+          <ErrorState
+            title="Error Loading Products"
+            message={error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
+            actionLabel="Go Home"
+            actionHref="/"
+          />
+        </main>
         <StorefrontFooter />
       </div>
     );

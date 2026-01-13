@@ -29,12 +29,6 @@ export default function StorefrontHeader({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isPreview, onNavigate } = usePreview();
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('[Header] Preview mode:', isPreview);
-    console.log('[Header] Current pathname:', pathname);
-  }, [isPreview, pathname]);
 
   // Removed excessive debug logging - not needed in production
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -285,9 +279,6 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => {
-                      console.log('[Header] Navigation clicked:', item.name, item.href);
-                    }}
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
@@ -467,10 +458,7 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => {
-                      console.log('[Header Mobile] Navigation clicked:', item.name, item.href);
-                      setMobileMenuOpen(false);
-                    }}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
