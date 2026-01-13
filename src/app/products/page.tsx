@@ -6,7 +6,6 @@
  * Day 30: Tenant Storefront - Product Listing
  */
 
-import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
 import ProductsListingClient from './products-listing-client';
@@ -17,6 +16,18 @@ import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
+/**
+ * Caching Strategy: Dynamic Rendering with Response Caching
+ * 
+ * - Must be dynamic because tenant resolution requires headers (hostname)
+ * - Cannot use ISR because tenant is request-specific
+ * - Caching is handled via:
+ *   1. API route cache headers (30s cache, 60s stale-while-revalidate)
+ *   2. Next.js automatic request deduplication
+ *   3. CDN caching via Vercel Edge Network
+ * 
+ * This provides good performance while maintaining tenant-specific content.
+ */
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -363,39 +374,19 @@ export default async function ProductsPage({
         <div className="min-h-screen bg-background flex flex-col">
           <StorefrontHeader />
           <main className="flex-1">
-            <Suspense fallback={
-              <div className="container mx-auto px-4 py-8">
-                <div className="space-y-6">
-                  <div className="h-8 bg-muted rounded animate-pulse w-1/4" />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {Array.from({ length: 8 }).map((_: any, i: any) => (
-                      <div key={i} className="border rounded-lg overflow-hidden">
-                        <div className="aspect-square w-full bg-muted animate-pulse" />
-                        <div className="p-4 space-y-2">
-                          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                          <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
-                          <div className="h-6 bg-muted rounded animate-pulse w-1/3" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            }>
-              <ProductsListingClient
-                initialProducts={products}
-                initialTotal={total}
-                initialCategories={categories}
-                initialPage={page}
-                initialLimit={limit}
-                initialSearch={search}
-                initialCategory={categoryParam}
-                initialSortBy={sort_by}
-                initialSortOrder={sort_order}
-                currentCategory={currentCategory}
-                themeSlug={tenant.theme_slug || 'default'}
-              />
-            </Suspense>
+            <ProductsListingClient
+              initialProducts={products}
+              initialTotal={total}
+              initialCategories={categories}
+              initialPage={page}
+              initialLimit={limit}
+              initialSearch={search}
+              initialCategory={categoryParam}
+              initialSortBy={sort_by}
+              initialSortOrder={sort_order}
+              currentCategory={currentCategory}
+              themeSlug={tenant.theme_slug || 'default'}
+            />
           </main>
           <StorefrontFooter />
         </div>

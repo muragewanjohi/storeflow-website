@@ -322,7 +322,7 @@ export async function GET(request: NextRequest) {
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
-    const response = {
+    const data = {
       products,
       pagination: {
         page: pageNum,
@@ -341,7 +341,15 @@ export async function GET(request: NextRequest) {
       limit: limitNum,
     });
 
-    return NextResponse.json(response);
+    // Add cache headers for better performance
+    // Cache for 30 seconds, allow stale-while-revalidate for 60 seconds
+    const response = NextResponse.json(data);
+    response.headers.set(
+      'Cache-Control',
+      'public, s-maxage=30, stale-while-revalidate=60'
+    );
+    
+    return response;
   } catch (error) {
     console.error('Error fetching products:', error);
 

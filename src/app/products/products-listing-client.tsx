@@ -90,23 +90,34 @@ export default function ProductsListingClient({
   const hasInitializedRef = useRef(false);
 
   // Ensure products are set immediately from initialProducts
+  // Use a ref to track the last synced initialProducts to avoid infinite loops
+  const lastSyncedInitialProductsRef = useRef<string>('');
   useEffect(() => {
     if (initialProducts.length > 0) {
-      // Always sync products from initialProducts to ensure they're displayed
-      // This is especially important on first render
-      if (products.length === 0 || JSON.stringify(products.map(p => p.id)) !== JSON.stringify(initialProducts.map(p => p.id))) {
+      // Create a stable key from initialProducts to detect changes
+      const initialProductsKey = initialProducts.map(p => p.id).join(',');
+      
+      // Only sync if initialProducts actually changed
+      if (lastSyncedInitialProductsRef.current !== initialProductsKey) {
         console.log('[ProductsListing] Setting products from initialProducts', {
           initialProductsCount: initialProducts.length,
           currentProductsCount: products.length,
         });
         setProducts(initialProducts);
         setTotal(initialTotal);
+        lastSyncedInitialProductsRef.current = initialProductsKey;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProducts, initialTotal]);
 
   // Log initial state - always log to help debug production issues
+  // Only log once on mount, so we use ref to track if we've logged
+  const hasLoggedRef = useRef(false);
   useEffect(() => {
+    if (hasLoggedRef.current) return;
+    hasLoggedRef.current = true;
+    
     console.log('[ProductsListing] Component mounted', {
       initialProductsCount: initialProducts.length,
       initialTotal,
@@ -128,6 +139,7 @@ export default function ProductsListingClient({
     } else {
       console.log('[ProductsListing] Successfully received products from server:', initialProducts.length);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Initialize selected categories - map slugs to IDs if needed
@@ -278,7 +290,6 @@ export default function ProductsListingClient({
     console.log('[ProductsListing] updateFilters called', {
       isInitialMount,
       hasInitialized: hasInitializedRef.current,
-      currentProductsCount: products.length,
     });
 
     // Don't update filters on initial mount - use initialProducts from server
