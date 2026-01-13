@@ -73,13 +73,15 @@ export default function ProductsListingClient({
   const { formatCurrency } = useCurrency();
   
   // Debug: Log pathname to verify routing and detect mismatches
+  // Only log once when pathname changes, not on every render
+  const pathnameLoggedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && pathname !== pathnameLoggedRef.current) {
+      pathnameLoggedRef.current = pathname;
       const actualPath = window.location.pathname;
-      console.log('[ProductsListing] Router pathname:', pathname, 'Actual URL pathname:', actualPath, {
+      console.log('[ProductsListing] Router pathname changed:', pathname, 'Actual URL pathname:', actualPath, {
         match: pathname === actualPath,
         shouldBeOnProducts: actualPath === '/products',
-        componentRendering: true,
       });
       
       // If there's a mismatch and we're actually on /products, log a warning
@@ -564,18 +566,21 @@ export default function ProductsListingClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
 
-  // Log render state
-  // Debug: Log render state only when key values change (not on every render)
+  // Log render state - only log when actually on products page and key values change
   useEffect(() => {
-    console.log('[ProductsListing] Render state', {
-      productsCount: products.length,
-      initialProductsCount: initialProducts.length,
-      total,
-      isSearching,
-      isInitialMount,
-      hasInitialized: hasInitializedRef.current,
-    });
-  }, [products.length, initialProducts.length, total, isSearching, isInitialMount]);
+    // Only log if we're actually on the products page
+    if (pathname === '/products' || pathname?.startsWith('/products')) {
+      console.log('[ProductsListing] Render state', {
+        pathname,
+        productsCount: products.length,
+        initialProductsCount: initialProducts.length,
+        total,
+        isSearching,
+        isInitialMount,
+        hasInitialized: hasInitializedRef.current,
+      });
+    }
+  }, [pathname, products.length, initialProducts.length, total, isSearching, isInitialMount]);
 
   // Ensure component always returns something visible - add test div to verify rendering
   return (
@@ -738,14 +743,8 @@ export default function ProductsListingClient({
             // Determine which products to display - prioritize products state, fallback to initialProducts
             const productsToDisplay = products.length > 0 ? products : initialProducts;
             
-            // Debug: Log what will be displayed
-            console.log('[ProductsListing] Rendering products grid', {
-              productsToDisplayCount: productsToDisplay.length,
-              productsStateCount: products.length,
-              initialProductsCount: initialProducts.length,
-              isSearching,
-              total,
-            });
+            // REMOVED: console.log from render function - it was causing infinite logs
+            // Logging moved to useEffect hooks that run only on state changes
             
             // Show loading skeleton only if actively searching AND no products available
             if (isSearching && productsToDisplay.length === 0) {
@@ -783,34 +782,11 @@ export default function ProductsListingClient({
             }
             
             // Show products with error boundary
-            // Debug: Add visible test to verify products are being rendered
-            console.log('[ProductsListing] About to render products grid', {
-              productsToDisplayCount: productsToDisplay.length,
-              willRender: productsToDisplay.length > 0,
-              firstProduct: productsToDisplay[0] ? {
-                id: productsToDisplay[0].id,
-                name: productsToDisplay[0].name,
-              } : null,
-            });
+            // REMOVED: console.log from render function - it was causing infinite logs
             
             return (
               <>
-                {/* Debug: Visible indicator that products should be showing */}
-                {productsToDisplay.length > 0 && (
-                  <div style={{ 
-                    position: 'fixed', 
-                    top: '60px', 
-                    left: 0, 
-                    zIndex: 9999, 
-                    background: 'green', 
-                    color: 'white', 
-                    padding: '4px 8px', 
-                    fontSize: '12px' 
-                  }}>
-                    Products Grid Rendering - {productsToDisplay.length} products
-                  </div>
-                )}
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8" style={{ position: 'relative', zIndex: 1 }}>
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
                   {productsToDisplay.map((product: any) => {
                     try {
                       return (

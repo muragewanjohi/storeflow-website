@@ -311,13 +311,23 @@ export default function StorefrontHeader({
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
                     onClick={(e) => {
-                      // Debug: Log navigation attempts
+                      // Debug: Log navigation attempts (only once per click)
                       console.log('[Header] Link clicked:', item.name, item.href, {
                         currentPathname: pathname,
                         targetHref: item.href,
                         willNavigate: true,
                       });
-                      // Let Next.js Link handle navigation naturally
+                      
+                      // Force navigation if Link doesn't work (fallback)
+                      if (pathname !== item.href) {
+                        // Small delay to let Next.js Link handle it first
+                        setTimeout(() => {
+                          if (typeof window !== 'undefined' && window.location.pathname !== item.href) {
+                            console.warn('[Header] Link navigation failed, using router.push as fallback');
+                            router.push(item.href);
+                          }
+                        }, 100);
+                      }
                     }}
                     // Best practice: Let Next.js Link handle navigation naturally
                     // Don't preventDefault - Link handles prefetching, client-side routing, and optimizations
