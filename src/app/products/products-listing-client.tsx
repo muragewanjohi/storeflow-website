@@ -72,24 +72,7 @@ export default function ProductsListingClient({
   const [isPending, startTransition] = useTransition();
   const { formatCurrency } = useCurrency();
   
-  // Debug: Log pathname to verify routing and detect mismatches
-  // Only log once when pathname changes, not on every render
-  const pathnameLoggedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (typeof window !== 'undefined' && pathname !== pathnameLoggedRef.current) {
-      pathnameLoggedRef.current = pathname;
-      const actualPath = window.location.pathname;
-      console.log('[ProductsListing] Router pathname changed:', pathname, 'Actual URL pathname:', actualPath, {
-        match: pathname === actualPath,
-        shouldBeOnProducts: actualPath === '/products',
-      });
-      
-      // If there's a mismatch and we're actually on /products, log a warning
-      if (pathname !== actualPath && actualPath === '/products') {
-        console.warn('[ProductsListing] Router pathname mismatch detected! Router thinks:', pathname, 'but URL is:', actualPath);
-      }
-    }
-  }, [pathname]);
+  // Removed excessive debug logging
   
   // Load theme-specific product card
   const ThemeProductCard = useMemo(() => {
@@ -111,18 +94,10 @@ export default function ProductsListingClient({
   const hasInitializedRef = useRef(false);
   const hasLoggedInitialRender = useRef(false);
 
-  // Log initial render only once (moved from component body to prevent infinite logs)
+  // Component initialization tracking
   useEffect(() => {
-    if (!hasLoggedInitialRender.current) {
-      hasLoggedInitialRender.current = true;
-      console.log('[ProductsListing] Component mounted (first render)', {
-        initialProductsCount: initialProducts.length,
-        productsStateCount: products.length,
-        initialTotal,
-        hasProducts: products.length > 0 || initialProducts.length > 0,
-      });
-    }
-  }, []); // Empty deps - only run once on mount
+    hasLoggedInitialRender.current = true;
+  }, []);
 
   // Ensure products are set immediately from initialProducts
   // Use a ref to track the last synced initialProducts to avoid infinite loops
@@ -135,11 +110,6 @@ export default function ProductsListingClient({
     
     // Only sync if initialProducts actually changed
     if (lastSyncedInitialProductsRef.current !== initialProductsKey) {
-      console.log('[ProductsListing] Syncing products from initialProducts', {
-        initialProductsCount: initialProducts.length,
-        currentProductsCount: products.length,
-        initialTotal,
-      });
       setProducts(initialProducts);
       setTotal(initialTotal);
       lastSyncedInitialProductsRef.current = initialProductsKey;
@@ -566,21 +536,7 @@ export default function ProductsListingClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
 
-  // Log render state - only log when actually on products page and key values change
-  useEffect(() => {
-    // Only log if we're actually on the products page
-    if (pathname === '/products' || pathname?.startsWith('/products')) {
-      console.log('[ProductsListing] Render state', {
-        pathname,
-        productsCount: products.length,
-        initialProductsCount: initialProducts.length,
-        total,
-        isSearching,
-        isInitialMount,
-        hasInitialized: hasInitializedRef.current,
-      });
-    }
-  }, [pathname, products.length, initialProducts.length, total, isSearching, isInitialMount]);
+  // Removed excessive debug logging
 
   // Ensure component always returns something visible - add test div to verify rendering
   return (

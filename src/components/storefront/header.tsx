@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -27,27 +27,10 @@ export default function StorefrontHeader({
 }: StorefrontHeaderProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const { isPreview, onNavigate } = usePreview();
 
-  // Debug: Log router state and detect mismatches
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const actualPath = window.location.pathname;
-      const routerMatches = pathname === actualPath;
-      console.log('[Header] Router state:', {
-        pathname,
-        actualPath,
-        routerMatches,
-        isPreview,
-        hasOnNavigate: !!onNavigate,
-      });
-      
-      // Warn if router doesn't match actual URL
-      if (!routerMatches) {
-        console.warn('[Header] Router pathname mismatch! Router thinks:', pathname, 'but URL is:', actualPath);
-      }
-    }
-  }, [pathname, isPreview, onNavigate]);
+  // Removed excessive debug logging - not needed in production
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -60,18 +43,7 @@ export default function StorefrontHeader({
     setIsMounted(true);
   }, []);
 
-  // Debug: Log logo state to help troubleshoot
-  useEffect(() => {
-    if (isMounted) {
-      console.log('[Header] Logo state:', {
-        hasLogo: !!storeLogo,
-        logoUrl: storeLogo,
-        logoError,
-        isMounted,
-        willShow: isMounted && storeLogo && !logoError,
-      });
-    }
-  }, [isMounted, storeLogo, logoError]);
+  // Removed debug logging
 
   // Initialize search query from URL params (if on products page)
   useEffect(() => {
@@ -310,27 +282,6 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
-                    onClick={(e) => {
-                      // Debug: Log navigation attempts (only once per click)
-                      console.log('[Header] Link clicked:', item.name, item.href, {
-                        currentPathname: pathname,
-                        targetHref: item.href,
-                        willNavigate: true,
-                      });
-                      
-                      // Force navigation if Link doesn't work (fallback)
-                      if (pathname !== item.href) {
-                        // Small delay to let Next.js Link handle it first
-                        setTimeout(() => {
-                          if (typeof window !== 'undefined' && window.location.pathname !== item.href) {
-                            console.warn('[Header] Link navigation failed, using router.push as fallback');
-                            router.push(item.href);
-                          }
-                        }, 100);
-                      }
-                    }}
-                    // Best practice: Let Next.js Link handle navigation naturally
-                    // Don't preventDefault - Link handles prefetching, client-side routing, and optimizations
                   >
                     {item.name}
                   </Link>
@@ -507,10 +458,7 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => {
-                      // Close mobile menu on navigation
-                      setMobileMenuOpen(false);
-                    }}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'

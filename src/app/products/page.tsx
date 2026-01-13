@@ -396,10 +396,6 @@ export default async function ProductsPage({
       <ThemeProviderWrapper>
         <div className="min-h-screen bg-background flex flex-col">
           <StorefrontHeader />
-          {/* Debug: Visible test to verify page is rendering - remove after debugging */}
-          <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: 'red', color: 'white', padding: '4px 8px', fontSize: '12px', pointerEvents: 'none' }}>
-            Products Page Loaded - {products.length} products
-          </div>
           <main className="flex-1">
             <ReactErrorBoundary>
               {/* ProductsListingClient is a client component - no need for Suspense */}
