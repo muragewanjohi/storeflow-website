@@ -396,46 +396,27 @@ export default async function ProductsPage({
       <ThemeProviderWrapper>
         <div className="min-h-screen bg-background flex flex-col">
           <StorefrontHeader />
-          {/* Debug: Visible test to verify page is rendering */}
-          <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: 'red', color: 'white', padding: '4px 8px', fontSize: '12px' }}>
+          {/* Debug: Visible test to verify page is rendering - remove after debugging */}
+          <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: 'red', color: 'white', padding: '4px 8px', fontSize: '12px', pointerEvents: 'none' }}>
             Products Page Loaded - {products.length} products
           </div>
           <main className="flex-1">
             <ReactErrorBoundary>
-              <Suspense fallback={
-                <div className="container mx-auto px-4 py-8">
-                  <div className="text-center py-12">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                          <div key={i} className="border rounded-lg overflow-hidden animate-pulse">
-                            <div className="aspect-square w-full bg-gray-200" />
-                            <div className="p-4 space-y-2">
-                              <div className="h-4 bg-gray-200 rounded w-3/4" />
-                              <div className="h-4 bg-gray-200 rounded w-1/2" />
-                              <div className="h-6 bg-gray-200 rounded w-1/3" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              }>
-                <ProductsListingClient
-                  initialProducts={products}
-                  initialTotal={total}
-                  initialCategories={categories}
-                  initialPage={page}
-                  initialLimit={limit}
-                  initialSearch={search}
-                  initialCategory={categoryParam}
-                  initialSortBy={sort_by}
-                  initialSortOrder={sort_order}
-                  currentCategory={currentCategory}
-                  themeSlug={tenant.theme_slug || 'default'}
-                />
-              </Suspense>
+              {/* ProductsListingClient is a client component - no need for Suspense */}
+              {/* Suspense is only needed for async server components */}
+              <ProductsListingClient
+                initialProducts={products}
+                initialTotal={total}
+                initialCategories={categories}
+                initialPage={page}
+                initialLimit={limit}
+                initialSearch={search}
+                initialCategory={categoryParam}
+                initialSortBy={sort_by}
+                initialSortOrder={sort_order}
+                currentCategory={currentCategory}
+                themeSlug={tenant.theme_slug || 'default'}
+              />
             </ReactErrorBoundary>
           </main>
           <StorefrontFooter />

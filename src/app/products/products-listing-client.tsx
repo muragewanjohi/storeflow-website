@@ -765,9 +765,34 @@ export default function ProductsListingClient({
             }
             
             // Show products with error boundary
+            // Debug: Add visible test to verify products are being rendered
+            console.log('[ProductsListing] About to render products grid', {
+              productsToDisplayCount: productsToDisplay.length,
+              willRender: productsToDisplay.length > 0,
+              firstProduct: productsToDisplay[0] ? {
+                id: productsToDisplay[0].id,
+                name: productsToDisplay[0].name,
+              } : null,
+            });
+            
             return (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                {/* Debug: Visible indicator that products should be showing */}
+                {productsToDisplay.length > 0 && (
+                  <div style={{ 
+                    position: 'fixed', 
+                    top: '60px', 
+                    left: 0, 
+                    zIndex: 9999, 
+                    background: 'green', 
+                    color: 'white', 
+                    padding: '4px 8px', 
+                    fontSize: '12px' 
+                  }}>
+                    Products Grid Rendering - {productsToDisplay.length} products
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8" style={{ position: 'relative', zIndex: 1 }}>
                   {productsToDisplay.map((product: any) => {
                     try {
                       return (
