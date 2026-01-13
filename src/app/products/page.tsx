@@ -45,10 +45,23 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const tenant = await requireTenant();
-
-  if (!tenant) {
-    return <div>Store not found</div>;
+  let tenant;
+  try {
+    tenant = await requireTenant();
+  } catch (error) {
+    console.error('[Products Page] Error getting tenant:', error);
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <StorefrontHeader />
+        <ErrorState
+          title="Store Not Found"
+          message="Unable to load the store. Please check the URL and try again."
+          actionLabel="Go Home"
+          actionHref="/"
+        />
+        <StorefrontFooter />
+      </div>
+    );
   }
 
   // Get initial products

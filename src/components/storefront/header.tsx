@@ -250,6 +250,10 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
+                    onClick={() => {
+                      // Debug: Log navigation attempts
+                      console.log('[Header] Navigating to:', item.href);
+                    }}
                   >
                     {item.name}
                   </Link>
@@ -426,7 +430,10 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={() => {
+                      console.log('[Header] Mobile navigation to:', item.href);
+                      setMobileMenuOpen(false);
+                    }}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
