@@ -192,28 +192,28 @@ export default function StorefrontHeader({
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white">
-      <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <nav className="container mx-auto px-2 sm:px-4 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          {/* Best practice: Tight spacing (8px) between logo and brand name for unified brand identity */}
-          <div className="flex items-center gap-2" suppressHydrationWarning>
+          {/* Best practice: Very tight spacing (4px) between logo and brand name for unified brand identity */}
+          <div className="flex items-center gap-1" suppressHydrationWarning>
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   onNavigate('/');
                 }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1"
               >
                 {storeLogo && !logoError && (
-                  <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
+                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
                     {isMounted ? (
                       <Image 
                         src={storeLogo} 
                         alt={storeName}
                         fill
                         className="object-contain"
-                        sizes="(max-width: 768px) 220px, 300px"
+                        sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
                         onError={(e) => {
                           console.error('[Header] Logo image failed to load:', storeLogo, e);
                           setLogoError(true);
@@ -236,16 +236,16 @@ export default function StorefrontHeader({
                 </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-1">
                 {storeLogo && !logoError && (
-                  <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
+                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
                     {isMounted ? (
                       <Image 
                         src={storeLogo} 
                         alt={storeName}
                         fill
                         className="object-contain"
-                        sizes="(max-width: 768px) 220px, 300px"
+                        sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
                         onError={(e) => {
                           console.error('[Header] Logo image failed to load:', storeLogo, e);
                           setLogoError(true);

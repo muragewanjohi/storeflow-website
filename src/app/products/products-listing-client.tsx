@@ -547,6 +547,7 @@ export default function ProductsListingClient({
   }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
 
   // Log render state
+  // Debug: Log render state only when key values change (not on every render)
   useEffect(() => {
     console.log('[ProductsListing] Render state', {
       productsCount: products.length,
@@ -556,10 +557,17 @@ export default function ProductsListingClient({
       isInitialMount,
       hasInitialized: hasInitializedRef.current,
     });
-  });
+  }, [products.length, initialProducts.length, total, isSearching, isInitialMount]);
 
+  // Ensure component always returns something visible - add test div to verify rendering
   return (
     <div className="container mx-auto px-4 md:px-4 py-6 md:py-8 max-w-[1440px]">
+      {/* Debug: Always visible test to verify component is rendering */}
+      {typeof window !== 'undefined' && (
+        <div style={{ display: 'none' }} data-testid="products-listing-mounted">
+          Products listing component mounted
+        </div>
+      )}
       {/* Breadcrumbs */}
       <div className="mb-4 md:mb-6 flex items-center gap-2 md:gap-3 text-[14px] md:text-[16px]">
         <Link href="/" className="text-[rgba(0,0,0,0.6)] hover:text-black transition-colors">
@@ -711,6 +719,15 @@ export default function ProductsListingClient({
           {(() => {
             // Determine which products to display - prioritize products state, fallback to initialProducts
             const productsToDisplay = products.length > 0 ? products : initialProducts;
+            
+            // Debug: Log what will be displayed
+            console.log('[ProductsListing] Rendering products grid', {
+              productsToDisplayCount: productsToDisplay.length,
+              productsStateCount: products.length,
+              initialProductsCount: initialProducts.length,
+              isSearching,
+              total,
+            });
             
             // Show loading skeleton only if actively searching AND no products available
             if (isSearching && productsToDisplay.length === 0) {
