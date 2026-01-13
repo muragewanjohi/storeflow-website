@@ -61,19 +61,25 @@ function HeroSectionComponent({
   section: Extract<PageSection, { type: 'hero' }>; 
   isPreview: boolean;
 }) {
-  // Use theme CSS variables for colors
-  const backgroundColor = section.background_color || 'var(--color-background, transparent)';
-  const textColor = 'var(--color-text, currentColor)';
-  const headingFont = 'var(--font-heading, inherit)';
-  const bodyFont = 'var(--font-body, inherit)';
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--hero-bg': section.background_color || 'var(--color-background, transparent)',
+    '--hero-text': 'var(--color-text, currentColor)',
+    '--hero-title-color': section.title_color || 'var(--color-primary, currentColor)',
+    '--hero-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--hero-description-color': section.description_color || 'var(--color-text, #666666)',
+    '--hero-cta-text-color': section.cta_text_color || 'var(--color-button-text, #FFFFFF)',
+    '--hero-cta-bg-color': section.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
 
   return (
     <section
       className="relative py-16 md:py-24"
-      style={{ 
-        backgroundColor,
-        color: textColor,
-        fontFamily: bodyFont,
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--hero-bg)',
       }}
     >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
@@ -83,8 +89,8 @@ function HeroSectionComponent({
               <h1 
                 className="text-4xl md:text-5xl font-bold mb-4"
                 style={{ 
-                  fontFamily: headingFont,
-                  color: 'var(--color-primary, currentColor)',
+                  fontFamily: 'var(--font-heading)',
+                  color: 'var(--hero-title-color)',
                 }}
               >
                 {section.title}
@@ -92,14 +98,23 @@ function HeroSectionComponent({
             )}
             {section.subtitle && (
               <h2 
-                className="text-2xl md:text-3xl text-muted-foreground mb-4"
-                style={{ fontFamily: headingFont }}
+                className="text-2xl md:text-3xl mb-4"
+                style={{ 
+                  fontFamily: 'var(--font-heading)',
+                  color: 'var(--hero-subtitle-color)',
+                }}
               >
                 {section.subtitle}
               </h2>
             )}
             {section.description && (
-              <p className="text-lg text-muted-foreground mb-6" style={{ fontFamily: bodyFont }}>
+              <p 
+                className="text-lg mb-6" 
+                style={{ 
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--hero-description-color)',
+                }}
+              >
                 {section.description}
               </p>
             )}
@@ -107,8 +122,8 @@ function HeroSectionComponent({
               <Button 
                 asChild
                 style={{ 
-                  backgroundColor: 'var(--color-primary, hsl(var(--primary)))',
-                  color: 'var(--color-text, hsl(var(--primary-foreground)))',
+                  backgroundColor: 'var(--hero-cta-bg-color)',
+                  color: 'var(--hero-cta-text-color)',
                 }}
               >
                 <a href={section.cta_link}>{section.cta_text}</a>
@@ -164,25 +179,44 @@ function FeaturesSectionComponent({
 }) {
   const columns = section.columns || 3;
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3';
-  const headingFont = 'var(--font-heading, inherit)';
-  const bodyFont = 'var(--font-body, inherit)';
+  
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--features-bg': section.background_color || 'transparent',
+    '--features-title-color': section.title_color || 'var(--color-primary, currentColor)',
+    '--features-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
 
   return (
-    <section className="py-16" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--features-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
           <h2 
             className="text-3xl font-bold text-center mb-4"
             style={{ 
-              fontFamily: headingFont,
-              color: 'var(--color-primary, currentColor)',
+              fontFamily: 'var(--font-heading)',
+              color: 'var(--features-title-color)',
             }}
           >
             {section.title}
           </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+          <p 
+            className="text-lg text-center mb-12" 
+            style={{ 
+              fontFamily: 'var(--font-body)',
+              color: 'var(--features-subtitle-color)',
+            }}
+          >
             {section.subtitle}
           </p>
         )}
@@ -296,22 +330,43 @@ function ProductsSectionComponent({
     fetchProducts();
   }, [section.category_id, section.limit, isPreview]);
 
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--products-bg': section.background_color || 'transparent',
+    '--products-title-color': section.title_color || 'var(--color-primary, currentColor)',
+    '--products-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
+
   return (
-    <section className="py-16" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--products-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
           <h2 
             className="text-3xl font-bold text-center mb-4"
             style={{ 
-              fontFamily: headingFont,
-              color: 'var(--color-primary, currentColor)',
+              fontFamily: 'var(--font-heading)',
+              color: 'var(--products-title-color)',
             }}
           >
             {section.title}
           </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+          <p 
+            className="text-lg text-center mb-12" 
+            style={{ 
+              fontFamily: 'var(--font-body)',
+              color: 'var(--products-subtitle-color)',
+            }}
+          >
             {section.subtitle}
           </p>
         )}
@@ -360,23 +415,44 @@ function TestimonialsSectionComponent({
   const gridCols = columns === 1 ? 'md:grid-cols-1' : columns === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3';
   const headingFont = 'var(--font-heading, inherit)';
   const bodyFont = 'var(--font-body, inherit)';
+  
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--testimonials-bg': section.background_color || 'var(--color-muted, rgba(0,0,0,0.05))',
+    '--testimonials-title-color': section.title_color || 'var(--color-primary, currentColor)',
+    '--testimonials-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
 
   return (
-    <section className="py-16 bg-muted/50" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--testimonials-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
           <h2 
             className="text-3xl font-bold text-center mb-4"
             style={{ 
-              fontFamily: headingFont,
-              color: 'var(--color-primary, currentColor)',
+              fontFamily: 'var(--font-heading)',
+              color: 'var(--testimonials-title-color)',
             }}
           >
             {section.title}
           </h2>
         )}
         {section.subtitle && (
-          <p className="text-lg text-muted-foreground text-center mb-12" style={{ fontFamily: bodyFont }}>
+          <p 
+            className="text-lg text-center mb-12" 
+            style={{ 
+              fontFamily: 'var(--font-body)',
+              color: 'var(--testimonials-subtitle-color)',
+            }}
+          >
             {section.subtitle}
           </p>
         )}
@@ -431,20 +507,25 @@ function TextSectionComponent({
   section: Extract<PageSection, { type: 'text' }>; 
   isPreview: boolean;
 }) {
-  const bodyFont = 'var(--font-body, inherit)';
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--text-bg': section.background_color || 'transparent',
+    '--text-color': section.text_color || 'var(--color-text, currentColor)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
 
   return (
     <section
       className="py-16"
-      style={{ 
-        backgroundColor: section.background_color || 'var(--color-background, transparent)',
-        fontFamily: bodyFont,
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--text-bg)',
       }}
     >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <div
           className="prose prose-lg max-w-none"
-          style={{ color: 'var(--color-text, currentColor)' }}
+          style={{ color: 'var(--text-color)' }}
           dangerouslySetInnerHTML={{ __html: section.content }}
         />
       </div>
@@ -590,8 +671,23 @@ function CategoriesSectionComponent({
     return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop';
   };
 
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--categories-bg': section.background_color || 'transparent',
+    '--categories-title-color': section.title_color || 'var(--color-text, currentColor)',
+    '--categories-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
+
   return (
-    <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--categories-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {(section.title || section.subtitle) && (
           <div className="flex items-center justify-between mb-8">
@@ -599,12 +695,23 @@ function CategoriesSectionComponent({
               <h2 
                 className="text-3xl md:text-4xl font-bold"
                 style={{ 
-                  fontFamily: headingFont,
-                  color: 'var(--color-text, currentColor)',
+                  fontFamily: 'var(--font-heading)',
+                  color: 'var(--categories-title-color)',
                 }}
               >
                 {section.title}
               </h2>
+            )}
+            {section.subtitle && (
+              <p 
+                className="text-lg"
+                style={{ 
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--categories-subtitle-color)',
+                }}
+              >
+                {section.subtitle}
+              </p>
             )}
           </div>
         )}
@@ -674,58 +781,87 @@ function BannersSectionComponent({
   const gridCols = columns === 1 ? 'grid-cols-1' : columns === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3';
   const headingFont = 'var(--font-heading, inherit)';
   const bodyFont = 'var(--font-body, inherit)';
+  
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--banners-bg': section.background_color || 'transparent',
+    '--banners-title-color': section.title_color || 'var(--color-text, currentColor)',
+    '--banners-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
 
   return (
-    <section className="py-8 bg-white" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-8" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--banners-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <div className={`grid ${gridCols} gap-6`}>
-          {section.banners.map((banner) => (
-            <div
-              key={banner.id}
-              className="relative rounded-lg overflow-hidden shadow-lg h-48 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-              style={{
-                backgroundColor: banner.background_color || 'var(--color-background, #f3f4f6)',
-              }}
-            >
-              {banner.image && !banner.image.startsWith('blob:') && (
-                <Image
-                  src={banner.image}
-                  alt={banner.title}
-                  fill
-                  className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
-                  sizes="(max-width: 768px) 100vw, 33vw"
-                />
-              )}
-              <div className="absolute inset-0 flex flex-col justify-center p-6">
-                {banner.subtitle && (
-                  <p className="text-sm text-gray-700 mb-2">{banner.subtitle}</p>
+          {section.banners.map((banner) => {
+            // Set banner-specific CSS variables
+            const bannerStyle = {
+              '--banner-bg': banner.background_color || 'var(--color-background, #f3f4f6)',
+              '--banner-title-color': banner.title_color || 'var(--banners-title-color)',
+              '--banner-subtitle-color': banner.subtitle_color || 'var(--banners-subtitle-color)',
+              '--banner-cta-text-color': banner.cta_text_color || '#FFFFFF',
+              '--banner-cta-bg-color': banner.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
+            } as React.CSSProperties & Record<string, string | undefined>;
+            
+            return (
+              <div
+                key={banner.id}
+                className="relative rounded-lg overflow-hidden shadow-lg h-48 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                style={bannerStyle}
+              >
+                {banner.image && !banner.image.startsWith('blob:') && (
+                  <Image
+                    src={banner.image}
+                    alt={banner.title}
+                    fill
+                    className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
                 )}
-                <h3 
-                  className="text-xl font-bold mb-3"
-                  style={{ 
-                    fontFamily: headingFont,
-                    color: 'var(--color-text, currentColor)',
-                  }}
-                >
-                  {banner.title}
-                </h3>
-                {banner.cta_text && banner.cta_link && (
-                  <Link href={banner.cta_link}>
-                    <Button
-                      size="sm"
-                      style={{
-                        backgroundColor: 'var(--color-primary, hsl(var(--primary)))',
-                        color: 'var(--color-text, white)',
-                      }}
-                      className="w-fit"
+                <div className="absolute inset-0 flex flex-col justify-center p-6">
+                  {banner.subtitle && (
+                    <p 
+                      className="text-sm mb-2"
+                      style={{ color: 'var(--banner-subtitle-color)' }}
                     >
-                      {banner.cta_text}
-                    </Button>
-                  </Link>
-                )}
+                      {banner.subtitle}
+                    </p>
+                  )}
+                  <h3 
+                    className="text-xl font-bold mb-3"
+                    style={{ 
+                      fontFamily: 'var(--font-heading)',
+                      color: 'var(--banner-title-color)',
+                    }}
+                  >
+                    {banner.title}
+                  </h3>
+                  {banner.cta_text && banner.cta_link && (
+                    <Link href={banner.cta_link}>
+                      <Button
+                        size="sm"
+                        style={{
+                          backgroundColor: 'var(--banner-cta-bg-color)',
+                          color: 'var(--banner-cta-text-color)',
+                        }}
+                        className="w-fit"
+                      >
+                        {banner.cta_text}
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>
@@ -1147,15 +1283,33 @@ function SplitLayoutSectionComponent({
     fetchProducts();
   }, [section.right_side, isPreview]);
 
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--split-layout-bg': section.background_color || 'transparent',
+    '--split-layout-left-bg': section.left_side.background_color || 'var(--color-background, #f3f4f6)',
+    '--split-layout-left-title-color': section.left_side.title_color || 'var(--color-text, currentColor)',
+    '--split-layout-left-subtitle-color': section.left_side.subtitle_color || 'var(--color-text, #666666)',
+    '--split-layout-left-cta-text-color': section.left_side.cta_text_color || '#FFFFFF',
+    '--split-layout-left-cta-bg-color': section.left_side.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
+
   return (
-    <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--split-layout-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Left Side - Banner */}
           <div
             className="relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px]"
             style={{
-              backgroundColor: section.left_side.background_color || 'var(--color-background, #f3f4f6)',
+              backgroundColor: 'var(--split-layout-left-bg)',
             }}
           >
             {section.left_side.image && !section.left_side.image.startsWith('blob:') && (
@@ -1172,20 +1326,31 @@ function SplitLayoutSectionComponent({
                 <h2 
                   className="text-3xl md:text-4xl font-bold mb-4"
                   style={{ 
-                    fontFamily: headingFont,
-                    color: 'var(--color-text, currentColor)',
+                    fontFamily: 'var(--font-heading)',
+                    color: 'var(--split-layout-left-title-color)',
                   }}
                 >
                   {section.left_side.title}
                 </h2>
+              )}
+              {section.left_side.subtitle && (
+                <p 
+                  className="text-lg mb-4"
+                  style={{ 
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--split-layout-left-subtitle-color)',
+                  }}
+                >
+                  {section.left_side.subtitle}
+                </p>
               )}
               {section.left_side.cta_text && section.left_side.cta_link && (
                 <Link href={section.left_side.cta_link}>
                   <Button
                     size="lg"
                     style={{
-                      backgroundColor: 'var(--color-primary, hsl(var(--primary)))',
-                      color: 'white',
+                      backgroundColor: 'var(--split-layout-left-cta-bg-color)',
+                      color: 'var(--split-layout-left-cta-text-color)',
                     }}
                     className="w-fit mx-auto"
                   >
@@ -1262,31 +1427,47 @@ function CTASectionComponent({
   section: Extract<PageSection, { type: 'cta' }>; 
   isPreview: boolean;
 }) {
-  const headingFont = 'var(--font-heading, inherit)';
-  const bodyFont = 'var(--font-body, inherit)';
-  
-  const backgroundStyle = section.background_gradient
-    ? { background: section.background_gradient }
-    : { backgroundColor: section.background_color || 'var(--color-primary, hsl(var(--primary)))' };
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle: React.CSSProperties & Record<string, string | undefined> = {
+    '--cta-bg': section.background_gradient 
+      ? undefined 
+      : (section.background_color || 'var(--color-primary, hsl(var(--primary)))'),
+    '--cta-bg-gradient': section.background_gradient || undefined,
+    '--cta-text': section.text_color || '#FFFFFF',
+    '--cta-title-color': section.title_color || section.text_color || '#FFFFFF',
+    '--cta-subtitle-color': section.subtitle_color || section.text_color || '#FFFFFF',
+    '--cta-cta-text-color': section.cta_text_color || '#FFFFFF',
+    '--cta-cta-bg-color': section.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+    ...(section.background_gradient 
+      ? { background: section.background_gradient } 
+      : { backgroundColor: 'var(--cta-bg)' }
+    ),
+    fontFamily: 'var(--font-body)',
+    color: 'var(--cta-text)',
+  };
 
   return (
     <section
       className="py-16 text-white"
-      style={{
-        ...backgroundStyle,
-        fontFamily: bodyFont,
-        color: section.text_color || 'white',
-      }}
+      style={sectionStyle}
     >
       <div className="container mx-auto px-4 text-center" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         <h2 
           className="text-3xl md:text-4xl font-bold mb-4"
-          style={{ fontFamily: headingFont }}
+          style={{ 
+            fontFamily: 'var(--font-heading)',
+            color: 'var(--cta-title-color)',
+          }}
         >
           {section.title}
         </h2>
         {section.subtitle && (
-          <p className="text-xl mb-8 opacity-90">
+          <p 
+            className="text-xl mb-8 opacity-90"
+            style={{ color: 'var(--cta-subtitle-color)' }}
+          >
             {section.subtitle}
           </p>
         )}
@@ -1294,9 +1475,10 @@ function CTASectionComponent({
           <Link href={section.cta_link}>
             <Button
               size="lg"
-              className="bg-white hover:bg-gray-100"
+              className="hover:opacity-90"
               style={{
-                color: section.background_color || 'var(--color-primary, hsl(var(--primary)))',
+                backgroundColor: 'var(--cta-cta-bg-color)',
+                color: 'var(--cta-cta-text-color)',
               }}
             >
               {section.cta_text}
@@ -1400,16 +1582,30 @@ function ProductTabsSectionComponent({
     fetchProducts();
   }, [activeTab, section.tabs, section.limit, isPreview]);
 
+  // Set CSS variables on section for better performance (section-specific naming)
+  const sectionStyle = {
+    '--product-tabs-bg': section.background_color || 'transparent',
+    '--product-tabs-title-color': section.title_color || 'var(--color-text, currentColor)',
+    '--font-heading': 'var(--font-heading, inherit)',
+    '--font-body': 'var(--font-body, inherit)',
+  } as React.CSSProperties & Record<string, string | undefined>;
+
   return (
-    <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
+    <section 
+      className="py-16" 
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--product-tabs-bg)',
+      }}
+    >
       <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {section.title && (
           <div className="text-center mb-12">
             <h2 
               className="text-3xl md:text-4xl font-bold mb-4"
               style={{ 
-                fontFamily: headingFont,
-                color: 'var(--color-text, currentColor)',
+                fontFamily: 'var(--font-heading)',
+                color: 'var(--product-tabs-title-color)',
               }}
             >
               {section.title}

@@ -248,6 +248,15 @@ export default async function ProductsPage({
       }
     }
 
+    console.log('[Products Page] Fetching products', {
+      tenantId: tenant.id,
+      where,
+      page,
+      limit,
+      sort_by,
+      sort_order,
+    });
+
     const [productsRaw, total] = await Promise.all([
       prisma.products.findMany({
         where,
@@ -270,9 +279,20 @@ export default async function ProductsPage({
       prisma.products.count({ where }),
     ]);
 
+    console.log('[Products Page] Products fetched', {
+      productsCount: productsRaw.length,
+      total,
+      page,
+      limit,
+    });
+
     // Convert Decimal to number for client components and map sale_price correctly
     // When sale_price exists: price = sale_price (discounted), compareAtPrice = price (original)
     // When no sale_price: price = price (normal), compareAtPrice = undefined
+    console.log('[Products Page] Mapping products', {
+      rawProductsCount: productsRaw.length,
+    });
+    
     const products = productsRaw.map((product: any) => {
       try {
         // Ensure price is converted to number (handle Prisma Decimal)
@@ -324,6 +344,12 @@ export default async function ProductsPage({
           category_id: product?.category_id ? String(product.category_id) : null,
         };
       }
+    });
+
+    console.log('[Products Page] Products mapped, rendering', {
+      finalProductsCount: products.length,
+      total,
+      themeSlug: tenant.theme_slug || 'default',
     });
 
     return (

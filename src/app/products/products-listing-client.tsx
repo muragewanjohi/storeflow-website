@@ -88,6 +88,18 @@ export default function ProductsListingClient({
   const [isInitialMount, setIsInitialMount] = useState(true);
   const initialProductsRef = useRef(initialProducts);
   const hasInitializedRef = useRef(false);
+
+  // Log initial state
+  useEffect(() => {
+    console.log('[ProductsListing] Component mounted', {
+      initialProductsCount: initialProducts.length,
+      initialTotal,
+      initialPage,
+      initialSearch,
+      initialCategory,
+      themeSlug,
+    });
+  }, []);
   
   // Initialize selected categories - map slugs to IDs if needed
   const getInitialSelectedCategories = () => {
@@ -122,9 +134,16 @@ export default function ProductsListingClient({
 
   // Mark initial mount as complete after products are loaded
   useEffect(() => {
+    console.log('[ProductsListing] Initial mount effect', {
+      initialProductsLength: initialProducts.length,
+      hasInitialized: hasInitializedRef.current,
+      currentProductsLength: products.length,
+    });
+
     // Only mark as initialized if we have products or if initialProducts is explicitly empty
     if (initialProducts.length > 0 || hasInitializedRef.current) {
       const timer = setTimeout(() => {
+        console.log('[ProductsListing] Marking as initialized (has products or already initialized)');
         setIsInitialMount(false);
         hasInitializedRef.current = true;
       }, 200);
@@ -132,12 +151,13 @@ export default function ProductsListingClient({
     } else if (initialProducts.length === 0 && !hasInitializedRef.current) {
       // If no products initially, still mark as initialized after a short delay
       const timer = setTimeout(() => {
+        console.log('[ProductsListing] Marking as initialized (no products, delayed)');
         setIsInitialMount(false);
         hasInitializedRef.current = true;
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [initialProducts.length]);
+  }, [initialProducts.length, products.length]);
 
   // Update products when initialProducts change (e.g., from server-side navigation)
   // Only update if the products actually changed (not just a re-render with same data)
@@ -146,14 +166,28 @@ export default function ProductsListingClient({
     const currentIds = initialProducts.map(p => p.id).join(',');
     const previousIds = initialProductsRef.current.map(p => p.id).join(',');
     
+    console.log('[ProductsListing] Checking for product updates', {
+      currentIdsCount: initialProducts.length,
+      previousIdsCount: initialProductsRef.current.length,
+      idsChanged: currentIds !== previousIds,
+      lengthChanged: initialProducts.length !== initialProductsRef.current.length,
+      currentProductsCount: products.length,
+    });
+    
     // Only update if products actually changed
     if (currentIds !== previousIds || initialProducts.length !== initialProductsRef.current.length) {
+      console.log('[ProductsListing] Products changed, updating state', {
+        newProductsCount: initialProducts.length,
+        newTotal: initialTotal,
+      });
       // Update products - always trust server state
       setProducts(initialProducts);
       setTotal(initialTotal);
       initialProductsRef.current = initialProducts;
+    } else {
+      console.log('[ProductsListing] Products unchanged, skipping update');
     }
-  }, [initialProducts, initialTotal]);
+  }, [initialProducts, initialTotal, products.length]);
 
   // Ensure URL has page=1 when page parameter is missing (fixes loading issue)
   // Use a ref to prevent multiple updates and ensure products are displayed first
@@ -212,12 +246,20 @@ export default function ProductsListingClient({
   })?.label || 'Most Popular';
 
   const updateFilters = useCallback(() => {
+    console.log('[ProductsListing] updateFilters called', {
+      isInitialMount,
+      hasInitialized: hasInitializedRef.current,
+      currentProductsCount: products.length,
+    });
+
     // Don't update filters on initial mount - use initialProducts from server
     if (isInitialMount || !hasInitializedRef.current) {
+      console.log('[ProductsListing] Skipping updateFilters - still initializing');
       return;
     }
     
     startTransition(() => {
+      console.log('[ProductsListing] Starting filter update');
       setIsSearching(true);
       const params = new URLSearchParams(searchParams.toString());
       
@@ -298,20 +340,42 @@ export default function ProductsListingClient({
       
       // Check if params actually changed - if not, don't fetch or update URL
       const paramsChanged = params.toString() !== originalParams.toString();
+      console.log('[ProductsListing] Filter update check', {
+        paramsChanged,
+        newParams: params.toString(),
+        originalParams: originalParams.toString(),
+      });
+      
       if (!paramsChanged) {
+        console.log('[ProductsListing] Params unchanged, skipping fetch');
         setIsSearching(false);
         return;
       }
       
+      const apiUrl = `/api/products?${params.toString()}`;
+      console.log('[ProductsListing] Fetching products from API', { apiUrl });
+      
       // Fetch updated products from API first, then navigate
-      fetch(`/api/products?${params.toString()}`)
+      fetch(apiUrl)
         .then(res => {
+          console.log('[ProductsListing] API response received', {
+            ok: res.ok,
+            status: res.status,
+            statusText: res.statusText,
+          });
           if (!res.ok) {
             throw new Error(`Failed to fetch products: ${res.statusText}`);
           }
           return res.json();
         })
         .then(data => {
+          console.log('[ProductsListing] API data received', {
+            hasProducts: !!data.products,
+            productsCount: data.products?.length || 0,
+            total: data.pagination?.total || 0,
+            dataKeys: Object.keys(data),
+          });
+          
           if (data.products && Array.isArray(data.products)) {
             // Map sale_price to compareAtPrice correctly
             const mappedProducts = data.products.map((p: any) => {
@@ -331,9 +395,14 @@ export default function ProductsListingClient({
                 };
               }
             });
+            console.log('[ProductsListing] Setting products from API', {
+              mappedProductsCount: mappedProducts.length,
+              total: data.pagination?.total || 0,
+            });
             setProducts(mappedProducts);
             setTotal(data.pagination?.total || 0);
           } else {
+            console.warn('[ProductsListing] No products in API response, clearing products');
             // Only clear products if we explicitly got an empty result, not on error
             setProducts([]);
             setTotal(0);
@@ -341,7 +410,7 @@ export default function ProductsListingClient({
           setIsSearching(false);
         })
         .catch(err => {
-          console.error('Error fetching products:', err);
+          console.error('[ProductsListing] Error fetching products:', err);
           // Don't clear products on error - keep existing products visible
           // Only clear if we're sure there are no products
           setIsSearching(false);
@@ -369,13 +438,23 @@ export default function ProductsListingClient({
 
   // Auto-search when debounced search changes (only after initial mount)
   useEffect(() => {
+    console.log('[ProductsListing] Debounced search effect', {
+      debouncedSearch,
+      initialSearch,
+      isInitialMount,
+      hasInitialized: hasInitializedRef.current,
+      searchChanged: debouncedSearch.trim() !== initialSearch.trim(),
+    });
+
     // Don't trigger on initial mount - wait until component is fully initialized
     if (isInitialMount || !hasInitializedRef.current) {
+      console.log('[ProductsListing] Skipping search update - still initializing');
       return;
     }
     
     // Only update if search actually changed (not just reference equality)
     if (debouncedSearch.trim() !== initialSearch.trim()) {
+      console.log('[ProductsListing] Search changed, calling updateFilters');
       updateFilters();
     }
   }, [debouncedSearch, updateFilters, initialSearch, isInitialMount]);
@@ -421,18 +500,40 @@ export default function ProductsListingClient({
 
   // Debounce filter updates (300ms delay) - but only after initial mount
   useEffect(() => {
+    console.log('[ProductsListing] Filter state changed', {
+      selectedCategoriesCount: selectedCategories.length,
+      priceRange,
+      selectedAttributeValuesCount: Object.keys(selectedAttributeValues).length,
+      isInitialMount,
+      hasInitialized: hasInitializedRef.current,
+    });
+
     // Don't trigger on initial mount - use initialProducts from server
     if (isInitialMount || !hasInitializedRef.current) {
+      console.log('[ProductsListing] Skipping filter update - still initializing');
       return;
     }
 
     const timer = setTimeout(() => {
+      console.log('[ProductsListing] Debounced filter update triggered');
       updateFilters();
     }, 300);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
+
+  // Log render state
+  useEffect(() => {
+    console.log('[ProductsListing] Render state', {
+      productsCount: products.length,
+      initialProductsCount: initialProducts.length,
+      total,
+      isSearching,
+      isInitialMount,
+      hasInitialized: hasInitializedRef.current,
+    });
+  });
 
   return (
     <div className="container mx-auto px-4 md:px-4 py-6 md:py-8 max-w-[1440px]">
@@ -601,14 +702,19 @@ export default function ProductsListingClient({
                 </div>
               </div>
             </div>
-          ) : products.length === 0 ? (
+          ) : (products.length === 0 && initialProducts.length === 0) ? (
             <div className="text-center py-12">
               <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
+              {process.env.NODE_ENV === 'development' && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}
+                </p>
+              )}
             </div>
           ) : (
             <>
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-                {products.map((product: any) => (
+                {(products.length > 0 ? products : initialProducts).map((product: any) => (
                   <ThemeProductCard
                     key={product.id}
                     product={product}

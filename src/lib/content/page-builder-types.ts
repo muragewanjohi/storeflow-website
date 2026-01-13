@@ -23,6 +23,11 @@ export interface HeroSection extends BaseSection {
   cta_text?: string;
   cta_link?: string;
   background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  description_color?: string;
+  cta_text_color?: string;
+  cta_button_color?: string;
 }
 
 export interface FeaturesSection extends BaseSection {
@@ -37,6 +42,9 @@ export interface FeaturesSection extends BaseSection {
     image?: string;
   }>;
   columns?: 2 | 3 | 4;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
 }
 
 export interface ProductsSection extends BaseSection {
@@ -47,6 +55,9 @@ export interface ProductsSection extends BaseSection {
   category_id?: string; // Show products from a category
   limit?: number; // Number of products to show
   columns?: 2 | 3 | 4;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
 }
 
 export interface TestimonialsSection extends BaseSection {
@@ -63,12 +74,16 @@ export interface TestimonialsSection extends BaseSection {
     rating?: number;
   }>;
   columns?: 1 | 2 | 3;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
 }
 
 export interface TextSection extends BaseSection {
   type: 'text';
   content: string; // Rich text HTML
   background_color?: string;
+  text_color?: string;
 }
 
 export interface ImageSection extends BaseSection {
@@ -87,6 +102,9 @@ export interface CategoriesSection extends BaseSection {
   limit?: number;
   columns?: 2 | 4 | 6 | 8;
   show_count?: boolean;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
 }
 
 export interface BannersSection extends BaseSection {
@@ -99,8 +117,15 @@ export interface BannersSection extends BaseSection {
     cta_text?: string;
     cta_link?: string;
     background_color?: string;
+    title_color?: string;
+    subtitle_color?: string;
+    cta_text_color?: string;
+    cta_button_color?: string;
   }>;
   columns?: 1 | 2 | 3;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
 }
 
 export interface SalesTabSection extends BaseSection {
@@ -153,6 +178,10 @@ export interface SplitLayoutSection extends BaseSection {
     cta_text?: string;
     cta_link?: string;
     background_color?: string;
+    title_color?: string;
+    subtitle_color?: string;
+    cta_text_color?: string;
+    cta_button_color?: string;
   };
   right_side: {
     type: 'products' | 'features';
@@ -162,6 +191,7 @@ export interface SplitLayoutSection extends BaseSection {
     limit?: number;
     columns?: 1 | 2;
   };
+  background_color?: string;
 }
 
 export interface CTASection extends BaseSection {
@@ -173,6 +203,10 @@ export interface CTASection extends BaseSection {
   background_color?: string;
   background_gradient?: string;
   text_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  cta_text_color?: string;
+  cta_button_color?: string;
 }
 
 export interface ProductTabsSection extends BaseSection {
@@ -187,6 +221,8 @@ export interface ProductTabsSection extends BaseSection {
   limit?: number;
   columns?: 2 | 3 | 4;
   default_tab?: string;
+  background_color?: string;
+  title_color?: string;
 }
 
 export type PageSection =

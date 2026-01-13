@@ -25,6 +25,12 @@ export async function GET(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     const { searchParams } = new URL(request.url);
+    
+    console.log('[Products API] GET request', {
+      tenantId: tenant.id,
+      url: request.url,
+      searchParams: Object.fromEntries(searchParams.entries()),
+    });
 
     // Parse and validate query parameters
     const queryParams: Record<string, any> = {};
@@ -263,6 +269,14 @@ export async function GET(request: NextRequest) {
     const orderBy: any = {};
     orderBy[sort_by] = sort_order;
 
+    console.log('[Products API] Query parameters', {
+      where,
+      skip: useFullTextSearch ? 0 : skip,
+      take: useFullTextSearch ? 1000 : limitNum,
+      orderBy,
+      useFullTextSearch,
+    });
+
     // Fetch products with pagination
     let products = await prisma.products.findMany({
       where,
@@ -281,6 +295,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    console.log('[Products API] Products fetched from database', {
+      productsCount: products.length,
+      useFullTextSearch,
+    });
+
     // If using full-text search, sort by relevance (order in searchProductIds)
     if (useFullTextSearch && searchProductIds.length > 0) {
       const productMap = new Map(products.map((p: any) => [p.id, p]));
@@ -292,12 +311,18 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.products.count({ where });
 
+    console.log('[Products API] Total count and pagination', {
+      total,
+      limitNum,
+      pageNum,
+    });
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
-    return NextResponse.json({
+    const response = {
       products,
       pagination: {
         page: pageNum,
@@ -307,7 +332,16 @@ export async function GET(request: NextRequest) {
         hasNextPage,
         hasPrevPage,
       },
+    };
+
+    console.log('[Products API] Returning response', {
+      productsCount: products.length,
+      total,
+      page: pageNum,
+      limit: limitNum,
     });
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching products:', error);
 

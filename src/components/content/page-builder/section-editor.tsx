@@ -28,6 +28,63 @@ interface SectionEditorProps {
   onUpdate: (updates: Partial<PageSection>) => void;
 }
 
+// Shared ColorPicker component (similar to theme customization)
+interface ColorPickerProps {
+  label: string;
+  colorKey: string;
+  defaultValue?: string;
+  description?: string;
+  section: any;
+  onColorChange: (colorKey: string, value: string) => void;
+  onColorReset: (colorKey: string) => void;
+}
+
+function ColorPicker({ 
+  label, 
+  colorKey, 
+  defaultValue = '#000000',
+  description,
+  section,
+  onColorChange,
+  onColorReset,
+}: ColorPickerProps) {
+  const currentValue = section[colorKey] || defaultValue;
+  
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label htmlFor={`color-${colorKey}`}>{label}</Label>
+        {description && (
+          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <Input
+          id={`color-${colorKey}`}
+          type="color"
+          value={currentValue}
+          onChange={(e) => onColorChange(colorKey, e.target.value)}
+          className="w-20 h-10 cursor-pointer"
+        />
+        <Input
+          type="text"
+          value={currentValue}
+          onChange={(e) => onColorChange(colorKey, e.target.value)}
+          placeholder={defaultValue}
+          className="flex-1"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onColorReset(colorKey)}
+        >
+          Reset
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function SectionEditor({ section, onUpdate }: Readonly<SectionEditorProps>) {
   switch (section.type) {
     case 'hero':
@@ -66,6 +123,16 @@ function HeroSectionEditor({
   section: Extract<PageSection, { type: 'hero' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  // Helper function to handle color changes
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  // Helper function to reset color
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -80,6 +147,16 @@ function HeroSectionEditor({
             placeholder="Hero title"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the hero title text"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -88,6 +165,16 @@ function HeroSectionEditor({
             placeholder="Hero subtitle"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the hero subtitle text"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        
         <div className="space-y-2">
           <Label>Description</Label>
           <Textarea
@@ -97,6 +184,16 @@ function HeroSectionEditor({
             rows={3}
           />
         </div>
+        <ColorPicker
+          label="Description Color"
+          colorKey="description_color"
+          defaultValue="#666666"
+          description="Color for the hero description text"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        
         <div className="space-y-2">
           <Label>Hero Image</Label>
           <ImageUploadField
@@ -105,6 +202,7 @@ function HeroSectionEditor({
             onChange={(url) => onUpdate({ image: url || undefined })}
           />
         </div>
+        
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>CTA Text</Label>
@@ -123,14 +221,34 @@ function HeroSectionEditor({
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Background Color</Label>
-          <Input
-            type="color"
-            value={section.background_color || '#ffffff'}
-            onChange={(e) => onUpdate({ background_color: e.target.value })}
-          />
-        </div>
+        <ColorPicker
+          label="CTA Text Color"
+          colorKey="cta_text_color"
+          defaultValue="#FFFFFF"
+          description="Color for the CTA button text"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="CTA Button Color"
+          colorKey="cta_button_color"
+          defaultValue="#4CAF50"
+          description="Background color for the CTA button"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the hero section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -143,6 +261,14 @@ function FeaturesSectionEditor({
   section: Extract<PageSection, { type: 'features' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   const updateFeature = (featureId: string, updates: Partial<typeof section.features[0]>) => {
     const newFeatures = section.features.map((f: any) =>
       f.id === featureId ? { ...f, ...updates } : f
@@ -177,6 +303,15 @@ function FeaturesSectionEditor({
             placeholder="Section title"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -185,6 +320,15 @@ function FeaturesSectionEditor({
             placeholder="Section subtitle"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Columns</Label>
           <Select
@@ -262,6 +406,15 @@ function FeaturesSectionEditor({
             </Card>
           ))}
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the features section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -274,6 +427,14 @@ function ProductsSectionEditor({
   section: Extract<PageSection, { type: 'products' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -288,6 +449,15 @@ function ProductsSectionEditor({
             placeholder="Section title"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -296,6 +466,15 @@ function ProductsSectionEditor({
             placeholder="Section subtitle"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Columns</Label>
           <Select
@@ -336,6 +515,15 @@ function ProductsSectionEditor({
             Leave empty to show all products
           </p>
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the products section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -348,6 +536,14 @@ function TestimonialsSectionEditor({
   section: Extract<PageSection, { type: 'testimonials' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   const updateTestimonial = (
     testimonialId: string,
     updates: Partial<typeof section.testimonials[0]>
@@ -386,6 +582,15 @@ function TestimonialsSectionEditor({
             placeholder="Section title"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -394,6 +599,15 @@ function TestimonialsSectionEditor({
             placeholder="Section subtitle"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Columns</Label>
           <Select
@@ -494,6 +708,15 @@ function TestimonialsSectionEditor({
             </Card>
           ))}
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the testimonials section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -506,6 +729,14 @@ function TextSectionEditor({
   section: Extract<PageSection, { type: 'text' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -519,14 +750,24 @@ function TextSectionEditor({
             onChange={(html) => onUpdate({ content: html })}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Background Color</Label>
-          <Input
-            type="color"
-            value={section.background_color || '#ffffff'}
-            onChange={(e) => onUpdate({ background_color: e.target.value })}
-          />
-        </div>
+        <ColorPicker
+          label="Text Color"
+          colorKey="text_color"
+          defaultValue="#000000"
+          description="Color for the text content"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the text section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -593,6 +834,14 @@ function CategoriesSectionEditor({
   section: Extract<PageSection, { type: 'categories' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   // Fetch categories
   const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories', 'active'],
@@ -648,6 +897,15 @@ function CategoriesSectionEditor({
             placeholder="Browse By Categories"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -656,6 +914,15 @@ function CategoriesSectionEditor({
             placeholder="Section subtitle"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
 
         {/* Category Selection */}
         <div className="space-y-3">
@@ -742,6 +1009,15 @@ function CategoriesSectionEditor({
             Show Item Count
           </Label>
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the categories section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -754,6 +1030,30 @@ function BannersSectionEditor({
   section: Extract<PageSection, { type: 'banners' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
+  const handleBannerColorChange = (bannerId: string, colorKey: string, value: string) => {
+    const newBanners = section.banners.map((b: any) =>
+      b.id === bannerId ? { ...b, [colorKey]: value } : b
+    );
+    onUpdate({ banners: newBanners });
+  };
+
+  const handleBannerColorReset = (bannerId: string, colorKey: string) => {
+    const newBanners = section.banners.map((b: any) => {
+      const updated = { ...b };
+      delete updated[colorKey];
+      return b.id === bannerId ? updated : b;
+    });
+    onUpdate({ banners: newBanners });
+  };
+
   // Track which banners are using custom URLs
   const [customUrlBanners, setCustomUrlBanners] = useState<Set<string>>(new Set());
 
@@ -845,6 +1145,33 @@ function BannersSectionEditor({
             </SelectContent>
           </Select>
         </div>
+        <ColorPicker
+          label="Section Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for section-level title (if used)"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="Section Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for section-level subtitle (if used)"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="Section Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the banners section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label>Banners</Label>
@@ -867,6 +1194,15 @@ function BannersSectionEditor({
                     placeholder="Banner title"
                   />
                 </div>
+                <ColorPicker
+                  label="Title Color"
+                  colorKey="title_color"
+                  defaultValue="#000000"
+                  description="Color for this banner's title"
+                  section={banner}
+                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                />
                 <div className="space-y-2">
                   <Label>Subtitle</Label>
                   <Input
@@ -875,6 +1211,15 @@ function BannersSectionEditor({
                     placeholder="Banner subtitle"
                   />
                 </div>
+                <ColorPicker
+                  label="Subtitle Color"
+                  colorKey="subtitle_color"
+                  defaultValue="#666666"
+                  description="Color for this banner's subtitle"
+                  section={banner}
+                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                />
                 <div className="space-y-2">
                   <Label>Image *</Label>
                   <ImageUploadField
@@ -950,14 +1295,33 @@ function BannersSectionEditor({
                     )}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Background Color</Label>
-                  <Input
-                    type="color"
-                    value={banner.background_color || '#f3f4f6'}
-                    onChange={(e) => updateBanner(banner.id, { background_color: e.target.value })}
-                  />
-                </div>
+                <ColorPicker
+                  label="CTA Text Color"
+                  colorKey="cta_text_color"
+                  defaultValue="#FFFFFF"
+                  description="Color for this banner's CTA button text"
+                  section={banner}
+                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                />
+                <ColorPicker
+                  label="CTA Button Color"
+                  colorKey="cta_button_color"
+                  defaultValue="#4CAF50"
+                  description="Background color for this banner's CTA button"
+                  section={banner}
+                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                />
+                <ColorPicker
+                  label="Background Color"
+                  colorKey="background_color"
+                  defaultValue="#F3F4F6"
+                  description="Background color for this banner"
+                  section={banner}
+                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                />
                 <Button
                   type="button"
                   variant="destructive"
@@ -1372,6 +1736,26 @@ function SplitLayoutSectionEditor({
   section: Extract<PageSection, { type: 'split_layout' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleLeftSideColorChange = (colorKey: string, value: string) => {
+    onUpdate({
+      left_side: { ...section.left_side, [colorKey]: value }
+    });
+  };
+
+  const handleLeftSideColorReset = (colorKey: string) => {
+    const updated = { ...section.left_side };
+    delete (updated as any)[colorKey];
+    onUpdate({ left_side: updated });
+  };
+
+  const handleSectionColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleSectionColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -1390,6 +1774,15 @@ function SplitLayoutSectionEditor({
               placeholder="Banner title"
             />
           </div>
+          <ColorPicker
+            label="Title Color"
+            colorKey="title_color"
+            defaultValue="#000000"
+            description="Color for the left side title"
+            section={section.left_side}
+            onColorChange={handleLeftSideColorChange}
+            onColorReset={handleLeftSideColorReset}
+          />
           <div className="space-y-2">
             <Label>Image *</Label>
             <ImageUploadField
@@ -1470,6 +1863,14 @@ function CTASectionEditor({
   section: Extract<PageSection, { type: 'cta' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -1484,6 +1885,15 @@ function CTASectionEditor({
             placeholder="We Make Your Daily Life More Easy"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the CTA section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -1492,6 +1902,15 @@ function CTASectionEditor({
             placeholder="Fresh, Affordable, and Delivered to Your Door!"
           />
         </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the CTA section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>CTA Text *</Label>
@@ -1510,14 +1929,42 @@ function CTASectionEditor({
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Background Color</Label>
-          <Input
-            type="color"
-            value={section.background_color || '#16a34a'}
-            onChange={(e) => onUpdate({ background_color: e.target.value })}
-          />
-        </div>
+        <ColorPicker
+          label="CTA Text Color"
+          colorKey="cta_text_color"
+          defaultValue="#FFFFFF"
+          description="Color for the CTA button text"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="CTA Button Color"
+          colorKey="cta_button_color"
+          defaultValue="#4CAF50"
+          description="Background color for the CTA button"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the CTA section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#16A34A"
+          description="Background color for the CTA section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Background Gradient (CSS gradient)</Label>
           <Input
@@ -1529,14 +1976,15 @@ function CTASectionEditor({
             If provided, gradient will override background color
           </p>
         </div>
-        <div className="space-y-2">
-          <Label>Text Color</Label>
-          <Input
-            type="color"
-            value={section.text_color || '#ffffff'}
-            onChange={(e) => onUpdate({ text_color: e.target.value })}
-          />
-        </div>
+        <ColorPicker
+          label="Text Color"
+          colorKey="text_color"
+          defaultValue="#FFFFFF"
+          description="General text color for the CTA section (fallback)"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
@@ -1549,6 +1997,14 @@ function ProductTabsSectionEditor({
   section: Extract<PageSection, { type: 'product_tabs' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
   const updateTab = (tabId: string, updates: Partial<typeof section.tabs[0]>) => {
     const newTabs = section.tabs.map((t: any) =>
       t.id === tabId ? { ...t, ...updates } : t
@@ -1583,6 +2039,15 @@ function ProductTabsSectionEditor({
             placeholder="Weekly Best Selling Organic Items"
           />
         </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
         <div className="space-y-2">
           <Label>Columns</Label>
           <Select
@@ -1671,6 +2136,15 @@ function ProductTabsSectionEditor({
             </Card>
           ))}
         </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the product tabs section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
       </CardContent>
     </Card>
   );
