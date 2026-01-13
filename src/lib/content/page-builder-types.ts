@@ -170,30 +170,99 @@ export interface SalesTabSection extends BaseSection {
   cta_position: 'top_right' | 'bottom_center' | 'none';
 }
 
+/**
+ * Enhanced Split Layout Section
+ * Based on Shopify/BigCommerce best practices
+ * 
+ * Phase 1 Features:
+ * - Layout ratio options (50/50, 60/40, etc.)
+ * - Text alignment controls
+ * - Mobile behavior options
+ * - Spacing/padding controls
+ * - Background gradients
+ */
 export interface SplitLayoutSection extends BaseSection {
   type: 'split_layout';
+  
+  // Layout Configuration
+  layout_ratio?: '50-50' | '60-40' | '40-60' | '70-30' | '30-70';
+  mobile_behavior?: 'stack' | 'scroll' | 'hide_left' | 'hide_right' | 'reverse_stack';
+  reverse_desktop?: boolean; // Swap left/right on desktop
+  
+  // Left Side Configuration
   left_side: {
-    type: 'banner' | 'image';
+    type: 'banner' | 'image' | 'text';
     title?: string;
     subtitle?: string;
-    image: string;
+    content?: string; // For text type or rich HTML
+    image?: string;
+    alt_text?: string;
     cta_text?: string;
     cta_link?: string;
+    
+    // Alignment & Positioning
+    text_alignment?: 'left' | 'center' | 'right';
+    vertical_alignment?: 'top' | 'middle' | 'bottom';
+    image_position?: 'cover' | 'contain' | 'top' | 'center' | 'bottom';
+    
+    // Colors & Styling
     background_color?: string;
+    background_gradient?: string;
     title_color?: string;
     subtitle_color?: string;
+    content_color?: string;
     cta_text_color?: string;
     cta_button_color?: string;
+    overlay_opacity?: number; // 0-100 for image overlays
+    border_radius?: number; // px
   };
+  
+  // Right Side Configuration
   right_side: {
-    type: 'products' | 'features';
+    type: 'products' | 'features' | 'text' | 'image';
     title?: string;
+    subtitle?: string;
+    content?: string; // For text type
+    image?: string;
+    alt_text?: string;
+    
+    // Product Options
+    product_selection?: 'category' | 'featured' | 'specific' | 'new' | 'bestsellers';
     product_ids?: string[];
     category_id?: string;
     limit?: number;
-    columns?: 1 | 2;
+    columns?: 1 | 2 | 3;
+    
+    // Features Options (if type is 'features')
+    features?: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      icon?: string;
+    }>;
+    
+    // Styling
+    background_color?: string;
+    title_color?: string;
+    subtitle_color?: string;
+    text_alignment?: 'left' | 'center' | 'right';
+    border_radius?: number;
   };
+  
+  // Section-Level Spacing & Styling
+  spacing?: {
+    section_padding_top?: number; // px
+    section_padding_bottom?: number; // px
+    section_padding_left?: number; // px (for container)
+    section_padding_right?: number; // px (for container)
+    column_gap?: number; // px gap between columns
+    content_padding?: number; // px padding inside each column
+  };
+  
   background_color?: string;
+  background_gradient?: string;
+  full_width?: boolean; // If true, extends to full viewport width
+  min_height?: number; // px - minimum section height
 }
 
 export interface CTASection extends BaseSection {

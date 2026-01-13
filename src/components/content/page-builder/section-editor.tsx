@@ -1744,6 +1744,10 @@ function SalesTabSectionEditor({
   );
 }
 
+/**
+ * Enhanced Split Layout Section Editor
+ * Based on Shopify/BigCommerce best practices
+ */
 function SplitLayoutSectionEditor({
   section,
   onUpdate,
@@ -1763,6 +1767,18 @@ function SplitLayoutSectionEditor({
     onUpdate({ left_side: updated });
   };
 
+  const handleRightSideColorChange = (colorKey: string, value: string) => {
+    onUpdate({
+      right_side: { ...section.right_side, [colorKey]: value }
+    });
+  };
+
+  const handleRightSideColorReset = (colorKey: string) => {
+    const updated = { ...section.right_side };
+    delete (updated as any)[colorKey];
+    onUpdate({ right_side: updated });
+  };
+
   const handleSectionColorChange = (colorKey: string, value: string) => {
     onUpdate({ [colorKey]: value });
   };
@@ -1775,10 +1791,214 @@ function SplitLayoutSectionEditor({
     <Card>
       <CardHeader>
         <CardTitle>Edit Split Layout Section</CardTitle>
+        <p className="text-sm text-muted-foreground">Enhanced with Shopify/BigCommerce best practices</p>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Layout Configuration */}
         <div className="space-y-4 border-b pb-4">
-          <h3 className="font-semibold">Left Side (Banner)</h3>
+          <h3 className="font-semibold text-lg">Layout Configuration</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Layout Ratio</Label>
+              <Select
+                value={section.layout_ratio || '50-50'}
+                onValueChange={(value) => onUpdate({ layout_ratio: value as any })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50-50">50 / 50 (Equal)</SelectItem>
+                  <SelectItem value="60-40">60 / 40</SelectItem>
+                  <SelectItem value="40-60">40 / 60</SelectItem>
+                  <SelectItem value="70-30">70 / 30</SelectItem>
+                  <SelectItem value="30-70">30 / 70</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Control the width ratio of left and right columns</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Mobile Behavior</Label>
+              <Select
+                value={section.mobile_behavior || 'stack'}
+                onValueChange={(value) => onUpdate({ mobile_behavior: value as any })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stack">Stack Vertically</SelectItem>
+                  <SelectItem value="reverse_stack">Reverse Stack</SelectItem>
+                  <SelectItem value="scroll">Horizontal Scroll</SelectItem>
+                  <SelectItem value="hide_left">Hide Left on Mobile</SelectItem>
+                  <SelectItem value="hide_right">Hide Right on Mobile</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">How sections behave on mobile devices</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="reverse_desktop"
+              checked={section.reverse_desktop || false}
+              onChange={(e) => onUpdate({ reverse_desktop: e.target.checked })}
+              className="rounded"
+            />
+            <Label htmlFor="reverse_desktop" className="cursor-pointer">Reverse order on desktop (Right | Left)</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="full_width"
+              checked={section.full_width || false}
+              onChange={(e) => onUpdate({ full_width: e.target.checked })}
+              className="rounded"
+            />
+            <Label htmlFor="full_width" className="cursor-pointer">Full width (extends to viewport edges)</Label>
+          </div>
+        </div>
+
+        {/* Section-Level Styling */}
+        <div className="space-y-4 border-b pb-4">
+          <h3 className="font-semibold text-lg">Section Styling</h3>
+          <div className="space-y-2">
+            <Label>Background Type</Label>
+            <Select
+              value={section.background_gradient ? 'gradient' : 'color'}
+              onValueChange={(value) => {
+                if (value === 'gradient') {
+                  onUpdate({ 
+                    background_gradient: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
+                    background_color: undefined 
+                  });
+                } else {
+                  onUpdate({ background_gradient: undefined });
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="color">Solid Color</SelectItem>
+                <SelectItem value="gradient">Gradient</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {section.background_gradient ? (
+            <div className="space-y-2">
+              <Label>Background Gradient</Label>
+              <Input
+                value={section.background_gradient || ''}
+                onChange={(e) => onUpdate({ background_gradient: e.target.value })}
+                placeholder="linear-gradient(to right, #f3f4f6, #e5e7eb)"
+              />
+              <p className="text-xs text-muted-foreground">CSS gradient value</p>
+            </div>
+          ) : (
+            <ColorPicker
+              label="Background Color"
+              colorKey="background_color"
+              defaultValue="transparent"
+              description="Background color for the entire section"
+              section={section}
+              onColorChange={handleSectionColorChange}
+              onColorReset={handleSectionColorReset}
+            />
+          )}
+          <div className="space-y-2">
+            <Label>Minimum Height (px)</Label>
+            <Input
+              type="number"
+              value={section.min_height || ''}
+              onChange={(e) => onUpdate({ min_height: parseInt(e.target.value) || undefined })}
+              placeholder="500"
+            />
+          </div>
+        </div>
+
+        {/* Spacing Configuration */}
+        <div className="space-y-4 border-b pb-4">
+          <h3 className="font-semibold text-lg">Spacing & Padding</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Section Padding Top (px)</Label>
+              <Input
+                type="number"
+                value={section.spacing?.section_padding_top ?? 64}
+                onChange={(e) => onUpdate({ 
+                  spacing: { 
+                    ...section.spacing, 
+                    section_padding_top: parseInt(e.target.value) || 64 
+                  }
+                })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Section Padding Bottom (px)</Label>
+              <Input
+                type="number"
+                value={section.spacing?.section_padding_bottom ?? 64}
+                onChange={(e) => onUpdate({ 
+                  spacing: { 
+                    ...section.spacing, 
+                    section_padding_bottom: parseInt(e.target.value) || 64 
+                  }
+                })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Column Gap (px)</Label>
+              <Input
+                type="number"
+                value={section.spacing?.column_gap ?? 48}
+                onChange={(e) => onUpdate({ 
+                  spacing: { 
+                    ...section.spacing, 
+                    column_gap: parseInt(e.target.value) || 48 
+                  }
+                })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Content Padding (px)</Label>
+              <Input
+                type="number"
+                value={section.spacing?.content_padding ?? 32}
+                onChange={(e) => onUpdate({ 
+                  spacing: { 
+                    ...section.spacing, 
+                    content_padding: parseInt(e.target.value) || 32 
+                  }
+                })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Left Side Configuration */}
+        <div className="space-y-4 border-b pb-4">
+          <h3 className="font-semibold text-lg">Left Side Configuration</h3>
+          <div className="space-y-2">
+            <Label>Content Type</Label>
+            <Select
+              value={section.left_side.type || 'banner'}
+              onValueChange={(value) => onUpdate({
+                left_side: { ...section.left_side, type: value as any }
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="banner">Banner (with overlay)</SelectItem>
+                <SelectItem value="image">Image Only</SelectItem>
+                <SelectItem value="text">Text Content</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -1798,16 +2018,181 @@ function SplitLayoutSectionEditor({
             onColorChange={handleLeftSideColorChange}
             onColorReset={handleLeftSideColorReset}
           />
+          
           <div className="space-y-2">
-            <Label>Image *</Label>
-            <ImageUploadField
-              label="banner image"
-              value={section.left_side.image || ''}
-              onChange={(url) => onUpdate({
-                left_side: { ...section.left_side, image: url || '' }
+            <Label>Subtitle</Label>
+            <Input
+              value={section.left_side.subtitle || ''}
+              onChange={(e) => onUpdate({
+                left_side: { ...section.left_side, subtitle: e.target.value }
+              })}
+              placeholder="Banner subtitle"
+            />
+          </div>
+          <ColorPicker
+            label="Subtitle Color"
+            colorKey="subtitle_color"
+            defaultValue="#666666"
+            description="Color for the left side subtitle"
+            section={section.left_side}
+            onColorChange={handleLeftSideColorChange}
+            onColorReset={handleLeftSideColorReset}
+          />
+          
+          {section.left_side.type !== 'image' && (
+            <>
+              <div className="space-y-2">
+                <Label>Image {section.left_side.type === 'banner' ? '(Background)' : ''}</Label>
+                <ImageUploadField
+                  label="left side image"
+                  value={section.left_side.image || ''}
+                  onChange={(url) => onUpdate({
+                    left_side: { ...section.left_side, image: url || '' }
+                  })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Image Position</Label>
+                <Select
+                  value={section.left_side.image_position || 'cover'}
+                  onValueChange={(value) => onUpdate({
+                    left_side: { ...section.left_side, image_position: value as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cover">Cover</SelectItem>
+                    <SelectItem value="contain">Contain</SelectItem>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Overlay Opacity ({section.left_side.overlay_opacity || 0}%)</Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={section.left_side.overlay_opacity || 0}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, overlay_opacity: parseInt(e.target.value) }
+                  })}
+                  className="w-full"
+                />
+              </div>
+            </>
+          )}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Text Alignment</Label>
+              <Select
+                value={section.left_side.text_alignment || 'center'}
+                onValueChange={(value) => onUpdate({
+                  left_side: { ...section.left_side, text_alignment: value as any }
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Vertical Alignment</Label>
+              <Select
+                value={section.left_side.vertical_alignment || 'middle'}
+                onValueChange={(value) => onUpdate({
+                  left_side: { ...section.left_side, vertical_alignment: value as any }
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="top">Top</SelectItem>
+                  <SelectItem value="middle">Middle</SelectItem>
+                  <SelectItem value="bottom">Bottom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Background Type</Label>
+            <Select
+              value={section.left_side.background_gradient ? 'gradient' : 'color'}
+              onValueChange={(value) => {
+                if (value === 'gradient') {
+                  onUpdate({ 
+                    left_side: {
+                      ...section.left_side,
+                      background_gradient: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
+                      background_color: undefined 
+                    }
+                  });
+                } else {
+                  onUpdate({ 
+                    left_side: {
+                      ...section.left_side,
+                      background_gradient: undefined
+                    }
+                  });
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="color">Solid Color</SelectItem>
+                <SelectItem value="gradient">Gradient</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {section.left_side.background_gradient ? (
+            <div className="space-y-2">
+              <Label>Background Gradient</Label>
+              <Input
+                value={section.left_side.background_gradient || ''}
+                onChange={(e) => onUpdate({
+                  left_side: { ...section.left_side, background_gradient: e.target.value }
+                })}
+                placeholder="linear-gradient(to right, #f3f4f6, #e5e7eb)"
+              />
+            </div>
+          ) : (
+            <ColorPicker
+              label="Background Color"
+              colorKey="background_color"
+              defaultValue="#f3f4f6"
+              description="Background color for the left side"
+              section={section.left_side}
+              onColorChange={handleLeftSideColorChange}
+              onColorReset={handleLeftSideColorReset}
+            />
+          )}
+          
+          <div className="space-y-2">
+            <Label>Border Radius (px)</Label>
+            <Input
+              type="number"
+              value={section.left_side.border_radius ?? 8}
+              onChange={(e) => onUpdate({
+                left_side: { ...section.left_side, border_radius: parseInt(e.target.value) || 0 }
               })}
             />
           </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>CTA Text</Label>
@@ -1830,9 +2215,49 @@ function SplitLayoutSectionEditor({
               />
             </div>
           </div>
+          <ColorPicker
+            label="CTA Text Color"
+            colorKey="cta_text_color"
+            defaultValue="#FFFFFF"
+            description="Color for the CTA button text"
+            section={section.left_side}
+            onColorChange={handleLeftSideColorChange}
+            onColorReset={handleLeftSideColorReset}
+          />
+          <ColorPicker
+            label="CTA Button Color"
+            colorKey="cta_button_color"
+            defaultValue="#4CAF50"
+            description="Background color for the CTA button"
+            section={section.left_side}
+            onColorChange={handleLeftSideColorChange}
+            onColorReset={handleLeftSideColorReset}
+          />
         </div>
+
+        {/* Right Side Configuration */}
         <div className="space-y-4">
-          <h3 className="font-semibold">Right Side (Products)</h3>
+          <h3 className="font-semibold text-lg">Right Side Configuration</h3>
+          <div className="space-y-2">
+            <Label>Content Type</Label>
+            <Select
+              value={section.right_side.type || 'products'}
+              onValueChange={(value) => onUpdate({
+                right_side: { ...section.right_side, type: value as any }
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="products">Products</SelectItem>
+                <SelectItem value="features">Features</SelectItem>
+                <SelectItem value="text">Text Content</SelectItem>
+                <SelectItem value="image">Image</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -1840,29 +2265,101 @@ function SplitLayoutSectionEditor({
               onChange={(e) => onUpdate({
                 right_side: { ...section.right_side, title: e.target.value }
               })}
-              placeholder="Top Rated"
+              placeholder="Section title"
             />
           </div>
+          <ColorPicker
+            label="Title Color"
+            colorKey="title_color"
+            defaultValue="#000000"
+            description="Color for the right side title"
+            section={section.right_side}
+            onColorChange={handleRightSideColorChange}
+            onColorReset={handleRightSideColorReset}
+          />
+          
+          {section.right_side.type === 'products' && (
+            <>
+              <div className="space-y-2">
+                <Label>Product Limit</Label>
+                <Input
+                  type="number"
+                  value={section.right_side.limit || 4}
+                  onChange={(e) => onUpdate({
+                    right_side: { ...section.right_side, limit: parseInt(e.target.value) || 4 }
+                  })}
+                  min={1}
+                  max={12}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.right_side.columns || 2)}
+                  onValueChange={(value) => onUpdate({
+                    right_side: { ...section.right_side, columns: parseInt(value) as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Column</SelectItem>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Category ID (Optional)</Label>
+                <Input
+                  value={section.right_side.category_id || ''}
+                  onChange={(e) => onUpdate({
+                    right_side: { ...section.right_side, category_id: e.target.value || undefined }
+                  })}
+                  placeholder="Filter by category"
+                />
+              </div>
+            </>
+          )}
+          
           <div className="space-y-2">
-            <Label>Limit</Label>
+            <Label>Text Alignment</Label>
+            <Select
+              value={section.right_side.text_alignment || 'left'}
+              onValueChange={(value) => onUpdate({
+                right_side: { ...section.right_side, text_alignment: value as any }
+              })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <ColorPicker
+            label="Background Color"
+            colorKey="background_color"
+            defaultValue="transparent"
+            description="Background color for the right side"
+            section={section.right_side}
+            onColorChange={handleRightSideColorChange}
+            onColorReset={handleRightSideColorReset}
+          />
+          
+          <div className="space-y-2">
+            <Label>Border Radius (px)</Label>
             <Input
               type="number"
-              value={section.right_side.limit || 4}
+              value={section.right_side.border_radius ?? 8}
               onChange={(e) => onUpdate({
-                right_side: { ...section.right_side, limit: parseInt(e.target.value) || 4 }
+                right_side: { ...section.right_side, border_radius: parseInt(e.target.value) || 0 }
               })}
-              min={1}
-              max={8}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Category ID (Optional)</Label>
-            <Input
-              value={section.right_side.category_id || ''}
-              onChange={(e) => onUpdate({
-                right_side: { ...section.right_side, category_id: e.target.value || undefined }
-              })}
-              placeholder="Filter by category"
             />
           </div>
         </div>

@@ -1286,6 +1286,19 @@ function SalesTabSectionComponent({
   );
 }
 
+/**
+ * Enhanced Split Layout Section Component
+ * Based on Shopify/BigCommerce best practices
+ * 
+ * Features:
+ * - Flexible layout ratios (50/50, 60/40, 40/60, 70/30, 30/70)
+ * - Text alignment controls
+ * - Mobile behavior options
+ * - Spacing/padding controls
+ * - Background gradients
+ * - Image positioning
+ * - Vertical alignment
+ */
 function SplitLayoutSectionComponent({ 
   section, 
   isPreview 
@@ -1299,6 +1312,7 @@ function SplitLayoutSectionComponent({
   const [rightProducts, setRightProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch products for right side if needed
   useEffect(() => {
     if (isPreview || section.right_side.type !== 'products') {
       setIsLoading(false);
@@ -1338,48 +1352,140 @@ function SplitLayoutSectionComponent({
     fetchProducts();
   }, [section.right_side, isPreview]);
 
-  // Set CSS variables on section for better performance (section-specific naming)
+  // Calculate layout ratio classes
+  const layoutRatio = section.layout_ratio || '50-50';
+  const getGridColsClass = () => {
+    switch (layoutRatio) {
+      case '60-40': return 'lg:grid-cols-[60fr_40fr]';
+      case '40-60': return 'lg:grid-cols-[40fr_60fr]';
+      case '70-30': return 'lg:grid-cols-[70fr_30fr]';
+      case '30-70': return 'lg:grid-cols-[30fr_70fr]';
+      default: return 'lg:grid-cols-2';
+    }
+  };
+
+  // Calculate mobile behavior classes
+  const mobileBehavior = section.mobile_behavior || 'stack';
+  const getMobileBehaviorClass = () => {
+    switch (mobileBehavior) {
+      case 'scroll': return 'flex overflow-x-auto lg:grid';
+      case 'hide_left': return 'grid-cols-1 [&>*:first-child]:hidden lg:[&>*:first-child]:block';
+      case 'hide_right': return 'grid-cols-1 [&>*:last-child]:hidden lg:[&>*:last-child]:block';
+      case 'reverse_stack': return 'flex flex-col-reverse lg:grid';
+      default: return 'grid-cols-1';
+    }
+  };
+
+  // Get text alignment classes
+  const getTextAlignClass = (alignment?: string) => {
+    switch (alignment) {
+      case 'left': return 'text-left items-start';
+      case 'right': return 'text-right items-end';
+      default: return 'text-center items-center';
+    }
+  };
+
+  // Get vertical alignment classes
+  const getVerticalAlignClass = (alignment?: string) => {
+    switch (alignment) {
+      case 'top': return 'justify-start';
+      case 'bottom': return 'justify-end';
+      default: return 'justify-center';
+    }
+  };
+
+  // Get image position classes
+  const getImagePositionClass = (position?: string) => {
+    switch (position) {
+      case 'contain': return 'object-contain';
+      case 'top': return 'object-cover object-top';
+      case 'bottom': return 'object-cover object-bottom';
+      case 'center': return 'object-cover object-center';
+      default: return 'object-cover';
+    }
+  };
+
+  // Spacing configuration
+  const spacing = section.spacing || {};
+  const paddingTop = spacing.section_padding_top !== undefined ? `${spacing.section_padding_top}px` : '4rem';
+  const paddingBottom = spacing.section_padding_bottom !== undefined ? `${spacing.section_padding_bottom}px` : '4rem';
+  const columnGap = spacing.column_gap !== undefined ? `${spacing.column_gap}px` : '3rem';
+  const contentPadding = spacing.content_padding !== undefined ? `${spacing.content_padding}px` : '2rem';
+
+  // Set CSS variables on section for better performance
   const sectionStyle = {
-    '--split-layout-bg': section.background_color || 'transparent',
-    '--split-layout-left-bg': section.left_side.background_color || 'var(--color-background, #f3f4f6)',
+    '--split-layout-bg': section.background_gradient || section.background_color || 'transparent',
+    '--split-layout-left-bg': section.left_side.background_gradient || section.left_side.background_color || 'var(--color-background, #f3f4f6)',
     '--split-layout-left-title-color': section.left_side.title_color || 'var(--color-text, currentColor)',
     '--split-layout-left-subtitle-color': section.left_side.subtitle_color || 'var(--color-text, #666666)',
+    '--split-layout-left-content-color': section.left_side.content_color || 'var(--color-text, #666666)',
     '--split-layout-left-cta-text-color': section.left_side.cta_text_color || '#FFFFFF',
     '--split-layout-left-cta-bg-color': section.left_side.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
-    '--font-heading': 'var(--font-heading, inherit)',
-    '--font-body': 'var(--font-body, inherit)',
+    '--split-layout-right-bg': section.right_side.background_color || 'transparent',
+    '--split-layout-right-title-color': section.right_side.title_color || 'var(--color-text, currentColor)',
+    '--split-layout-right-subtitle-color': section.right_side.subtitle_color || 'var(--color-text, #666666)',
+    '--font-heading': headingFont,
+    '--font-body': bodyFont,
+    paddingTop,
+    paddingBottom,
+    backgroundImage: section.background_gradient || undefined,
+    backgroundColor: section.background_gradient ? undefined : (section.background_color || 'transparent'),
+    minHeight: section.min_height ? `${section.min_height}px` : undefined,
   } as React.CSSProperties & Record<string, string | undefined>;
+
+  const containerClass = section.full_width ? 'w-full px-4' : 'container mx-auto px-4';
+
+  // Reverse desktop order if specified
+  const shouldReverse = section.reverse_desktop;
 
   return (
     <section 
-      className="py-16" 
-      style={{
-        ...sectionStyle,
-        backgroundColor: 'var(--split-layout-bg)',
-      }}
+      className="relative" 
+      style={sectionStyle}
     >
-      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Left Side - Banner */}
+      <div className={containerClass} style={{ maxWidth: section.full_width ? '100%' : 'var(--container-max-width, 1200px)' }}>
+        <div 
+          className={`grid ${getMobileBehaviorClass()} ${getGridColsClass()} ${shouldReverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}
+          style={{ gap: columnGap }}
+        >
+          {/* Left Side */}
           <div
-            className="relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px]"
+            className={`relative overflow-hidden ${section.left_side.border_radius ? '' : 'rounded-lg'}`}
             style={{
-              backgroundColor: 'var(--split-layout-left-bg)',
+              backgroundImage: section.left_side.background_gradient || undefined,
+              backgroundColor: section.left_side.background_gradient ? undefined : 'var(--split-layout-left-bg)',
+              borderRadius: section.left_side.border_radius ? `${section.left_side.border_radius}px` : '0.5rem',
+              minHeight: mobileBehavior === 'scroll' ? '400px' : '500px',
             }}
           >
-            {section.left_side.image && !section.left_side.image.startsWith('blob:') && (
-              <Image
-                src={section.left_side.image}
-                alt={section.left_side.title || 'Banner'}
-                fill
-                className="object-cover opacity-70"
-                sizes="(max-width: 1024px) 100vw, 50vw"
-              />
+            {/* Background Image (if any) */}
+            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type !== 'text' && (
+              <div className="absolute inset-0">
+                <Image
+                  src={section.left_side.image}
+                  alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
+                  fill
+                  className={getImagePositionClass(section.left_side.image_position)}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+                {/* Overlay */}
+                {section.left_side.overlay_opacity !== undefined && (
+                  <div 
+                    className="absolute inset-0 bg-black"
+                    style={{ opacity: section.left_side.overlay_opacity / 100 }}
+                  />
+                )}
+              </div>
             )}
-            <div className="absolute inset-0 flex flex-col justify-center p-8 text-center">
+            
+            {/* Content Overlay */}
+            <div 
+              className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
+              style={{ padding: contentPadding, zIndex: 10 }}
+            >
               {section.left_side.title && (
                 <h2 
-                  className="text-3xl md:text-4xl font-bold mb-4"
+                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--split-layout-left-title-color)',
@@ -1390,7 +1496,7 @@ function SplitLayoutSectionComponent({
               )}
               {section.left_side.subtitle && (
                 <p 
-                  className="text-lg mb-4"
+                  className="text-lg md:text-xl mb-4"
                   style={{ 
                     fontFamily: 'var(--font-body)',
                     color: 'var(--split-layout-left-subtitle-color)',
@@ -1398,6 +1504,16 @@ function SplitLayoutSectionComponent({
                 >
                   {section.left_side.subtitle}
                 </p>
+              )}
+              {section.left_side.content && (
+                <div 
+                  className="prose max-w-none mb-6"
+                  style={{ 
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--split-layout-left-content-color)',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: section.left_side.content }}
+                />
               )}
               {section.left_side.cta_text && section.left_side.cta_link && (
                 <Link href={section.left_side.cta_link}>
@@ -1407,7 +1523,7 @@ function SplitLayoutSectionComponent({
                       backgroundColor: 'var(--split-layout-left-cta-bg-color)',
                       color: 'var(--split-layout-left-cta-text-color)',
                     }}
-                    className="w-fit mx-auto"
+                    className={section.left_side.text_alignment === 'left' ? '' : section.left_side.text_alignment === 'right' ? 'ml-auto' : 'mx-auto'}
                   >
                     {section.left_side.cta_text}
                   </Button>
@@ -1416,23 +1532,43 @@ function SplitLayoutSectionComponent({
             </div>
           </div>
 
-          {/* Right Side - Products or Features */}
-          <div className="space-y-8">
+          {/* Right Side */}
+          <div 
+            className={`${section.right_side.border_radius ? '' : 'rounded-lg'}`}
+            style={{
+              backgroundColor: 'var(--split-layout-right-bg)',
+              borderRadius: section.right_side.border_radius ? `${section.right_side.border_radius}px` : '0.5rem',
+              padding: contentPadding,
+            }}
+          >
             {section.right_side.title && (
               <h2 
-                className="text-2xl md:text-3xl font-bold"
+                className={`text-2xl md:text-3xl font-bold mb-6 ${getTextAlignClass(section.right_side.text_alignment).split(' ')[0]}`}
                 style={{ 
                   fontFamily: headingFont,
-                  color: 'var(--color-text, currentColor)',
+                  color: 'var(--split-layout-right-title-color)',
                 }}
               >
                 {section.right_side.title}
               </h2>
             )}
+            {section.right_side.subtitle && (
+              <p 
+                className={`text-lg mb-6 ${getTextAlignClass(section.right_side.text_alignment).split(' ')[0]}`}
+                style={{ 
+                  fontFamily: bodyFont,
+                  color: 'var(--split-layout-right-subtitle-color)',
+                }}
+              >
+                {section.right_side.subtitle}
+              </p>
+            )}
+            
+            {/* Right Side Content Based on Type */}
             {section.right_side.type === 'products' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${section.right_side.columns === 1 ? 'grid-cols-1' : section.right_side.columns === 3 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                 {isPreview ? (
-                  <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg">
+                  <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
                     Products will be displayed here
                   </div>
                 ) : isLoading ? (
@@ -1466,6 +1602,46 @@ function SplitLayoutSectionComponent({
                     </div>
                   ))
                 )}
+              </div>
+            )}
+
+            {section.right_side.type === 'features' && section.right_side.features && (
+              <div className="space-y-4">
+                {section.right_side.features.map((feature) => (
+                  <div key={feature.id} className="flex gap-4 items-start">
+                    {feature.icon && (
+                      <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <span className="text-2xl">{feature.icon}</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
+                      {feature.description && (
+                        <p className="text-muted-foreground">{feature.description}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {section.right_side.type === 'text' && section.right_side.content && (
+              <div 
+                className="prose max-w-none"
+                style={{ fontFamily: bodyFont }}
+                dangerouslySetInnerHTML={{ __html: section.right_side.content }}
+              />
+            )}
+
+            {section.right_side.type === 'image' && section.right_side.image && !section.right_side.image.startsWith('blob:') && (
+              <div className="relative aspect-video rounded-lg overflow-hidden">
+                <Image
+                  src={section.right_side.image}
+                  alt={section.right_side.alt_text || 'Image'}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
               </div>
             )}
           </div>

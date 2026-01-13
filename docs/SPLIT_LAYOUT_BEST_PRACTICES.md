@@ -14,7 +14,8 @@ Split layout sections are a powerful design pattern used by major e-commerce pla
 4. **Product Integration**: Dynamic product fetching from categories
 5. **Responsive Design**: Grid layout that stacks on mobile
 
-### ⚠️ Areas for Improvement
+### ⚠️ Areas for Improvementclear
+
 
 Based on industry best practices from Shopify, BigCommerce, and other major platforms:
 
@@ -222,12 +223,27 @@ right_side: {
 
 ## Implementation Priority
 
-### Phase 1: High Priority (Quick Wins)
-1. ✅ Layout ratio options (50/50, 60/40, etc.)
-2. ✅ Text alignment controls
-3. ✅ Mobile behavior options
-4. ✅ Spacing/padding controls
-5. ✅ Background gradients
+### Phase 1: High Priority (Quick Wins) ✅ COMPLETED
+1. ✅ Layout ratio options (50/50, 60/40, etc.) - **DONE**
+2. ✅ Text alignment controls - **DONE**
+3. ✅ Mobile behavior options - **DONE**
+4. ✅ Spacing/padding controls - **DONE**
+5. ✅ Background gradients - **DONE**
+6. ✅ Image positioning controls - **DONE**
+7. ✅ Vertical alignment - **DONE**
+8. ✅ Border radius controls - **DONE**
+9. ✅ Overlay opacity controls - **DONE**
+
+**Status**: Phase 1 implementation complete as of January 2026
+**Files Updated**:
+- `/src/lib/content/page-builder-types.ts` - Enhanced interface
+- `/src/components/content/page-builder/section-templates.tsx` - Enhanced renderer
+- `/src/components/content/page-builder/section-editor.tsx` - Enhanced editor
+- `/src/components/content/page-builder/page-builder.tsx` - Updated defaults
+- `/src/components/storefront/shared-layout.tsx` - New shared layout component
+
+**Documentation**:
+- `/docs/ENHANCED_SPLIT_LAYOUT_GUIDE.md` - Complete implementation guide
 
 ### Phase 2: Medium Priority (Enhanced Functionality)
 1. Content type flexibility
