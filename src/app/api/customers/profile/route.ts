@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const customer = await getCurrentCustomer();
 
     if (!customer) {
+      // 401 is expected for unauthenticated users - don't log as error
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }

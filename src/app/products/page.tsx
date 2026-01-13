@@ -350,6 +350,12 @@ export default async function ProductsPage({
       finalProductsCount: products.length,
       total,
       themeSlug: tenant.theme_slug || 'default',
+      firstProduct: products[0] ? {
+        id: products[0].id,
+        name: products[0].name,
+        price: products[0].price,
+        hasImage: !!products[0].image,
+      } : null,
     });
 
     return (

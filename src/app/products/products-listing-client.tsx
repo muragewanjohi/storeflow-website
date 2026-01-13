@@ -91,16 +91,21 @@ export default function ProductsListingClient({
 
   // Ensure products are set immediately from initialProducts
   useEffect(() => {
-    if (initialProducts.length > 0 && products.length === 0) {
-      console.log('[ProductsListing] Setting products from initialProducts', {
-        initialProductsCount: initialProducts.length,
-      });
-      setProducts(initialProducts);
-      setTotal(initialTotal);
+    if (initialProducts.length > 0) {
+      // Always sync products from initialProducts to ensure they're displayed
+      // This is especially important on first render
+      if (products.length === 0 || JSON.stringify(products.map(p => p.id)) !== JSON.stringify(initialProducts.map(p => p.id))) {
+        console.log('[ProductsListing] Setting products from initialProducts', {
+          initialProductsCount: initialProducts.length,
+          currentProductsCount: products.length,
+        });
+        setProducts(initialProducts);
+        setTotal(initialTotal);
+      }
     }
-  }, [initialProducts, initialTotal, products.length]);
+  }, [initialProducts, initialTotal]);
 
-  // Log initial state
+  // Log initial state - always log to help debug production issues
   useEffect(() => {
     console.log('[ProductsListing] Component mounted', {
       initialProductsCount: initialProducts.length,
@@ -109,7 +114,20 @@ export default function ProductsListingClient({
       initialSearch,
       initialCategory,
       themeSlug,
+      firstProduct: initialProducts[0] ? {
+        id: initialProducts[0].id,
+        name: initialProducts[0].name,
+        price: initialProducts[0].price,
+        hasImage: !!initialProducts[0].image,
+      } : null,
     });
+    
+    // Log to help debug in production
+    if (initialProducts.length === 0) {
+      console.warn('[ProductsListing] WARNING: No initial products received from server');
+    } else {
+      console.log('[ProductsListing] Successfully received products from server:', initialProducts.length);
+    }
   }, []);
   
   // Initialize selected categories - map slugs to IDs if needed
@@ -727,25 +745,37 @@ export default function ProductsListingClient({
               return (
                 <div className="text-center py-12">
                   <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
-                  {process.env.NODE_ENV === 'development' && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}, isSearching={isSearching.toString()}
-                    </p>
-                  )}
+                  {/* Always show debug info to help troubleshoot production issues */}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}, isSearching={isSearching.toString()}
+                  </p>
                 </div>
               );
             }
             
-            // Show products
+            // Show products with error boundary
             return (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-                  {productsToDisplay.map((product: any) => (
-                    <ThemeProductCard
-                      key={product.id}
-                      product={product}
-                    />
-                  ))}
+                  {productsToDisplay.map((product: any) => {
+                    try {
+                      return (
+                        <ThemeProductCard
+                          key={product.id}
+                          product={product}
+                        />
+                      );
+                    } catch (error) {
+                      console.error('[ProductsListing] Error rendering product card:', product?.id, error);
+                      // Return a fallback card if rendering fails
+                      return (
+                        <div key={product.id} className="border rounded-lg p-4">
+                          <p className="text-sm text-muted-foreground">Error loading product</p>
+                          <p className="text-xs text-muted-foreground mt-1">{product?.name || product?.id}</p>
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
 
               {/* Pagination */}
