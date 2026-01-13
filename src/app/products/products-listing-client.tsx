@@ -86,6 +86,8 @@ export default function ProductsListingClient({
   const [total, setTotal] = useState(initialTotal);
   const [isSearching, setIsSearching] = useState(false);
   const [isInitialMount, setIsInitialMount] = useState(true);
+  const initialProductsRef = useRef(initialProducts);
+  const hasInitializedRef = useRef(false);
   
   // Initialize selected categories - map slugs to IDs if needed
   const getInitialSelectedCategories = () => {
@@ -118,20 +120,38 @@ export default function ProductsListingClient({
   const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
 
-  // Mark initial mount as complete after first render
+  // Mark initial mount as complete after products are loaded
   useEffect(() => {
-    // Use a small delay to ensure initialProducts are set
-    const timer = setTimeout(() => {
-      setIsInitialMount(false);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    // Only mark as initialized if we have products or if initialProducts is explicitly empty
+    if (initialProducts.length > 0 || hasInitializedRef.current) {
+      const timer = setTimeout(() => {
+        setIsInitialMount(false);
+        hasInitializedRef.current = true;
+      }, 200);
+      return () => clearTimeout(timer);
+    } else if (initialProducts.length === 0 && !hasInitializedRef.current) {
+      // If no products initially, still mark as initialized after a short delay
+      const timer = setTimeout(() => {
+        setIsInitialMount(false);
+        hasInitializedRef.current = true;
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialProducts.length]);
 
   // Update products when initialProducts change (e.g., from server-side navigation)
+  // Only update if the products actually changed (not just a re-render with same data)
   useEffect(() => {
-    if (initialProducts && initialProducts.length >= 0) {
+    // Check if initialProducts actually changed by comparing IDs
+    const currentIds = initialProducts.map(p => p.id).join(',');
+    const previousIds = initialProductsRef.current.map(p => p.id).join(',');
+    
+    // Only update if products actually changed
+    if (currentIds !== previousIds || initialProducts.length !== initialProductsRef.current.length) {
+      // Update products - always trust server state
       setProducts(initialProducts);
       setTotal(initialTotal);
+      initialProductsRef.current = initialProducts;
     }
   }, [initialProducts, initialTotal]);
 
@@ -193,13 +213,16 @@ export default function ProductsListingClient({
 
   const updateFilters = useCallback(() => {
     // Don't update filters on initial mount - use initialProducts from server
-    if (isInitialMount) {
+    if (isInitialMount || !hasInitializedRef.current) {
       return;
     }
     
     startTransition(() => {
       setIsSearching(true);
       const params = new URLSearchParams(searchParams.toString());
+      
+      // Store original params to compare later
+      const originalParams = new URLSearchParams(searchParams.toString());
       
       if (debouncedSearch.trim()) {
         params.set('search', debouncedSearch.trim());
@@ -273,6 +296,13 @@ export default function ProductsListingClient({
         params.set('page', params.get('page') || '1'); // Ensure it's always set
       }
       
+      // Check if params actually changed - if not, don't fetch or update URL
+      const paramsChanged = params.toString() !== originalParams.toString();
+      if (!paramsChanged) {
+        setIsSearching(false);
+        return;
+      }
+      
       // Fetch updated products from API first, then navigate
       fetch(`/api/products?${params.toString()}`)
         .then(res => {
@@ -282,7 +312,7 @@ export default function ProductsListingClient({
           return res.json();
         })
         .then(data => {
-          if (data.products) {
+          if (data.products && Array.isArray(data.products)) {
             // Map sale_price to compareAtPrice correctly
             const mappedProducts = data.products.map((p: any) => {
               const regularPrice = Number(p.price) || 0;
@@ -304,6 +334,7 @@ export default function ProductsListingClient({
             setProducts(mappedProducts);
             setTotal(data.pagination?.total || 0);
           } else {
+            // Only clear products if we explicitly got an empty result, not on error
             setProducts([]);
             setTotal(0);
           }
@@ -311,13 +342,19 @@ export default function ProductsListingClient({
         })
         .catch(err => {
           console.error('Error fetching products:', err);
-          setProducts([]);
-          setTotal(0);
+          // Don't clear products on error - keep existing products visible
+          // Only clear if we're sure there are no products
           setIsSearching(false);
         });
       
-      // Navigate after fetching to update URL
-      router.push(`/products?${params.toString()}`);
+      // Update URL without causing a full page navigation
+      // Use replace to avoid adding to history and triggering unnecessary re-renders
+      // Only update URL if it actually changed to prevent unnecessary re-renders
+      const currentUrl = `/products?${searchParams.toString()}`;
+      const newUrl = `/products?${params.toString()}`;
+      if (currentUrl !== newUrl) {
+        router.replace(newUrl, { scroll: false });
+      }
     });
   }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router, initialCategories, isInitialMount]);
 
@@ -330,12 +367,18 @@ export default function ProductsListingClient({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Auto-search when debounced search changes
+  // Auto-search when debounced search changes (only after initial mount)
   useEffect(() => {
-    if (debouncedSearch !== initialSearch) {
+    // Don't trigger on initial mount - wait until component is fully initialized
+    if (isInitialMount || !hasInitializedRef.current) {
+      return;
+    }
+    
+    // Only update if search actually changed (not just reference equality)
+    if (debouncedSearch.trim() !== initialSearch.trim()) {
       updateFilters();
     }
-  }, [debouncedSearch, updateFilters, initialSearch]);
+  }, [debouncedSearch, updateFilters, initialSearch, isInitialMount]);
 
   const handleSortChange = (value: string) => {
     if (value === 'popular') {
@@ -379,7 +422,7 @@ export default function ProductsListingClient({
   // Debounce filter updates (300ms delay) - but only after initial mount
   useEffect(() => {
     // Don't trigger on initial mount - use initialProducts from server
-    if (isInitialMount) {
+    if (isInitialMount || !hasInitializedRef.current) {
       return;
     }
 

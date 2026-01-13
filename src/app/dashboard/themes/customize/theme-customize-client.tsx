@@ -495,7 +495,7 @@ export default function ThemeCustomizeClient() {
                 <ul className="text-xs space-y-1 text-muted-foreground">
                   <li>✅ <strong>Primary:</strong> Applied via CSS variables (--primary, --color-primary) - Used in buttons, links, active states</li>
                   <li>✅ <strong>Secondary:</strong> Applied via CSS variables (--secondary, --color-secondary) - Used in secondary buttons, hover states</li>
-                  <li>✅ <strong>Accent:</strong> Applied via CSS variables (--accent, --color-accent) - Available for custom use</li>
+                  <li>✅ <strong>Accent:</strong> Applied via CSS variables (--accent, --color-accent) - Used for hover effects, active links, highlights, and decorative elements</li>
                   <li>✅ <strong>Background:</strong> Applied via CSS variables (--background) - Page background</li>
                   <li>✅ <strong>Text:</strong> Applied via CSS variables (--foreground) - Main text color</li>
                   <li>⚠️ <strong>Muted:</strong> Applied via CSS variables (--color-muted) - Note: Some theme components may use hardcoded colors</li>
@@ -513,7 +513,7 @@ export default function ThemeCustomizeClient() {
               {[
                 { key: 'primary', description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements' },
                 { key: 'secondary', description: 'Used for: Secondary buttons, hover states, complementary UI elements' },
-                { key: 'accent', description: 'Used for: Highlights, special features, decorative elements' },
+                { key: 'accent', description: 'Used for: Highlights, special features, decorative elements, hover effects, and active links' },
                 { key: 'background', description: 'Used for: Page background color (applied via CSS variables)' },
                 { key: 'text', description: 'Used for: Main text color, headings, body text (applied via CSS variables)' },
                 { key: 'muted', description: 'Used for: Muted text, placeholders, secondary text, borders' },

@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -995,7 +995,7 @@ function SalesTabSectionEditor({
     },
   });
 
-  const sales = salesData?.sales || [];
+  const sales = useMemo(() => salesData?.sales || [], [salesData?.sales]);
   const displayMode = section.display_mode || 'single_sale';
   const layout = section.layout || 'grid';
   const bannerStyle = section.banner_style || 'contained';

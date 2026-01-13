@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -99,8 +99,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
 
   const [products, setProducts] = useState<Sale['product_sales']>(sale?.product_sales || []);
   
-  // Ensure products is always defined
-  const safeProducts = products || [];
+  // Ensure products is always defined - memoize to prevent unnecessary re-renders
+  const safeProducts = useMemo(() => products || [], [products]);
   const [availableProducts, setAvailableProducts] = useState<Array<{
     id: string;
     name: string;
@@ -138,7 +138,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       }
     };
     loadProducts();
-  }, [products]);
+  }, [safeProducts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

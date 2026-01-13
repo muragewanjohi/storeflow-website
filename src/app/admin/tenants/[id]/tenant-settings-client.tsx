@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -281,7 +281,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
     }
   };
 
-  const loadBillingHistory = async () => {
+  const loadBillingHistory = useCallback(async () => {
     setIsLoadingBilling(true);
     try {
       const response = await fetch(`/api/admin/tenants/${tenant.id}/billing`);
@@ -294,11 +294,11 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
     } finally {
       setIsLoadingBilling(false);
     }
-  };
+  }, [tenant.id]);
 
   useEffect(() => {
     loadBillingHistory();
-  }, []);
+  }, [loadBillingHistory]);
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {

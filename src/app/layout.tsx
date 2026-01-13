@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
+import ThemeStylesServer from "@/components/storefront/theme-styles-server";
 
 export const metadata: Metadata = {
   title: "DukaNest - Multi-Tenant Ecommerce Platform",
@@ -33,6 +34,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <Suspense fallback={null}>
+          <ThemeStylesServer />
+        </Suspense>
         <Suspense fallback={null}>
           <GoogleAnalytics />
         </Suspense>

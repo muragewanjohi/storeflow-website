@@ -62,10 +62,17 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
 
     const root = document.documentElement;
     
+    // Check if server-side styles are already applied (to avoid re-applying and causing flash)
+    const serverStylesApplied = document.getElementById('theme-styles-server') !== null;
+    
     // Merge theme colors with customizations
     const themeColors = (theme?.colors || {}) as Record<string, string>;
     const customColors = (customizations?.custom_colors || {}) as Record<string, string>;
     const colors = { ...themeColors, ...customColors };
+    
+    // If server-side styles are already applied, we still need to update them
+    // in case the theme data changed (e.g., after customization save)
+    // But we can skip the initial flash since server-side styles are already there
 
     // Apply color CSS variables
     Object.entries(colors).forEach(([key, value]) => {
@@ -80,12 +87,8 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
           if (!colors.buttonBackground) {
             root.style.setProperty('--primary', hslValue);
           }
-          // Use buttonText if available, otherwise use text color for primary-foreground (button text)
-          if (!colors.buttonText) {
-            const textColor = colors.text || '#FFFFFF';
-            const textHsl = hexToHsl(textColor);
-            root.style.setProperty('--primary-foreground', textHsl);
-          }
+          // Don't set primary-foreground here - it will be set after all colors are processed
+          // to ensure buttonText takes precedence if it exists
         }
         if (key === 'secondary') {
           const hslValue = hexToHsl(value);
@@ -130,13 +133,21 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
     // After processing all colors, apply button colors to primary/primary-foreground for buttons
     // This ensures buttons use buttonBackground and buttonText when available
     // This makes buttons automatically use the customized button colors
-    if (colors.buttonBackground) {
+    if (colors.buttonBackground && typeof colors.buttonBackground === 'string' && colors.buttonBackground.trim()) {
       const buttonBgHsl = hexToHsl(colors.buttonBackground);
       root.style.setProperty('--primary', buttonBgHsl);
     }
-    if (colors.buttonText) {
+    
+    // Always set primary-foreground: use buttonText if available, otherwise use text color, otherwise white
+    // This ensures buttons always have the correct text color
+    if (colors.buttonText && typeof colors.buttonText === 'string' && colors.buttonText.trim()) {
       const buttonTextHsl = hexToHsl(colors.buttonText);
       root.style.setProperty('--primary-foreground', buttonTextHsl);
+    } else {
+      // Fallback to text color or white if buttonText is not set
+      const textColor = colors.text || '#FFFFFF';
+      const textHsl = hexToHsl(textColor);
+      root.style.setProperty('--primary-foreground', textHsl);
     }
 
     // Apply typography
