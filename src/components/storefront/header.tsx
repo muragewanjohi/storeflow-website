@@ -28,6 +28,15 @@ export default function StorefrontHeader({
   const pathname = usePathname();
   const router = useRouter();
   const { isPreview, onNavigate } = usePreview();
+
+  // Debug: Log router state
+  useEffect(() => {
+    console.log('[Header] Router state:', {
+      pathname,
+      isPreview,
+      hasOnNavigate: !!onNavigate,
+    });
+  }, [pathname, isPreview, onNavigate]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -39,6 +48,19 @@ export default function StorefrontHeader({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Debug: Log logo state to help troubleshoot
+  useEffect(() => {
+    if (isMounted) {
+      console.log('[Header] Logo state:', {
+        hasLogo: !!storeLogo,
+        logoUrl: storeLogo,
+        logoError,
+        isMounted,
+        willShow: isMounted && storeLogo && !logoError,
+      });
+    }
+  }, [isMounted, storeLogo, logoError]);
 
   // Initialize search query from URL params (if on products page)
   useEffect(() => {
@@ -182,38 +204,62 @@ export default function StorefrontHeader({
                 }}
                 className="flex items-center gap-3 md:gap-4"
               >
-                {isMounted && storeLogo && !logoError ? (
+                {storeLogo && !logoError && (
                   <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
-                    <Image 
-                      src={storeLogo} 
-                      alt={storeName}
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 768px) 220px, 300px"
-                      onError={() => setLogoError(true)}
-                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
-                    />
+                    {isMounted ? (
+                      <Image 
+                        src={storeLogo} 
+                        alt={storeName}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 768px) 220px, 300px"
+                        onError={(e) => {
+                          console.error('[Header] Logo image failed to load:', storeLogo, e);
+                          setLogoError(true);
+                        }}
+                        onLoad={() => {
+                          console.log('[Header] Logo image loaded successfully:', storeLogo);
+                        }}
+                        unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                        priority
+                      />
+                    ) : (
+                      // Show placeholder during SSR/hydration
+                      <div className="w-full h-full bg-transparent" />
+                    )}
                   </div>
-                ) : null}
+                )}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
                 </span>
               </button>
             ) : (
               <Link href="/" className="flex items-center gap-3 md:gap-4">
-                {isMounted && storeLogo && !logoError ? (
+                {storeLogo && !logoError && (
                   <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
-                    <Image 
-                      src={storeLogo} 
-                      alt={storeName}
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 768px) 220px, 300px"
-                      onError={() => setLogoError(true)}
-                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
-                    />
+                    {isMounted ? (
+                      <Image 
+                        src={storeLogo} 
+                        alt={storeName}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 768px) 220px, 300px"
+                        onError={(e) => {
+                          console.error('[Header] Logo image failed to load:', storeLogo, e);
+                          setLogoError(true);
+                        }}
+                        onLoad={() => {
+                          console.log('[Header] Logo image loaded successfully:', storeLogo);
+                        }}
+                        unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                        priority
+                      />
+                    ) : (
+                      // Show placeholder during SSR/hydration
+                      <div className="w-full h-full bg-transparent" />
+                    )}
                   </div>
-                ) : null}
+                )}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
                 </span>
@@ -250,9 +296,15 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
-                    onClick={() => {
+                    onClick={(e) => {
                       // Debug: Log navigation attempts
-                      console.log('[Header] Navigating to:', item.href);
+                      console.log('[Header] Link clicked, navigating to:', item.href, {
+                        currentPath: pathname,
+                        targetPath: item.href,
+                        isPreview,
+                      });
+                      // Let Next.js Link handle navigation normally
+                      // If navigation doesn't work, it's likely a Next.js routing issue
                     }}
                   >
                     {item.name}
