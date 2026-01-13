@@ -205,7 +205,7 @@ export default function StorefrontHeader({
                 className="flex items-center gap-3 md:gap-4"
               >
                 {storeLogo && !logoError && (
-                  <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
+                  <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
                     {isMounted ? (
                       <Image 
                         src={storeLogo} 
@@ -218,14 +218,15 @@ export default function StorefrontHeader({
                           setLogoError(true);
                         }}
                         onLoad={() => {
-                          console.log('[Header] Logo image loaded successfully:', storeLogo);
+                          console.log('[Header] Logo image loaded successfully and should be visible:', storeLogo);
                         }}
                         unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                         priority
+                        style={{ position: 'absolute', inset: 0 }}
                       />
                     ) : (
                       // Show placeholder during SSR/hydration
-                      <div className="w-full h-full bg-transparent" />
+                      <div className="w-full h-full bg-transparent" aria-hidden="true" />
                     )}
                   </div>
                 )}
@@ -236,7 +237,7 @@ export default function StorefrontHeader({
             ) : (
               <Link href="/" className="flex items-center gap-3 md:gap-4">
                 {storeLogo && !logoError && (
-                  <div className="relative h-12 md:h-16 w-auto max-w-[220px] md:max-w-[300px]">
+                  <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
                     {isMounted ? (
                       <Image 
                         src={storeLogo} 
@@ -249,14 +250,15 @@ export default function StorefrontHeader({
                           setLogoError(true);
                         }}
                         onLoad={() => {
-                          console.log('[Header] Logo image loaded successfully:', storeLogo);
+                          console.log('[Header] Logo image loaded successfully and should be visible:', storeLogo);
                         }}
                         unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                         priority
+                        style={{ position: 'absolute', inset: 0 }}
                       />
                     ) : (
                       // Show placeholder during SSR/hydration
-                      <div className="w-full h-full bg-transparent" />
+                      <div className="w-full h-full bg-transparent" aria-hidden="true" />
                     )}
                   </div>
                 )}
@@ -296,15 +298,32 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       // Debug: Log navigation attempts
                       console.log('[Header] Link clicked, navigating to:', item.href, {
                         currentPath: pathname,
                         targetPath: item.href,
                         isPreview,
                       });
-                      // Let Next.js Link handle navigation normally
-                      // If navigation doesn't work, it's likely a Next.js routing issue
+                      
+                      // If we're already on this page, don't navigate
+                      if (pathname === item.href) {
+                        console.log('[Header] Already on target page, skipping navigation');
+                        return;
+                      }
+                      
+                      // Try router.push as primary method for more reliable navigation
+                      // Next.js Link should handle this, but router.push is more explicit
+                      try {
+                        e.preventDefault();
+                        console.log('[Header] Using router.push for navigation');
+                        await router.push(item.href);
+                        console.log('[Header] Navigation completed via router.push');
+                      } catch (error) {
+                        console.error('[Header] Navigation error:', error);
+                        // Fallback to window.location if router.push fails
+                        window.location.href = item.href;
+                      }
                     }}
                   >
                     {item.name}
@@ -482,9 +501,20 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => {
+                    onClick={async (e) => {
                       console.log('[Header] Mobile navigation to:', item.href);
                       setMobileMenuOpen(false);
+                      
+                      // Use router.push for more reliable navigation
+                      if (pathname !== item.href) {
+                        try {
+                          e.preventDefault();
+                          await router.push(item.href);
+                        } catch (error) {
+                          console.error('[Header] Mobile navigation error:', error);
+                          window.location.href = item.href;
+                        }
+                      }
                     }}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
