@@ -87,18 +87,22 @@ export default function ProductsListingClient({
   const [total, setTotal] = useState(initialTotal);
   const [isSearching, setIsSearching] = useState(false);
   const [isInitialMount, setIsInitialMount] = useState(true);
-  
-  // Log initial state immediately to help debug
-  if (typeof window !== 'undefined') {
-    console.log('[ProductsListing] Initial render', {
-      initialProductsCount: initialProducts.length,
-      productsStateCount: products.length,
-      initialTotal,
-      hasProducts: products.length > 0 || initialProducts.length > 0,
-    });
-  }
   const initialProductsRef = useRef(initialProducts);
   const hasInitializedRef = useRef(false);
+  const hasLoggedInitialRender = useRef(false);
+
+  // Log initial render only once (moved from component body to prevent infinite logs)
+  useEffect(() => {
+    if (!hasLoggedInitialRender.current) {
+      hasLoggedInitialRender.current = true;
+      console.log('[ProductsListing] Component mounted (first render)', {
+        initialProductsCount: initialProducts.length,
+        productsStateCount: products.length,
+        initialTotal,
+        hasProducts: products.length > 0 || initialProducts.length > 0,
+      });
+    }
+  }, []); // Empty deps - only run once on mount
 
   // Ensure products are set immediately from initialProducts
   // Use a ref to track the last synced initialProducts to avoid infinite loops
@@ -115,54 +119,36 @@ export default function ProductsListingClient({
         initialProductsCount: initialProducts.length,
         currentProductsCount: products.length,
         initialTotal,
-        willUpdate: true,
       });
       setProducts(initialProducts);
       setTotal(initialTotal);
       lastSyncedInitialProductsRef.current = initialProductsKey;
-    } else {
-      // Log when we skip sync (for debugging)
-      if (initialProducts.length > 0 || products.length > 0) {
-        console.log('[ProductsListing] Skipping sync - no change detected', {
-          initialProductsCount: initialProducts.length,
-          currentProductsCount: products.length,
-          key: initialProductsKey.substring(0, 50),
-        });
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProducts, initialTotal]);
 
-  // Log initial state - always log to help debug production issues
-  // Only log once on mount, so we use ref to track if we've logged
-  const hasLoggedRef = useRef(false);
+  // Log detailed initial state - only once on mount (consolidated with other mount log)
   useEffect(() => {
-    if (hasLoggedRef.current) return;
-    hasLoggedRef.current = true;
-    
-    console.log('[ProductsListing] Component mounted', {
-      initialProductsCount: initialProducts.length,
-      initialTotal,
-      initialPage,
-      initialSearch,
-      initialCategory,
-      themeSlug,
-      firstProduct: initialProducts[0] ? {
-        id: initialProducts[0].id,
-        name: initialProducts[0].name,
-        price: initialProducts[0].price,
-        hasImage: !!initialProducts[0].image,
-      } : null,
-    });
-    
-    // Log to help debug in production
-    if (initialProducts.length === 0) {
-      console.warn('[ProductsListing] WARNING: No initial products received from server');
-    } else {
-      console.log('[ProductsListing] Successfully received products from server:', initialProducts.length);
+    if (!hasLoggedInitialRender.current) {
+      console.log('[ProductsListing] Detailed mount info', {
+        initialProductsCount: initialProducts.length,
+        initialTotal,
+        initialPage,
+        initialSearch,
+        initialCategory,
+        firstProduct: initialProducts[0] ? {
+          id: initialProducts[0].id,
+          name: initialProducts[0].name,
+          price: initialProducts[0].price,
+          hasImage: !!initialProducts[0].image,
+        } : null,
+      });
+      
+      if (initialProducts.length === 0) {
+        console.warn('[ProductsListing] WARNING: No initial products received from server');
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty deps - only run once
   
   // Initialize selected categories - map slugs to IDs if needed
   const getInitialSelectedCategories = () => {
@@ -195,32 +181,18 @@ export default function ProductsListingClient({
   const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
 
-  // Mark initial mount as complete after products are loaded
+  // Mark as initialized after mount - only run once
   useEffect(() => {
-    console.log('[ProductsListing] Initial mount effect', {
-      initialProductsLength: initialProducts.length,
-      hasInitialized: hasInitializedRef.current,
-      currentProductsLength: products.length,
-    });
-
-    // Only mark as initialized if we have products or if initialProducts is explicitly empty
-    if (initialProducts.length > 0 || hasInitializedRef.current) {
-      const timer = setTimeout(() => {
-        console.log('[ProductsListing] Marking as initialized (has products or already initialized)');
-        setIsInitialMount(false);
-        hasInitializedRef.current = true;
-      }, 200);
-      return () => clearTimeout(timer);
-    } else if (initialProducts.length === 0 && !hasInitializedRef.current) {
-      // If no products initially, still mark as initialized after a short delay
-      const timer = setTimeout(() => {
-        console.log('[ProductsListing] Marking as initialized (no products, delayed)');
-        setIsInitialMount(false);
-        hasInitializedRef.current = true;
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [initialProducts.length, products.length]);
+    if (hasInitializedRef.current) return;
+    
+    // Mark as initialized after a short delay to allow initial render
+    const timer = setTimeout(() => {
+      setIsInitialMount(false);
+      hasInitializedRef.current = true;
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, []); // Empty deps - only run once on mount
 
   // Update products when initialProducts change (e.g., from server-side navigation)
   // Only update if the products actually changed (not just a re-render with same data)
@@ -229,28 +201,17 @@ export default function ProductsListingClient({
     const currentIds = initialProducts.map(p => p.id).join(',');
     const previousIds = initialProductsRef.current.map(p => p.id).join(',');
     
-    console.log('[ProductsListing] Checking for product updates', {
-      currentIdsCount: initialProducts.length,
-      previousIdsCount: initialProductsRef.current.length,
-      idsChanged: currentIds !== previousIds,
-      lengthChanged: initialProducts.length !== initialProductsRef.current.length,
-      currentProductsCount: products.length,
-    });
-    
     // Only update if products actually changed
     if (currentIds !== previousIds || initialProducts.length !== initialProductsRef.current.length) {
       console.log('[ProductsListing] Products changed, updating state', {
         newProductsCount: initialProducts.length,
-        newTotal: initialTotal,
+        oldProductsCount: initialProductsRef.current.length,
       });
-      // Update products - always trust server state
       setProducts(initialProducts);
       setTotal(initialTotal);
       initialProductsRef.current = initialProducts;
-    } else {
-      console.log('[ProductsListing] Products unchanged, skipping update');
     }
-  }, [initialProducts, initialTotal, products.length]);
+  }, [initialProducts, initialTotal]); // Removed products.length to prevent loop
 
   // Ensure URL has page=1 when page parameter is missing (fixes loading issue)
   // Use a ref to prevent multiple updates and ensure products are displayed first
@@ -750,16 +711,6 @@ export default function ProductsListingClient({
           {(() => {
             // Determine which products to display - prioritize products state, fallback to initialProducts
             const productsToDisplay = products.length > 0 ? products : initialProducts;
-            
-            // Debug logging for rendering decision
-            if (typeof window !== 'undefined' && productsToDisplay.length === 0) {
-              console.log('[ProductsListing] No products to display', {
-                productsStateCount: products.length,
-                initialProductsCount: initialProducts.length,
-                isSearching,
-                total,
-              });
-            }
             
             // Show loading skeleton only if actively searching AND no products available
             if (isSearching && productsToDisplay.length === 0) {
