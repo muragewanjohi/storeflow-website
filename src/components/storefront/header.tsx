@@ -195,14 +195,15 @@ export default function StorefrontHeader({
       <nav className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3 md:gap-4" suppressHydrationWarning>
+          {/* Best practice: Tight spacing (8px) between logo and brand name for unified brand identity */}
+          <div className="flex items-center gap-2" suppressHydrationWarning>
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   onNavigate('/');
                 }}
-                className="flex items-center gap-3 md:gap-4"
+                className="flex items-center gap-2"
               >
                 {storeLogo && !logoError && (
                   <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
@@ -235,7 +236,7 @@ export default function StorefrontHeader({
                 </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center gap-3 md:gap-4">
+              <Link href="/" className="flex items-center gap-2">
                 {storeLogo && !logoError && (
                   <div className="relative h-12 md:h-16 w-[220px] md:w-[300px] flex-shrink-0">
                     {isMounted ? (
@@ -298,33 +299,8 @@ export default function StorefrontHeader({
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
-                    onClick={async (e) => {
-                      // Debug: Log navigation attempts
-                      console.log('[Header] Link clicked, navigating to:', item.href, {
-                        currentPath: pathname,
-                        targetPath: item.href,
-                        isPreview,
-                      });
-                      
-                      // If we're already on this page, don't navigate
-                      if (pathname === item.href) {
-                        console.log('[Header] Already on target page, skipping navigation');
-                        return;
-                      }
-                      
-                      // Try router.push as primary method for more reliable navigation
-                      // Next.js Link should handle this, but router.push is more explicit
-                      try {
-                        e.preventDefault();
-                        console.log('[Header] Using router.push for navigation');
-                        await router.push(item.href);
-                        console.log('[Header] Navigation completed via router.push');
-                      } catch (error) {
-                        console.error('[Header] Navigation error:', error);
-                        // Fallback to window.location if router.push fails
-                        window.location.href = item.href;
-                      }
-                    }}
+                    // Best practice: Let Next.js Link handle navigation naturally
+                    // Don't preventDefault - Link handles prefetching, client-side routing, and optimizations
                   >
                     {item.name}
                   </Link>
@@ -501,20 +477,9 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={async (e) => {
-                      console.log('[Header] Mobile navigation to:', item.href);
+                    onClick={() => {
+                      // Close mobile menu on navigation
                       setMobileMenuOpen(false);
-                      
-                      // Use router.push for more reliable navigation
-                      if (pathname !== item.href) {
-                        try {
-                          e.preventDefault();
-                          await router.push(item.href);
-                        } catch (error) {
-                          console.error('[Header] Mobile navigation error:', error);
-                          window.location.href = item.href;
-                        }
-                      }
                     }}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
