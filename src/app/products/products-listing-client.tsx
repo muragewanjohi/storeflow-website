@@ -66,12 +66,6 @@ export default function ProductsListingClient({
   currentCategory,
   themeSlug = 'default',
 }: Readonly<ProductsListingClientProps>) {
-  console.log('[ProductsListingClient] ===== CLIENT COMPONENT RENDERING =====', {
-    initialProductsCount: initialProducts.length,
-    initialTotal,
-    timestamp: new Date().toISOString()
-  });
-  
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -199,10 +193,6 @@ export default function ProductsListingClient({
     
     // Only update if products actually changed
     if (currentIds !== previousIds || initialProducts.length !== initialProductsRef.current.length) {
-      console.log('[ProductsListing] Products changed, updating state', {
-        newProductsCount: initialProducts.length,
-        oldProductsCount: initialProductsRef.current.length,
-      });
       setProducts(initialProducts);
       setTotal(initialTotal);
       initialProductsRef.current = initialProducts;
@@ -213,22 +203,19 @@ export default function ProductsListingClient({
   // Use a ref to prevent multiple updates and ensure products are displayed first
   const urlUpdatedRef = useRef(false);
   useEffect(() => {
-    // Only update URL after products are set to avoid blocking render
-    if (products.length > 0 || initialProducts.length > 0) {
-      const currentPage = searchParams.get('page');
-      // If page parameter is missing and we're on page 1, update URL to include it
-      // Only do this once to avoid infinite loops
-      if (!urlUpdatedRef.current && !currentPage && initialPage === 1) {
-        urlUpdatedRef.current = true;
-        // Use setTimeout to ensure this happens after render
-        setTimeout(() => {
-          const params = new URLSearchParams(searchParams.toString());
-          params.set('page', '1');
-          router.replace(`/products?${params.toString()}`, { scroll: false });
-        }, 0);
-      }
+    const currentPage = searchParams.get('page');
+    // If page parameter is missing and we're on page 1, update URL to include it
+    // Only do this once to avoid infinite loops
+    if (!urlUpdatedRef.current && !currentPage && initialPage === 1) {
+      urlUpdatedRef.current = true;
+      // Use setTimeout to ensure this happens after render
+      setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('page', '1');
+        router.replace(`/products?${params.toString()}`, { scroll: false });
+      }, 0);
     }
-  }, [searchParams, initialPage, router, products.length, initialProducts.length]);
+  }, [searchParams, initialPage, router]);
   
   // Fetch attributes on mount
   useEffect(() => {
