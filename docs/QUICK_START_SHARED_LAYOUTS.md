@@ -1,4 +1,5 @@
 # Quick Start: Shared Storefront Layouts
+# Quick Start Guide
 
 ## 5-Minute Getting Started Guide
 

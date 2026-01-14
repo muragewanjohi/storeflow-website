@@ -166,11 +166,10 @@ export default function StorefrontHeader({
   }, [isPreview]);
 
   // Ecommerce storefront navigation (not marketing site)
+  // TESTING: Minimal menu with only Home and Products to isolate navigation issue
   const navigation = [
     { name: 'Home', href: '/' },
-    { name: 'Shop', href: '/products' },
-    { name: 'About', href: '/about' },
-    { name: 'Contact', href: '/contact' },
+    { name: 'Products', href: '/products' },
   ];
 
   return (
@@ -279,6 +278,15 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={(e) => {
+                      console.log('[Header DEBUG] Link clicked:', {
+                        name: item.name,
+                        href: item.href,
+                        currentPathname: pathname,
+                        isPreview,
+                        timestamp: new Date().toISOString()
+                      });
+                    }}
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
@@ -458,7 +466,16 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={() => {
+                      console.log('[Header DEBUG Mobile] Link clicked:', {
+                        name: item.name,
+                        href: item.href,
+                        currentPathname: pathname,
+                        isPreview,
+                        timestamp: new Date().toISOString()
+                      });
+                      setMobileMenuOpen(false);
+                    }}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
