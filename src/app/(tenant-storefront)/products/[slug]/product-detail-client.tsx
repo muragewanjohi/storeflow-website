@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
+import ProductReviewsSection from '@/components/storefront/product-reviews-section';
 
 interface ProductVariant {
   id: string;
@@ -120,14 +121,6 @@ export default function ProductDetailClient({
             onClick: () => router.push('/cart'),
           },
           duration: 3000,
-        });
-      } else if (response.status === 401) {
-        toast.error('Please login', {
-          description: 'You need to be logged in to add items to cart',
-          action: {
-            label: 'Login',
-            onClick: () => router.push(`/login?redirect=${window.location.pathname}`),
-          },
         });
       } else {
         const error = await response.json();
@@ -440,6 +433,11 @@ export default function ProductDetailClient({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Product Reviews Section */}
+      <div className="mt-12">
+        <ProductReviewsSection productId={product.id} />
       </div>
 
       {/* Related Products */}

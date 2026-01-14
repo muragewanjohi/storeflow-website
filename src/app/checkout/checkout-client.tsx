@@ -104,8 +104,6 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
         
         // Pre-fill email if available (from user session)
         // This would come from the authenticated user's profile
-      } else if (response.status === 401) {
-        router.push('/login?redirect=/checkout');
       } else {
         toast.error('Failed to load cart');
         router.push('/cart');
@@ -269,6 +267,22 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
+        {/* Guest Checkout Notice */}
+        {!isAuthenticated && (
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-1">Guest Checkout</p>
+                  <p className="text-sm text-muted-foreground">
+                    You&apos;re checking out as a guest. You can create an account during checkout or continue without one.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

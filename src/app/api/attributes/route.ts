@@ -32,6 +32,11 @@ export async function GET(request: NextRequest) {
       },
       include: {
         attribute_values: {
+          select: {
+            id: true,
+            value: true,
+            color_code: true,
+          },
           orderBy: {
             value: 'asc',
           },

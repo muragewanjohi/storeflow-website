@@ -168,8 +168,13 @@ export default function ProductsListingClient({
   const [selectedCategories, setSelectedCategories] = useState<string[]>(getInitialSelectedCategories());
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [selectedAttributeValues, setSelectedAttributeValues] = useState<Record<string, string[]>>({});
-  const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string }> }>>([]);
+  const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string; color_code: string | null }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
+  // Collapsible sections state (popular e-commerce pattern)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    categories: true,
+    price: true,
+  });
 
   // Mark as initialized after mount - only run once
   useEffect(() => {
@@ -588,101 +593,174 @@ export default function ProductsListingClient({
 
       {/* Main Content: Filters Sidebar + Product Grid */}
       <div className="flex gap-6 relative">
-        {/* Filters Sidebar */}
-        <aside className={`fixed md:relative inset-y-0 left-0 md:inset-auto z-50 md:z-auto w-[295px] md:w-[295px] flex-shrink-0 ${showFilters ? 'block' : 'hidden'} lg:block`}>
-          <div className="border border-[rgba(0,0,0,0.1)] rounded-[20px] p-6 bg-white h-full md:h-auto overflow-y-auto md:overflow-y-visible">
+        {/* Filters Sidebar - Modern E-commerce Design */}
+        <aside className={`fixed md:relative inset-y-0 left-0 md:inset-auto z-50 md:z-auto w-[280px] md:w-[280px] flex-shrink-0 ${showFilters ? 'block' : 'hidden'} lg:block bg-white md:bg-transparent`}>
+          <div className="border border-[rgba(0,0,0,0.1)] rounded-lg md:rounded-lg p-4 md:p-6 bg-white h-full md:h-auto overflow-y-auto md:overflow-y-visible shadow-sm md:shadow-none">
             {/* Filters Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[20px] font-bold text-black">Filters</h2>
+            <div className="flex items-center justify-between mb-4 md:mb-6 pb-4 border-b">
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">Filters</h2>
               <button
                 onClick={() => setShowFilters(false)}
-                className="md:hidden"
+                className="md:hidden p-1 hover:bg-gray-100 rounded"
                 aria-label="Close filters"
               >
-                <XMarkIcon className="w-6 h-6" />
+                <XMarkIcon className="w-5 h-5 text-gray-600" />
               </button>
             </div>
 
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Categories Filter */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[20px] font-bold text-black">Categories</h3>
-                <ChevronDownIcon className="w-4 h-4" />
-              </div>
-              <div className="space-y-3">
-                {initialCategories.map((cat) => (
-                  <div key={cat.id} className="flex items-center space-x-3">
-                    <Checkbox
-                      id={`category-${cat.id}`}
-                      checked={selectedCategories.includes(cat.id)}
-                      onCheckedChange={() => toggleCategory(cat.id)}
-                    />
-                    <Label
-                      htmlFor={`category-${cat.id}`}
-                      className="text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors cursor-pointer flex-1"
-                    >
-                      {cat.name}
-                    </Label>
+            {/* Categories Filter - Collapsible */}
+            {initialCategories.length > 0 && (
+              <div className="mb-4 md:mb-6 pb-4 border-b">
+                <button
+                  onClick={() => setExpandedSections(prev => ({ ...prev, categories: !prev.categories }))}
+                  className="flex items-center justify-between w-full mb-3 group"
+                >
+                  <h3 className="text-base md:text-lg font-semibold text-gray-900">Categories</h3>
+                  <ChevronDownIcon 
+                    className={`w-4 h-4 text-gray-500 transition-transform ${expandedSections.categories ? 'rotate-180' : ''}`} 
+                  />
+                </button>
+                {expandedSections.categories && (
+                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto">
+                    {initialCategories.map((cat) => (
+                      <div key={cat.id} className="flex items-center space-x-2.5 group/item">
+                        <Checkbox
+                          id={`category-${cat.id}`}
+                          checked={selectedCategories.includes(cat.id)}
+                          onCheckedChange={() => toggleCategory(cat.id)}
+                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <Label
+                          htmlFor={`category-${cat.id}`}
+                          className="text-sm md:text-base text-gray-700 hover:text-gray-900 transition-colors cursor-pointer flex-1 group-hover/item:text-gray-900"
+                        >
+                          {cat.name}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+            )}
 
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Price Filter */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[20px] font-bold text-black">Price</h3>
-                <ChevronDownIcon className="w-4 h-4" />
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-[14px]">
-                  <span className="font-medium text-black">${priceRange[0]}</span>
-                  <span className="font-medium text-black">${priceRange[1]}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1000"
-                  value={priceRange[1]}
-                  onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                  className="w-full h-2 bg-[#f0f0f0] rounded-lg appearance-none cursor-pointer"
+            {/* Price Filter - Collapsible */}
+            <div className="mb-4 md:mb-6 pb-4 border-b">
+              <button
+                onClick={() => setExpandedSections(prev => ({ ...prev, price: !prev.price }))}
+                className="flex items-center justify-between w-full mb-3 group"
+              >
+                <h3 className="text-base md:text-lg font-semibold text-gray-900">Price</h3>
+                <ChevronDownIcon 
+                  className={`w-4 h-4 text-gray-500 transition-transform ${expandedSections.price ? 'rotate-180' : ''}`} 
                 />
-              </div>
+              </button>
+              {expandedSections.price && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-gray-700">${priceRange[0].toFixed(0)}</span>
+                    <span className="font-medium text-gray-700">${priceRange[1].toFixed(0)}</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1000"
+                      step="10"
+                      value={priceRange[1]}
+                      onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                      style={{
+                        background: `linear-gradient(to right, rgb(59 130 246) 0%, rgb(59 130 246) ${(priceRange[1] / 1000) * 100}%, rgb(229 231 235) ${(priceRange[1] / 1000) * 100}%, rgb(229 231 235) 100%)`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="h-px bg-[rgba(0,0,0,0.1)] mb-6" />
-
-            {/* Attributes Filters */}
-            {attributes.map((attribute) => (
-              <div key={attribute.id} className="mb-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[20px] font-bold text-black">{attribute.name}</h3>
-                  <ChevronDownIcon className="w-4 h-4" />
-                </div>
-                <div className="space-y-3">
-                  {attribute.attribute_values.map((value) => (
-                    <div key={value.id} className="flex items-center space-x-3">
-                      <Checkbox
-                        id={`attr-${attribute.id}-${value.id}`}
-                        checked={(selectedAttributeValues[attribute.id] || []).includes(value.id)}
-                        onCheckedChange={() => toggleAttributeValue(attribute.id, value.id)}
-                      />
-                      <Label
-                        htmlFor={`attr-${attribute.id}-${value.id}`}
-                        className="text-[16px] text-[rgba(0,0,0,0.6)] hover:text-black transition-colors cursor-pointer flex-1"
-                      >
-                        {value.value}
-                      </Label>
+            {/* Attributes Filters - Collapsible */}
+            {attributes.map((attribute) => {
+              const isExpanded = expandedSections[`attr-${attribute.id}`] !== false;
+              const hasSelectedValues = (selectedAttributeValues[attribute.id] || []).length > 0;
+              
+              return (
+                <div key={attribute.id} className="mb-4 md:mb-6 pb-4 border-b last:border-b-0">
+                  <button
+                    onClick={() => setExpandedSections(prev => ({ 
+                      ...prev, 
+                      [`attr-${attribute.id}`]: !prev[`attr-${attribute.id}`] 
+                    }))}
+                    className="flex items-center justify-between w-full mb-3 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base md:text-lg font-semibold text-gray-900">{attribute.name}</h3>
+                      {hasSelectedValues && (
+                        <span className="text-xs font-medium bg-primary text-white px-2 py-0.5 rounded-full">
+                          {(selectedAttributeValues[attribute.id] || []).length}
+                        </span>
+                      )}
                     </div>
-                  ))}
+                    <ChevronDownIcon 
+                      className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                    />
+                  </button>
+                  {isExpanded && attribute.attribute_values.length > 0 && (
+                    <div className="space-y-2.5 max-h-[250px] overflow-y-auto">
+                      {attribute.attribute_values.map((value) => {
+                        const isChecked = (selectedAttributeValues[attribute.id] || []).includes(value.id);
+                        // Special handling for color attributes
+                        const isColor = attribute.type === 'color';
+                        const colorCode = value.color_code;
+                        
+                        return (
+                          <div key={value.id} className="flex items-center space-x-2.5 group/item">
+                            <Checkbox
+                              id={`attr-${attribute.id}-${value.id}`}
+                              checked={isChecked}
+                              onCheckedChange={() => toggleAttributeValue(attribute.id, value.id)}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <Label
+                              htmlFor={`attr-${attribute.id}-${value.id}`}
+                              className="text-sm md:text-base text-gray-700 hover:text-gray-900 transition-colors cursor-pointer flex-1 group-hover/item:text-gray-900 flex items-center gap-2"
+                            >
+                              {isColor && colorCode && (
+                                <span 
+                                  className="w-4 h-4 rounded-full border border-gray-300"
+                                  style={{ backgroundColor: colorCode }}
+                                  aria-label={value.value}
+                                />
+                              )}
+                              <span>{value.value}</span>
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="h-px bg-[rgba(0,0,0,0.1)] mt-6" />
+              );
+            })}
+
+            {/* Clear Filters Button - Show when filters are active */}
+            {(selectedCategories.length > 0 || 
+              priceRange[0] > 0 || 
+              priceRange[1] < 1000 || 
+              Object.keys(selectedAttributeValues).some(key => selectedAttributeValues[key].length > 0)) && (
+              <div className="mt-4 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedCategories([]);
+                    setPriceRange([0, 1000]);
+                    setSelectedAttributeValues({});
+                  }}
+                  className="w-full text-sm"
+                >
+                  Clear All Filters
+                </Button>
               </div>
-            ))}
+            )}
           </div>
         </aside>
 

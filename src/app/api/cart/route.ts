@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     const cartItems = await prisma.cart_items.findMany({
       where: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        ...(customerId ? { user_id: customerId } : { session_id: sessionId }),
       },
       select: {
         id: true,
@@ -144,15 +144,26 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/cart - Add item to cart
+ * 
+ * Supports both authenticated users and guest users (via session_id)
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth();
     const tenant = await requireTenant();
     const body = await request.json();
     
-    // Get or create customer record
-    const customerId = await getOrCreateCustomer(user, tenant.id);
+    // Try to get authenticated user (optional for guest checkout)
+    const user = await getUser();
+    let customerId: string | null = null;
+    let sessionId: string | null = null;
+    
+    if (user) {
+      // Authenticated user - use customer ID
+      customerId = await getOrCreateCustomer(user, tenant.id);
+    } else {
+      // Guest user - use session ID
+      sessionId = await getOrCreateSessionId();
+    }
     
     const { product_id, variant_id, quantity } = addToCartSchema.parse(body);
 
@@ -230,7 +241,7 @@ export async function POST(request: NextRequest) {
     const existingItem = await prisma.cart_items.findFirst({
       where: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        ...(customerId ? { user_id: customerId } : { session_id: sessionId }),
         product_id,
         variant_id: variant_id || null,
       },
@@ -251,6 +262,7 @@ export async function POST(request: NextRequest) {
         data: {
           tenant_id: tenant.id,
           user_id: customerId,
+          session_id: sessionId,
           product_id,
           variant_id: variant_id || null,
           quantity,
@@ -262,7 +274,7 @@ export async function POST(request: NextRequest) {
     const cartItems = await prisma.cart_items.findMany({
       where: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        ...(customerId ? { user_id: customerId } : { session_id: sessionId }),
       },
       include: {
         products: {
@@ -353,15 +365,32 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/cart - Update cart item quantity
+ * 
+ * Supports both authenticated users and guest users (via session_id)
  */
 export async function PUT(request: NextRequest) {
   try {
-    const user = await requireAuth();
     const tenant = await requireTenant();
     const body = await request.json();
     
-    // Get or create customer record
-    const customerId = await getOrCreateCustomer(user, tenant.id);
+    // Try to get authenticated user (optional for guest checkout)
+    const user = await getUser();
+    let customerId: string | null = null;
+    let sessionId: string | null = null;
+    
+    if (user) {
+      // Authenticated user - use customer ID
+      customerId = await getOrCreateCustomer(user, tenant.id);
+    } else {
+      // Guest user - use session ID
+      sessionId = await getSessionId();
+      if (!sessionId) {
+        return NextResponse.json(
+          { error: 'Cart session not found' },
+          { status: 404 }
+        );
+      }
+    }
     
     const { product_id, variant_id, quantity } = body;
 
@@ -375,7 +404,7 @@ export async function PUT(request: NextRequest) {
     const cartItem = await prisma.cart_items.findFirst({
       where: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        ...(customerId ? { user_id: customerId } : { session_id: sessionId }),
         product_id,
         variant_id: variant_id || null,
       },
@@ -430,15 +459,32 @@ export async function PUT(request: NextRequest) {
 
 /**
  * DELETE /api/cart - Remove item from cart
+ * 
+ * Supports both authenticated users and guest users (via session_id)
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireAuth();
     const tenant = await requireTenant();
     const { searchParams } = new URL(request.url);
     
-    // Get or create customer record
-    const customerId = await getOrCreateCustomer(user, tenant.id);
+    // Try to get authenticated user (optional for guest checkout)
+    const user = await getUser();
+    let customerId: string | null = null;
+    let sessionId: string | null = null;
+    
+    if (user) {
+      // Authenticated user - use customer ID
+      customerId = await getOrCreateCustomer(user, tenant.id);
+    } else {
+      // Guest user - use session ID
+      sessionId = await getSessionId();
+      if (!sessionId) {
+        return NextResponse.json(
+          { error: 'Cart session not found' },
+          { status: 404 }
+        );
+      }
+    }
     
     const product_id = searchParams.get('product_id');
     const variant_id = searchParams.get('variant_id');
@@ -451,7 +497,7 @@ export async function DELETE(request: NextRequest) {
     const cartItem = await prisma.cart_items.findFirst({
       where: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        ...(customerId ? { user_id: customerId } : { session_id: sessionId }),
         product_id,
         variant_id: variant_id || null,
       },

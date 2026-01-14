@@ -8,7 +8,7 @@
 
 import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
-import SimpleProductsListing from './simple-products-listing';
+import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
@@ -311,6 +311,35 @@ export default async function ProductsPage({
       limit,
     });
 
+    // Fetch rating stats for all products
+    const productIds = productsRaw.map((p: any) => p.id);
+    const ratingStats = productIds.length > 0 ? await prisma.product_reviews.groupBy({
+      by: ['product_id'],
+      where: {
+        product_id: { in: productIds },
+        tenant_id: tenant.id,
+        status: 'approved',
+        rating: { not: null },
+      },
+      _avg: {
+        rating: true,
+      },
+      _count: {
+        rating: true,
+      },
+    }) : [];
+
+    // Create a map of product_id -> rating stats
+    const ratingMap = new Map(
+      ratingStats.map((stat: any) => [
+        stat.product_id,
+        {
+          averageRating: stat._avg.rating || 0,
+          totalReviews: stat._count.rating || 0,
+        },
+      ])
+    );
+
     // Convert Decimal to number for client components and map sale_price correctly
     // When sale_price exists: price = sale_price (discounted), compareAtPrice = price (original)
     // When no sale_price: price = price (normal), compareAtPrice = undefined
@@ -332,6 +361,8 @@ export default async function ProductsPage({
               : Number(product.sale_price))
           : null;
         
+        const stats = ratingMap.get(product.id) || { averageRating: 0, totalReviews: 0 };
+        
         if (salePrice && salePrice < regularPrice && salePrice > 0) {
           // Product is on sale: use sale_price as price, regular price as compareAtPrice
           return {
@@ -343,6 +374,8 @@ export default async function ProductsPage({
             image: product.image ? String(product.image) : null,
             stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
             category_id: product.category_id ? String(product.category_id) : null,
+            averageRating: stats.averageRating,
+            totalReviews: stats.totalReviews,
           };
         } else {
           // No sale: use regular price as price
@@ -354,11 +387,14 @@ export default async function ProductsPage({
             image: product.image ? String(product.image) : null,
             stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
             category_id: product.category_id ? String(product.category_id) : null,
+            averageRating: stats.averageRating,
+            totalReviews: stats.totalReviews,
           };
         }
       } catch (error) {
         console.error('[Products Page] Error mapping product:', product?.id, error);
         // Fallback to simple mapping if price conversion fails
+        const stats = ratingMap.get(product?.id) || { averageRating: 0, totalReviews: 0 };
         return {
           id: String(product?.id || ''),
           name: String(product?.name || ''),
@@ -367,6 +403,8 @@ export default async function ProductsPage({
           image: product?.image ? String(product.image) : null,
           stock_quantity: product?.stock_quantity !== null ? Number(product.stock_quantity) : null,
           category_id: product?.category_id ? String(product.category_id) : null,
+          averageRating: stats.averageRating,
+          totalReviews: stats.totalReviews,
         };
       }
     });
@@ -394,9 +432,18 @@ export default async function ProductsPage({
     console.log('[Products Page] ===== ABOUT TO RETURN JSX =====');
 
     return (
-      <SimpleProductsListing 
-        products={products}
-        total={total}
+      <ProductsListingClient
+        initialProducts={products}
+        initialTotal={total}
+        initialCategories={categories}
+        initialPage={page}
+        initialLimit={limit}
+        initialSearch={search}
+        initialCategory={categoryParam}
+        initialSortBy={sort_by}
+        initialSortOrder={sort_order}
+        currentCategory={currentCategory}
+        themeSlug={tenant.theme_slug || 'default'}
       />
     );
   } catch (error) {

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
+import RatingDisplay from '@/components/storefront/rating-display';
 
 interface Product {
   id: string;
@@ -27,6 +28,8 @@ interface Product {
   saleBadge?: string;
   saleBadgeColor?: string;
   discountPercent?: number;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 interface DefaultProductCardProps {
@@ -184,6 +187,18 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
               {product.name}
             </h3>
           </Link>
+        )}
+        
+        {/* Rating Display */}
+        {(product.averageRating !== undefined && product.averageRating > 0) && (
+          <div className="mb-2">
+            <RatingDisplay
+              rating={product.averageRating}
+              totalReviews={product.totalReviews}
+              size="sm"
+              showCount={false}
+            />
+          </div>
         )}
         
         <div className="flex items-center justify-between">

@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth/server';
+import { getUser } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { checkoutSchema } from '@/lib/orders/validation';
@@ -15,13 +15,16 @@ import { sendOrderPlacedEmail, sendNewOrderAlertEmail } from '@/lib/orders/email
 import { canCreateOrder } from '@/lib/subscriptions/limits';
 import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock';
 import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
+import { getSessionId } from '@/lib/cart/session';
 
 /**
  * POST /api/checkout - Create order from cart
+ * 
+ * Supports both authenticated users and guest checkout
+ * Guest checkout requires email in shipping_address
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth();
     const tenant = await requireTenant();
     const body = await request.json();
     
@@ -39,8 +42,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create customer record
-    const customerId = await getOrCreateCustomer(user, tenant.id);
+    // Try to get authenticated user (optional for guest checkout)
+    const user = await getUser();
+    let customerId: string | null = null;
+    let sessionId: string | null = null;
+    
+    if (user) {
+      // Authenticated user - get or create customer record
+      customerId = await getOrCreateCustomer(user, tenant.id);
+    } else {
+      // Guest checkout - use session ID for cart clearing
+      sessionId = await getSessionId();
+      
+      // For guest checkout, we can optionally create a customer record from email
+      // This allows linking orders if they register later
+      // For now, we'll leave customerId as null for guest orders
+    }
 
     // Get cart items from the request (validated)
     const cartItems = validatedData.items;
@@ -231,18 +248,23 @@ export async function POST(request: NextRequest) {
       await syncProductStockFromVariants(productId, tenant.id);
     }
 
-    // Clear cart items from database (only if authenticated)
+    // Clear cart items from database
     if (customerId) {
+      // Authenticated user - clear by user_id
       await prisma.cart_items.deleteMany({
         where: {
           tenant_id: tenant.id,
           user_id: customerId,
         },
       });
-    } else {
-      // For guest checkout, clear cart by session_id if available
-      // This would require passing session_id from client
-      // For now, guest cart will remain until session expires
+    } else if (sessionId) {
+      // Guest user - clear by session_id
+      await prisma.cart_items.deleteMany({
+        where: {
+          tenant_id: tenant.id,
+          session_id: sessionId,
+        },
+      });
     }
     
     // Dispatch cart updated event (for header cart count)

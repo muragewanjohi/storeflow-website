@@ -317,13 +317,52 @@ export async function GET(request: NextRequest) {
       pageNum,
     });
 
+    // Fetch rating stats for all products in batch
+    const productIds = products.map((p: any) => p.id);
+    const ratingStats = await prisma.product_reviews.groupBy({
+      by: ['product_id'],
+      where: {
+        product_id: { in: productIds },
+        tenant_id: tenant.id,
+        status: 'approved',
+        rating: { not: null },
+      },
+      _avg: {
+        rating: true,
+      },
+      _count: {
+        rating: true,
+      },
+    });
+
+    // Create a map of product_id -> rating stats
+    const ratingMap = new Map(
+      ratingStats.map((stat: any) => [
+        stat.product_id,
+        {
+          averageRating: stat._avg.rating || 0,
+          totalReviews: stat._count.rating || 0,
+        },
+      ])
+    );
+
+    // Add rating stats to products
+    const productsWithRatings = products.map((product: any) => {
+      const stats = ratingMap.get(product.id) || { averageRating: 0, totalReviews: 0 };
+      return {
+        ...product,
+        averageRating: stats.averageRating,
+        totalReviews: stats.totalReviews,
+      };
+    });
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limitNum);
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 
     const data = {
-      products,
+      products: productsWithRatings,
       pagination: {
         page: pageNum,
         limit: limitNum,
