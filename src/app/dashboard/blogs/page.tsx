@@ -7,6 +7,7 @@
 
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import BlogsListClient from './blogs-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -30,53 +31,76 @@ export default async function BlogsPage({
 
   // Parse search params
   const params = await searchParams;
-  const page = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
-  const limit = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 20;
+  const pageNum = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
+  const limitNum = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 20;
   const search = typeof params.search === 'string' ? params.search : undefined;
   const status = typeof params.status === 'string' ? params.status : undefined;
   const category_id = typeof params.category_id === 'string' ? params.category_id : undefined;
 
-  // Build query string
-  const queryParams = new URLSearchParams();
-  if (page > 1) queryParams.set('page', page.toString());
-  if (limit !== 20) queryParams.set('limit', limit.toString());
-  if (search) queryParams.set('search', search);
-  if (status) queryParams.set('status', status);
-  if (category_id) queryParams.set('category_id', category_id);
-
-  // Use API route for blogs
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const blogsUrl = `${baseUrl}/api/blogs?${queryParams.toString()}`;
-  
+  // Fetch blogs directly from database (matching pages pattern)
   let blogs: any[] = [];
   let pagination: any = null;
   let dbError: string | null = null;
 
   try {
-    // Check if this is a refresh request (cache busting)
-    const isRefresh = typeof params.refresh === 'string';
-    
-    const blogsResponse = await fetch(blogsUrl, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+    // Build where clause
+    const where: any = {
+      tenant_id: tenant.id,
+    };
+
+    // Search filter
+    if (search) {
+      where.OR = [
+        { title: { contains: search.trim(), mode: 'insensitive' } },
+        { slug: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Status filter
+    if (status) {
+      where.status = status;
+    }
+
+    // Category filter
+    if (category_id) {
+      where.category_id = category_id;
+    }
+
+    // Calculate pagination
+    const skip = (pageNum - 1) * limitNum;
+
+    // Fetch blogs with pagination
+    blogs = await prisma.blogs.findMany({
+      where,
+      skip,
+      take: limitNum,
+      orderBy: {
+        created_at: 'desc',
       },
-      // Completely bypass cache on refresh, use shorter cache otherwise
-      ...(isRefresh 
-        ? { cache: 'no-store' as const }
-        : { next: { revalidate: 5 } }
-      ),
+      include: {
+        blog_categories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
     });
 
-    if (blogsResponse.ok) {
-      const blogsData = await blogsResponse.json();
-      blogs = blogsData.blogs || [];
-      pagination = blogsData.pagination || null;
-    } else {
-      const errorData = await blogsResponse.json().catch(() => ({}));
-      if (blogsResponse.status === 500 && errorData.error?.includes('database')) {
-        dbError = 'Unable to connect to the database. Please check your database connection.';
-      }
-    }
+    // Get total count for pagination
+    const total = await prisma.blogs.count({ where });
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limitNum);
+    pagination = {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
+    };
   } catch (error) {
     console.error('Error fetching blogs:', error);
     dbError = 'Failed to load blogs. Please try again later.';
@@ -85,17 +109,19 @@ export default async function BlogsPage({
   // Fetch categories for filter
   let categories: any[] = [];
   try {
-    const categoriesResponse = await fetch(`${baseUrl}/api/blogs/categories`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+    categories = await prisma.blog_categories.findMany({
+      where: {
+        tenant_id: tenant.id,
       },
-      next: { revalidate: 60 },
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
     });
-
-    if (categoriesResponse.ok) {
-      const categoriesData = await categoriesResponse.json();
-      categories = categoriesData.categories || [];
-    }
   } catch (error) {
     console.error('Error fetching categories:', error);
   }
@@ -107,8 +133,8 @@ export default async function BlogsPage({
       categories={categories}
       dbError={dbError}
       currentSearchParams={{
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         search: search || '',
         status: status || '',
         category_id: category_id || '',
