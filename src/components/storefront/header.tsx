@@ -275,15 +275,15 @@ export default function StorefrontHeader({
                   );
                 }
                 return (
-                  <Link
+                  <a
                     key={item.name}
                     href={item.href}
-                    className={`text-sm font-medium transition-colors ${
+                    className={`text-sm font-medium transition-colors cursor-pointer ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
                   >
                     {item.name}
-                  </Link>
+                  </a>
                 );
               })}
             </div>
@@ -454,18 +454,18 @@ export default function StorefrontHeader({
                   );
                 }
                 return (
-                  <Link
+                  <a
                     key={item.name}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-3 py-2 text-base font-medium transition-colors ${
+                    className={`block px-3 py-2 text-base font-medium transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     {item.name}
-                  </Link>
+                  </a>
                 );
               })}
               <div className="border-t mt-2 pt-2">
