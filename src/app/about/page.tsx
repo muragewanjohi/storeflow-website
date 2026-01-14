@@ -11,6 +11,9 @@ import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
+// Force dynamic rendering since this page depends on tenant context from headers
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await requireTenant();
   return generateStorefrontMetadata({
