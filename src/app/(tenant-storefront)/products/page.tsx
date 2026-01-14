@@ -311,44 +311,8 @@ export default async function ProductsPage({
       limit,
     });
 
-    // Fetch rating stats for all products (with error handling)
-    const productIds: string[] = productsRaw.map((p: any) => String(p.id));
-    let ratingMap = new Map<string, { averageRating: number; totalReviews: number }>();
-    
-    if (productIds.length > 0) {
-      try {
-        const ratingStats = await prisma.product_reviews.groupBy({
-          by: ['product_id'],
-          where: {
-            product_id: { in: productIds },
-            tenant_id: tenant.id,
-            status: 'approved',
-            rating: { not: null },
-          },
-          _avg: {
-            rating: true,
-          },
-          _count: {
-            rating: true,
-          },
-        } as any); // Type assertion to handle Prisma type complexity
-        
-        // Create a map of product_id -> rating stats
-        ratingMap = new Map(
-          ratingStats.map((stat: any) => [
-            String(stat.product_id),
-            {
-              averageRating: stat._avg.rating ? Number(stat._avg.rating) : 0,
-              totalReviews: stat._count.rating || 0,
-            },
-          ])
-        );
-      } catch (error) {
-        console.error('[Products Page] Error fetching rating stats:', error);
-        // Continue without rating stats - don't break the page
-        ratingMap = new Map();
-      }
-    }
+    // Simplified: Skip rating stats for now - will add back later
+    // This ensures products page loads quickly without complex queries
 
     // Convert Decimal to number for client components and map sale_price correctly
     // When sale_price exists: price = sale_price (discounted), compareAtPrice = price (original)
@@ -371,8 +335,6 @@ export default async function ProductsPage({
               : Number(product.sale_price))
           : null;
         
-        const stats = ratingMap.get(String(product.id)) || { averageRating: 0, totalReviews: 0 };
-        
         if (salePrice && salePrice < regularPrice && salePrice > 0) {
           // Product is on sale: use sale_price as price, regular price as compareAtPrice
           return {
@@ -384,8 +346,6 @@ export default async function ProductsPage({
             image: product.image ? String(product.image) : null,
             stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
             category_id: product.category_id ? String(product.category_id) : null,
-            averageRating: stats.averageRating,
-            totalReviews: stats.totalReviews,
           };
         } else {
           // No sale: use regular price as price
@@ -397,14 +357,11 @@ export default async function ProductsPage({
             image: product.image ? String(product.image) : null,
             stock_quantity: product.stock_quantity !== null ? Number(product.stock_quantity) : null,
             category_id: product.category_id ? String(product.category_id) : null,
-            averageRating: stats.averageRating,
-            totalReviews: stats.totalReviews,
           };
         }
       } catch (error) {
         console.error('[Products Page] Error mapping product:', product?.id, error);
         // Fallback to simple mapping if price conversion fails
-        const stats = ratingMap.get(String(product?.id)) || { averageRating: 0, totalReviews: 0 };
         return {
           id: String(product?.id || ''),
           name: String(product?.name || ''),
@@ -413,8 +370,6 @@ export default async function ProductsPage({
           image: product?.image ? String(product.image) : null,
           stock_quantity: product?.stock_quantity !== null ? Number(product.stock_quantity) : null,
           category_id: product?.category_id ? String(product.category_id) : null,
-          averageRating: stats.averageRating,
-          totalReviews: stats.totalReviews,
         };
       }
     });

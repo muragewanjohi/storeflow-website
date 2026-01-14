@@ -6,7 +6,7 @@
  * Day 31: Tenant Storefront - Checkout Flow
  */
 
-import { getUser } from '@/lib/auth/server';
+import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { requireTenant } from '@/lib/tenant-context/server';
 import CheckoutClient from './checkout-client';
 import StorefrontHeader from '@/components/storefront/header-server';
@@ -23,13 +23,14 @@ export default async function CheckoutPage() {
 
   // Allow both authenticated and guest checkout
   // Guest checkout will require email during checkout process
-  const user = await getUser();
+  // Use getCurrentCustomer to check customer authentication (not tenant admin auth)
+  const customer = await getCurrentCustomer();
 
   return (
     <div className="min-h-screen flex flex-col">
       <StorefrontHeader />
       <main className="flex-1">
-        <CheckoutClient isAuthenticated={!!user} />
+        <CheckoutClient isAuthenticated={!!customer} />
       </main>
       <StorefrontFooter />
     </div>

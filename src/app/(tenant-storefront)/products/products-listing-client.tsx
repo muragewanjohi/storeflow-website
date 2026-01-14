@@ -85,149 +85,22 @@ export default function ProductsListingClient({
   const [category, setCategory] = useState(initialCategory);
   const [sortBy, setSortBy] = useState(initialSortBy);
   const [sortOrder, setSortOrder] = useState(initialSortOrder);
-  // Initialize state with initialProducts - this ensures products are available immediately
-  const [products, setProducts] = useState(initialProducts);
-  const [total, setTotal] = useState(initialTotal);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isInitialMount, setIsInitialMount] = useState(true);
-  const initialProductsRef = useRef(initialProducts);
-  const hasInitializedRef = useRef(false);
-  const hasLoggedInitialRender = useRef(false);
+  // Simplified: Just use initialProducts directly, no complex state management
+  const [products] = useState(initialProducts);
+  const [total] = useState(initialTotal);
+
+  // Simplified: Remove complex initialization logic
   
-  // Ensure isSearching is false on initial mount
-  useEffect(() => {
-    if (isInitialMount) {
-      setIsSearching(false);
-    }
-  }, [isInitialMount]);
-
-  // Component initialization tracking
-  useEffect(() => {
-    hasLoggedInitialRender.current = true;
-  }, []);
-
-  // Ensure products are set immediately from initialProducts
-  // Use a ref to track the last synced initialProducts to avoid infinite loops
-  const lastSyncedInitialProductsRef = useRef<string>('');
-  useEffect(() => {
-    // Create a stable key from initialProducts to detect changes
-    const initialProductsKey = initialProducts.length > 0 
-      ? initialProducts.map(p => p.id).join(',')
-      : 'empty';
-    
-    // Only sync if initialProducts actually changed
-    if (lastSyncedInitialProductsRef.current !== initialProductsKey) {
-      setProducts(initialProducts);
-      setTotal(initialTotal);
-      lastSyncedInitialProductsRef.current = initialProductsKey;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProducts, initialTotal]);
-
-  // Log detailed initial state - only once on mount (consolidated with other mount log)
-  useEffect(() => {
-    if (!hasLoggedInitialRender.current) {
-      console.log('[ProductsListing] Detailed mount info', {
-        initialProductsCount: initialProducts.length,
-        initialTotal,
-        initialPage,
-        initialSearch,
-        initialCategory,
-        firstProduct: initialProducts[0] ? {
-          id: initialProducts[0].id,
-          name: initialProducts[0].name,
-          price: initialProducts[0].price,
-          hasImage: !!initialProducts[0].image,
-        } : null,
-      });
-      
-      if (initialProducts.length === 0) {
-        console.warn('[ProductsListing] WARNING: No initial products received from server');
-      }
-    }
-  }, []); // Empty deps - only run once
-  
-  // Initialize selected categories - map slugs to IDs if needed
-  const getInitialSelectedCategories = () => {
-    if (!initialCategory) return [];
-    
-    const categoryParams = initialCategory.split(',').filter(p => p.trim());
-    const categoryIds: string[] = [];
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
-    for (const param of categoryParams) {
-      if (uuidRegex.test(param)) {
-        // It's a UUID, use directly
-        categoryIds.push(param);
-      } else {
-        // It's a slug, find matching category ID
-        const category = initialCategories.find(cat => cat.slug === param);
-        if (category) {
-          categoryIds.push(category.id);
-        }
-      }
-    }
-    
-    return categoryIds;
-  };
-
-  // Filter states
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(getInitialSelectedCategories());
+  // Simplified: Basic filter states only
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [selectedAttributeValues, setSelectedAttributeValues] = useState<Record<string, string[]>>({});
   const [attributes, setAttributes] = useState<Array<{ id: string; name: string; type: string | null; attribute_values: Array<{ id: string; value: string; color_code: string | null }> }>>([]);
   const [showFilters, setShowFilters] = useState(true);
-  // Collapsible sections state (popular e-commerce pattern)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     categories: true,
     price: true,
   });
-
-  // Mark as initialized after mount - only run once
-  useEffect(() => {
-    if (hasInitializedRef.current) return;
-    
-    // Mark as initialized after a short delay to allow initial render
-    const timer = setTimeout(() => {
-      setIsInitialMount(false);
-      hasInitializedRef.current = true;
-    }, 200);
-    
-    return () => clearTimeout(timer);
-  }, []); // Empty deps - only run once on mount
-
-  // Update products when initialProducts change (e.g., from server-side navigation)
-  // Only update if the products actually changed (not just a re-render with same data)
-  useEffect(() => {
-    // Check if initialProducts actually changed by comparing IDs
-    const currentIds = initialProducts.map(p => p.id).join(',');
-    const previousIds = initialProductsRef.current.map(p => p.id).join(',');
-    
-    // Only update if products actually changed
-    if (currentIds !== previousIds || initialProducts.length !== initialProductsRef.current.length) {
-      setProducts(initialProducts);
-      setTotal(initialTotal);
-      initialProductsRef.current = initialProducts;
-    }
-  }, [initialProducts, initialTotal]); // Removed products.length to prevent loop
-
-  // Ensure URL has page=1 when page parameter is missing (fixes loading issue)
-  // Use a ref to prevent multiple updates and ensure products are displayed first
-  const urlUpdatedRef = useRef(false);
-  useEffect(() => {
-    const currentPage = searchParams.get('page');
-    // If page parameter is missing and we're on page 1, update URL to include it
-    // Only do this once to avoid infinite loops
-    if (!urlUpdatedRef.current && !currentPage && initialPage === 1) {
-      urlUpdatedRef.current = true;
-      // Use setTimeout to ensure this happens after render
-      setTimeout(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set('page', '1');
-        router.replace(`/products?${params.toString()}`, { scroll: false });
-      }, 0);
-    }
-  }, [searchParams, initialPage, router]);
   
   // Fetch attributes on mount
   useEffect(() => {
@@ -264,234 +137,26 @@ export default function ProductsListingClient({
     return sortBy === opt.value && (opt.value === 'price' ? sortOrder === 'asc' : true);
   })?.label || 'Most Popular';
 
-  const updateFilters = useCallback(() => {
-    console.log('[ProductsListing] updateFilters called', {
-      isInitialMount,
-      hasInitialized: hasInitializedRef.current,
-    });
-
-    // Don't update filters on initial mount - use initialProducts from server
-    if (isInitialMount || !hasInitializedRef.current) {
-      console.log('[ProductsListing] Skipping updateFilters - still initializing');
-      return;
-    }
-    
-    startTransition(() => {
-      console.log('[ProductsListing] Starting filter update');
-      setIsSearching(true);
-      const params = new URLSearchParams(searchParams.toString());
-      
-      // Store original params to compare later
-      const originalParams = new URLSearchParams(searchParams.toString());
-      
-      if (debouncedSearch.trim()) {
-        params.set('search', debouncedSearch.trim());
-      } else {
-        params.delete('search');
-      }
-
-      // Multiple categories support - use slugs for better SEO
-      if (selectedCategories.length > 0) {
-        // Map category IDs to slugs for URL
-        const categorySlugs = selectedCategories
-          .map(id => {
-            const category = initialCategories.find(cat => cat.id === id);
-            // Only use slug if it exists, otherwise skip (don't use ID as fallback)
-            return category?.slug || null;
-          })
-          .filter((slug): slug is string => !!slug);
-        
-        if (categorySlugs.length > 0) {
-          params.set('category', categorySlugs.join(','));
-        } else {
-          // If no slugs available, use IDs but ensure they're properly formatted
-          const validIds = selectedCategories.filter(id => {
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            return uuidRegex.test(id) && !id.includes(',');
-          });
-          if (validIds.length > 0) {
-            params.set('category', validIds.join(','));
-          } else {
-            params.delete('category');
-          }
-        }
-      } else {
-        params.delete('category');
-      }
-
-      // Price range filter
-      if (priceRange[0] > 0 || priceRange[1] < 1000) {
-        params.set('min_price', priceRange[0].toString());
-        params.set('max_price', priceRange[1].toString());
-      } else {
-        params.delete('min_price');
-        params.delete('max_price');
-      }
-
-      // Attribute filters
-      Object.entries(selectedAttributeValues).forEach(([attributeId, values]) => {
-        if (values.length > 0) {
-          params.set(`attr_${attributeId}`, values.join(','));
-        } else {
-          params.delete(`attr_${attributeId}`);
-        }
-      });
-
-      if (sortBy !== 'created_at') {
-        params.set('sort', sortBy);
-      } else {
-        params.delete('sort');
-      }
-
-      if (sortOrder !== 'desc') {
-        params.set('order', sortOrder);
-      } else {
-        params.delete('order');
-      }
-
-      // Always ensure page parameter is set (defaults to 1 if missing)
-      if (!params.get('page')) {
-        params.set('page', '1');
-      } else {
-        params.set('page', params.get('page') || '1'); // Ensure it's always set
-      }
-      
-      // Check if params actually changed - if not, don't fetch or update URL
-      const paramsChanged = params.toString() !== originalParams.toString();
-      console.log('[ProductsListing] Filter update check', {
-        paramsChanged,
-        newParams: params.toString(),
-        originalParams: originalParams.toString(),
-      });
-      
-      if (!paramsChanged) {
-        console.log('[ProductsListing] Params unchanged, skipping fetch');
-        setIsSearching(false);
-        return;
-      }
-      
-      const apiUrl = `/api/products?${params.toString()}`;
-      console.log('[ProductsListing] Fetching products from API', { apiUrl });
-      
-      // Fetch updated products from API first, then navigate
-      fetch(apiUrl)
-        .then(res => {
-          console.log('[ProductsListing] API response received', {
-            ok: res.ok,
-            status: res.status,
-            statusText: res.statusText,
-          });
-          if (!res.ok) {
-            throw new Error(`Failed to fetch products: ${res.statusText}`);
-          }
-          return res.json();
-        })
-        .then(data => {
-          console.log('[ProductsListing] API data received', {
-            hasProducts: !!data.products,
-            productsCount: data.products?.length || 0,
-            total: data.pagination?.total || 0,
-            dataKeys: Object.keys(data),
-          });
-          
-          if (data.products && Array.isArray(data.products)) {
-            // Map sale_price to compareAtPrice correctly
-            const mappedProducts = data.products.map((p: any) => {
-              const regularPrice = Number(p.price) || 0;
-              const salePrice = p.sale_price ? Number(p.sale_price) : null;
-              
-              if (salePrice && salePrice < regularPrice && salePrice > 0) {
-                return {
-                  ...p,
-                  price: salePrice,
-                  compareAtPrice: regularPrice,
-                };
-              } else {
-                return {
-                  ...p,
-                  price: regularPrice,
-                };
-              }
-            });
-            console.log('[ProductsListing] Setting products from API', {
-              mappedProductsCount: mappedProducts.length,
-              total: data.pagination?.total || 0,
-            });
-            setProducts(mappedProducts);
-            setTotal(data.pagination?.total || 0);
-          } else {
-            console.warn('[ProductsListing] No products in API response, clearing products');
-            // Only clear products if we explicitly got an empty result, not on error
-            setProducts([]);
-            setTotal(0);
-          }
-          setIsSearching(false);
-        })
-        .catch(err => {
-          console.error('[ProductsListing] Error fetching products:', err);
-          // Don't clear products on error - keep existing products visible
-          // Only clear if we're sure there are no products
-          setIsSearching(false);
-        });
-      
-      // Update URL without causing a full page navigation
-      // Use replace to avoid adding to history and triggering unnecessary re-renders
-      // Only update URL if it actually changed to prevent unnecessary re-renders
-      const currentUrl = `/products?${searchParams.toString()}`;
-      const newUrl = `/products?${params.toString()}`;
-      if (currentUrl !== newUrl) {
-        router.replace(newUrl, { scroll: false });
-      }
-    });
-  }, [debouncedSearch, selectedCategories, priceRange, selectedAttributeValues, sortBy, sortOrder, searchParams, router, initialCategories, isInitialMount]);
-
-  // Debounce search input (500ms delay)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Auto-search when debounced search changes (only after initial mount)
-  useEffect(() => {
-    console.log('[ProductsListing] Debounced search effect', {
-      debouncedSearch,
-      initialSearch,
-      isInitialMount,
-      hasInitialized: hasInitializedRef.current,
-      searchChanged: debouncedSearch.trim() !== initialSearch.trim(),
-    });
-
-    // Don't trigger on initial mount - wait until component is fully initialized
-    if (isInitialMount || !hasInitializedRef.current) {
-      console.log('[ProductsListing] Skipping search update - still initializing');
-      return;
-    }
-    
-    // Only update if search actually changed (not just reference equality)
-    if (debouncedSearch.trim() !== initialSearch.trim()) {
-      console.log('[ProductsListing] Search changed, calling updateFilters');
-      updateFilters();
-    }
-  }, [debouncedSearch, updateFilters, initialSearch, isInitialMount]);
+  // Simplified: Removed complex filtering logic - just display products from server
 
   const handleSortChange = (value: string) => {
+    // Simplified: Just navigate to new URL with sort params - server will handle it
+    const params = new URLSearchParams(searchParams.toString());
     if (value === 'popular') {
-      setSortBy('created_at');
-      setSortOrder('desc');
+      params.delete('sort');
+      params.delete('order');
     } else if (value === 'price_desc') {
-      setSortBy('price');
-      setSortOrder('desc');
+      params.set('sort', 'price');
+      params.set('order', 'desc');
     } else if (value === 'price') {
-      setSortBy('price');
-      setSortOrder('asc');
+      params.set('sort', 'price');
+      params.set('order', 'asc');
     } else {
-      setSortBy(value);
-      setSortOrder('asc');
+      params.set('sort', value);
+      params.set('order', 'asc');
     }
-    updateFilters();
+    params.set('page', '1'); // Reset to page 1 when sorting
+    router.push(`/products?${params.toString()}`);
   };
 
   const toggleCategory = (catId: string) => {
@@ -517,29 +182,7 @@ export default function ProductsListingClient({
   };
 
   // Debounce filter updates (300ms delay) - but only after initial mount
-  useEffect(() => {
-    console.log('[ProductsListing] Filter state changed', {
-      selectedCategoriesCount: selectedCategories.length,
-      priceRange,
-      selectedAttributeValuesCount: Object.keys(selectedAttributeValues).length,
-      isInitialMount,
-      hasInitialized: hasInitializedRef.current,
-    });
-
-    // Don't trigger on initial mount - use initialProducts from server
-    if (isInitialMount || !hasInitializedRef.current) {
-      console.log('[ProductsListing] Skipping filter update - still initializing');
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      console.log('[ProductsListing] Debounced filter update triggered');
-      updateFilters();
-    }, 300);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategories, priceRange, selectedAttributeValues, isInitialMount]);
+  // Simplified: Removed filter update effects - filters will be handled via URL navigation
 
   // Removed excessive debug logging
 
@@ -773,75 +416,32 @@ export default function ProductsListingClient({
 
         {/* Product Grid */}
         <div className="flex-1">
-          {(() => {
-            // Determine which products to display - prioritize products state, fallback to initialProducts
-            // On initial mount, always use initialProducts to ensure server-rendered products show immediately
-            const productsToDisplay = (isInitialMount && initialProducts.length > 0) 
-              ? initialProducts 
-              : (products.length > 0 ? products : initialProducts);
-            
-            // Show loading skeleton only if actively searching AND no products available
-            // Never show skeleton on initial mount - always show initialProducts if available
-            if (isSearching && productsToDisplay.length === 0 && !isInitialMount && hasInitializedRef.current) {
-              return (
-                <div className="text-center py-12">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="border rounded-lg overflow-hidden animate-pulse">
-                          <div className="aspect-square w-full bg-gray-200" />
-                          <div className="p-4 space-y-2">
-                            <div className="h-4 bg-gray-200 rounded w-3/4" />
-                            <div className="h-4 bg-gray-200 rounded w-1/2" />
-                            <div className="h-6 bg-gray-200 rounded w-1/3" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-            
-            // Show "No products" message only if we have no products at all
-            if (productsToDisplay.length === 0) {
-              return (
-                <div className="text-center py-12">
-                  <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
-                  {/* Always show debug info to help troubleshoot production issues */}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Debug: initialProducts={initialProducts.length}, products={products.length}, total={total}, isInitialMount={isInitialMount.toString()}, isSearching={isSearching.toString()}
-                  </p>
-                </div>
-              );
-            }
-            
-            // Show products with error boundary
-            // REMOVED: console.log from render function - it was causing infinite logs
-            
-            return (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-                  {productsToDisplay.map((product: any) => {
-                    try {
-                      return (
-                        <ThemeProductCard
-                          key={product.id}
-                          product={product}
-                        />
-                      );
-                    } catch (error) {
-                      console.error('[ProductsListing] Error rendering product card:', product?.id, error);
-                      // Return a fallback card if rendering fails
-                      return (
-                        <div key={product.id} className="border rounded-lg p-4">
-                          <p className="text-sm text-muted-foreground">Error loading product</p>
-                          <p className="text-xs text-muted-foreground mt-1">{product?.name || product?.id}</p>
-                        </div>
-                      );
-                    }
-                  })}
-                </div>
+          {products.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-[rgba(0,0,0,0.6)] text-[16px]">No products found</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+                {products.map((product: any) => {
+                  try {
+                    return (
+                      <ThemeProductCard
+                        key={product.id}
+                        product={product}
+                      />
+                    );
+                  } catch (error) {
+                    console.error('[ProductsListing] Error rendering product card:', product?.id, error);
+                    return (
+                      <div key={product.id} className="border rounded-lg p-4">
+                        <p className="text-sm text-muted-foreground">Error loading product</p>
+                        <p className="text-xs text-muted-foreground mt-1">{product?.name || product?.id}</p>
+                      </div>
+                    );
+                  }
+                })}
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -917,9 +517,8 @@ export default function ProductsListingClient({
                   </Button>
                 </div>
               )}
-              </>
-            );
-          })()}
+            </>
+          )}
         </div>
       </div>
     </div>

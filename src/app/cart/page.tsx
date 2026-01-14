@@ -7,7 +7,7 @@
  */
 
 import { redirect } from 'next/navigation';
-import { getUser } from '@/lib/auth/server';
+import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { getTenant } from '@/lib/tenant-context/server';
 import CartClient from './cart-client';
 import StorefrontHeader from '@/components/storefront/header-server';
@@ -28,13 +28,14 @@ export default async function CartPage() {
 
   // Allow both authenticated and guest users
   // Guest users can view their cart, but will be prompted to login at checkout
-  const user = await getUser();
+  // Use getCurrentCustomer to check customer authentication (not tenant admin auth)
+  const customer = await getCurrentCustomer();
 
   return (
     <div className="min-h-screen flex flex-col">
       <StorefrontHeader />
       <main className="flex-1">
-        <CartClient isAuthenticated={!!user} />
+        <CartClient isAuthenticated={!!customer} />
       </main>
       <StorefrontFooter />
     </div>
