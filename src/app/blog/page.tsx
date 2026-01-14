@@ -1,21 +1,25 @@
 /**
  * Blog Listing Page
  * 
- * Displays all published marketing blog posts
+ * Displays all published blog posts for the current tenant
  */
 
 import { prisma } from '@/lib/prisma/client';
-import { MARKETING_TENANT_ID } from '@/lib/content/marketing';
+import { requireTenant } from '@/lib/tenant-context/server';
 import BlogListingClient from './blog-listing-client';
-import MarketingHeader from '@/components/marketing/header';
+import StorefrontHeader from '@/components/storefront/header-server';
+import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BlogListingPage() {
-  // Fetch all published marketing blogs
+  const tenant = await requireTenant();
+  
+  // Fetch all published blogs for this tenant
   const blogs = await prisma.blogs.findMany({
     where: {
-      tenant_id: MARKETING_TENANT_ID,
+      tenant_id: tenant.id,
       status: 'published',
     },
     include: {
@@ -33,10 +37,15 @@ export default async function BlogListingPage() {
   });
 
   return (
-    <>
-      <MarketingHeader />
-      <BlogListingClient blogs={blogs} />
-    </>
+    <ThemeProviderWrapper>
+      <div className="min-h-screen flex flex-col bg-white">
+        <StorefrontHeader />
+        <main className="flex-1">
+          <BlogListingClient blogs={blogs} />
+        </main>
+        <StorefrontFooter />
+      </div>
+    </ThemeProviderWrapper>
   );
 }
 

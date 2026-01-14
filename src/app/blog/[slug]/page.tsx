@@ -1,14 +1,16 @@
 /**
  * Blog Post Detail Page
  * 
- * Displays a single blog post by slug or ID
+ * Displays a single blog post by slug or ID for the current tenant
  */
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
-import { MARKETING_TENANT_ID } from '@/lib/content/marketing';
+import { requireTenant } from '@/lib/tenant-context/server';
 import BlogPostClient from './blog-post-client';
-import MarketingHeader from '@/components/marketing/header';
+import StorefrontHeader from '@/components/storefront/header-server';
+import StorefrontFooter from '@/components/storefront/footer';
+import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,7 @@ interface PageProps {
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
+  const tenant = await requireTenant();
   const { slug } = await params;
 
   // Try to find blog by slug first, then by ID
@@ -26,7 +29,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         { slug },
         { id: slug },
       ],
-      tenant_id: MARKETING_TENANT_ID,
+      tenant_id: tenant.id,
       status: 'published',
     },
     include: {
@@ -47,7 +50,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   // Fetch related blogs (same category, excluding current blog)
   const relatedBlogs = await prisma.blogs.findMany({
     where: {
-      tenant_id: MARKETING_TENANT_ID,
+      tenant_id: tenant.id,
       status: 'published',
       id: { not: blog.id },
       ...(blog.category_id ? { category_id: blog.category_id } : {}),
@@ -68,10 +71,15 @@ export default async function BlogPostPage({ params }: PageProps) {
   });
 
   return (
-    <>
-      <MarketingHeader />
-      <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />
-    </>
+    <ThemeProviderWrapper>
+      <div className="min-h-screen flex flex-col bg-white">
+        <StorefrontHeader />
+        <main className="flex-1">
+          <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />
+        </main>
+        <StorefrontFooter />
+      </div>
+    </ThemeProviderWrapper>
   );
 }
 
