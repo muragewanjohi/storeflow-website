@@ -8,9 +8,6 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
 import { requireTenant } from '@/lib/tenant-context/server';
 import BlogPostClient from './blog-post-client';
-import StorefrontHeader from '@/components/storefront/header-server';
-import StorefrontFooter from '@/components/storefront/footer';
-import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,16 +67,6 @@ export default async function BlogPostPage({ params }: PageProps) {
     take: 3,
   });
 
-  return (
-    <ThemeProviderWrapper>
-      <div className="min-h-screen flex flex-col bg-white">
-        <StorefrontHeader />
-        <main className="flex-1">
-          <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />
-        </main>
-        <StorefrontFooter />
-      </div>
-    </ThemeProviderWrapper>
-  );
+  return <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />;
 }
 

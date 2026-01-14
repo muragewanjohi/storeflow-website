@@ -176,7 +176,7 @@ export default function StorefrontHeader({
     { name: 'Products', href: '/products' },
     { name: 'About Us', href: '/about' },
     { name: 'Contact Us', href: '/contact' },
-    { name: 'Blogs', href: '/blogs' },
+    { name: 'Blogs', href: '/blog' },
   ];
 
   return (
