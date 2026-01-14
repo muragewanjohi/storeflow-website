@@ -1,7 +1,7 @@
 /**
  * About Page Loading State
  * 
- * Displays skeleton UI while about page loads (content only)
+ * Displays skeleton UI while about page loads (content only, no header)
  */
 
 export default function AboutLoading() {
