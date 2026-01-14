@@ -33,6 +33,7 @@ import {
   PhotoIcon,
   ArrowTrendingUpIcon,
   PaintBrushIcon,
+  FireIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -58,6 +59,7 @@ const navigation: NavigationItem[] = [
   // Catalog group
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Catalog' },
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },
+  { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Catalog' },
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
   // Content group
   { name: 'Pages', href: '/dashboard/pages', icon: DocumentTextIcon, group: 'Content' },

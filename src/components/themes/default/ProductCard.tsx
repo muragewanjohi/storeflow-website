@@ -24,6 +24,9 @@ interface Product {
   image: string | null;
   stock_quantity: number | null;
   metadata?: Record<string, unknown>;
+  saleBadge?: string;
+  saleBadgeColor?: string;
+  discountPercent?: number;
 }
 
 interface DefaultProductCardProps {
@@ -36,6 +39,10 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
   const { formatCurrency } = useCurrency();
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  
+  // Determine sale badge text and color
+  const saleBadgeText = product.saleBadge || (isOnSale ? 'Sale' : null);
+  const saleBadgeColor = product.saleBadgeColor || '#EF4444';
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -87,9 +94,15 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                   <span className="text-4xl">📦</span>
                 </div>
               )}
-              {isOnSale && (
-                <Badge className="absolute top-2 left-2 z-10" variant="destructive">
-                  Sale
+              {saleBadgeText && (
+                <Badge 
+                  className="absolute top-2 left-2 z-10" 
+                  style={{
+                    backgroundColor: saleBadgeColor,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {product.discountPercent ? `${product.discountPercent}% OFF` : saleBadgeText}
                 </Badge>
               )}
               {isOutOfStock && (
@@ -128,9 +141,15 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                   <span className="text-4xl">📦</span>
                 </div>
               )}
-              {isOnSale && (
-                <Badge className="absolute top-2 left-2 z-10" variant="destructive">
-                  Sale
+              {saleBadgeText && (
+                <Badge 
+                  className="absolute top-2 left-2 z-10" 
+                  style={{
+                    backgroundColor: saleBadgeColor,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {product.discountPercent ? `${product.discountPercent}% OFF` : saleBadgeText}
                 </Badge>
               )}
               {isOutOfStock && (
