@@ -278,15 +278,6 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={(e) => {
-                      console.log('[Header DEBUG] Link clicked:', {
-                        name: item.name,
-                        href: item.href,
-                        currentPathname: pathname,
-                        isPreview,
-                        timestamp: new Date().toISOString()
-                      });
-                    }}
                     className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
@@ -466,16 +457,7 @@ export default function StorefrontHeader({
                   <Link
                     key={item.name}
                     href={item.href}
-                    onClick={() => {
-                      console.log('[Header DEBUG Mobile] Link clicked:', {
-                        name: item.name,
-                        href: item.href,
-                        currentPathname: pathname,
-                        isPreview,
-                        timestamp: new Date().toISOString()
-                      });
-                      setMobileMenuOpen(false);
-                    }}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
