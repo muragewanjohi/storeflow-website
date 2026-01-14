@@ -340,7 +340,7 @@ export async function POST(request: NextRequest) {
     const total = items.reduce((sum: number, item: typeof items[0]) => sum + item.price * item.quantity, 0);
     const item_count = items.reduce((sum: number, item: typeof items[0]) => sum + item.quantity, 0);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       cart: {
         items,
@@ -348,6 +348,12 @@ export async function POST(request: NextRequest) {
         item_count,
       },
     });
+    
+    // Set cache headers to prevent stale cart data
+    // Use no-cache for cart responses to ensure real-time updates
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    
+    return response;
   } catch (error: any) {
     console.error('Error adding to cart:', error);
     if (error.name === 'ZodError') {

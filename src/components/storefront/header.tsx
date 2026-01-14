@@ -144,10 +144,51 @@ export default function StorefrontHeader({
     }, 100);
     
     // Listen for cart updates from other components (real-time updates)
+    // Fetch immediately with no cache to get fresh count
     const handleCartUpdate = () => {
-      if (isMounted) {
-        fetchCartCount();
+      if (!isMounted) return;
+      
+      // Cancel any pending request
+      if (abortController) {
+        abortController.abort();
       }
+      
+      // Small delay to ensure database write completes before fetching
+      setTimeout(() => {
+        if (!isMounted) return;
+        
+        const updateController = new AbortController();
+        const timeoutId = setTimeout(() => updateController.abort(), 3000);
+        
+        // Fetch immediately with no cache for real-time update
+        fetch('/api/cart/count', {
+          cache: 'no-store',
+          signal: updateController.signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        })
+          .then(res => {
+            clearTimeout(timeoutId);
+            if (res.ok && isMounted) {
+              return res.json();
+            }
+            return null;
+          })
+          .then(data => {
+            if (data && isMounted) {
+              setCartItemCount(data.count || 0);
+            }
+          })
+          .catch((error: any) => {
+            clearTimeout(timeoutId);
+            // Silently fail if aborted or network error
+            if (error.name !== 'AbortError' && isMounted) {
+              // Only log non-abort errors
+              console.debug('Cart count update failed:', error);
+            }
+          });
+      }, 150); // 150ms delay to ensure DB write completes
     };
     
     window.addEventListener('cartUpdated', handleCartUpdate);

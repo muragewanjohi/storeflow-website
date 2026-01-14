@@ -56,7 +56,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
         setCart(data.cart);
       } else if (response.status === 401 && isAuthenticated) {
         // Only redirect if we expected to be authenticated
-        router.push('/login?redirect=/cart');
+        router.push('/customer-login?redirect=/checkout');
       }
     } catch (error) {
       console.error('Error fetching cart:', error);
@@ -421,7 +421,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
               <Button
                 onClick={() => {
                   if (!isAuthenticated) {
-                    router.push('/login?redirect=/cart');
+                    router.push('/customer-login?redirect=/checkout');
                   } else {
                     router.push('/checkout');
                   }

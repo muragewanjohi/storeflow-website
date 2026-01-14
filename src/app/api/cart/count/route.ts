@@ -85,9 +85,15 @@ export async function GET(request: NextRequest) {
       count: itemCount,
     });
     
-    // Cache for 10 seconds - cart count doesn't need to be real-time
-    // stale-while-revalidate allows serving stale data while revalidating
-    response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    // Check if this is a real-time update request (no-cache header)
+    const cacheControl = request.headers.get('cache-control');
+    if (cacheControl?.includes('no-cache') || cacheControl?.includes('no-store')) {
+      // Real-time update - no cache
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    } else {
+      // Normal request - cache for 10 seconds
+      response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    }
     
     return response;
   } catch (error: any) {

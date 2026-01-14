@@ -317,38 +317,48 @@ export async function GET(request: NextRequest) {
       pageNum,
     });
 
-    // Fetch rating stats for all products in batch
-    const productIds = products.map((p: any) => p.id);
-    const ratingStats = await prisma.product_reviews.groupBy({
-      by: ['product_id'],
-      where: {
-        product_id: { in: productIds },
-        tenant_id: tenant.id,
-        status: 'approved',
-        rating: { not: null },
-      },
-      _avg: {
-        rating: true,
-      },
-      _count: {
-        rating: true,
-      },
-    });
+    // Fetch rating stats for all products in batch (with error handling)
+    const productIds: string[] = products.map((p: any) => String(p.id));
+    let ratingMap = new Map<string, { averageRating: number; totalReviews: number }>();
+    
+    if (productIds.length > 0) {
+      try {
+        const ratingStats = await prisma.product_reviews.groupBy({
+          by: ['product_id'],
+          where: {
+            product_id: { in: productIds },
+            tenant_id: tenant.id,
+            status: 'approved',
+            rating: { not: null },
+          },
+          _avg: {
+            rating: true,
+          },
+          _count: {
+            rating: true,
+          },
+        } as any); // Type assertion to handle Prisma type complexity
 
-    // Create a map of product_id -> rating stats
-    const ratingMap = new Map(
-      ratingStats.map((stat: any) => [
-        stat.product_id,
-        {
-          averageRating: stat._avg.rating || 0,
-          totalReviews: stat._count.rating || 0,
-        },
-      ])
-    );
+        // Create a map of product_id -> rating stats
+        ratingMap = new Map(
+          ratingStats.map((stat: any) => [
+            String(stat.product_id),
+            {
+              averageRating: stat._avg.rating ? Number(stat._avg.rating) : 0,
+              totalReviews: stat._count.rating || 0,
+            },
+          ])
+        );
+      } catch (error) {
+        console.error('[Products API] Error fetching rating stats:', error);
+        // Continue without rating stats - don't break the API
+        ratingMap = new Map();
+      }
+    }
 
     // Add rating stats to products
     const productsWithRatings = products.map((product: any) => {
-      const stats = ratingMap.get(product.id) || { averageRating: 0, totalReviews: 0 };
+      const stats = ratingMap.get(String(product.id)) || { averageRating: 0, totalReviews: 0 };
       return {
         ...product,
         averageRating: stats.averageRating,

@@ -93,6 +93,13 @@ export default function ProductsListingClient({
   const initialProductsRef = useRef(initialProducts);
   const hasInitializedRef = useRef(false);
   const hasLoggedInitialRender = useRef(false);
+  
+  // Ensure isSearching is false on initial mount
+  useEffect(() => {
+    if (isInitialMount) {
+      setIsSearching(false);
+    }
+  }, [isInitialMount]);
 
   // Component initialization tracking
   useEffect(() => {
@@ -768,13 +775,14 @@ export default function ProductsListingClient({
         <div className="flex-1">
           {(() => {
             // Determine which products to display - prioritize products state, fallback to initialProducts
-            const productsToDisplay = products.length > 0 ? products : initialProducts;
-            
-            // REMOVED: console.log from render function - it was causing infinite logs
-            // Logging moved to useEffect hooks that run only on state changes
+            // On initial mount, always use initialProducts to ensure server-rendered products show immediately
+            const productsToDisplay = (isInitialMount && initialProducts.length > 0) 
+              ? initialProducts 
+              : (products.length > 0 ? products : initialProducts);
             
             // Show loading skeleton only if actively searching AND no products available
-            if (isSearching && productsToDisplay.length === 0) {
+            // Never show skeleton on initial mount - always show initialProducts if available
+            if (isSearching && productsToDisplay.length === 0 && !isInitialMount && hasInitializedRef.current) {
               return (
                 <div className="text-center py-12">
                   <div className="space-y-4">
