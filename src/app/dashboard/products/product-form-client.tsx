@@ -96,7 +96,7 @@ export default function ProductFormClient({
   // If product has a category_id, check if it's a subcategory
   const [parentCategoryId, setParentCategoryId] = useState<string>(() => {
     // Initialize based on product's category_id - will be updated in useEffect if it's a subcategory
-    return product?.category_id || 'none';
+    return (product?.category_id && product.category_id !== 'none') ? product.category_id : 'none';
   });
   const [subcategories, setSubcategories] = useState<Category[]>([]);
   const [loadingSubcategories, setLoadingSubcategories] = useState(false);
@@ -137,7 +137,7 @@ export default function ProductFormClient({
             setParentCategoryId(data.category.parent_id);
             fetchSubcategories(data.category.parent_id);
             // Keep category_id as the subcategory
-          } else {
+          } else if (product.category_id) {
             // It's a top-level category - fetch subcategories to see if any exist
             setParentCategoryId(product.category_id);
             fetchSubcategories(product.category_id);
