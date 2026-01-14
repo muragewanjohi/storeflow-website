@@ -20,6 +20,10 @@ export default async function BlogPostPage({ params }: PageProps) {
     const tenant = await requireTenant();
     const { slug } = await params;
 
+    if (!slug) {
+      notFound();
+    }
+
     // Try to find blog by slug first, then by ID
     const blog = await prisma.blogs.findFirst({
       where: {
@@ -42,6 +46,12 @@ export default async function BlogPostPage({ params }: PageProps) {
     });
 
     if (!blog) {
+      notFound();
+    }
+
+    // Validate required fields
+    if (!blog.title) {
+      console.error('Blog post missing title:', blog.id);
       notFound();
     }
 
@@ -68,7 +78,20 @@ export default async function BlogPostPage({ params }: PageProps) {
       take: 3,
     });
 
-    return <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />;
+    // Serialize dates for client component (Next.js requires JSON-serializable data)
+    const serializedBlog = {
+      ...blog,
+      created_at: blog.created_at ? blog.created_at.toISOString() : null,
+      updated_at: blog.updated_at ? blog.updated_at.toISOString() : null,
+    };
+
+    const serializedRelatedBlogs = relatedBlogs.map((related) => ({
+      ...related,
+      created_at: related.created_at ? related.created_at.toISOString() : null,
+      updated_at: related.updated_at ? related.updated_at.toISOString() : null,
+    }));
+
+    return <BlogPostClient blog={serializedBlog} relatedBlogs={serializedRelatedBlogs} />;
   } catch (error) {
     console.error('Error loading blog post:', error);
     // Re-throw to trigger Next.js error boundary

@@ -23,8 +23,8 @@ interface BlogPost {
   content: string | null;
   excerpt: string | null;
   image: string | null;
-  created_at: Date | null;
-  updated_at: Date | null;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
   meta_title: string | null;
   meta_description: string | null;
   blog_categories: BlogCategory | null;
@@ -36,9 +36,11 @@ interface BlogPostClientProps {
 }
 
 export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPostClientProps>) {
-  const formatDate = (date: Date | null) => {
+  const formatDate = (date: string | Date | null) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
+    // Handle both string (from server) and Date (fallback) formats
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -91,13 +93,14 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
 
           {/* Featured Image */}
           {blog.image && (
-            <div className="relative w-full h-96 mb-8 rounded-2xl overflow-hidden">
+            <div className="relative w-full h-96 mb-8 rounded-2xl overflow-hidden bg-gray-100">
               <Image
                 src={blog.image}
-                alt={blog.title}
+                alt={blog.title || 'Blog post image'}
                 fill
                 className="object-cover"
                 priority
+                unoptimized
               />
             </div>
           )}
