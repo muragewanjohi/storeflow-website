@@ -171,9 +171,12 @@ export default function StorefrontHeader({
   }, [isPreview]);
 
   // Ecommerce storefront navigation
+  // Popular e-commerce stores (Amazon, Target, Best Buy, etc.) typically include "Deals" or "Sales" 
+  // in their main navigation to make promotions easily discoverable
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Products', href: '/products' },
+    { name: 'Sales', href: '/sales' },
     { name: 'About Us', href: '/about' },
     { name: 'Contact Us', href: '/contact' },
     { name: 'Blogs', href: '/blog' },

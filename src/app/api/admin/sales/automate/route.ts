@@ -104,6 +104,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Deactivate/End sales that have passed their end_date
+    // IMPORTANT: When a sale ends:
+    // - The sale status is set to 'ended'
+    // - product_sales records remain in the database (for historical purposes)
+    // - Products automatically stop showing sale prices because we only query active sales
+    // - The product's own sale_price field (if set) remains unchanged - it's separate from sale-specific pricing
+    // - Sale prices are NOT automatically cleared from products - they remain for future sales or manual management
     try {
       const salesToDeactivate = await prisma.sales.findMany({
         where: {

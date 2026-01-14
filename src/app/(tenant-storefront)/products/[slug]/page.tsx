@@ -96,14 +96,58 @@ export default async function ProductDetailPage({
     notFound();
   }
 
+  // Fetch active sales for this product to get sale pricing
+  const now = new Date();
+  const activeProductSales = await prisma.product_sales.findFirst({
+    where: {
+      product_id: product.id,
+      tenant_id: tenant.id,
+      sales: {
+        status: 'active',
+        OR: [
+          { start_date: null, end_date: null },
+          { start_date: { lte: now }, end_date: { gte: now } },
+          { start_date: { lte: now }, end_date: null },
+          { start_date: null, end_date: { gte: now } },
+        ],
+      },
+    },
+    include: {
+      sales: {
+        select: {
+          id: true,
+          name: true,
+          badge_text: true,
+          badge_color: true,
+          start_date: true,
+          end_date: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: 'desc', // Get the most recent sale if product is in multiple sales
+    },
+  });
+
+  // Determine the effective sale price
+  // Priority: product_sales.sale_price > product.sale_price > product.price
+  const regularPrice = Number(product.price);
+  let effectiveSalePrice: number | null = null;
+  
+  if (activeProductSales?.sale_price) {
+    effectiveSalePrice = Number(activeProductSales.sale_price);
+  } else if (product.sale_price) {
+    effectiveSalePrice = Number(product.sale_price);
+  }
+
   // Parallel fetch: Convert product data AND fetch related products simultaneously
   // This reduces total wait time - Amazon/Shopify technique
   const [productData, relatedProducts] = await Promise.all([
     // Convert in parallel (synchronous but allows Promise.all)
     Promise.resolve({
       ...product,
-      price: Number(product.price),
-      sale_price: product.sale_price ? Number(product.sale_price) : null,
+      price: regularPrice,
+      sale_price: effectiveSalePrice, // Use sale price from active sale or product's sale_price
       // stock_quantity is already synced with variant totals in the database
       product_variants: product.product_variants.map((variant: any) => ({
         ...variant,
@@ -146,7 +190,7 @@ export default async function ProductDetailPage({
   }));
 
   // Calculate final price for structured data
-  const finalPrice = product.sale_price ? Number(product.sale_price) : Number(product.price);
+  const finalPrice = effectiveSalePrice || Number(product.price);
 
   // Generate structured data for SEO
   // stock_quantity is already synced with variant totals in the database
