@@ -92,6 +92,63 @@ export default function ProductFormClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!product;
 
+  // Determine initial parent category and subcategory
+  // If product has a category_id, check if it's a subcategory
+  const [parentCategoryId, setParentCategoryId] = useState<string>(() => {
+    // Initialize based on product's category_id - will be updated in useEffect if it's a subcategory
+    return product?.category_id || 'none';
+  });
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [loadingSubcategories, setLoadingSubcategories] = useState(false);
+
+  // Fetch subcategories when parent category changes
+  const fetchSubcategories = async (parentId: string) => {
+    if (parentId === 'none') {
+      setSubcategories([]);
+      return;
+    }
+
+    setLoadingSubcategories(true);
+    try {
+      const response = await fetch(`/api/categories?parent_id=${parentId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSubcategories(data.categories || []);
+      } else {
+        setSubcategories([]);
+      }
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
+      setSubcategories([]);
+    } finally {
+      setLoadingSubcategories(false);
+    }
+  };
+
+  // Initialize parent category and subcategory on mount (for editing)
+  useEffect(() => {
+    if (product?.category_id && product.category_id !== 'none') {
+      // Fetch category details to check if it's a subcategory
+      fetch(`/api/categories/${product.category_id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.category?.parent_id) {
+            // It's a subcategory - set parent and fetch subcategories
+            setParentCategoryId(data.category.parent_id);
+            fetchSubcategories(data.category.parent_id);
+            // Keep category_id as the subcategory
+          } else {
+            // It's a top-level category - fetch subcategories to see if any exist
+            setParentCategoryId(product.category_id);
+            fetchSubcategories(product.category_id);
+            // Keep category_id as the parent (will be updated if subcategory selected)
+          }
+        })
+        .catch(err => console.error('Error fetching category:', err));
+    }
+  }, []);
+
+
   const [formData, setFormData] = useState({
     name: product?.name || '',
     sku: product?.sku || '',
@@ -1056,10 +1113,15 @@ export default function ProductFormClient({
                 <div className="space-y-2">
                   <Label htmlFor="category_id">Category</Label>
                   <Select
-                    value={formData.category_id || 'none'}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, category_id: value === 'none' ? 'none' : value })
-                    }
+                    value={parentCategoryId || 'none'}
+                    onValueChange={(value) => {
+                      const newParentId = value === 'none' ? 'none' : value;
+                      setParentCategoryId(newParentId);
+                      // When parent changes, set category_id to parent (user can select subcategory after)
+                      setFormData({ ...formData, category_id: newParentId });
+                      // Fetch subcategories for the selected parent
+                      fetchSubcategories(newParentId);
+                    }}
                   >
                     <SelectTrigger id="category_id">
                       <SelectValue placeholder="Select a category" />
@@ -1074,6 +1136,49 @@ export default function ProductFormClient({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Subcategory dropdown - only show if parent category has subcategories */}
+                {parentCategoryId !== 'none' && (
+                  <>
+                    {loadingSubcategories ? (
+                      <div className="text-xs text-muted-foreground">
+                        Loading subcategories...
+                      </div>
+                    ) : subcategories.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="subcategory_id">Subcategory</Label>
+                        <Select
+                          value={
+                            formData.category_id !== parentCategoryId && 
+                            subcategories.some((sc: any) => sc.id === formData.category_id)
+                              ? formData.category_id 
+                              : 'none'
+                          }
+                          onValueChange={(value) => {
+                            // Use subcategory as category_id, or parent if "none" selected
+                            const finalCategoryId = value === 'none' ? parentCategoryId : value;
+                            setFormData({ ...formData, category_id: finalCategoryId });
+                          }}
+                        >
+                          <SelectTrigger id="subcategory_id">
+                            <SelectValue placeholder="Select a subcategory (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Subcategory</SelectItem>
+                            {subcategories.map((subcategory: any) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Select a subcategory or leave as parent category
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </CardContent>
             </Card>
 
