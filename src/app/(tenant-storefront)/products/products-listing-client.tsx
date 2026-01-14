@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { loadThemeProductCard } from '@/lib/themes/theme-loader';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 
@@ -35,24 +35,21 @@ interface ProductsListingClientProps {
   themeSlug?: string;
 }
 
-export default function ProductsListingClient({
+function ProductsListingClient({
   initialProducts = [],
   initialTotal = 0,
   themeSlug = 'default',
 }: Readonly<ProductsListingClientProps>) {
-  // Load theme-specific product card
+  // Load theme-specific product card - memoize to prevent re-creation
   const ThemeProductCard = useMemo(() => {
     const CardComponent = loadThemeProductCard(themeSlug);
     return CardComponent || DefaultProductCard;
   }, [themeSlug]);
 
-  // Ensure products is always an array
-  const products = Array.isArray(initialProducts) ? initialProducts : [];
-
-  console.log('[ProductsListingClient] Rendering', {
-    productsCount: products.length,
-    total: initialTotal,
-  });
+  // Memoize products array to prevent unnecessary re-renders
+  const products = useMemo(() => {
+    return Array.isArray(initialProducts) ? initialProducts : [];
+  }, [initialProducts]);
 
   if (products.length === 0) {
     return (
@@ -91,3 +88,6 @@ export default function ProductsListingClient({
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(ProductsListingClient);
