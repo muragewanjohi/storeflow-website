@@ -42,17 +42,9 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  console.log('[Products Page] ===== PAGE COMPONENT CALLED =====', {
-    timestamp: new Date().toISOString()
-  });
-  
   let tenant;
   try {
     tenant = await requireTenant();
-    console.log('[Products Page] Tenant loaded successfully:', {
-      tenantId: tenant.id,
-      tenantName: tenant.name
-    });
   } catch (error) {
     console.error('[Products Page] Error getting tenant:', error);
     return (
@@ -278,15 +270,7 @@ export default async function ProductsPage({
       }
     }
 
-    console.log('[Products Page] Fetching products', {
-      tenantId: tenant.id,
-      where,
-      page,
-      limit,
-      sort_by,
-      sort_order,
-    });
-
+    // Fetch products with timeout protection
     const [productsRaw, totalCountResult] = await Promise.all([
       prisma.products.findMany({
         where,
@@ -310,13 +294,6 @@ export default async function ProductsPage({
     ]);
     
     total = totalCountResult || 0;
-
-    console.log('[Products Page] Products fetched', {
-      productsCount: productsRaw.length,
-      total,
-      page,
-      limit,
-    });
 
     // Simplified: Skip rating stats for now - will add back later
     // This ensures products page loads quickly without complex queries
@@ -381,31 +358,7 @@ export default async function ProductsPage({
       }
     });
 
-    console.log('[Products Page] Products mapped, rendering', {
-      finalProductsCount: products.length,
-      total,
-      themeSlug: tenant.theme_slug || 'default',
-      firstProduct: products[0] ? {
-        id: products[0].id,
-        name: products[0].name,
-        price: products[0].price,
-        hasImage: !!products[0].image,
-      } : null,
-    });
-
-    console.log('[Products Page] Rendering page with products', {
-      productsCount: products.length,
-      total,
-      categoriesCount: categories.length,
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-    });
-
-    console.log('[Products Page] ===== ABOUT TO RETURN JSX =====', {
-      productsCount: products.length,
-      total,
-      categoriesCount: categories.length,
-    });
+    // Ready to render
 
     // Always return the component, even if products array is empty
     return (
@@ -444,7 +397,6 @@ export default async function ProductsPage({
     }
 
     // Generic error - still try to render with empty products so user sees something
-    console.error('[Products Page] Rendering with empty products due to error');
     return (
       <ProductsListingClient
         initialProducts={[]}
