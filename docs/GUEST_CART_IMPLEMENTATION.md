@@ -11,8 +11,10 @@ Guest cart support allows unauthenticated users to add items to their cart and p
 **File:** `storeflow/src/lib/cart/session.ts`
 
 - Generates unique session IDs for guest users
-- Stores session ID in HTTP-only cookie (`cart_session_id`)
-- Session persists for 30 days
+- Stores session ID in HTTP-only session cookie (`cart_session_id`)
+- **Session cookie (no expiration)** - clears when browser/incognito window closes
+- This follows e-commerce best practices: guest carts should not persist across sessions
+- Users who want cart persistence should create an account
 - Session ID is a 64-character hex string (cryptographically secure)
 
 ### Database Schema
@@ -121,8 +123,9 @@ where: {
    - Guest carts are tenant-specific
 
 4. **Session Expiration**
-   - Sessions expire after 30 days of inactivity
-   - Old guest carts can be cleaned up via cron job
+   - Session cookies clear when browser/incognito window closes
+   - Cart items in database remain but are orphaned (no active session)
+   - Old guest cart items can be cleaned up via cron job (e.g., items older than 30 days)
 
 ## Performance Optimizations
 
