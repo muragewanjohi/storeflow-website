@@ -8,13 +8,12 @@
 
 import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
-import ProductsListingClient from './products-listing-client';
+import SimpleProductsListing from './simple-products-listing';
 import { prisma } from '@/lib/prisma/client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { ErrorState } from '@/components/storefront/error-boundary';
-import { ReactErrorBoundary } from '@/components/storefront/react-error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
 /**
@@ -409,12 +408,11 @@ export default async function ProductsPage({
       <ThemeProviderWrapper>
         <div className="min-h-screen flex flex-col bg-white">
           <StorefrontHeader />
-          <main className="flex-1 container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold mb-4">Products Page (Simplified for Testing)</h1>
-            <p className="text-gray-600">Found {total} products in {categories.length} categories.</p>
-            <p className="text-green-600 mt-4">✓ Header loaded successfully</p>
-            <p className="text-green-600">✓ Theme provider working</p>
-            <p className="text-green-600">✓ Data fetched from database</p>
+          <main className="flex-1">
+            <SimpleProductsListing 
+              products={products}
+              total={total}
+            />
           </main>
           <StorefrontFooter />
         </div>
