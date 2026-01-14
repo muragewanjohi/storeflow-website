@@ -31,24 +31,7 @@ export async function getTenant(): Promise<Tenant | null> {
     const hostname = headersList.get('host') || '';
     const hostnameWithoutPort = hostname.split(':')[0];
     
-    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
-    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
-                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
-    
-    // Check if this is a marketing site hostname - don't resolve tenant for these
-    const isMarketingSite = 
-      hostnameWithoutPort === 'www' ||
-      hostnameWithoutPort === 'marketing' ||
-      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
-      hostnameWithoutPort === '127.0.0.1' ||
-      hostnameWithoutPort.includes('storeflow') ||
-      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
-    
-    if (isMarketingSite) {
-      return null; // Marketing site - no tenant
-    }
-    
-    // Check if tenant ID is already in headers (from middleware)
+    // Check if tenant ID is already in headers (from middleware) - highest priority
     const tenantId = headersList.get('x-tenant-id');
     
     if (tenantId) {
@@ -69,12 +52,12 @@ export async function getTenant(): Promise<Tenant | null> {
       } as Tenant;
     }
 
-    // If hostname doesn't resolve to tenant, check for tenant-subdomain cookie
-    // This is useful for server-side fetch requests where hostname might be different
+    // Check for tenant-subdomain cookie BEFORE marketing site check
+    // This is useful for server-side fetch requests where hostname might be different (e.g., www.dukanest.com)
     const cookieStore = await cookies();
     const tenantSubdomainCookie = cookieStore.get('tenant-subdomain')?.value;
     
-    if (tenantSubdomainCookie && !isMarketingSite) {
+    if (tenantSubdomainCookie) {
       // Try to resolve tenant directly by subdomain from cookie
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -97,6 +80,23 @@ export async function getTenant(): Promise<Tenant | null> {
         // If cookie-based lookup fails, fall through to hostname-based lookup
         console.error('Error resolving tenant from cookie:', error);
       }
+    }
+    
+    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
+    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
+                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+    
+    // Check if this is a marketing site hostname - don't resolve tenant for these
+    const isMarketingSite = 
+      hostnameWithoutPort === 'www' ||
+      hostnameWithoutPort === 'marketing' ||
+      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
+      hostnameWithoutPort === '127.0.0.1' ||
+      hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+    
+    if (isMarketingSite) {
+      return null; // Marketing site - no tenant
     }
 
     // Fallback: resolve tenant from hostname (only if not marketing site)
