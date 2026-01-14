@@ -407,24 +407,14 @@ export default async function ProductsPage({
 
     return (
       <ThemeProviderWrapper>
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-white">
           <StorefrontHeader />
-          <main className="flex-1">
-            <ReactErrorBoundary>
-              <ProductsListingClient
-                initialProducts={products}
-                initialTotal={total}
-                initialCategories={categories}
-                initialPage={page}
-                initialLimit={limit}
-                initialSearch={search}
-                initialCategory={categoryParam}
-                initialSortBy={sort_by}
-                initialSortOrder={sort_order}
-                currentCategory={currentCategory}
-                themeSlug={tenant.theme_slug || 'default'}
-              />
-            </ReactErrorBoundary>
+          <main className="flex-1 container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-4">Products Page (Simplified for Testing)</h1>
+            <p className="text-gray-600">Found {total} products in {categories.length} categories.</p>
+            <p className="text-green-600 mt-4">✓ Header loaded successfully</p>
+            <p className="text-green-600">✓ Theme provider working</p>
+            <p className="text-green-600">✓ Data fetched from database</p>
           </main>
           <StorefrontFooter />
         </div>

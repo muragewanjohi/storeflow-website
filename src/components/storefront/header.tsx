@@ -172,11 +172,13 @@ export default function StorefrontHeader({
     };
   }, [isPreview]);
 
-  // Ecommerce storefront navigation (not marketing site)
-  // TESTING: Minimal menu with only Home and Products to isolate navigation issue
+  // Ecommerce storefront navigation
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Products', href: '/products' },
+    { name: 'About Us', href: '/about' },
+    { name: 'Contact Us', href: '/contact' },
+    { name: 'Blogs', href: '/blogs' },
   ];
 
   return (
