@@ -65,6 +65,11 @@ export default async function ProductsPage({
     );
   }
 
+  // Ensure we always return something, even if there's an error
+  let products: any[] = [];
+  let total = 0;
+  let categories: any[] = [];
+
   // Get initial products
   const params = await searchParams;
   const page = parseInt(params.page as string) || 1;
@@ -229,7 +234,7 @@ export default async function ProductsPage({
 
   try {
     // Fetch categories list (for filters)
-    const categories = await prisma.categories.findMany({
+    categories = await prisma.categories.findMany({
       where: {
         tenant_id: tenant.id,
         status: 'active',
@@ -282,7 +287,7 @@ export default async function ProductsPage({
       sort_order,
     });
 
-    const [productsRaw, total] = await Promise.all([
+    const [productsRaw, totalCountResult] = await Promise.all([
       prisma.products.findMany({
         where,
         skip: (page - 1) * limit,
@@ -303,6 +308,8 @@ export default async function ProductsPage({
       }),
       prisma.products.count({ where }),
     ]);
+    
+    total = totalCountResult || 0;
 
     console.log('[Products Page] Products fetched', {
       productsCount: productsRaw.length,
@@ -321,7 +328,7 @@ export default async function ProductsPage({
       rawProductsCount: productsRaw.length,
     });
     
-    const products = productsRaw.map((product: any) => {
+    products = productsRaw.map((product: any) => {
       try {
         // Ensure price is converted to number (handle Prisma Decimal)
         const regularPrice = typeof product.price === 'object' && product.price !== null 
@@ -394,13 +401,18 @@ export default async function ProductsPage({
       tenantName: tenant.name,
     });
 
-    console.log('[Products Page] ===== ABOUT TO RETURN JSX =====');
+    console.log('[Products Page] ===== ABOUT TO RETURN JSX =====', {
+      productsCount: products.length,
+      total,
+      categoriesCount: categories.length,
+    });
 
+    // Always return the component, even if products array is empty
     return (
       <ProductsListingClient
-        initialProducts={products}
-        initialTotal={total}
-        initialCategories={categories}
+        initialProducts={products || []}
+        initialTotal={total || 0}
+        initialCategories={categories || []}
         initialPage={page}
         initialLimit={limit}
         initialSearch={search}
@@ -412,7 +424,7 @@ export default async function ProductsPage({
       />
     );
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error('[Products Page] Error fetching products:', error);
     
     // Check if it's a database connection error
     if (error instanceof Error && error.message.includes("Can't reach database server")) {
@@ -431,13 +443,21 @@ export default async function ProductsPage({
       );
     }
 
-    // Generic error
+    // Generic error - still try to render with empty products so user sees something
+    console.error('[Products Page] Rendering with empty products due to error');
     return (
-      <ErrorState
-        title="Error Loading Products"
-        message={error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
-        actionLabel="Go Home"
-        actionHref="/"
+      <ProductsListingClient
+        initialProducts={[]}
+        initialTotal={0}
+        initialCategories={[]}
+        initialPage={1}
+        initialLimit={12}
+        initialSearch=""
+        initialCategory=""
+        initialSortBy="created_at"
+        initialSortOrder="desc"
+        currentCategory={null}
+        themeSlug={tenant?.theme_slug || 'default'}
       />
     );
   }

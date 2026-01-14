@@ -86,8 +86,23 @@ export default function ProductsListingClient({
   const [sortBy, setSortBy] = useState(initialSortBy);
   const [sortOrder, setSortOrder] = useState(initialSortOrder);
   // Simplified: Just use initialProducts directly, no complex state management
-  const [products] = useState(initialProducts);
-  const [total] = useState(initialTotal);
+  // Ensure we always have an array, even if empty
+  const [products] = useState(Array.isArray(initialProducts) ? initialProducts : []);
+  const [total] = useState(typeof initialTotal === 'number' ? initialTotal : 0);
+  
+  // Debug: Log initial state
+  useEffect(() => {
+    console.log('[ProductsListingClient] Component mounted', {
+      initialProductsCount: initialProducts?.length || 0,
+      initialTotal: initialTotal || 0,
+      productsCount: products.length,
+      total,
+      firstProduct: products[0] ? {
+        id: products[0].id,
+        name: products[0].name,
+      } : null,
+    });
+  }, []);
 
   // Simplified: Remove complex initialization logic
   
