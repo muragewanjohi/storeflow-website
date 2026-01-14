@@ -1,26 +1,12 @@
 /**
  * Products Page Loading State
  * 
- * Displays skeleton UI while products page loads
+ * Displays skeleton UI while products page loads (content only)
  */
 
 export default function ProductsLoading() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header Skeleton */}
-      <div className="sticky top-0 z-50 w-full border-b bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-            <div className="flex items-center gap-4">
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* Content Skeleton */}
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
@@ -46,6 +32,6 @@ export default function ProductsLoading() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,32 +1,18 @@
 /**
  * Blog Page Loading State
  * 
- * Displays skeleton UI while blog page loads
+ * Displays skeleton UI while blog page loads (content only)
  */
 
 export default function BlogLoading() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header Skeleton */}
-      <div className="sticky top-0 z-50 w-full border-b bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-            <div className="flex items-center gap-4">
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* Content Skeleton */}
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="h-10 w-48 bg-gray-200 rounded animate-pulse mb-2" />
-          <div className="h-6 w-96 bg-gray-200 rounded animate-pulse" />
+        <div className="mb-8 text-center">
+          <div className="h-10 w-48 mx-auto bg-gray-200 rounded animate-pulse mb-2" />
+          <div className="h-6 w-96 mx-auto bg-gray-200 rounded animate-pulse" />
         </div>
 
         {/* Blog Posts Grid Skeleton */}
@@ -51,6 +37,6 @@ export default function BlogLoading() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

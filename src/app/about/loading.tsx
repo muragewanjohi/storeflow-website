@@ -1,26 +1,12 @@
 /**
  * About Page Loading State
  * 
- * Displays skeleton UI while about page loads
+ * Displays skeleton UI while about page loads (content only)
  */
 
 export default function AboutLoading() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header Skeleton */}
-      <div className="sticky top-0 z-50 w-full border-b bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-            <div className="flex items-center gap-4">
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* Hero Skeleton */}
       <div className="bg-gradient-to-b from-gray-50 to-white py-16 px-4">
         <div className="container mx-auto max-w-4xl text-center">
@@ -44,6 +30,6 @@ export default function AboutLoading() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }
