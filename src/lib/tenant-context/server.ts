@@ -4,8 +4,9 @@
  * Functions for getting tenant information in server components and API routes
  */
 
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { getTenantFromRequest, type Tenant } from '../tenant-context';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Get tenant from request headers (set by middleware)
@@ -66,6 +67,36 @@ export async function getTenant(): Promise<Tenant | null> {
         name: headersList.get('x-tenant-name') || '',
         status: 'active',
       } as Tenant;
+    }
+
+    // If hostname doesn't resolve to tenant, check for tenant-subdomain cookie
+    // This is useful for server-side fetch requests where hostname might be different
+    const cookieStore = await cookies();
+    const tenantSubdomainCookie = cookieStore.get('tenant-subdomain')?.value;
+    
+    if (tenantSubdomainCookie && !isMarketingSite) {
+      // Try to resolve tenant directly by subdomain from cookie
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const { data: tenant, error } = await supabase
+            .from('tenants')
+            .select('*')
+            .eq('subdomain', tenantSubdomainCookie.toLowerCase())
+            .eq('status', 'active')
+            .maybeSingle();
+          
+          if (tenant && !error) {
+            return tenant as Tenant;
+          }
+        }
+      } catch (error) {
+        // If cookie-based lookup fails, fall through to hostname-based lookup
+        console.error('Error resolving tenant from cookie:', error);
+      }
     }
 
     // Fallback: resolve tenant from hostname (only if not marketing site)
