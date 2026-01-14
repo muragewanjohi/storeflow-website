@@ -16,57 +16,63 @@ interface PageProps {
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
-  const tenant = await requireTenant();
-  const { slug } = await params;
+  try {
+    const tenant = await requireTenant();
+    const { slug } = await params;
 
-  // Try to find blog by slug first, then by ID
-  const blog = await prisma.blogs.findFirst({
-    where: {
-      OR: [
-        { slug },
-        { id: slug },
-      ],
-      tenant_id: tenant.id,
-      status: 'published',
-    },
-    include: {
-      blog_categories: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
+    // Try to find blog by slug first, then by ID
+    const blog = await prisma.blogs.findFirst({
+      where: {
+        OR: [
+          { slug },
+          { id: slug },
+        ],
+        tenant_id: tenant.id,
+        status: 'published',
+      },
+      include: {
+        blog_categories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!blog) {
-    notFound();
+    if (!blog) {
+      notFound();
+    }
+
+    // Fetch related blogs (same category, excluding current blog)
+    const relatedBlogs = await prisma.blogs.findMany({
+      where: {
+        tenant_id: tenant.id,
+        status: 'published',
+        id: { not: blog.id },
+        ...(blog.category_id ? { category_id: blog.category_id } : {}),
+      },
+      include: {
+        blog_categories: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+      take: 3,
+    });
+
+    return <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />;
+  } catch (error) {
+    console.error('Error loading blog post:', error);
+    // Re-throw to trigger Next.js error boundary
+    throw error;
   }
-
-  // Fetch related blogs (same category, excluding current blog)
-  const relatedBlogs = await prisma.blogs.findMany({
-    where: {
-      tenant_id: tenant.id,
-      status: 'published',
-      id: { not: blog.id },
-      ...(blog.category_id ? { category_id: blog.category_id } : {}),
-    },
-    include: {
-      blog_categories: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-        },
-      },
-    },
-    orderBy: {
-      created_at: 'desc',
-    },
-    take: 3,
-  });
-
-  return <BlogPostClient blog={blog} relatedBlogs={relatedBlogs} />;
 }
 

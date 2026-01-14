@@ -46,12 +46,11 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
   };
 
   return (
-    <div className="min-h-screen bg-white pt-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="container mx-auto px-4 py-12 max-w-4xl">
         {/* Back Button */}
         <Link
           href="/blog"
-          className="inline-flex items-center gap-2 text-[#0025cc] hover:text-[#001a99] mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Blog</span>
@@ -64,7 +63,7 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
               <div className="mb-4">
                 <Link
                   href={`/blog?category=${blog.blog_categories.slug || blog.blog_categories.id}`}
-                  className="inline-flex items-center gap-2 text-[#0025cc] hover:text-[#001a99] transition-colors"
+                  className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
                 >
                   <Tag className="w-4 h-4" />
                   <span className="text-sm font-medium">{blog.blog_categories.name}</span>
@@ -72,11 +71,11 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
               </div>
             )}
 
-            <h1 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
+            <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
               {blog.title}
             </h1>
 
-            <div className="flex items-center gap-4 text-sm text-[#8d8d8d] mb-6">
+            <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 <span>{formatDate(blog.created_at)}</span>
@@ -84,7 +83,7 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
             </div>
 
             {blog.excerpt && (
-              <p className="text-xl text-[#8d8d8d] leading-relaxed mb-8">
+              <p className="text-xl text-gray-500 leading-relaxed mb-8">
                 {blog.excerpt}
               </p>
             )}
@@ -111,7 +110,7 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
                 dangerouslySetInnerHTML={{ __html: blog.content }}
               />
             ) : (
-              <p className="text-[#8d8d8d]">No content available.</p>
+              <p className="text-gray-500">No content available.</p>
             )}
           </div>
         </article>
@@ -119,7 +118,7 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
         {/* Related Blogs */}
         {relatedBlogs.length > 0 && (
           <section className="mt-16 pt-12 border-t border-gray-200">
-            <h2 className="text-2xl font-bold text-[#0c0528] mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-8">
               Related Articles
             </h2>
             <div className="grid md:grid-cols-3 gap-6">
@@ -130,7 +129,7 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
                   className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden"
                 >
                   {relatedPost.image && (
-                    <div className="relative h-40 bg-[#e7e9eb] overflow-hidden">
+                    <div className="relative h-40 bg-gray-100 overflow-hidden">
                       <Image
                         src={relatedPost.image}
                         alt={relatedPost.title}
@@ -140,11 +139,11 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
                     </div>
                   )}
                   <div className="p-4">
-                    <h3 className="text-lg font-semibold text-[#0c0528] mb-2 line-clamp-2 group-hover:text-[#0025cc] transition-colors">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                       {relatedPost.title}
                     </h3>
                     {relatedPost.excerpt && (
-                      <p className="text-sm text-[#8d8d8d] line-clamp-2">
+                      <p className="text-sm text-gray-500 line-clamp-2">
                         {relatedPost.excerpt}
                       </p>
                     )}
@@ -154,7 +153,6 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
             </div>
           </section>
         )}
-      </div>
     </div>
   );
 }
