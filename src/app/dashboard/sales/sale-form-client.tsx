@@ -471,6 +471,10 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                         Mark as featured sale
                       </Label>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Featured sales can be displayed prominently in Sales Tab sections on your homepage. 
+                      Use this for your most important promotions like Black Friday, Holiday Sales, etc.
+                    </p>
                   </div>
                 </div>
               </CardContent>

@@ -124,7 +124,7 @@ export default function SalePageClient({
 
       {/* Sale Banner */}
       {sale.banner_image && (
-        <div className="relative mb-8 aspect-video w-full overflow-hidden rounded-lg">
+        <div className="relative mb-8 h-64 w-full overflow-hidden rounded-lg">
           <Image
             src={sale.banner_image}
             alt={sale.name}

@@ -61,10 +61,12 @@ export default async function SalesPage({
       ];
     }
 
-    // Status filter
+    // Status filter - only apply if explicitly set and not 'all'
+    // If no status filter, show all statuses (draft, active, scheduled, ended)
     if (status && status !== 'all') {
       where.status = status;
     }
+    // Note: If status is 'all' or undefined, we don't filter by status, showing all sales
 
     // Featured filter
     if (is_featured !== undefined) {

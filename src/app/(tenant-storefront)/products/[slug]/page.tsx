@@ -10,8 +10,6 @@ import { notFound } from 'next/navigation';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import ProductDetailClient from './product-detail-client';
-import StorefrontHeader from '@/components/storefront/header-server';
-import StorefrontFooter from '@/components/storefront/footer';
 import { generateProductMetadata, generateProductStructuredData } from '@/lib/seo/storefront-metadata';
 import { loadThemeProductDetail } from '@/lib/themes/theme-loader';
 import type { Metadata } from 'next';
@@ -172,6 +170,7 @@ export default async function ProductDetailPage({
   const ProductDetailComponent = ThemeProductDetail || ProductDetailClient;
 
   // Use Suspense boundaries for streaming - allows page to render progressively
+  // Note: Header and Footer are provided by the (tenant-storefront) layout
   return (
     <>
       <Script
@@ -179,16 +178,10 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <div className="min-h-screen flex flex-col">
-        <StorefrontHeader />
-        <main className="flex-1">
-          <ProductDetailComponent
-            product={productData}
-            relatedProducts={relatedProductsData}
-          />
-        </main>
-        <StorefrontFooter />
-      </div>
+      <ProductDetailComponent
+        product={productData}
+        relatedProducts={relatedProductsData}
+      />
     </>
   );
 }
