@@ -7,7 +7,6 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -35,14 +34,7 @@ export default function StorefrontHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [logoError, setLogoError] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Prevent hydration mismatch by only showing logo after mount
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Removed debug logging
 
@@ -80,6 +72,9 @@ export default function StorefrontHeader({
       
       abortController = new AbortController();
       
+      // Add timeout
+      const timeoutId = setTimeout(() => abortController?.abort(), 3000); // 3 second timeout
+      
       try {
         const response = await fetch('/api/cart/count', {
           signal: abortController.signal,
@@ -88,11 +83,14 @@ export default function StorefrontHeader({
           next: { revalidate: 10 },
         });
         
+        clearTimeout(timeoutId);
+        
         if (response.ok && isMounted) {
           const data: { count: number } = await response.json();
           setCartItemCount(data.count);
         }
       } catch (error: any) {
+        clearTimeout(timeoutId);
         // Silently fail - user might not be authenticated or request was aborted
         if (error.name !== 'AbortError' && isMounted) {
           setCartItemCount(0);
@@ -105,12 +103,19 @@ export default function StorefrontHeader({
       if (authChecked) return;
       authChecked = true;
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
       try {
         const response = await fetch('/api/customers/profile', {
+          signal: controller.signal,
           cache: 'default',
           next: { revalidate: 60 }, // Cache for 60 seconds
           // Suppress error logging for 401 (unauthorized) - this is expected for unauthenticated users
         });
+        
+        clearTimeout(timeoutId);
+        
         if (response.ok && isMounted) {
           setIsAuthenticated(true);
         } else {
@@ -121,6 +126,7 @@ export default function StorefrontHeader({
           }
         }
       } catch (error: any) {
+        clearTimeout(timeoutId);
         // Silently handle errors - user might not be authenticated
         // Don't log 401 errors as they're expected for unauthenticated users
         if (isMounted && error.name !== 'AbortError') {
@@ -188,65 +194,41 @@ export default function StorefrontHeader({
                 }}
                 className="flex items-center gap-1"
               >
-                {storeLogo && !logoError && (
-                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
-                    {isMounted ? (
-                      <Image 
-                        src={storeLogo} 
-                        alt={storeName}
-                        fill
-                        className="object-contain"
-                        sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
-                        onError={(e) => {
-                          console.error('[Header] Logo image failed to load:', storeLogo, e);
-                          setLogoError(true);
-                        }}
-                        onLoad={() => {
-                          console.log('[Header] Logo image loaded successfully and should be visible:', storeLogo);
-                        }}
-                        unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
-                        priority
-                        style={{ position: 'absolute', inset: 0 }}
-                      />
-                    ) : (
-                      // Show placeholder during SSR/hydration
-                      <div className="w-full h-full bg-transparent" aria-hidden="true" />
-                    )}
-                  </div>
+                {storeLogo && (
+                  <img 
+                    src={storeLogo} 
+                    alt={storeName}
+                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
+                    onError={(e) => {
+                      console.error('[Header] Logo image failed to load:', storeLogo, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                    onLoad={() => {
+                      console.log('[Header] Logo image loaded successfully:', storeLogo);
+                    }}
+                  />
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
                   {storeName}
                 </span>
               </button>
             ) : (
               <a href="/" className="flex items-center gap-1">
-                {storeLogo && !logoError && (
-                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
-                    {isMounted ? (
-                      <Image 
-                        src={storeLogo} 
-                        alt={storeName}
-                        fill
-                        className="object-contain"
-                        sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
-                        onError={(e) => {
-                          console.error('[Header] Logo image failed to load:', storeLogo, e);
-                          setLogoError(true);
-                        }}
-                        onLoad={() => {
-                          console.log('[Header] Logo image loaded successfully and should be visible:', storeLogo);
-                        }}
-                        unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
-                        priority
-                        style={{ position: 'absolute', inset: 0 }}
-                      />
-                    ) : (
-                      // Show placeholder during SSR/hydration
-                      <div className="w-full h-full bg-transparent" aria-hidden="true" />
-                    )}
-                  </div>
+                {storeLogo && (
+                  <img 
+                    src={storeLogo} 
+                    alt={storeName}
+                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
+                    onError={(e) => {
+                      console.error('[Header] Logo image failed to load:', storeLogo, e);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                    onLoad={() => {
+                      console.log('[Header] Logo image loaded successfully:', storeLogo);
+                    }}
+                  />
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
+                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
                   {storeName}
                 </span>
               </a>
