@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -45,7 +46,7 @@ export default function SimpleProductsListing({
           : 'grid-cols-1'
       }`}>
         {products.map((product) => (
-          <a
+          <Link
             key={product.id}
             href={`/products/${product.slug || product.id}`}
             className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200"
@@ -108,7 +109,7 @@ export default function SimpleProductsListing({
                 </p>
               )}
             </div>
-          </a>
+          </Link>
         ))}
       </div>
 

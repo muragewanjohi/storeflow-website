@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -27,9 +28,6 @@ export default function StorefrontHeader({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { isPreview, onNavigate } = usePreview();
-
-  // Debug: Log header props
-  console.log('[Header] Props received:', { storeName, storeLogo, pathname });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
@@ -202,11 +200,7 @@ export default function StorefrontHeader({
                     alt={storeName}
                     className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
                     onError={(e) => {
-                      console.error('[Header] Logo image failed to load:', storeLogo, e);
                       e.currentTarget.style.display = 'none';
-                    }}
-                    onLoad={() => {
-                      console.log('[Header] Logo image loaded successfully:', storeLogo);
                     }}
                   />
                 )}
@@ -215,25 +209,21 @@ export default function StorefrontHeader({
                 </span>
               </button>
             ) : (
-              <a href="/" className="flex items-center gap-1">
+              <Link href="/" className="flex items-center gap-1">
                 {storeLogo && (
                   <img 
                     src={storeLogo} 
                     alt={storeName}
                     className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
                     onError={(e) => {
-                      console.error('[Header] Logo image failed to load:', storeLogo, e);
                       e.currentTarget.style.display = 'none';
-                    }}
-                    onLoad={() => {
-                      console.log('[Header] Logo image loaded successfully:', storeLogo);
                     }}
                   />
                 )}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
                   {storeName}
                 </span>
-              </a>
+              </Link>
             )}
           </div>
 
@@ -260,15 +250,15 @@ export default function StorefrontHeader({
                   );
                 }
                 return (
-                  <a
+                  <Link
                     key={item.name}
                     href={item.href}
-                    className={`text-sm font-medium transition-colors cursor-pointer ${
+                    className={`text-sm font-medium transition-colors ${
                       isActive ? 'text-accent' : 'text-primary hover:text-accent'
                     }`}
                   >
                     {item.name}
-                  </a>
+                  </Link>
                 );
               })}
             </div>
@@ -304,12 +294,12 @@ export default function StorefrontHeader({
           <div className="flex items-center gap-2">
             {/* Account / Login */}
             {isAuthenticated ? (
-              <a href="/account">
+              <Link href="/account">
                 <Button variant="ghost" size="sm" className="text-primary hover:text-accent transition-colors">
                   <UserIcon className="h-5 w-5 mr-2" />
                   <span className="hidden sm:inline">Account</span>
                 </Button>
-              </a>
+              </Link>
             ) : (
               <div className="flex items-center gap-2">
                 {isPreview && onNavigate ? (
@@ -325,7 +315,7 @@ export default function StorefrontHeader({
                     Login
                   </Button>
                 ) : (
-                  <a href="/customer-login">
+                  <Link href="/customer-login">
                     <Button 
                       size="sm" 
                       variant="default"
@@ -333,7 +323,7 @@ export default function StorefrontHeader({
                     >
                       Login
                     </Button>
-                  </a>
+                  </Link>
                 )}
               </div>
             )}
@@ -353,7 +343,7 @@ export default function StorefrontHeader({
                 <span className="sr-only">Shopping cart</span>
               </Button>
             ) : (
-              <a href="/cart">
+              <Link href="/cart">
                 <Button variant="ghost" size="icon" className="relative group">
                   <ShoppingCartIcon className="h-6 w-6 text-primary transition-all duration-300 group-hover:scale-110" />
                   {cartItemCount > 0 && (
@@ -366,7 +356,7 @@ export default function StorefrontHeader({
                   )}
                   <span className="sr-only">Shopping cart</span>
                 </Button>
-              </a>
+              </Link>
             )}
 
             {/* Mobile menu button */}
@@ -439,37 +429,37 @@ export default function StorefrontHeader({
                   );
                 }
                 return (
-                  <a
+                  <Link
                     key={item.name}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`block px-3 py-2 text-base font-medium transition-colors cursor-pointer ${
+                    className={`block px-3 py-2 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     {item.name}
-                  </a>
+                  </Link>
                 );
               })}
               <div className="border-t mt-2 pt-2">
                 {isAuthenticated ? (
-                  <a
+                  <Link
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
                     My Account
-                  </a>
+                  </Link>
                 ) : (
-                  <a
+                  <Link
                     href="/customer-login"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
                     Login
-                  </a>
+                  </Link>
                 )}
               </div>
             </div>
