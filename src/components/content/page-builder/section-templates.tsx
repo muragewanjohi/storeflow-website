@@ -953,27 +953,42 @@ function SalesTabSectionComponent({
         setError(null);
 
         if (displayMode === 'single_sale' && section.sale_id) {
-          // First get sale details to get slug
-          const saleDetailsResponse = await fetch(`/api/dashboard/sales/${section.sale_id}`);
-          if (!saleDetailsResponse.ok) {
-            throw new Error('Failed to fetch sale details');
-          }
-          const saleDetails = await saleDetailsResponse.json();
+          // Use sale_slug if available, otherwise try to fetch from public API
+          let saleSlug = section.sale_slug;
           
-          // Then fetch sale with products using slug
-          const saleResponse = await fetch(`/api/sales/${saleDetails.sale.slug}`);
+          // If no slug stored, we need to get it - but we can't use dashboard API from storefront
+          // So we'll try to fetch from public API by trying common patterns or use the stored slug
+          if (!saleSlug) {
+            // Try to get slug from sale_id by checking if it's actually a slug
+            // If sale_id looks like a UUID, we can't proceed without slug
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(section.sale_id);
+            if (isUUID) {
+              throw new Error('Sale slug not available. Please re-select the sale in the page editor.');
+            } else {
+              // If it's not a UUID, assume it's a slug
+              saleSlug = section.sale_id;
+            }
+          }
+          
+          // Fetch sale with products using slug (public API)
+          const saleResponse = await fetch(`/api/sales/${saleSlug}`);
           if (!saleResponse.ok) {
+            if (saleResponse.status === 404) {
+              throw new Error('Sale not found. The sale may have been deleted or is not active.');
+            }
             throw new Error('Failed to fetch sale');
           }
           const saleData = await saleResponse.json();
           
-          const saleProducts: Product[] = (saleData.sale?.products || []).map((ps: any) => {
-            const product = ps.product;
-            const regularPrice = Number(product.price);
-            const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
-            const discountPercent = ps.discount_percent 
-              ? Number(ps.discount_percent)
-              : salePrice < regularPrice
+          // Products from public API are already mapped - they're direct product objects
+          const productsArray = saleData.products || [];
+          
+          const saleProducts: Product[] = productsArray.map((product: any) => {
+            const regularPrice = Number(product.compareAtPrice || product.price);
+            const salePrice = Number(product.price);
+            const discountPercent = product.discount_percent 
+              ? Number(product.discount_percent)
+              : product.compareAtPrice && salePrice < regularPrice
               ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
               : 0;
 
@@ -982,7 +997,7 @@ function SalesTabSectionComponent({
               name: product.name,
               slug: product.slug,
               price: salePrice,
-              compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+              compareAtPrice: product.compareAtPrice || undefined,
               image: product.image,
               stock_quantity: product.stock_quantity,
               saleBadge: section.badge_text || saleData.sale?.badge_text || 'SALE',
@@ -994,47 +1009,74 @@ function SalesTabSectionComponent({
           setProducts(saleProducts);
           setSales([saleData.sale]);
         } else if (displayMode === 'featured_sales' && section.featured_sale_ids && section.featured_sale_ids.length > 0) {
-          // Fetch multiple featured sales - first get details to get slugs
-          const salesDetailsPromises = section.featured_sale_ids.map((saleId: string) =>
-            fetch(`/api/dashboard/sales/${saleId}`).then(res => res.json())
-          );
-          const salesDetails = await Promise.all(salesDetailsPromises);
+          // Fetch featured sales from public API
+          const featuredSalesResponse = await fetch('/api/sales?status=active&is_featured=true&limit=10');
+          if (!featuredSalesResponse.ok) {
+            throw new Error('Failed to fetch featured sales');
+          }
+          const featuredData = await featuredSalesResponse.json();
+          const featuredSales = featuredData.sales || [];
           
-          // Then fetch each sale with products using slugs
-          const salesPromises = salesDetails
-            .filter(s => s.sale && s.sale.slug)
-            .map((s: any) => fetch(`/api/sales/${s.sale.slug}`).then(res => res.json()));
-          const salesData = await Promise.all(salesPromises);
-          const validSales = salesData.filter(s => s.sale).map(s => s.sale);
-          setSales(validSales);
+          // Limit to the number of featured sales selected
+          const salesToShow = featuredSales.slice(0, section.featured_sale_ids.length);
+          
+          // Fetch products for each featured sale
+          const salesWithProducts = await Promise.all(
+            salesToShow.map(async (sale: any) => {
+              try {
+                const saleResponse = await fetch(`/api/sales/${sale.slug}`);
+                if (saleResponse.ok) {
+                  const saleData = await saleResponse.json();
+                  return {
+                    ...saleData.sale || sale,
+                    products: saleData.products || [],
+                  };
+                }
+              } catch (error) {
+                console.error(`Error fetching sale ${sale.slug}:`, error);
+              }
+              return null;
+            })
+          );
+          
+          const validSalesData = salesWithProducts.filter(s => s !== null);
+          setSales(validSalesData);
 
           // Load products from first sale or active tab
-          if (validSales.length > 0) {
-            const activeSale = validSales[activeTab] || validSales[0];
-            const saleProducts: Product[] = (activeSale.products || []).map((ps: any) => {
-              const product = ps.product;
-              const regularPrice = Number(product.price);
-              const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
-              const discountPercent = ps.discount_percent 
-                ? Number(ps.discount_percent)
-                : salePrice < regularPrice
-                ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
-                : 0;
+          if (validSalesData.length > 0) {
+            const activeSale = validSalesData[activeTab] || validSalesData[0];
+            const productsArray = activeSale.products || [];
+            
+            if (productsArray.length > 0) {
+              // Products from public API are already mapped - they're direct product objects
+              const saleProducts: Product[] = productsArray.map((product: any) => {
+                const regularPrice = Number(product.compareAtPrice || product.price);
+                const salePrice = Number(product.price);
+                const discountPercent = product.discount_percent 
+                  ? Number(product.discount_percent)
+                  : product.compareAtPrice && salePrice < regularPrice
+                  ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+                  : 0;
 
-              return {
-                id: product.id,
-                name: product.name,
-                slug: product.slug,
-                price: salePrice,
-                compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
-                image: product.image,
-                stock_quantity: product.stock_quantity,
-                saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
-                saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
-                discountPercent,
-              };
-            }).slice(0, section.limit || 8);
-            setProducts(saleProducts);
+                return {
+                  id: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  price: salePrice,
+                  compareAtPrice: product.compareAtPrice || undefined,
+                  image: product.image,
+                  stock_quantity: product.stock_quantity,
+                  saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
+                  saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
+                  discountPercent,
+                };
+              }).slice(0, section.limit || 8);
+              setProducts(saleProducts);
+            } else {
+              setProducts([]);
+            }
+          } else {
+            setProducts([]);
           }
         } else if (displayMode === 'all_active') {
           // Fetch all active sales
@@ -1052,13 +1094,14 @@ function SalesTabSectionComponent({
             const saleResponse = await fetch(`/api/sales/${sale.slug}`);
             if (saleResponse.ok) {
               const saleData = await saleResponse.json();
-              const saleProducts = (saleData.sale?.products || []).map((ps: any) => {
-                const product = ps.product;
-                const regularPrice = Number(product.price);
-                const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
-                const discountPercent = ps.discount_percent 
-                  ? Number(ps.discount_percent)
-                  : salePrice < regularPrice
+              // Products from public API are already mapped - they're direct product objects
+              const productsArray = saleData.products || [];
+              const saleProducts = productsArray.map((product: any) => {
+                const regularPrice = Number(product.compareAtPrice || product.price);
+                const salePrice = Number(product.price);
+                const discountPercent = product.discount_percent 
+                  ? Number(product.discount_percent)
+                  : product.compareAtPrice && salePrice < regularPrice
                   ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
                   : 0;
 
@@ -1067,7 +1110,7 @@ function SalesTabSectionComponent({
                   name: product.name,
                   slug: product.slug,
                   price: salePrice,
-                  compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+                  compareAtPrice: product.compareAtPrice || undefined,
                   image: product.image,
                   stock_quantity: product.stock_quantity,
                   saleBadge: section.badge_text || sale.badge_text || 'SALE',
@@ -1091,23 +1134,50 @@ function SalesTabSectionComponent({
     };
 
     fetchData();
-  }, [displayMode, section.sale_id, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview]);
+  }, [displayMode, section.sale_id, section.sale_slug, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview]);
 
   // Update products when active tab changes (for featured_sales mode)
   useEffect(() => {
     if (displayMode === 'featured_sales' && sales.length > 0 && !isPreview) {
       const activeSale = sales[activeTab] || sales[0];
-      if (activeSale) {
+      if (activeSale && activeSale.products) {
+        // Products are already loaded in the sale object
+        const productsArray = activeSale.products || [];
+        const saleProducts: Product[] = productsArray.map((product: any) => {
+          const regularPrice = Number(product.compareAtPrice || product.price);
+          const salePrice = Number(product.price);
+          const discountPercent = product.discount_percent 
+            ? Number(product.discount_percent)
+            : product.compareAtPrice && salePrice < regularPrice
+            ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+            : 0;
+
+          return {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            price: salePrice,
+            compareAtPrice: product.compareAtPrice || undefined,
+            image: product.image,
+            stock_quantity: product.stock_quantity,
+            saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
+            saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
+            discountPercent,
+          };
+        }).slice(0, section.limit || 8);
+        setProducts(saleProducts);
+      } else if (activeSale && activeSale.slug) {
+        // Fallback: fetch if products not already loaded
         fetch(`/api/sales/${activeSale.slug}`)
           .then(res => res.json())
           .then(data => {
-            const saleProducts: Product[] = (data.sale?.products || []).map((ps: any) => {
-              const product = ps.product;
-              const regularPrice = Number(product.price);
-              const salePrice = ps.sale_price ? Number(ps.sale_price) : (product.sale_price ? Number(product.sale_price) : regularPrice);
-              const discountPercent = ps.discount_percent 
-                ? Number(ps.discount_percent)
-                : salePrice < regularPrice
+            const productsArray = data.products || [];
+            const saleProducts: Product[] = productsArray.map((product: any) => {
+              const regularPrice = Number(product.compareAtPrice || product.price);
+              const salePrice = Number(product.price);
+              const discountPercent = product.discount_percent 
+                ? Number(product.discount_percent)
+                : product.compareAtPrice && salePrice < regularPrice
                 ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
                 : 0;
 
@@ -1116,7 +1186,7 @@ function SalesTabSectionComponent({
                 name: product.name,
                 slug: product.slug,
                 price: salePrice,
-                compareAtPrice: salePrice < regularPrice ? regularPrice : undefined,
+                compareAtPrice: product.compareAtPrice || undefined,
                 image: product.image,
                 stock_quantity: product.stock_quantity,
                 saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
@@ -1126,7 +1196,10 @@ function SalesTabSectionComponent({
             }).slice(0, section.limit || 8);
             setProducts(saleProducts);
           })
-          .catch(err => console.error('Error fetching sale products:', err));
+          .catch(err => {
+            console.error('Error fetching sale products:', err);
+            setProducts([]);
+          });
       }
     }
   }, [activeTab, displayMode, sales, section.limit, section.badge_text, section.badge_color, isPreview]);
@@ -1207,11 +1280,11 @@ function SalesTabSectionComponent({
             )}
           </div>
           {section.cta_position === 'top_right' && section.cta_text && section.cta_link && (
-            <Link href={section.cta_link}>
+            <a href={section.cta_link}>
               <Button variant="outline">
                 {section.cta_text}
               </Button>
-            </Link>
+            </a>
           )}
         </div>
 
@@ -1274,11 +1347,11 @@ function SalesTabSectionComponent({
         {/* Bottom CTA */}
         {section.cta_position === 'bottom_center' && section.cta_text && section.cta_link && (
           <div className="mt-8 text-center">
-            <Link href={section.cta_link}>
+            <a href={section.cta_link}>
               <Button variant="outline" size="lg">
                 {section.cta_text}
               </Button>
-            </Link>
+            </a>
           </div>
         )}
       </div>

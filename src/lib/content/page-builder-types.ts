@@ -138,6 +138,7 @@ export interface SalesTabSection extends BaseSection {
   
   // Single Sale Mode
   sale_id?: string; // Required if display_mode is 'single_sale'
+  sale_slug?: string; // Sale slug for public API access (auto-populated when sale_id is selected)
   
   // Featured Sales Mode
   featured_sale_ids?: string[]; // Array of sale IDs for featured mode

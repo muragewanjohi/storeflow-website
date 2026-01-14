@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -60,58 +60,66 @@ export default function ProductSalesSection({ productId }: Readonly<ProductSales
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [saleToRemove, setSaleToRemove] = useState<ProductSale | null>(null);
 
+  // Function to load product sales efficiently - defined with useCallback to avoid dependency issues
+  const loadProductSales = useCallback(async () => {
+    try {
+      // Load all sales first
+      const salesResponse = await fetch('/api/dashboard/sales?limit=100');
+      if (salesResponse.ok) {
+        const salesData = await salesResponse.json();
+        setSales(salesData.sales || []);
+      }
+
+      // Load product's sales by checking all sales
+      const allSalesResponse = await fetch('/api/dashboard/sales?limit=1000');
+      if (allSalesResponse.ok) {
+        const allSalesData = await allSalesResponse.json();
+        const productSalesList: ProductSale[] = [];
+        
+        // Use Promise.all for parallel fetching
+        const saleProductPromises = (allSalesData.sales || []).map(async (sale: Sale) => {
+          try {
+            const saleProductsResponse = await fetch(`/api/dashboard/sales/${sale.id}/products`);
+            if (saleProductsResponse.ok) {
+              const saleProductsData = await saleProductsResponse.json();
+              const productSale = saleProductsData.products.find(
+                (ps: any) => ps.product.id === productId
+              );
+              if (productSale) {
+                return {
+                  id: productSale.id,
+                  sale_id: sale.id,
+                  sale_price: productSale.sale_price,
+                  discount_percent: productSale.discount_percent,
+                  sales: sale,
+                };
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching products for sale ${sale.id}:`, error);
+          }
+          return null;
+        });
+
+        const results = await Promise.all(saleProductPromises);
+        const validProductSales = results.filter((ps): ps is ProductSale => ps !== null);
+        setProductSales(validProductSales);
+      }
+    } catch (error) {
+      console.error('Error loading sales:', error);
+    }
+  }, [productId]);
+
   // Load sales and product sales
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      try {
-        // Load all sales
-        const salesResponse = await fetch('/api/dashboard/sales?limit=100');
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json();
-          setSales(salesData.sales || []);
-        }
-
-        // Load product's sales
-        const productResponse = await fetch(`/api/products/${productId}`);
-        if (productResponse.ok) {
-          const productData = await productResponse.json();
-          // Get sales for this product by checking all sales
-          const allSalesResponse = await fetch('/api/dashboard/sales?limit=1000');
-          if (allSalesResponse.ok) {
-            const allSalesData = await allSalesResponse.json();
-            const productSalesList: ProductSale[] = [];
-            
-            for (const sale of allSalesData.sales || []) {
-              const saleProductsResponse = await fetch(`/api/dashboard/sales/${sale.id}/products`);
-              if (saleProductsResponse.ok) {
-                const saleProductsData = await saleProductsResponse.json();
-                const productSale = saleProductsData.products.find(
-                  (ps: any) => ps.product.id === productId
-                );
-                if (productSale) {
-                  productSalesList.push({
-                    id: productSale.id,
-                    sale_id: sale.id,
-                    sale_price: productSale.sale_price,
-                    discount_percent: productSale.discount_percent,
-                    sales: sale,
-                  });
-                }
-              }
-            }
-            setProductSales(productSalesList);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading sales:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      await loadProductSales();
+      setIsLoading(false);
     };
 
     loadData();
-  }, [productId]);
+  }, [loadProductSales]);
 
   const handleAddToSale = async () => {
     if (!selectedSaleId) return;
@@ -131,38 +139,15 @@ export default function ProductSalesSection({ productId }: Readonly<ProductSales
         throw new Error(errorData.error || 'Failed to add product to sale');
       }
 
-      // Reload product sales
-      const allSalesResponse = await fetch('/api/dashboard/sales?limit=1000');
-      if (allSalesResponse.ok) {
-        const allSalesData = await allSalesResponse.json();
-        const productSalesList: ProductSale[] = [];
-        
-        for (const sale of allSalesData.sales || []) {
-          const saleProductsResponse = await fetch(`/api/dashboard/sales/${sale.id}/products`);
-          if (saleProductsResponse.ok) {
-            const saleProductsData = await saleProductsResponse.json();
-            const productSale = saleProductsData.products.find(
-              (ps: any) => ps.product.id === productId
-            );
-            if (productSale) {
-              productSalesList.push({
-                id: productSale.id,
-                sale_id: sale.id,
-                sale_price: productSale.sale_price,
-                discount_percent: productSale.discount_percent,
-                sales: sale,
-              });
-            }
-          }
-        }
-        setProductSales(productSalesList);
-      }
+      // Reload product sales using the same efficient function
+      await loadProductSales();
 
       setShowAddDialog(false);
       setSelectedSaleId('');
       setSalePrice('');
     } catch (error) {
       console.error('Error adding product to sale:', error);
+      alert(error instanceof Error ? error.message : 'Failed to add product to sale');
     }
   };
 

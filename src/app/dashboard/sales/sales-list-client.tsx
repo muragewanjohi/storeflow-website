@@ -367,9 +367,6 @@ export default function SalesListClient({
                     <SelectItem value="false">Not Featured</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Featured sales can be displayed prominently in Sales Tab sections on your homepage
-                </p>
               </div>
               <div className="flex items-end">
                 <Button onClick={handleSearch} disabled={isPending}>

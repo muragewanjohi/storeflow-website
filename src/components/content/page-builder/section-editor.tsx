@@ -1421,9 +1421,9 @@ function SalesTabSectionEditor({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            {displayMode === 'single_sale' && 'Display products from one specific sale'}
-            {displayMode === 'featured_sales' && 'Display multiple featured sales as tabs'}
-            {displayMode === 'all_active' && 'Automatically show all currently active sales'}
+            {displayMode === 'single_sale' && 'Single Sale: Display products from one specific sale. Select a sale below to show its products on your homepage.'}
+            {displayMode === 'featured_sales' && 'Featured Sales: Display multiple featured sales as tabs. Users can switch between different sales to see products from each.'}
+            {displayMode === 'all_active' && 'All Active Sales: Automatically show all currently active sales. Products from all active sales will be displayed together.'}
           </p>
         </div>
 
@@ -1440,6 +1440,7 @@ function SalesTabSectionEditor({
                   const selectedSale = sales.find((s: any) => s.id === value);
                   onUpdate({
                     sale_id: value,
+                    sale_slug: selectedSale?.slug || undefined,
                     cta_link: selectedSale ? `/sales/${selectedSale.slug}` : section.cta_link,
                   });
                 }}
