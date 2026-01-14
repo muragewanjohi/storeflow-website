@@ -66,6 +66,12 @@ export default function ProductsListingClient({
   currentCategory,
   themeSlug = 'default',
 }: Readonly<ProductsListingClientProps>) {
+  console.log('[ProductsListingClient] ===== CLIENT COMPONENT RENDERING =====', {
+    initialProductsCount: initialProducts.length,
+    initialTotal,
+    timestamp: new Date().toISOString()
+  });
+  
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();

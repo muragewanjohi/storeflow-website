@@ -46,9 +46,17 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  console.log('[Products Page] ===== PAGE COMPONENT CALLED =====', {
+    timestamp: new Date().toISOString()
+  });
+  
   let tenant;
   try {
     tenant = await requireTenant();
+    console.log('[Products Page] Tenant loaded successfully:', {
+      tenantId: tenant.id,
+      tenantName: tenant.name
+    });
   } catch (error) {
     console.error('[Products Page] Error getting tenant:', error);
     return (
@@ -394,6 +402,8 @@ export default async function ProductsPage({
       tenantId: tenant.id,
       tenantName: tenant.name,
     });
+
+    console.log('[Products Page] ===== ABOUT TO RETURN JSX =====');
 
     return (
       <ThemeProviderWrapper>
