@@ -7,7 +7,6 @@
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -218,7 +217,7 @@ export default function StorefrontHeader({
                 </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center gap-1">
+              <a href="/" className="flex items-center gap-1">
                 {storeLogo && !logoError && (
                   <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
                     {isMounted ? (
@@ -248,7 +247,7 @@ export default function StorefrontHeader({
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors" suppressHydrationWarning>
                   {storeName}
                 </span>
-              </Link>
+              </a>
             )}
           </div>
 
@@ -319,12 +318,12 @@ export default function StorefrontHeader({
           <div className="flex items-center gap-2">
             {/* Account / Login */}
             {isAuthenticated ? (
-              <Link href="/account">
+              <a href="/account">
                 <Button variant="ghost" size="sm" className="text-primary hover:text-accent transition-colors">
                   <UserIcon className="h-5 w-5 mr-2" />
                   <span className="hidden sm:inline">Account</span>
                 </Button>
-              </Link>
+              </a>
             ) : (
               <div className="flex items-center gap-2">
                 {isPreview && onNavigate ? (
@@ -340,7 +339,7 @@ export default function StorefrontHeader({
                     Login
                   </Button>
                 ) : (
-                  <Link href="/customer-login">
+                  <a href="/customer-login">
                     <Button 
                       size="sm" 
                       variant="default"
@@ -348,7 +347,7 @@ export default function StorefrontHeader({
                     >
                       Login
                     </Button>
-                  </Link>
+                  </a>
                 )}
               </div>
             )}
@@ -368,7 +367,7 @@ export default function StorefrontHeader({
                 <span className="sr-only">Shopping cart</span>
               </Button>
             ) : (
-              <Link href="/cart">
+              <a href="/cart">
                 <Button variant="ghost" size="icon" className="relative group">
                   <ShoppingCartIcon className="h-6 w-6 text-primary transition-all duration-300 group-hover:scale-110" />
                   {cartItemCount > 0 && (
@@ -381,7 +380,7 @@ export default function StorefrontHeader({
                   )}
                   <span className="sr-only">Shopping cart</span>
                 </Button>
-              </Link>
+              </a>
             )}
 
             {/* Mobile menu button */}
@@ -470,21 +469,21 @@ export default function StorefrontHeader({
               })}
               <div className="border-t mt-2 pt-2">
                 {isAuthenticated ? (
-                  <Link
+                  <a
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
                     My Account
-                  </Link>
+                  </a>
                 ) : (
-                  <Link
+                  <a
                     href="/customer-login"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
                     Login
-                  </Link>
+                  </a>
                 )}
               </div>
             </div>
