@@ -56,20 +56,12 @@ export default async function ProductsPage({
   } catch (error) {
     console.error('[Products Page] Error getting tenant:', error);
     return (
-      <ThemeProviderWrapper>
-        <div className="min-h-screen flex flex-col">
-          <StorefrontHeader />
-          <main className="flex-1">
-            <ErrorState
-              title="Store Not Found"
-              message="Unable to load the store. Please check the URL and try again."
-              actionLabel="Go Home"
-              actionHref="/"
-            />
-          </main>
-          <StorefrontFooter />
-        </div>
-      </ThemeProviderWrapper>
+      <ErrorState
+        title="Store Not Found"
+        message="Unable to load the store. Please check the URL and try again."
+        actionLabel="Go Home"
+        actionHref="/"
+      />
     );
   }
 
