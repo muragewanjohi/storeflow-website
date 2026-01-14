@@ -62,7 +62,7 @@ export default async function AboutPage() {
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Mission</h2>
                 <p className="text-gray-700 leading-relaxed mb-4">
                   We believe that everyone deserves access to quality products without breaking the bank. 
-                  That's why we carefully curate our selection, partnering with reliable suppliers to 
+                  That&apos;s why we carefully curate our selection, partnering with reliable suppliers to 
                   bring you the best value.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
