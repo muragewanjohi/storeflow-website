@@ -131,7 +131,7 @@ export default function SalesListClient({
   
   const [search, setSearch] = useState(currentSearchParams.search);
   const [status, setStatus] = useState(currentSearchParams.status || 'all');
-  const [is_featured, setIsFeatured] = useState(currentSearchParams.is_featured || '');
+  const [is_featured, setIsFeatured] = useState(currentSearchParams.is_featured || 'all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
@@ -152,7 +152,7 @@ export default function SalesListClient({
       params.delete('status');
     }
     
-    if (is_featured && is_featured !== '') {
+    if (is_featured && is_featured !== 'all') {
       params.set('is_featured', is_featured);
     } else {
       params.delete('is_featured');
@@ -357,12 +357,12 @@ export default function SalesListClient({
               </div>
               <div className="w-full sm:w-[180px]">
                 <Label htmlFor="featured">Featured</Label>
-                <Select value={is_featured} onValueChange={setIsFeatured}>
+                <Select value={is_featured || 'all'} onValueChange={setIsFeatured}>
                   <SelectTrigger id="featured">
                     <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="true">Featured Only</SelectItem>
                     <SelectItem value="false">Not Featured</SelectItem>
                   </SelectContent>

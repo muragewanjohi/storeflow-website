@@ -37,7 +37,9 @@ export default async function SalesPage({
   const limitNum = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 20;
   const search = typeof params.search === 'string' ? params.search : undefined;
   const status = typeof params.status === 'string' ? params.status : undefined;
-  const is_featured = typeof params.is_featured === 'string' ? params.is_featured === 'true' : undefined;
+  const is_featured = typeof params.is_featured === 'string' && params.is_featured !== 'all' 
+    ? params.is_featured === 'true' 
+    : undefined;
 
   // Fetch sales directly from database
   let sales: any[] = [];
@@ -130,7 +132,7 @@ export default async function SalesPage({
         limit: limitNum,
         search: search || '',
         status: status || 'all',
-        is_featured: is_featured !== undefined ? String(is_featured) : '',
+        is_featured: is_featured !== undefined ? String(is_featured) : 'all',
       }}
     />
   );
