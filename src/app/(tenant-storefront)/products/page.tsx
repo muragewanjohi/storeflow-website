@@ -10,9 +10,6 @@ import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
 import SimpleProductsListing from './simple-products-listing';
 import { prisma } from '@/lib/prisma/client';
-import StorefrontHeader from '@/components/storefront/header-server';
-import StorefrontFooter from '@/components/storefront/footer';
-import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
@@ -405,18 +402,10 @@ export default async function ProductsPage({
     console.log('[Products Page] ===== ABOUT TO RETURN JSX =====');
 
     return (
-      <ThemeProviderWrapper>
-        <div className="min-h-screen flex flex-col bg-white">
-          <StorefrontHeader />
-          <main className="flex-1">
-            <SimpleProductsListing 
-              products={products}
-              total={total}
-            />
-          </main>
-          <StorefrontFooter />
-        </div>
-      </ThemeProviderWrapper>
+      <SimpleProductsListing 
+        products={products}
+        total={total}
+      />
     );
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -424,38 +413,28 @@ export default async function ProductsPage({
     // Check if it's a database connection error
     if (error instanceof Error && error.message.includes("Can't reach database server")) {
       return (
-        <ThemeProviderWrapper>
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center p-8">
-              <h1 className="text-2xl font-bold mb-4">Database Connection Error</h1>
-              <p className="text-muted-foreground mb-4">
-                Unable to connect to the database server.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please check your DATABASE_URL environment variable and ensure the database server is running.
-              </p>
-            </div>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center p-8">
+            <h1 className="text-2xl font-bold mb-4">Database Connection Error</h1>
+            <p className="text-muted-foreground mb-4">
+              Unable to connect to the database server.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Please check your DATABASE_URL environment variable and ensure the database server is running.
+            </p>
           </div>
-        </ThemeProviderWrapper>
+        </div>
       );
     }
 
     // Generic error
     return (
-      <ThemeProviderWrapper>
-        <div className="min-h-screen flex flex-col">
-          <StorefrontHeader />
-          <main className="flex-1">
-            <ErrorState
-              title="Error Loading Products"
-              message={error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
-              actionLabel="Go Home"
-              actionHref="/"
-            />
-          </main>
-          <StorefrontFooter />
-        </div>
-      </ThemeProviderWrapper>
+      <ErrorState
+        title="Error Loading Products"
+        message={error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.'}
+        actionLabel="Go Home"
+        actionHref="/"
+      />
     );
   }
 }

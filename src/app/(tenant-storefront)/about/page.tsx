@@ -6,9 +6,6 @@
 
 import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
-import StorefrontHeader from '@/components/storefront/header-server';
-import StorefrontFooter from '@/components/storefront/footer';
-import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 
 // Force dynamic rendering since this page depends on tenant context from headers
@@ -28,10 +25,7 @@ export default async function AboutPage() {
   const tenant = await requireTenant();
 
   return (
-    <ThemeProviderWrapper>
-      <div className="min-h-screen flex flex-col bg-white">
-        <StorefrontHeader />
-        <main className="flex-1">
+    <>
           {/* Hero Section */}
           <div className="bg-gradient-to-b from-gray-50 to-white py-16 px-4">
             <div className="container mx-auto max-w-4xl text-center">
@@ -132,9 +126,6 @@ export default async function AboutPage() {
               </section>
             </div>
           </div>
-        </main>
-        <StorefrontFooter />
-      </div>
-    </ThemeProviderWrapper>
+    </>
   );
 }
