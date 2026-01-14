@@ -30,8 +30,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { generateSlug } from '@/lib/content/validation';
 import { toast } from 'sonner';
+
+// Generate slug for blog categories - keep full name with hyphens for spaces
+const generateCategorySlug = (text: string): string => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')  // Replace spaces with hyphens
+    .replace(/^-+|-+$/g, '');  // Remove leading/trailing hyphens
+};
 
 interface BlogCategory {
   id: string;
@@ -110,7 +118,7 @@ export default function BlogCategoriesClient({
         },
         body: JSON.stringify({
           name: formData.name,
-          slug: formData.slug || generateSlug(formData.name),
+          slug: formData.slug || generateCategorySlug(formData.name),
         }),
       });
 
@@ -217,7 +225,7 @@ export default function BlogCategoriesClient({
                           ...formData,
                           name: newName,
                           // Only auto-generate slug if it hasn't been manually edited
-                          slug: slugManuallyEdited ? formData.slug : generateSlug(newName),
+                          slug: slugManuallyEdited ? formData.slug : generateCategorySlug(newName),
                         });
                       }}
                       placeholder="Category name"

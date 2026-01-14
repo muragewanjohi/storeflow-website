@@ -19,6 +19,8 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 // Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
+import PageBuilder from '@/components/content/page-builder/page-builder';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Blog {
   id: string;
@@ -64,6 +66,29 @@ export default function BlogFormClient({ blog, categories }: Readonly<BlogFormCl
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Detect content mode: if content is valid JSON with sections, use page builder
+  const detectContentMode = (content: string | null | undefined): 'rich-text' | 'page-builder' => {
+    if (!content || content.trim() === '') return 'rich-text';
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.sections)) {
+        return 'page-builder';
+      }
+    } catch {
+      // Not JSON, assume rich text
+    }
+    return 'rich-text';
+  };
+
+  const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
+    detectContentMode(blog?.content)
+  );
+
+  // Handle content change from page builder
+  const handleContentChange = (newContent: string) => {
+    setFormData((prev) => ({ ...prev, content: newContent }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,11 +299,36 @@ export default function BlogFormClient({ blog, categories }: Readonly<BlogFormCl
 
               <div className="space-y-2">
                 <Label htmlFor="content">Content</Label>
-                <RichTextEditor
-                  content={formData.content || ''}
-                  onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
-                  placeholder="Write your blog post content here..."
-                />
+                <Tabs value={contentMode} onValueChange={(value) => setContentMode(value as 'rich-text' | 'page-builder')}>
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="rich-text">Rich Text Editor</TabsTrigger>
+                    <TabsTrigger value="page-builder">Page Builder</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="rich-text" className="mt-0">
+                    <RichTextEditor
+                      content={contentMode === 'rich-text' ? (formData.content || '') : ''}
+                      onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
+                      placeholder="Start writing your blog post content..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Use the toolbar to format text, add images, links, and more
+                    </p>
+                  </TabsContent>
+                  
+                  <TabsContent value="page-builder" className="mt-0">
+                    <PageBuilder
+                      value={contentMode === 'page-builder' ? (formData.content || '') : ''}
+                      onChange={handleContentChange}
+                      pageSlug={formData.slug || undefined}
+                      pageId={blog?.id}
+                      pageStatus={formData.status}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Build your blog post using pre-designed sections. Content is stored as JSON.
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </div>
             </CardContent>
           </Card>

@@ -44,14 +44,13 @@ export default function CategoryFormClient({ category }: Readonly<CategoryFormCl
     }));
   };
 
-  // Generate slug helper
+  // Generate slug helper - keep full name with hyphens for spaces
   const generateSlug = (text: string): string => {
     return text
       .toLowerCase()
       .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/\s+/g, '-')  // Replace spaces with hyphens
+      .replace(/^-+|-+$/g, '');  // Remove leading/trailing hyphens
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
