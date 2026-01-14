@@ -24,16 +24,30 @@ export default async function BlogPostPage({ params }: PageProps) {
       notFound();
     }
 
-    // Try to find blog by slug first, then by ID
+    // Check if slug is a valid UUID format (8-4-4-4-12 hex characters)
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+
+    // Build where clause: try slug first, and ID only if slug looks like a UUID
+    const whereClause: any = {
+      tenant_id: tenant.id,
+      status: 'published',
+    };
+
+    if (isUUID) {
+      // If it looks like a UUID, try both slug and ID
+      whereClause.OR = [
+        { slug },
+        { id: slug },
+      ];
+    } else {
+      // If it's not a UUID, only search by slug
+      whereClause.slug = slug;
+    }
+
+    // Try to find blog by slug first, then by ID (if UUID format)
     const blog = await prisma.blogs.findFirst({
-      where: {
-        OR: [
-          { slug },
-          { id: slug },
-        ],
-        tenant_id: tenant.id,
-        status: 'published',
-      },
+      where: whereClause,
       include: {
         blog_categories: {
           select: {
