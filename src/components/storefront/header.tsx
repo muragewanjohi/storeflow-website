@@ -29,7 +29,9 @@ export default function StorefrontHeader({
   const [isPending, startTransition] = useTransition();
   const { isPreview, onNavigate } = usePreview();
 
-  // Removed excessive debug logging - not needed in production
+  // Debug: Log header props
+  console.log('[Header] Props received:', { storeName, storeLogo, pathname });
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);

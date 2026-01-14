@@ -15,10 +15,25 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
   const { data: themeData } = useQuery({
     queryKey: ['current-theme'],
     queryFn: async () => {
-      const response = await fetch('/api/themes/current');
-      if (!response.ok) return null;
-      return await response.json();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        const response = await fetch('/api/themes/current', {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) return null;
+        return await response.json();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error('[ThemeProvider] Failed to load theme:', error);
+        return null; // Fail gracefully
+      }
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 1, // Only retry once
+    retryDelay: 1000, // Wait 1 second before retry
   });
 
   const theme = themeData?.theme;
