@@ -145,15 +145,33 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
               )}
 
               {/* CTA Button */}
-              <Link href={`/sales/${sale.slug}`} className="mt-auto">
+              {sale.slug ? (
                 <Button 
-                  className="w-full group/button"
+                  asChild
+                  className="w-full group/button mt-auto"
                   size="lg"
                 >
-                  Shop Now
-                  <ArrowRightIcon className="ml-2 h-4 w-4 group-hover/button:translate-x-1 transition-transform" />
+                  <Link href={`/sales/${sale.slug}`}>
+                    Shop Now
+                    <ArrowRightIcon className="ml-2 h-4 w-4 group-hover/button:translate-x-1 transition-transform" />
+                  </Link>
                 </Button>
-              </Link>
+              ) : (
+                <div className="mt-auto">
+                  <Button 
+                    className="w-full"
+                    size="lg"
+                    disabled
+                    variant="outline"
+                  >
+                    Shop Now
+                    <ArrowRightIcon className="ml-2 h-4 w-4" />
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1 text-center">
+                    Sale slug missing
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
         ))}

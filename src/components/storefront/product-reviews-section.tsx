@@ -13,8 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 interface Review {
   id: string;
@@ -44,21 +42,36 @@ export default function ProductReviewsSection({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
+  const [canReview, setCanReview] = useState(false);
+  const [reviewEligibility, setReviewEligibility] = useState<{
+    canReview: boolean;
+    hasPurchased: boolean;
+    hasReviewed: boolean;
+    reason?: string;
+    code?: string;
+  } | null>(null);
 
-  // Check authentication status
+  // Check authentication status and review eligibility
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndEligibility = async () => {
       try {
-        const response = await fetch('/api/customers/profile');
-        setIsAuthenticated(response.ok);
+        const authResponse = await fetch('/api/customers/profile');
+        setIsAuthenticated(authResponse.ok);
+        
+        // Check review eligibility
+        const eligibilityResponse = await fetch(`/api/products/${productId}/can-review`);
+        if (eligibilityResponse.ok) {
+          const eligibilityData = await eligibilityResponse.json();
+          setReviewEligibility(eligibilityData);
+          setCanReview(eligibilityData.canReview || false);
+        }
       } catch {
         setIsAuthenticated(false);
+        setCanReview(false);
       }
     };
-    checkAuth();
-  }, []);
+    checkAuthAndEligibility();
+  }, [productId]);
 
   // Fetch reviews
   useEffect(() => {
@@ -84,46 +97,57 @@ export default function ProductReviewsSection({
   const handleSubmitReview = async (rating: number, comment: string) => {
     setIsSubmitting(true);
     try {
-      const body: any = {
-        product_id: productId,
-        rating,
-        comment,
-      };
-
-      // Add guest info if not authenticated
-      if (!isAuthenticated) {
-        if (!guestName.trim() || !guestEmail.trim()) {
-          toast.error('Please provide your name and email');
-          setIsSubmitting(false);
-          return;
-        }
-        body.customer_name = guestName.trim();
-        body.customer_email = guestEmail.trim();
-      }
-
       const response = await fetch('/api/products/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          product_id: productId,
+          rating,
+          comment,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
+        
+        // Handle specific error codes
+        if (error.code === 'PURCHASE_REQUIRED') {
+          toast.error('Purchase required', {
+            description: 'You can only review products you have purchased',
+          });
+          return;
+        } else if (error.code === 'LOGIN_REQUIRED') {
+          toast.error('Please login to review products', {
+            description: 'You must be logged in to submit a review',
+          });
+          return;
+        }
+        
         throw new Error(error.error || 'Failed to submit review');
       }
 
-      toast.success('Review submitted successfully! It will be visible after approval.');
+      toast.success('Review submitted successfully!', {
+        description: 'Your review will be visible after approval',
+      });
       setShowReviewForm(false);
-      setGuestName('');
-      setGuestEmail('');
 
-      // Refresh reviews
-      const reviewsResponse = await fetch(`/api/products/${productId}/reviews?limit=10`);
+      // Refresh reviews and eligibility
+      const [reviewsResponse, eligibilityResponse] = await Promise.all([
+        fetch(`/api/products/${productId}/reviews?limit=10`),
+        fetch(`/api/products/${productId}/can-review`),
+      ]);
+      
       if (reviewsResponse.ok) {
         const data = await reviewsResponse.json();
         setReviews(data.reviews || []);
         setAverageRating(data.stats?.averageRating || 0);
         setTotalReviews(data.stats?.totalReviews || 0);
+      }
+      
+      if (eligibilityResponse.ok) {
+        const eligibilityData = await eligibilityResponse.json();
+        setReviewEligibility(eligibilityData);
+        setCanReview(eligibilityData.canReview || false);
       }
     } catch (error) {
       console.error('Error submitting review:', error);
@@ -160,44 +184,30 @@ export default function ProductReviewsSection({
                 </div>
               )}
             </div>
-            {!showReviewForm && (
+            {!showReviewForm && canReview && (
               <Button onClick={() => setShowReviewForm(true)}>
                 Write a Review
               </Button>
+            )}
+            {!showReviewForm && !canReview && reviewEligibility && (
+              <div className="text-sm text-muted-foreground">
+                {reviewEligibility.code === 'PURCHASE_REQUIRED' && (
+                  <span>Purchase required to review</span>
+                )}
+                {reviewEligibility.code === 'LOGIN_REQUIRED' && (
+                  <span>Login required to review</span>
+                )}
+                {reviewEligibility.code === 'ALREADY_REVIEWED' && (
+                  <span>You&apos;ve already reviewed this product</span>
+                )}
+              </div>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {/* Review Form */}
-          {showReviewForm && (
+          {showReviewForm && canReview && (
             <div className="mb-8 pb-8 border-b">
-              {!isAuthenticated && (
-                <div className="mb-4 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="guest-name">Your Name</Label>
-                      <Input
-                        id="guest-name"
-                        value={guestName}
-                        onChange={(e) => setGuestName(e.target.value)}
-                        placeholder="Enter your name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="guest-email">Your Email</Label>
-                      <Input
-                        id="guest-email"
-                        type="email"
-                        value={guestEmail}
-                        onChange={(e) => setGuestEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
               <RatingInput
                 productId={productId}
                 onSubmit={handleSubmitReview}
@@ -207,8 +217,6 @@ export default function ProductReviewsSection({
                   variant="outline"
                   onClick={() => {
                     setShowReviewForm(false);
-                    setGuestName('');
-                    setGuestEmail('');
                   }}
                 >
                   Cancel

@@ -6,14 +6,25 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircleIcon, TruckIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TruckIcon, StarIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
+import RatingInput from '@/components/storefront/rating-input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 interface OrderProduct {
   id: string;
@@ -44,6 +55,14 @@ interface Order {
   order_products: OrderProduct[];
 }
 
+interface ProductReviewStatus {
+  productId: string;
+  canReview: boolean;
+  hasReviewed: boolean;
+  reviewStatus?: 'pending' | 'approved';
+  reviewId?: string;
+}
+
 interface OrderConfirmationClientProps {
   order: Order;
   isAuthenticated?: boolean;
@@ -57,6 +76,10 @@ export default function OrderConfirmationClient({
 }: Readonly<OrderConfirmationClientProps>) {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ProductReviewStatus>>({});
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<OrderProduct | null>(null);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(true);
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
@@ -65,6 +88,103 @@ export default function OrderConfirmationClient({
   const trackingNumber = order.order_details?.tracking_number || null;
   const shippingCarrier = order.order_details?.shipping_carrier || null;
   const isShipped = order.status?.toLowerCase() === 'shipped';
+  const isPaid = order.payment_status?.toLowerCase() === 'paid';
+
+  // Check review status for all products in order
+  useEffect(() => {
+    const checkReviewStatuses = async () => {
+      if (!isAuthenticated || !isPaid) {
+        setIsLoadingReviews(false);
+        return;
+      }
+
+      try {
+        const statuses: Record<string, ProductReviewStatus> = {};
+        
+        // Check review status for each product
+        await Promise.all(
+          order.order_products
+            .filter((item) => item.product_id)
+            .map(async (item) => {
+              try {
+                const response = await fetch(`/api/products/${item.product_id}/can-review`);
+                if (response.ok) {
+                  const data = await response.json();
+                  statuses[item.product_id!] = {
+                    productId: item.product_id!,
+                    canReview: data.canReview || false,
+                    hasReviewed: data.hasReviewed || false,
+                  };
+                } else {
+                  statuses[item.product_id!] = {
+                    productId: item.product_id!,
+                    canReview: false,
+                    hasReviewed: false,
+                  };
+                }
+              } catch (error) {
+                console.error(`Error checking review status for product ${item.product_id}:`, error);
+                statuses[item.product_id!] = {
+                  productId: item.product_id!,
+                  canReview: false,
+                  hasReviewed: false,
+                };
+              }
+            })
+        );
+
+        setReviewStatuses(statuses);
+      } catch (error) {
+        console.error('Error checking review statuses:', error);
+      } finally {
+        setIsLoadingReviews(false);
+      }
+    };
+
+    checkReviewStatuses();
+  }, [order.order_products, isAuthenticated, isPaid]);
+
+  const handleReviewSubmit = async (rating: number, comment: string) => {
+    if (!selectedProduct?.product_id) return;
+
+    try {
+      const response = await fetch('/api/products/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: selectedProduct.product_id,
+          rating,
+          comment,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit review');
+      }
+
+      toast.success('Review submitted successfully!', {
+        description: 'Your review will be visible after approval',
+      });
+
+      // Update review status
+      setReviewStatuses((prev) => ({
+        ...prev,
+        [selectedProduct.product_id!]: {
+          productId: selectedProduct.product_id!,
+          canReview: false,
+          hasReviewed: true,
+          reviewStatus: 'pending',
+        },
+      }));
+
+      setReviewDialogOpen(false);
+      setSelectedProduct(null);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to submit review');
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -149,29 +269,76 @@ export default function OrderConfirmationClient({
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {order.order_products.map((item: any) => (
-                    <div key={item.id} className="flex gap-4">
-                      {item.products?.image && (
-                        <div className="relative w-20 h-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                          <Image
-                            src={item.products.image}
-                            alt={item.products.name}
-                            fill
-                            className="object-cover"
-                          />
+                  {order.order_products.map((item: any) => {
+                    const productId = item.product_id;
+                    const reviewStatus = productId ? reviewStatuses[productId] : null;
+                    const canReview = reviewStatus?.canReview && isPaid && isAuthenticated;
+                    const hasReviewed = reviewStatus?.hasReviewed;
+
+                    return (
+                      <div key={item.id} className="flex gap-4 pb-4 border-b last:border-b-0 last:pb-0">
+                        {item.products?.image && (
+                          <div className="relative w-20 h-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            <Image
+                              src={item.products.image}
+                              alt={item.products.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <h3 className="font-semibold">{item.products?.name || 'Product'}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Quantity: {item.quantity} × {formatPrice(item.price)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">{formatPrice(item.total)}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Review Section - Only show if order is paid and user is authenticated */}
+                          {isPaid && isAuthenticated && productId && (
+                            <div className="mt-3 pt-3 border-t">
+                              {isLoadingReviews ? (
+                                <p className="text-sm text-muted-foreground">Checking review status...</p>
+                              ) : canReview ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedProduct(item);
+                                    setReviewDialogOpen(true);
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <StarIcon className="w-4 h-4" />
+                                  Write a Review
+                                </Button>
+                              ) : hasReviewed ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="gap-1">
+                                    <StarIcon className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                    Review Submitted
+                                  </Badge>
+                                  {reviewStatus?.reviewStatus === 'pending' && (
+                                    <span className="text-xs text-muted-foreground">(Pending approval)</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  Review not available
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{item.products?.name || 'Product'}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Quantity: {item.quantity} × {formatPrice(item.price)}
-                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatPrice(item.total)}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -306,6 +473,28 @@ export default function OrderConfirmationClient({
           </div>
         </div>
       </div>
+
+      {/* Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Review Product</DialogTitle>
+            <DialogDescription>
+              {selectedProduct?.products?.name && (
+                <>Share your experience with {selectedProduct.products.name}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProduct && (
+            <div className="mt-4">
+              <RatingInput
+                productId={selectedProduct.product_id!}
+                onSubmit={handleReviewSubmit}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

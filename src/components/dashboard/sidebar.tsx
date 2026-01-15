@@ -54,30 +54,44 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
+  // 1. Dashboard (Most important - always first)
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon },
-  // Catalog group
-  { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Catalog' },
-  { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Catalog' },
-  { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Catalog' },
-  { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Catalog' },
-  // Content group
+  
+  // 2. Orders (Second most important - revenue center)
+  { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
+  
+  // 3. Products group (Catalog management)
+  { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Products' },
+  { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Products' },
+  { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Products' },
+  { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon, group: 'Products' },
+  { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, group: 'Products', adminOnly: true },
+  
+  // 4. Customers (Standalone - important)
+  { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
+  
+  // 5. Marketing group (Sales, Promotions, Analytics)
+  { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Marketing' },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon, group: 'Marketing' },
+  
+  // 6. Content group (Website content)
   { name: 'Pages', href: '/dashboard/pages', icon: DocumentTextIcon, group: 'Content' },
   { name: 'Blogs', href: '/dashboard/blogs', icon: NewspaperIcon, group: 'Content' },
   { name: 'Blog Categories', href: '/dashboard/blogs/categories', icon: TagIcon, group: 'Content', submenu: true },
   { name: 'Forms', href: '/dashboard/forms', icon: ClipboardDocumentListIcon, group: 'Content' },
   { name: 'Media Library', href: '/dashboard/media', icon: PhotoIcon, group: 'Content' },
   { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, group: 'Content', adminOnly: true },
-  // Other items
-  { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon },
-  { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, adminOnly: true },
-  { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
-  { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
-  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
+  
+  // 7. Settings (Standalone)
+  { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
+  
+  // 8. Support group
   { name: 'Support Tickets', href: '/dashboard/support/tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
+  
+  // 9. Admin-only items
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
-  { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
+  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
 ];
 
 // Catalog icon
@@ -86,7 +100,8 @@ const CatalogIcon = Squares2X2Icon;
 export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externalMobileMenuOpen, setMobileMenuOpen: externalSetMobileMenuOpen, collapsed = false }: Readonly<SidebarProps>) {
   const router = useRouter();
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
-  const [catalogExpanded, setCatalogExpanded] = useState(true);
+  const [productsExpanded, setProductsExpanded] = useState(true);
+  const [marketingExpanded, setMarketingExpanded] = useState(true);
   const [contentExpanded, setContentExpanded] = useState(true);
   const [supportExpanded, setSupportExpanded] = useState(true);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -105,49 +120,83 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     return true;
   });
 
-  // Group navigation items, ensuring Dashboard is first, then Catalog, then Content, then Support, then others
+  // Group navigation items following e-commerce best practices:
+  // 1. Dashboard (standalone)
+  // 2. Orders (standalone - most important after dashboard)
+  // 3. Products group
+  // 4. Customers (standalone)
+  // 5. Marketing group
+  // 6. Content group
+  // 7. Settings (standalone)
+  // 8. Support group
+  // 9. Admin items (standalone)
+  
   const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
-  const catalogItems = filteredNavigation.filter((item: any) => item.group === 'Catalog');
+  const ordersItem = filteredNavigation.find((item) => item.name === 'Orders');
+  const customersItem = filteredNavigation.find((item) => item.name === 'Customers');
+  const settingsItem = filteredNavigation.find((item) => item.name === 'Settings');
+  const productsItems = filteredNavigation.filter((item: any) => item.group === 'Products');
+  const marketingItems = filteredNavigation.filter((item: any) => item.group === 'Marketing');
   const contentItems = filteredNavigation.filter((item: any) => item.group === 'Content');
   const supportItems = filteredNavigation.filter((item: any) => item.group === 'Support');
-  const mainItems = filteredNavigation.filter((item: any) => !item.group && item.name !== 'Dashboard');
+  const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group);
   
   // Build grouped navigation in the correct order using an array to maintain sequence
   const orderedGroupedNavigation: Array<{ groupName: string; items: NavigationItem[] }> = [];
   
-  // First: Dashboard (Main group)
+  // 1. Dashboard (standalone)
   if (dashboardItem) {
     orderedGroupedNavigation.push({ groupName: 'Main', items: [dashboardItem] });
   }
   
-  // Second: Catalog group
-  if (catalogItems.length > 0) {
-    orderedGroupedNavigation.push({ groupName: 'Catalog', items: catalogItems });
+  // 2. Orders (standalone - most important)
+  if (ordersItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [ordersItem] });
   }
   
-  // Third: Content group
+  // 3. Products group
+  if (productsItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Products', items: productsItems });
+  }
+  
+  // 4. Customers (standalone)
+  if (customersItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [customersItem] });
+  }
+  
+  // 5. Marketing group
+  if (marketingItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Marketing', items: marketingItems });
+  }
+  
+  // 6. Content group
   if (contentItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Content', items: contentItems });
   }
   
-  // Fourth: Support group
+  // 7. Settings (standalone)
+  if (settingsItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [settingsItem] });
+  }
+  
+  // 8. Support group
   if (supportItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Support', items: supportItems });
   }
   
-  // Fourth: Other main items (add to existing Main group or create new)
-  if (mainItems.length > 0) {
-    const mainGroupIndex = orderedGroupedNavigation.findIndex((g) => g.groupName === 'Main');
-    if (mainGroupIndex !== -1) {
-      orderedGroupedNavigation[mainGroupIndex].items.push(...mainItems);
-    } else {
-      orderedGroupedNavigation.push({ groupName: 'Main', items: mainItems });
-    }
+  // 9. Admin items (standalone)
+  if (adminItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: adminItems });
   }
 
-  // Check if any catalog item is active
-  const isCatalogActive = filteredNavigation.some(
-    (item) => item.group === 'Catalog' && (pathname === item.href || pathname.startsWith(item.href + '/'))
+  // Check if any products item is active
+  const isProductsActive = filteredNavigation.some(
+    (item) => item.group === 'Products' && (pathname === item.href || pathname.startsWith(item.href + '/'))
+  );
+
+  // Check if any marketing item is active
+  const isMarketingActive = filteredNavigation.some(
+    (item) => item.group === 'Marketing' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
   // Check if any content item is active
@@ -214,10 +263,11 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
               </div>
               <ul role="list" className="space-y-6">
                 {orderedGroupedNavigation.map(({ groupName, items }) => {
-                  const isCatalogGroup = groupName === 'Catalog';
+                  const isProductsGroup = groupName === 'Products';
+                  const isMarketingGroup = groupName === 'Marketing';
                   const isContentGroup = groupName === 'Content';
                   const isSupportGroup = groupName === 'Support';
-                  const isExpanded = isCatalogGroup ? catalogExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true));
+                  const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
                   const isMainGroup = groupName === 'Main';
                   
                   return (
@@ -226,8 +276,10 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                         <button
                           type="button"
                           onClick={() => {
-                            if (isCatalogGroup) {
-                              setCatalogExpanded(!catalogExpanded);
+                            if (isProductsGroup) {
+                              setProductsExpanded(!productsExpanded);
+                            } else if (isMarketingGroup) {
+                              setMarketingExpanded(!marketingExpanded);
                             } else if (isContentGroup) {
                               setContentExpanded(!contentExpanded);
                             } else if (isSupportGroup) {
@@ -235,12 +287,15 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             }
                           }}
                           className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                            (isCatalogGroup && isCatalogActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                            (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            {isCatalogGroup && (
+                            {isProductsGroup && (
                               <CatalogIcon className="h-4 w-4" />
+                            )}
+                            {isMarketingGroup && (
+                              <FireIcon className="h-4 w-4" />
                             )}
                             {isContentGroup && (
                               <DocumentTextIcon className="h-4 w-4" />
@@ -250,7 +305,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             )}
                             <span>{groupName}</span>
                           </div>
-                          {(isCatalogGroup || isContentGroup || isSupportGroup) && (
+                          {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
                             <ChevronDownIcon
                               className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                             />
@@ -329,10 +384,11 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
             )}
             <ul role="list" className="flex flex-1 flex-col gap-y-4">
               {orderedGroupedNavigation.map(({ groupName, items }) => {
-                const isCatalogGroup = groupName === 'Catalog';
+                const isProductsGroup = groupName === 'Products';
+                const isMarketingGroup = groupName === 'Marketing';
                 const isContentGroup = groupName === 'Content';
                 const isSupportGroup = groupName === 'Support';
-                const isExpanded = isCatalogGroup ? catalogExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true));
+                const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
                 const isMainGroup = groupName === 'Main';
                 
                 return (
@@ -341,8 +397,10 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                       <button
                         type="button"
                         onClick={() => {
-                          if (isCatalogGroup) {
-                            setCatalogExpanded(!catalogExpanded);
+                          if (isProductsGroup) {
+                            setProductsExpanded(!productsExpanded);
+                          } else if (isMarketingGroup) {
+                            setMarketingExpanded(!marketingExpanded);
                           } else if (isContentGroup) {
                             setContentExpanded(!contentExpanded);
                           } else if (isSupportGroup) {
@@ -350,12 +408,15 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           }
                         }}
                         className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                          (isCatalogGroup && isCatalogActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                          (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          {isCatalogGroup && (
+                          {isProductsGroup && (
                             <CatalogIcon className="h-4 w-4" />
+                          )}
+                          {isMarketingGroup && (
+                            <FireIcon className="h-4 w-4" />
                           )}
                           {isContentGroup && (
                             <DocumentTextIcon className="h-4 w-4" />
@@ -365,7 +426,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           )}
                           <span>{groupName}</span>
                         </div>
-                        {(isCatalogGroup || isContentGroup || isSupportGroup) && (
+                        {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
                           <ChevronDownIcon
                             className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                           />

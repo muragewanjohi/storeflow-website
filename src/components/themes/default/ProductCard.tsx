@@ -6,6 +6,8 @@
 
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,6 +17,7 @@ import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingDisplay from '@/components/storefront/rating-display';
+import { toast } from 'sonner';
 
 interface Product {
   id: string;
@@ -40,6 +43,8 @@ interface DefaultProductCardProps {
 export default function DefaultProductCard({ product, className }: DefaultProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const { formatCurrency } = useCurrency();
+  const router = useRouter();
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
   
@@ -51,6 +56,64 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
     if (isPreview && onProductClick) {
       e.preventDefault();
       onProductClick(product.id);
+    }
+  };
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isPreview) return;
+    if (isOutOfStock) {
+      toast.error('Product is out of stock');
+      return;
+    }
+
+    setIsAddingToCart(true);
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: product.id,
+          quantity: 1,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        if (response.status === 401) {
+          toast.error('Please login to add items to cart', {
+            description: 'You need to be logged in to add items to your cart',
+            action: {
+              label: 'Login',
+              onClick: () => router.push('/login?redirect=/products'),
+            },
+          });
+        } else {
+          throw new Error(data.error || 'Failed to add to cart');
+        }
+        return;
+      }
+
+      const data = await response.json();
+      window.dispatchEvent(new Event('cartUpdated'));
+      toast.success('Item added to cart!', {
+        description: `${product.name} has been added to your cart`,
+        action: {
+          label: 'View Cart',
+          onClick: () => router.push('/cart'),
+        },
+      });
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setIsAddingToCart(false);
     }
   };
 
@@ -214,12 +277,8 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
           <Button
             size="sm"
             variant="outline"
-            disabled={isOutOfStock}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation(); // Prevent triggering parent click
-              // Add to cart logic here
-            }}
+            disabled={isOutOfStock || isAddingToCart}
+            onClick={handleAddToCart}
           >
             <ShoppingCartIcon className="h-4 w-4" />
           </Button>

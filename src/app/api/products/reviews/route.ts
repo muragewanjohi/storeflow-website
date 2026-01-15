@@ -68,14 +68,52 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-    } else {
-      // Guest review - require name and email
-      if (!validatedData.customer_name || !validatedData.customer_email) {
+
+      // Verify customer has purchased this product (e-commerce best practice)
+      // Check if user has a completed order with this product
+      // First, find order_products for this user and product
+      const orderProduct = await prisma.order_products.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          user_id: userId,
+          product_id: validatedData.product_id,
+        },
+        include: {
+          orders: {
+            select: {
+              id: true,
+              status: true,
+              payment_status: true,
+            },
+          },
+        },
+      });
+
+      // Check if the order is paid and not cancelled/refunded
+      const hasPurchased = orderProduct && 
+        orderProduct.orders?.payment_status === 'paid' &&
+        orderProduct.orders?.status &&
+        !['cancelled', 'refunded'].includes(orderProduct.orders.status);
+
+      if (!hasPurchased) {
         return NextResponse.json(
-          { error: 'Name and email are required for guest reviews. Please login or provide your details.' },
-          { status: 400 }
+          { 
+            error: 'You can only review products you have purchased',
+            code: 'PURCHASE_REQUIRED',
+          },
+          { status: 403 }
         );
       }
+    } else {
+      // Guest reviews are not allowed (must be logged in to review)
+      // This ensures purchase verification works properly
+      return NextResponse.json(
+        { 
+          error: 'You must be logged in to submit a review. Please login to review products you have purchased.',
+          code: 'LOGIN_REQUIRED',
+        },
+        { status: 401 }
+      );
     }
 
     // Create review

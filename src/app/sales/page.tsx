@@ -69,16 +69,27 @@ export default async function AllSalesPage() {
     return (!startDate || now >= startDate) && (!endDate || now <= endDate);
   });
 
+  // Filter out sales without slugs and log warnings
+  const validSales = activeSales
+    .filter(sale => {
+      if (!sale.slug) {
+        console.warn('[All Sales Page] Sale missing slug:', sale.id, sale.name);
+        return false;
+      }
+      return true;
+    })
+    .map(sale => ({
+      ...sale,
+      status: (sale.status || 'draft') as 'draft' | 'active' | 'scheduled' | 'ended',
+      is_featured: sale.is_featured ?? false,
+    }));
+
   return (
     <ThemeProviderWrapper>
       <div className="min-h-screen bg-background flex flex-col">
         <StorefrontHeader />
         <main className="flex-1">
-          <AllSalesClient sales={activeSales.map(sale => ({
-            ...sale,
-            status: (sale.status || 'draft') as 'draft' | 'active' | 'scheduled' | 'ended',
-            is_featured: sale.is_featured ?? false,
-          }))} />
+          <AllSalesClient sales={validSales} />
         </main>
         <StorefrontFooter />
       </div>

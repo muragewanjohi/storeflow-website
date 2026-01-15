@@ -6,13 +6,16 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Rating, Star } from '@smastrom/react-rating';
 import '@smastrom/react-rating/style.css';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { InfoIcon, ShoppingBagIcon } from 'lucide-react';
 
 interface RatingInputProps {
   productId: string;
@@ -20,15 +23,58 @@ interface RatingInputProps {
   className?: string;
 }
 
+interface ReviewEligibility {
+  canReview: boolean;
+  hasPurchased: boolean;
+  hasReviewed: boolean;
+  reason?: string;
+  code?: string;
+}
+
 export default function RatingInput({
   productId,
   onSubmit,
   className = '',
 }: Readonly<RatingInputProps>) {
+  const router = useRouter();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
+  const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
+
+  // Check if user can review this product
+  useEffect(() => {
+    const checkEligibility = async () => {
+      try {
+        const response = await fetch(`/api/products/${productId}/can-review`);
+        if (response.ok) {
+          const data = await response.json();
+          setEligibility(data);
+        } else {
+          // If endpoint doesn't exist or fails, allow review (backward compatibility)
+          setEligibility({
+            canReview: true,
+            hasPurchased: true,
+            hasReviewed: false,
+          });
+        }
+      } catch (error) {
+        console.error('Error checking review eligibility:', error);
+        // On error, allow review (backward compatibility)
+        setEligibility({
+          canReview: true,
+          hasPurchased: true,
+          hasReviewed: false,
+        });
+      } finally {
+        setIsCheckingEligibility(false);
+      }
+    };
+
+    checkEligibility();
+  }, [productId]);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -38,6 +84,28 @@ export default function RatingInput({
 
     if (!comment.trim()) {
       toast.error('Please write a review');
+      return;
+    }
+
+    // Check eligibility before submitting
+    if (eligibility && !eligibility.canReview) {
+      if (eligibility.code === 'LOGIN_REQUIRED') {
+        toast.error('Please login to review products', {
+          description: 'You must be logged in to submit a review',
+          action: {
+            label: 'Login',
+            onClick: () => router.push('/login?redirect=/products'),
+          },
+        });
+      } else if (eligibility.code === 'PURCHASE_REQUIRED') {
+        toast.error('Purchase required', {
+          description: 'You can only review products you have purchased',
+        });
+      } else if (eligibility.code === 'ALREADY_REVIEWED') {
+        toast.error('Already reviewed', {
+          description: 'You have already reviewed this product',
+        });
+      }
       return;
     }
 
@@ -59,12 +127,39 @@ export default function RatingInput({
 
         if (!response.ok) {
           const error = await response.json();
+          
+          // Handle specific error codes
+          if (error.code === 'PURCHASE_REQUIRED') {
+            toast.error('Purchase required', {
+              description: 'You can only review products you have purchased',
+            });
+            return;
+          } else if (error.code === 'LOGIN_REQUIRED') {
+            toast.error('Please login to review products', {
+              description: 'You must be logged in to submit a review',
+              action: {
+                label: 'Login',
+                onClick: () => router.push('/login?redirect=/products'),
+              },
+            });
+            return;
+          }
+          
           throw new Error(error.error || 'Failed to submit review');
         }
 
-        toast.success('Review submitted successfully!');
+        toast.success('Review submitted successfully!', {
+          description: 'Your review will be visible after approval',
+        });
         setRating(0);
         setComment('');
+        
+        // Refresh eligibility check
+        const eligibilityResponse = await fetch(`/api/products/${productId}/can-review`);
+        if (eligibilityResponse.ok) {
+          const data = await eligibilityResponse.json();
+          setEligibility(data);
+        }
       }
     } catch (error) {
       console.error('Error submitting review:', error);
@@ -73,6 +168,68 @@ export default function RatingInput({
       setIsSubmitting(false);
     }
   };
+
+  // Show loading state while checking eligibility
+  if (isCheckingEligibility) {
+    return (
+      <div className={`space-y-4 ${className}`}>
+        <div className="text-center py-4 text-muted-foreground">
+          Checking review eligibility...
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if user cannot review
+  if (eligibility && !eligibility.canReview) {
+    return (
+      <div className={`space-y-4 ${className}`}>
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            {eligibility.code === 'LOGIN_REQUIRED' && (
+              <>
+                <p className="font-medium mb-1">Login Required</p>
+                <p className="text-sm">
+                  You must be logged in to review products. Please{' '}
+                  <button
+                    onClick={() => router.push('/login?redirect=/products')}
+                    className="text-primary hover:underline"
+                  >
+                    login
+                  </button>{' '}
+                  to continue.
+                </p>
+              </>
+            )}
+            {eligibility.code === 'PURCHASE_REQUIRED' && (
+              <>
+                <p className="font-medium mb-1 flex items-center gap-2">
+                  <ShoppingBagIcon className="h-4 w-4" />
+                  Purchase Required
+                </p>
+                <p className="text-sm">
+                  You can only review products you have purchased. After purchasing this product, 
+                  you&apos;ll be able to share your experience with other customers.
+                </p>
+              </>
+            )}
+            {eligibility.code === 'ALREADY_REVIEWED' && (
+              <>
+                <p className="font-medium mb-1">Already Reviewed</p>
+                <p className="text-sm">
+                  You have already submitted a review for this product. Thank you for your feedback!
+                </p>
+              </>
+            )}
+            {!eligibility.code && eligibility.reason && (
+              <p className="text-sm">{eligibility.reason}</p>
+            )}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -120,7 +277,7 @@ export default function RatingInput({
 
       <Button
         onClick={handleSubmit}
-        disabled={isSubmitting || rating === 0 || !comment.trim()}
+        disabled={isSubmitting || rating === 0 || !comment.trim() || (eligibility ? !eligibility.canReview : false)}
         className="w-full md:w-auto"
       >
         {isSubmitting ? 'Submitting...' : 'Submit Review'}

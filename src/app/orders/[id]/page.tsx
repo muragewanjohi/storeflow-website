@@ -9,6 +9,7 @@ import { getUser } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
+import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import OrderConfirmationClient from './order-confirmation-client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
@@ -36,10 +37,16 @@ export default async function OrderConfirmationPage({
   if (user) {
     // Authenticated user - use customer ID
     customerId = await getOrCreateCustomer(user, tenant.id);
+  } else {
+    // Try customer session (for customer login)
+    const customer = await getCurrentCustomer();
+    if (customer) {
+      customerId = customer.id;
+    }
   }
 
   // Build where clause - allow access via:
-  // 1. Authenticated user (user_id matches)
+  // 1. Authenticated user/customer (user_id matches)
   // 2. Guest order (order_number + email match)
   const whereClause: any = {
     id,
@@ -47,7 +54,7 @@ export default async function OrderConfirmationPage({
   };
 
   if (customerId) {
-    // Authenticated user - can access their own orders
+    // Authenticated user/customer - can access their own orders
     whereClause.user_id = customerId;
   } else if (order_number && email) {
     // Guest order - verify with order number and email
@@ -61,7 +68,7 @@ export default async function OrderConfirmationPage({
     notFound();
   }
 
-  // Fetch order
+  // Fetch order with product details for reviews
   const order = await prisma.orders.findFirst({
     where: whereClause,
     select: {
