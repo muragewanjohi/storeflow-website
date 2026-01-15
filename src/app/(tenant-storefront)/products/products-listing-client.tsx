@@ -46,9 +46,10 @@ function ProductsListingClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Get pagination params from URL
+  // Get pagination and sort params from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const currentLimit = parseInt(searchParams.get('limit') || '24', 10);
+  const currentSort = searchParams.get('sort') || 'popular'; // Default to 'popular'
   
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
@@ -61,8 +62,8 @@ function ProductsListingClient({
     return CardComponent || DefaultProductCard;
   }, [themeSlug]);
 
-  // Fetch products with pagination
-  const fetchProducts = useCallback(async (page: number, limit: number) => {
+  // Fetch products with pagination and sorting
+  const fetchProducts = useCallback(async (page: number, limit: number, sort: string) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -73,16 +74,25 @@ function ProductsListingClient({
       params.append('page', page.toString());
       params.append('limit', limit.toString());
       
+      // Set sort parameters based on sort option (same as ProductTabsSectionComponent)
+      if (sort === 'new') {
+        params.append('sort_by', 'created_at');
+        params.append('sort_order', 'desc');
+      } else if (sort === 'low_price') {
+        params.append('sort_by', 'price');
+        params.append('sort_order', 'asc');
+      } else if (sort === 'popular') {
+        // For popular, sort by created_at desc as a proxy (in real app, would use views/sales)
+        params.append('sort_by', 'created_at');
+        params.append('sort_order', 'desc');
+      }
+      
       // Preserve other filters from URL
       const search = searchParams.get('search');
       const category = searchParams.get('category');
-      const sort = searchParams.get('sort');
-      const order = searchParams.get('order');
       
       if (search) params.append('search', search);
       if (category) params.append('category', category);
-      if (sort) params.append('sort_by', sort);
-      if (order) params.append('sort_order', order);
       
       // Fetch products from API with pagination
       const response = await fetch(`/api/products?${params.toString()}`);
@@ -114,18 +124,18 @@ function ProductsListingClient({
     }
   }, [searchParams]);
 
-  // Fetch products when page or limit changes
+  // Fetch products when page, limit, or sort changes
   useEffect(() => {
-    fetchProducts(currentPage, currentLimit);
-  }, [currentPage, currentLimit, fetchProducts]);
+    fetchProducts(currentPage, currentLimit, currentSort);
+  }, [currentPage, currentLimit, currentSort, fetchProducts]);
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / currentLimit);
   const startItem = total > 0 ? (currentPage - 1) * currentLimit + 1 : 0;
   const endItem = Math.min(currentPage * currentLimit, total);
 
-  // Update URL with new page/limit while preserving other params
-  const updateURL = useCallback((updates: { page?: number; limit?: number }) => {
+  // Update URL with new page/limit/sort while preserving other params
+  const updateURL = useCallback((updates: { page?: number; limit?: number; sort?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
     
     if (updates.page !== undefined) {
@@ -139,6 +149,16 @@ function ProductsListingClient({
     if (updates.limit !== undefined) {
       params.set('limit', updates.limit.toString());
       // Reset to page 1 when changing limit
+      params.delete('page');
+    }
+    
+    if (updates.sort !== undefined) {
+      if (updates.sort === 'popular') {
+        params.delete('sort'); // 'popular' is default
+      } else {
+        params.set('sort', updates.sort);
+      }
+      // Reset to page 1 when changing sort
       params.delete('page');
     }
     
@@ -204,7 +224,7 @@ function ProductsListingClient({
         <div className="text-center py-12">
           <p className="text-lg text-red-600">Error: {error}</p>
           <Button 
-            onClick={() => fetchProducts(currentPage, currentLimit)}
+            onClick={() => fetchProducts(currentPage, currentLimit, currentSort)}
             className="mt-4"
           >
             Try Again
@@ -261,6 +281,44 @@ function ProductsListingClient({
           </Select>
           <span className="text-sm text-muted-foreground whitespace-nowrap">per page</span>
         </div>
+      </div>
+
+      {/* Sort Tabs - Same style as Product Tabs Section */}
+      <div className="flex flex-wrap items-center gap-2 mb-6 pb-4 border-b">
+        <span className="text-sm font-medium text-muted-foreground mr-2">Sort by:</span>
+        <button
+          onClick={() => updateURL({ sort: 'popular' })}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            currentSort === 'popular' || (!currentSort && currentSort !== 'new' && currentSort !== 'low_price')
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          disabled={isLoading}
+        >
+          Popular
+        </button>
+        <button
+          onClick={() => updateURL({ sort: 'new' })}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            currentSort === 'new'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          disabled={isLoading}
+        >
+          Newly Added
+        </button>
+        <button
+          onClick={() => updateURL({ sort: 'low_price' })}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            currentSort === 'low_price'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+          disabled={isLoading}
+        >
+          Low Price
+        </button>
       </div>
 
       {/* Products Grid */}
