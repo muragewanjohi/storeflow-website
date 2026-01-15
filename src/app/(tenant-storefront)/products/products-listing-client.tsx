@@ -71,6 +71,10 @@ function ProductsListingClient({
     categories: true,
     attributes: true,
   });
+  
+  // Selected filters state - derived from URL on mount, updated when checkboxes change
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, Set<string>>>({});
 
   // Load theme-specific product card - memoize to prevent re-creation
   const ThemeProductCard = useMemo(() => {
@@ -78,8 +82,8 @@ function ProductsListingClient({
     return CardComponent || DefaultProductCard;
   }, [themeSlug]);
 
-  // Fetch products with pagination and sorting
-  const fetchProducts = useCallback(async (page: number, limit: number, sort: string) => {
+  // Fetch products with pagination, sorting, and filters
+  const fetchProducts = useCallback(async (page: number, limit: number, sort: string, categoryIds?: string[], attributeFilters?: Record<string, string[]>) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -103,14 +107,25 @@ function ProductsListingClient({
         params.append('sort_order', 'desc');
       }
       
-      // Preserve other filters from URL
+      // Add category filters
+      if (categoryIds && categoryIds.length > 0) {
+        params.append('category', categoryIds.join(','));
+      }
+      
+      // Add attribute filters (format: attr_{attributeId}=valueId1,valueId2)
+      if (attributeFilters) {
+        for (const [attributeId, valueIds] of Object.entries(attributeFilters)) {
+          if (valueIds.length > 0) {
+            params.append(`attr_${attributeId}`, valueIds.join(','));
+          }
+        }
+      }
+      
+      // Preserve search from URL
       const search = searchParams.get('search');
-      const category = searchParams.get('category');
-      
       if (search) params.append('search', search);
-      if (category) params.append('category', category);
       
-      // Fetch products from API with pagination
+      // Fetch products from API with pagination and filters
       const response = await fetch(`/api/products?${params.toString()}`);
       
       if (!response.ok) {
@@ -140,10 +155,40 @@ function ProductsListingClient({
     }
   }, [searchParams]);
 
-  // Fetch products when page, limit, or sort changes
+  // Initialize filters from URL on mount
   useEffect(() => {
-    fetchProducts(currentPage, currentLimit, currentSort);
-  }, [currentPage, currentLimit, currentSort, fetchProducts]);
+    // Read category filters from URL
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      const categoryIds = categoryParam.split(',').map(id => id.trim()).filter(Boolean);
+      setSelectedCategories(new Set(categoryIds));
+    }
+    
+    // Read attribute filters from URL
+    const attrFilters: Record<string, Set<string>> = {};
+    for (const [key, value] of searchParams.entries()) {
+      if (key.startsWith('attr_')) {
+        const attributeId = key.replace('attr_', '');
+        const valueIds = value.split(',').map(id => id.trim()).filter(Boolean);
+        if (valueIds.length > 0) {
+          attrFilters[attributeId] = new Set(valueIds);
+        }
+      }
+    }
+    setSelectedAttributes(attrFilters);
+  }, []); // Only run on mount
+
+  // Fetch products when page, limit, sort, or filters change
+  useEffect(() => {
+    // Convert selected filters to arrays for API
+    const categoryIds = Array.from(selectedCategories);
+    const attributeFilters: Record<string, string[]> = {};
+    for (const [attributeId, valueIds] of Object.entries(selectedAttributes)) {
+      attributeFilters[attributeId] = Array.from(valueIds);
+    }
+    
+    fetchProducts(currentPage, currentLimit, currentSort, categoryIds, attributeFilters);
+  }, [currentPage, currentLimit, currentSort, selectedCategories, selectedAttributes, fetchProducts]);
 
   // Fetch categories and attributes on mount
   useEffect(() => {
@@ -205,6 +250,89 @@ function ProductsListingClient({
     
     router.push(`/products?${params.toString()}`);
   }, [searchParams, router]);
+
+  // Update URL with filter changes
+  const updateFilters = useCallback((categoryIds: string[], attributeFilters: Record<string, string[]>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    // Update category filter
+    if (categoryIds.length > 0) {
+      params.set('category', categoryIds.join(','));
+    } else {
+      params.delete('category');
+    }
+    
+    // Remove all existing attribute filters
+    for (const key of params.keys()) {
+      if (key.startsWith('attr_')) {
+        params.delete(key);
+      }
+    }
+    
+    // Add new attribute filters
+    for (const [attributeId, valueIds] of Object.entries(attributeFilters)) {
+      if (valueIds.length > 0) {
+        params.append(`attr_${attributeId}`, valueIds.join(','));
+      }
+    }
+    
+    // Reset to page 1 when filters change
+    params.delete('page');
+    
+    router.push(`/products?${params.toString()}`);
+  }, [searchParams, router]);
+
+  // Handle category checkbox change
+  const handleCategoryChange = useCallback((categoryId: string, checked: boolean) => {
+    setSelectedCategories(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(categoryId);
+      } else {
+        newSet.delete(categoryId);
+      }
+      
+      // Update URL immediately
+      const categoryIds = Array.from(newSet);
+      const attributeFilters: Record<string, string[]> = {};
+      for (const [attrId, valueIds] of Object.entries(selectedAttributes)) {
+        attributeFilters[attrId] = Array.from(valueIds);
+      }
+      updateFilters(categoryIds, attributeFilters);
+      
+      return newSet;
+    });
+  }, [selectedAttributes, updateFilters]);
+
+  // Handle attribute value checkbox change
+  const handleAttributeChange = useCallback((attributeId: string, valueId: string, checked: boolean) => {
+    setSelectedAttributes(prev => {
+      const newAttrs = { ...prev };
+      if (!newAttrs[attributeId]) {
+        newAttrs[attributeId] = new Set();
+      }
+      
+      if (checked) {
+        newAttrs[attributeId].add(valueId);
+      } else {
+        newAttrs[attributeId].delete(valueId);
+        // Remove empty sets
+        if (newAttrs[attributeId].size === 0) {
+          delete newAttrs[attributeId];
+        }
+      }
+      
+      // Update URL immediately
+      const categoryIds = Array.from(selectedCategories);
+      const attributeFilters: Record<string, string[]> = {};
+      for (const [attrId, valueIds] of Object.entries(newAttrs)) {
+        attributeFilters[attrId] = Array.from(valueIds);
+      }
+      updateFilters(categoryIds, attributeFilters);
+      
+      return newAttrs;
+    });
+  }, [selectedCategories, updateFilters]);
 
   // Generate page numbers with ellipsis (e-commerce pattern)
   const getPageNumbers = () => {
@@ -310,7 +438,23 @@ function ProductsListingClient({
         {/* Filters Sidebar - Popular E-commerce Layout */}
         <aside className={`w-full md:w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden'} md:block`}>
           <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 sticky top-4">
-            <h2 className="text-lg font-semibold mb-4 pb-3 border-b">Filters</h2>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b">
+              <h2 className="text-lg font-semibold">Filters</h2>
+              {(selectedCategories.size > 0 || Object.keys(selectedAttributes).length > 0) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCategories(new Set());
+                    setSelectedAttributes({});
+                    updateFilters([], {});
+                  }}
+                  className="text-xs h-auto py-1 px-2 text-muted-foreground hover:text-foreground"
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
 
             {/* Categories Section */}
             {categories.length > 0 && (
@@ -319,7 +463,14 @@ function ProductsListingClient({
                   onClick={() => setExpandedSections(prev => ({ ...prev, categories: !prev.categories }))}
                   className="flex items-center justify-between w-full mb-3 group"
                 >
-                  <h3 className="text-base font-semibold text-gray-900">Categories</h3>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Categories
+                    {selectedCategories.size > 0 && (
+                      <span className="ml-2 text-xs font-normal text-primary">
+                        ({selectedCategories.size})
+                      </span>
+                    )}
+                  </h3>
                   {expandedSections.categories ? (
                     <ChevronUpIcon className="w-4 h-4 text-gray-500" />
                   ) : (
@@ -328,21 +479,26 @@ function ProductsListingClient({
                 </button>
                 {expandedSections.categories && (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                    {categories.map((category) => (
-                      <div key={category.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`category-${category.id}`}
-                          disabled
-                          className="cursor-not-allowed"
-                        />
-                        <Label
-                          htmlFor={`category-${category.id}`}
-                          className="text-sm text-gray-700 cursor-pointer flex-1"
-                        >
-                          {category.name}
-                        </Label>
-                      </div>
-                    ))}
+                    {categories.map((category) => {
+                      const isChecked = selectedCategories.has(category.id);
+                      return (
+                        <div key={category.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`category-${category.id}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => handleCategoryChange(category.id, checked === true)}
+                            className="cursor-pointer"
+                          />
+                          <Label
+                            htmlFor={`category-${category.id}`}
+                            className="text-sm text-gray-700 cursor-pointer flex-1"
+                            onClick={() => handleCategoryChange(category.id, !isChecked)}
+                          >
+                            {category.name}
+                          </Label>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -355,7 +511,14 @@ function ProductsListingClient({
                   onClick={() => setExpandedSections(prev => ({ ...prev, attributes: !prev.attributes }))}
                   className="flex items-center justify-between w-full mb-3 group"
                 >
-                  <h3 className="text-base font-semibold text-gray-900">Filter by</h3>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Filter by
+                    {Object.keys(selectedAttributes).length > 0 && (
+                      <span className="ml-2 text-xs font-normal text-primary">
+                        ({Object.values(selectedAttributes).reduce((sum, set) => sum + set.size, 0)})
+                      </span>
+                    )}
+                  </h3>
                   {expandedSections.attributes ? (
                     <ChevronUpIcon className="w-4 h-4 text-gray-500" />
                   ) : (
@@ -370,16 +533,19 @@ function ProductsListingClient({
                         <div className="space-y-2 max-h-[200px] overflow-y-auto">
                           {attribute.attribute_values.map((value) => {
                             const isColor = attribute.type === 'color';
+                            const isChecked = selectedAttributes[attribute.id]?.has(value.id) || false;
                             return (
                               <div key={value.id} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`attr-${attribute.id}-${value.id}`}
-                                  disabled
-                                  className="cursor-not-allowed"
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => handleAttributeChange(attribute.id, value.id, checked === true)}
+                                  className="cursor-pointer"
                                 />
                                 <Label
                                   htmlFor={`attr-${attribute.id}-${value.id}`}
                                   className="text-sm text-gray-700 cursor-pointer flex-1 flex items-center gap-2"
+                                  onClick={() => handleAttributeChange(attribute.id, value.id, !isChecked)}
                                 >
                                   {isColor && value.color_code && (
                                     <span
