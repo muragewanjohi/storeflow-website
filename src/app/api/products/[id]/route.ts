@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
@@ -182,6 +183,17 @@ export async function PUT(
       console.warn('[Product Update] Failed to update search_vector (non-critical):', searchVectorError);
     }
 
+    // Invalidate product caches for this tenant
+    try {
+      revalidateTag(`products-${tenant.id}`);
+      revalidateTag(`products-count-${tenant.id}`);
+      revalidateTag(`products-ratings-${tenant.id}`);
+      console.log('[Product Update] Cache invalidated for tenant:', tenant.id);
+    } catch (cacheError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[Product Update] Failed to invalidate cache (non-critical):', cacheError);
+    }
+
     return NextResponse.json({
       message: 'Product updated successfully',
       product,
@@ -256,6 +268,17 @@ export async function DELETE(
     await prisma.products.delete({
       where: { id },
     });
+
+    // Invalidate product caches for this tenant
+    try {
+      revalidateTag(`products-${tenant.id}`);
+      revalidateTag(`products-count-${tenant.id}`);
+      revalidateTag(`products-ratings-${tenant.id}`);
+      console.log('[Product Delete] Cache invalidated for tenant:', tenant.id);
+    } catch (cacheError) {
+      // Non-critical: log but don't fail the request
+      console.warn('[Product Delete] Failed to invalidate cache (non-critical):', cacheError);
+    }
 
     return NextResponse.json({
       message: 'Product deleted successfully',

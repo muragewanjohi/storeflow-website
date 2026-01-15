@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { unstable_cache, revalidateTag } from 'next/cache';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { createProductSchema, productQuerySchema, generateSlug, generateSKU } from '@/lib/products/validation';
@@ -15,6 +16,8 @@ import { requireAuth } from '@/lib/auth/server';
 import { Prisma } from '@prisma/client';
 import { canCreateProduct } from '@/lib/subscriptions/limits';
 import { z } from 'zod';
+import { getProductsListCacheKey, getProductsCountCacheKey, getProductRatingStatsCacheKey } from '@/lib/cache/product-cache-keys';
+import { CACHE_TTL } from '@/lib/cache/redis';
 
 /**
  * GET /api/products
@@ -269,35 +272,80 @@ export async function GET(request: NextRequest) {
     const orderBy: any = {};
     orderBy[sort_by] = sort_order;
 
+    // Generate cache key for this query
+    const cacheKey = getProductsListCacheKey(tenant.id, {
+      page: pageNum,
+      limit: limitNum,
+      search,
+      status,
+      category_id,
+      brand_id,
+      min_price,
+      max_price,
+      in_stock,
+      sort_by,
+      sort_order,
+      ...Object.fromEntries(
+        Array.from(searchParams.entries()).filter(([key]) => key.startsWith('attr_'))
+      ),
+    });
+
     console.log('[Products API] Query parameters', {
       where,
       skip: useFullTextSearch ? 0 : skip,
       take: useFullTextSearch ? 1000 : limitNum,
       orderBy,
       useFullTextSearch,
+      cacheKey,
     });
 
-    // Fetch products with pagination
-    let products = await prisma.products.findMany({
-      where,
-      skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
-      take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
-      orderBy,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        price: true,
-        image: true,
-        stock_quantity: true, // Already synced with variant totals
-        category_id: true,
-        created_at: true, // Include for sorting by newest
+    // Create cached function for fetching products
+    const getCachedProducts = unstable_cache(
+      async () => {
+        return await prisma.products.findMany({
+          where,
+          skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
+          take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
+          orderBy,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
+            image: true,
+            stock_quantity: true, // Already synced with variant totals
+            category_id: true,
+            created_at: true, // Include for sorting by newest
+          },
+        });
       },
-    });
+      [cacheKey, `products-${tenant.id}`],
+      {
+        revalidate: CACHE_TTL.SHORT, // 60 seconds
+        tags: [`products-${tenant.id}`], // For cache invalidation
+      }
+    );
+
+    // Create cached function for counting products
+    const countCacheKey = getProductsCountCacheKey(tenant.id, where);
+    const getCachedCount = unstable_cache(
+      async () => {
+        return await prisma.products.count({ where });
+      },
+      [countCacheKey, `products-count-${tenant.id}`],
+      {
+        revalidate: CACHE_TTL.SHORT, // 60 seconds
+        tags: [`products-${tenant.id}`], // For cache invalidation
+      }
+    );
+
+    // Fetch products with pagination (cached)
+    let products = await getCachedProducts();
 
     console.log('[Products API] Products fetched from database', {
       productsCount: products.length,
       useFullTextSearch,
+      cacheKey,
     });
 
     // If using full-text search, sort by relevance (order in searchProductIds)
@@ -309,7 +357,8 @@ export async function GET(request: NextRequest) {
         .slice(skip, skip + limitNum);
     }
 
-    const total = await prisma.products.count({ where });
+    // Get total count (cached)
+    const total = await getCachedCount();
 
     console.log('[Products API] Total count and pagination', {
       total,
@@ -317,27 +366,40 @@ export async function GET(request: NextRequest) {
       pageNum,
     });
 
-    // Fetch rating stats for all products in batch (with error handling)
+    // Fetch rating stats for all products in batch (with error handling and caching)
     const productIds: string[] = products.map((p: any) => String(p.id));
     let ratingMap = new Map<string, { averageRating: number; totalReviews: number }>();
     
     if (productIds.length > 0) {
       try {
-        const ratingStats = await prisma.product_reviews.groupBy({
-          by: ['product_id'],
-          where: {
-            product_id: { in: productIds },
-            tenant_id: tenant.id,
-            status: 'approved',
-            rating: { not: null },
+        // Create cached function for rating stats
+        const ratingStatsCacheKey = getProductRatingStatsCacheKey(tenant.id, productIds);
+        const getCachedRatingStats = unstable_cache(
+          async () => {
+            return await prisma.product_reviews.groupBy({
+              by: ['product_id'],
+              where: {
+                product_id: { in: productIds },
+                tenant_id: tenant.id,
+                status: 'approved',
+                rating: { not: null },
+              },
+              _avg: {
+                rating: true,
+              },
+              _count: {
+                rating: true,
+              },
+            } as any); // Type assertion to handle Prisma type complexity
           },
-          _avg: {
-            rating: true,
-          },
-          _count: {
-            rating: true,
-          },
-        } as any); // Type assertion to handle Prisma type complexity
+          [ratingStatsCacheKey, `products-ratings-${tenant.id}`],
+          {
+            revalidate: CACHE_TTL.MEDIUM, // 5 minutes (ratings change less frequently)
+            tags: [`products-ratings-${tenant.id}`], // For cache invalidation
+          }
+        );
+
+        const ratingStats = await getCachedRatingStats();
 
         // Create a map of product_id -> rating stats
         ratingMap = new Map(
@@ -870,6 +932,17 @@ export async function POST(request: NextRequest) {
       } catch (searchVectorError) {
         // Non-critical: log but don't fail the request
         console.warn('[Product Create] Failed to update search_vector (non-critical):', searchVectorError);
+      }
+
+      // Invalidate product caches for this tenant
+      try {
+        revalidateTag(`products-${tenant.id}`);
+        revalidateTag(`products-count-${tenant.id}`);
+        revalidateTag(`products-ratings-${tenant.id}`);
+        console.log('[Product Create] Cache invalidated for tenant:', tenant.id);
+      } catch (cacheError) {
+        // Non-critical: log but don't fail the request
+        console.warn('[Product Create] Failed to invalidate cache (non-critical):', cacheError);
       }
     } catch (createError: any) {
       console.error('[Product Create] Prisma create error:', createError);

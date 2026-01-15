@@ -192,9 +192,11 @@ export const cacheKeys = {
  * Cache TTL constants (in seconds)
  */
 export const CACHE_TTL = {
-  SHORT: 60, // 1 minute
-  MEDIUM: 300, // 5 minutes
-  LONG: 3600, // 1 hour
-  VERY_LONG: 86400, // 24 hours
+  SHORT: 60, // 1 minute (Next.js cache)
+  MEDIUM: 300, // 5 minutes (Redis - products list)
+  LONG: 3600, // 1 hour (Redis - product detail)
+  VERY_LONG: 86400, // 24 hours (static data)
+  PRODUCTS_LIST: 300, // 5 minutes (products listing)
+  PRODUCT_DETAIL: 3600, // 1 hour (single product)
 } as const;
 
