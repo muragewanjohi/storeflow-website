@@ -217,7 +217,7 @@ export default function OrderConfirmationClient({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => router.push('/orders')}
+                  onClick={() => router.push('/account/orders')}
                   className="gap-2"
                 >
                   <ArrowLeftIcon className="h-4 w-4" />
@@ -454,7 +454,7 @@ export default function OrderConfirmationClient({
                   {isAuthenticated ? (
                     <>
                       <Button
-                        onClick={() => router.push('/orders')}
+                        onClick={() => router.push('/account/orders')}
                         className="w-full"
                         variant="outline"
                       >

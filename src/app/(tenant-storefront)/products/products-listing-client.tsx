@@ -26,6 +26,8 @@ interface Product {
   image: string | null;
   stock_quantity: number | null;
   category_id: string | null;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 interface ProductsListingClientProps {
@@ -153,6 +155,8 @@ function ProductsListingClient({
         compareAtPrice: p.compareAtPrice ? (typeof p.compareAtPrice === 'number' ? p.compareAtPrice : Number(p.compareAtPrice)) : undefined,
         image: p.image,
         stock_quantity: p.stock_quantity,
+        averageRating: p.averageRating !== undefined ? (typeof p.averageRating === 'number' ? p.averageRating : Number(p.averageRating)) : undefined,
+        totalReviews: p.totalReviews !== undefined ? (typeof p.totalReviews === 'number' ? p.totalReviews : Number(p.totalReviews)) : undefined,
       }));
       
       setProducts(fetchedProducts);

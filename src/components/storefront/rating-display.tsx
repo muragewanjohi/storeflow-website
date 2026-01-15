@@ -59,16 +59,23 @@ export function RatingDisplay({
 
   const config = sizeConfig[size];
 
+  // Extract scale classes from className for the Rating component wrapper
+  const scaleMatch = className.match(/(scale-\S+)/);
+  const scaleClass = scaleMatch ? scaleMatch[0] : '';
+  const containerClass = className.replace(/(scale-\S+\s*origin-\S+)/g, '').trim();
+
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <Rating
-        value={rating}
-        readOnly={readonly}
-        itemStyles={config.itemStyles}
-        spaceBetween={config.spaceBetween}
-        radius={config.radius}
-        style={{ maxWidth: 'fit-content' }}
-      />
+    <div className={`flex items-center gap-2 ${containerClass}`}>
+      <div className={scaleClass}>
+        <Rating
+          value={rating}
+          readOnly={readonly}
+          itemStyles={config.itemStyles}
+          spaceBetween={config.spaceBetween}
+          radius={config.radius}
+          style={{ maxWidth: 'fit-content' }}
+        />
+      </div>
       {showCount && totalReviews !== undefined && (
         <span className="text-sm text-muted-foreground">
           ({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})

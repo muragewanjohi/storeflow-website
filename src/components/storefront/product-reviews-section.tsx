@@ -38,6 +38,13 @@ export default function ProductReviewsSection({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [starDistribution, setStarDistribution] = useState<Record<number, { count: number; percentage: number }>>({
+    5: { count: 0, percentage: 0 },
+    4: { count: 0, percentage: 0 },
+    3: { count: 0, percentage: 0 },
+    2: { count: 0, percentage: 0 },
+    1: { count: 0, percentage: 0 },
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -79,10 +86,17 @@ export default function ProductReviewsSection({
       try {
         const response = await fetch(`/api/products/${productId}/reviews?limit=10`);
         if (response.ok) {
-          const data = await response.json();
-          setReviews(data.reviews || []);
-          setAverageRating(data.stats?.averageRating || 0);
-          setTotalReviews(data.stats?.totalReviews || 0);
+        const data = await response.json();
+        setReviews(data.reviews || []);
+        setAverageRating(data.stats?.averageRating || 0);
+        setTotalReviews(data.stats?.totalReviews || 0);
+        setStarDistribution(data.stats?.starDistribution || {
+          5: { count: 0, percentage: 0 },
+          4: { count: 0, percentage: 0 },
+          3: { count: 0, percentage: 0 },
+          2: { count: 0, percentage: 0 },
+          1: { count: 0, percentage: 0 },
+        });
         }
       } catch (error) {
         console.error('Error fetching reviews:', error);
@@ -142,6 +156,13 @@ export default function ProductReviewsSection({
         setReviews(data.reviews || []);
         setAverageRating(data.stats?.averageRating || 0);
         setTotalReviews(data.stats?.totalReviews || 0);
+        setStarDistribution(data.stats?.starDistribution || {
+          5: { count: 0, percentage: 0 },
+          4: { count: 0, percentage: 0 },
+          3: { count: 0, percentage: 0 },
+          2: { count: 0, percentage: 0 },
+          1: { count: 0, percentage: 0 },
+        });
       }
       
       if (eligibilityResponse.ok) {
@@ -170,105 +191,111 @@ export default function ProductReviewsSection({
     <div className={className}>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl mb-2">Customer Reviews</CardTitle>
-              {!isLoading && (
-                <div className="flex items-center gap-2">
-                  <RatingDisplay
-                    rating={averageRating}
-                    totalReviews={totalReviews}
-                    size="sm"
-                    showCount={true}
-                  />
-                </div>
-              )}
-            </div>
-            {!showReviewForm && canReview && (
-              <Button onClick={() => setShowReviewForm(true)}>
-                Write a Review
-              </Button>
-            )}
-            {!showReviewForm && !canReview && reviewEligibility && (
-              <div className="text-sm text-muted-foreground">
-                {reviewEligibility.code === 'LOGIN_REQUIRED' && (
-                  <span>Login required to review</span>
-                )}
-                {reviewEligibility.code === 'ALREADY_REVIEWED' && (
-                  <span>You&apos;ve already reviewed this product</span>
-                )}
-              </div>
-            )}
-          </div>
+          <CardTitle className="text-2xl mb-4">Customer Reviews</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Review Form */}
-          {showReviewForm && canReview && (
-            <div className="mb-8 pb-8 border-b">
-              <RatingInput
-                productId={productId}
-                onSubmit={handleSubmitReview}
-              />
-              <div className="mt-4 flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowReviewForm(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Reviews List */}
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">
               Loading reviews...
             </div>
-          ) : reviews.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No reviews yet. Be the first to review this product!
-            </div>
           ) : (
-            <div className="space-y-6">
-              {reviews.map((review) => (
-                <div key={review.id} className="space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      {review.customer?.image ? (
-                        <img
-                          src={review.customer.image}
-                          alt={review.customer.name}
-                          className="w-10 h-10 rounded-full"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-semibold">
-                            {review.customer?.name?.[0]?.toUpperCase() || 'U'}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left Column: Rating Summary (Amazon-style) */}
+              <div className="lg:col-span-1">
+                <div className="space-y-4">
+                  {/* Overall Rating */}
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <span className="text-4xl font-bold">
+                        {averageRating > 0 ? averageRating.toFixed(1) : '0.0'}
+                      </span>
+                      <span className="text-xl text-muted-foreground">out of 5</span>
+                    </div>
+                    <div className="mb-2">
+                      <RatingDisplay
+                        rating={averageRating}
+                        size="md"
+                        showCount={false}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {totalReviews} {totalReviews === 1 ? 'global rating' : 'global ratings'}
+                    </p>
+                  </div>
+
+                  {/* Star Distribution Breakdown */}
+                  {totalReviews > 0 && (
+                    <div className="space-y-2 pt-4 border-t">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const dist = starDistribution[star] || { count: 0, percentage: 0 };
+                        return (
+                          <div key={star} className="flex items-center gap-2 text-sm">
+                            <span className="w-12 text-right">{star} star</span>
+                            <div className="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-yellow-400 transition-all"
+                                style={{ width: `${dist.percentage}%` }}
+                              />
+                            </div>
+                            <span className="w-12 text-left text-muted-foreground">
+                              {dist.percentage}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Individual Reviews */}
+              <div className="lg:col-span-2">
+                {reviews.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No reviews yet. Be the first to review this product!
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="space-y-2 pb-6 border-b last:border-b-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            {review.customer?.image ? (
+                              <img
+                                src={review.customer.image}
+                                alt={review.customer.name}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-primary font-semibold">
+                                  {review.customer?.name?.[0]?.toUpperCase() || 'U'}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold">
+                                {review.customer?.name || 'Anonymous'}
+                              </p>
+                              <RatingDisplay
+                                rating={review.rating}
+                                size="sm"
+                                showCount={false}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDate(review.created_at)}
                           </span>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-semibold">
-                          {review.customer?.name || 'Anonymous'}
-                        </p>
-                        <RatingDisplay
-                          rating={review.rating}
-                          size="sm"
-                          showCount={false}
-                        />
+                        {review.comment && (
+                          <p className="text-muted-foreground mt-2">{review.comment}</p>
+                        )}
                       </div>
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDate(review.created_at)}
-                    </span>
+                    ))}
                   </div>
-                  <p className="text-muted-foreground">{review.comment}</p>
-                  <Separator className="mt-4" />
-                </div>
-              ))}
+                )}
+              </div>
             </div>
           )}
         </CardContent>

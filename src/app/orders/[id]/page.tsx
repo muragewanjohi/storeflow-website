@@ -45,26 +45,12 @@ export default async function OrderConfirmationPage({
     }
   }
 
-  // Build where clause - allow access via:
-  // 1. Authenticated user/customer (user_id matches)
-  // 2. Guest order (order_number + email match from shipping_address)
-  // 3. Order ID + order_number (for immediate redirect after checkout)
+  // Build where clause - fetch order by ID and tenant_id
+  // Access verification happens after fetching (more flexible for fresh orders)
   const whereClause: any = {
     id,
     tenant_id: tenant.id,
   };
-
-  if (customerId) {
-    // Authenticated user/customer - can access their own orders
-    whereClause.user_id = customerId;
-  } else if (order_number) {
-    // For guest orders, verify with order_number
-    // We'll verify email from shipping_address after fetching
-    whereClause.order_number = order_number;
-  } else {
-    // No authentication and no order_number - deny access
-    notFound();
-  }
 
   // Fetch order with product details for reviews
   const order = await prisma.orders.findFirst({
@@ -72,6 +58,7 @@ export default async function OrderConfirmationPage({
     select: {
       id: true,
       order_number: true,
+      user_id: true, // Include user_id for access verification
       total_amount: true,
       status: true,
       payment_status: true,
@@ -99,30 +86,37 @@ export default async function OrderConfirmationPage({
     notFound();
   }
 
-  // For guest orders, verify email matches shipping_address email if provided
-  if (!customerId && email) {
+  // Verify access permissions
+  const orderAge = order.created_at 
+    ? Date.now() - new Date(order.created_at).getTime()
+    : Infinity;
+  const isFreshOrder = orderAge < 10 * 60 * 1000; // 10 minutes
+
+  // Check if user has access to this order
+  let hasAccess = false;
+
+  if (customerId) {
+    // Authenticated user - check if user_id matches
+    // Also allow if order is fresh (handles case where customerId lookup might differ)
+    hasAccess = order.user_id === customerId || isFreshOrder;
+  } else if (email) {
+    // Guest order with email - verify email matches shipping_address
     const shippingEmail = order.shipping_address && typeof order.shipping_address === 'object' && 'email' in order.shipping_address
       ? (order.shipping_address as any).email
       : null;
     
-    if (shippingEmail && shippingEmail.toLowerCase() !== email.toLowerCase()) {
-      // Email doesn't match - deny access
-      notFound();
-    }
+    hasAccess = shippingEmail && shippingEmail.toLowerCase() === email.toLowerCase();
+  } else if (order_number) {
+    // Guest order with order_number - allow if order_number matches
+    // Also allow if order is fresh (for immediate redirect after checkout)
+    hasAccess = order.order_number === order_number || isFreshOrder;
+  } else {
+    // No authentication, no email, no order_number - only allow if order is fresh
+    hasAccess = isFreshOrder;
   }
 
-  // For guest orders without email param, allow access if order is fresh (within 10 minutes)
-  // This handles immediate redirect after checkout
-  if (!customerId && !email) {
-    const orderAge = order.created_at 
-      ? Date.now() - new Date(order.created_at).getTime()
-      : Infinity;
-    const isFreshOrder = orderAge < 10 * 60 * 1000; // 10 minutes
-    
-    if (!isFreshOrder) {
-      // Order is not fresh and no email provided - deny access
-      notFound();
-    }
+  if (!hasAccess) {
+    notFound();
   }
 
   // Convert Decimal to number and ensure order_details is included
@@ -139,12 +133,12 @@ export default async function OrderConfirmationPage({
 
   // Check if this is a fresh order confirmation (within last 5 minutes)
   // Only show confirmation message for fresh orders
-  const isFreshOrder = order.created_at && 
+  const isFreshOrderForConfirmation = order.created_at && 
     (Date.now() - new Date(order.created_at).getTime()) < 5 * 60 * 1000; // 5 minutes
 
   // Check if accessed via track order (has email param) or from orders list
   const isFromTrackOrder = !!email;
-  const showConfirmation = isFreshOrder && !isFromTrackOrder;
+  const showConfirmation = isFreshOrderForConfirmation && !isFromTrackOrder;
 
   // Determine if user is authenticated (either admin user or customer session)
   const isAuthenticated = !!user || !!customerId;

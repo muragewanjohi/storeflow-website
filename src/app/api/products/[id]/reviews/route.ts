@@ -85,20 +85,55 @@ export async function GET(
       }),
     ]);
 
-    // Calculate average rating
-    const ratingStats = await prisma.product_reviews.aggregate({
-      where: {
-        product_id: productId,
-        tenant_id: tenant.id,
-        status: 'approved',
-        rating: { not: null },
-      },
-      _avg: {
-        rating: true,
-      },
-      _count: {
-        rating: true,
-      },
+    // Calculate average rating and star distribution
+    const [ratingStats, starDistribution] = await Promise.all([
+      prisma.product_reviews.aggregate({
+        where: {
+          product_id: productId,
+          tenant_id: tenant.id,
+          status: 'approved',
+          rating: { not: null },
+        },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      }),
+      prisma.product_reviews.groupBy({
+        by: ['rating'],
+        where: {
+          product_id: productId,
+          tenant_id: tenant.id,
+          status: 'approved',
+          rating: { not: null },
+        },
+        _count: {
+          rating: true,
+        },
+      }),
+    ]);
+
+    // Calculate star distribution percentages
+    const totalReviews = ratingStats._count.rating || 0;
+    const distribution: Record<number, { count: number; percentage: number }> = {
+      5: { count: 0, percentage: 0 },
+      4: { count: 0, percentage: 0 },
+      3: { count: 0, percentage: 0 },
+      2: { count: 0, percentage: 0 },
+      1: { count: 0, percentage: 0 },
+    };
+
+    starDistribution.forEach((item: any) => {
+      const rating = item.rating as number;
+      const count = item._count.rating || 0;
+      if (rating >= 1 && rating <= 5) {
+        distribution[rating] = {
+          count,
+          percentage: totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0,
+        };
+      }
     });
 
     return NextResponse.json({
@@ -124,6 +159,7 @@ export async function GET(
       stats: {
         averageRating: ratingStats._avg.rating || 0,
         totalReviews: ratingStats._count.rating || 0,
+        starDistribution: distribution,
       },
     });
   } catch (error) {
