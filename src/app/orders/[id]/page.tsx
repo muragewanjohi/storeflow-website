@@ -122,13 +122,16 @@ export default async function OrderConfirmationPage({
   const isFromTrackOrder = !!email;
   const showConfirmation = isFreshOrder && !isFromTrackOrder;
 
+  // Determine if user is authenticated (either admin user or customer session)
+  const isAuthenticated = !!user || !!customerId;
+
   return (
     <div className="min-h-screen flex flex-col">
       <StorefrontHeader />
       <main className="flex-1">
         <OrderConfirmationClient 
           order={orderData} 
-          isAuthenticated={!!user}
+          isAuthenticated={isAuthenticated}
           showConfirmation={showConfirmation ?? false}
         />
       </main>

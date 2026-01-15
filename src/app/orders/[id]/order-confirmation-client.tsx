@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircleIcon, TruckIcon, StarIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingInput from '@/components/storefront/rating-input';
@@ -211,6 +211,20 @@ export default function OrderConfirmationClient({
         {/* Order Status Header - Show when not fresh confirmation */}
         {!showConfirmation && (
           <div className="mb-6">
+            {/* Back to Orders Button - Only show if authenticated */}
+            {isAuthenticated && (
+              <div className="mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push('/orders')}
+                  className="gap-2"
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                  Back to Orders
+                </Button>
+              </div>
+            )}
             <h1 className="text-3xl font-bold mb-2">Order #{order.order_number}</h1>
             <p className="text-muted-foreground">
               {order.created_at
@@ -290,7 +304,12 @@ export default function OrderConfirmationClient({
                         <div className="flex-1">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <h3 className="font-semibold">{item.products?.name || 'Product'}</h3>
+                              <Link 
+                                href={item.products?.slug ? `/products/${item.products.slug}` : `/products/${item.products?.id}`}
+                                className="hover:text-primary transition-colors"
+                              >
+                                <h3 className="font-semibold">{item.products?.name || 'Product'}</h3>
+                              </Link>
                               <p className="text-sm text-muted-foreground">
                                 Quantity: {item.quantity} × {formatPrice(item.price)}
                               </p>
@@ -306,20 +325,25 @@ export default function OrderConfirmationClient({
                               {isLoadingReviews ? (
                                 <p className="text-sm text-muted-foreground">Checking review status...</p>
                               ) : canReview ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedProduct(item);
-                                    setReviewDialogOpen(true);
-                                  }}
-                                  className="gap-2"
-                                >
-                                  <StarIcon className="w-4 h-4" />
-                                  Write a Review
-                                </Button>
-                              ) : hasReviewed ? (
                                 <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedProduct(item);
+                                      setReviewDialogOpen(true);
+                                    }}
+                                    className="gap-2"
+                                  >
+                                    <StarIcon className="w-4 h-4" />
+                                    Write a Review
+                                  </Button>
+                                  <span className="text-xs text-muted-foreground">
+                                    Share your experience with this product
+                                  </span>
+                                </div>
+                              ) : hasReviewed ? (
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <Badge variant="secondary" className="gap-1">
                                     <StarIcon className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                                     Review Submitted
@@ -431,13 +455,20 @@ export default function OrderConfirmationClient({
 
                 <div className="space-y-2">
                   {isAuthenticated ? (
-                    <Button
-                      onClick={() => router.push('/orders')}
-                      className="w-full"
-                      variant="outline"
-                    >
-                      View All Orders
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => router.push('/orders')}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        View All Orders
+                      </Button>
+                      <Link href="/products">
+                        <Button className="w-full" variant="outline">
+                          Continue Shopping
+                        </Button>
+                      </Link>
+                    </>
                   ) : (
                     <>
                       <Button
@@ -460,13 +491,13 @@ export default function OrderConfirmationClient({
                           Create Account
                         </Button>
                       </div>
+                      <Link href="/products">
+                        <Button className="w-full" variant="outline">
+                          Continue Shopping
+                        </Button>
+                      </Link>
                     </>
                   )}
-                  <Link href="/products">
-                    <Button className="w-full" variant="outline">
-                      Continue Shopping
-                    </Button>
-                  </Link>
                 </div>
               </CardContent>
             </Card>
