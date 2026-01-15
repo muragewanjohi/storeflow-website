@@ -360,19 +360,9 @@ export default async function ProductsPage({
 
     // Ready to render
 
-    // Always return the component, even if products array is empty
+    // Return component - it will fetch products client-side (same as homepage)
     return (
       <ProductsListingClient
-        initialProducts={products || []}
-        initialTotal={total || 0}
-        initialCategories={categories || []}
-        initialPage={page}
-        initialLimit={limit}
-        initialSearch={search}
-        initialCategory={categoryParam}
-        initialSortBy={sort_by}
-        initialSortOrder={sort_order}
-        currentCategory={currentCategory}
         themeSlug={tenant.theme_slug || 'default'}
       />
     );
@@ -396,19 +386,9 @@ export default async function ProductsPage({
       );
     }
 
-    // Generic error - still try to render with empty products so user sees something
+    // Generic error - component will handle fetching client-side
     return (
       <ProductsListingClient
-        initialProducts={[]}
-        initialTotal={0}
-        initialCategories={[]}
-        initialPage={1}
-        initialLimit={12}
-        initialSearch=""
-        initialCategory=""
-        initialSortBy="created_at"
-        initialSortOrder="desc"
-        currentCategory={null}
         themeSlug={tenant?.theme_slug || 'default'}
       />
     );
