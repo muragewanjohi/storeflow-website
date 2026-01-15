@@ -47,7 +47,8 @@ export default async function OrderConfirmationPage({
 
   // Build where clause - allow access via:
   // 1. Authenticated user/customer (user_id matches)
-  // 2. Guest order (order_number + email match)
+  // 2. Guest order (order_number + email match from shipping_address)
+  // 3. Order ID + order_number (for immediate redirect after checkout)
   const whereClause: any = {
     id,
     tenant_id: tenant.id,
@@ -56,15 +57,12 @@ export default async function OrderConfirmationPage({
   if (customerId) {
     // Authenticated user/customer - can access their own orders
     whereClause.user_id = customerId;
-  } else if (order_number && email) {
-    // Guest order - verify with order number and email
+  } else if (order_number) {
+    // For guest orders, verify with order_number
+    // We'll verify email from shipping_address after fetching
     whereClause.order_number = order_number;
-    whereClause.email = {
-      equals: email,
-      mode: 'insensitive',
-    };
   } else {
-    // No authentication and no order_number/email - deny access
+    // No authentication and no order_number - deny access
     notFound();
   }
 
@@ -99,6 +97,32 @@ export default async function OrderConfirmationPage({
 
   if (!order) {
     notFound();
+  }
+
+  // For guest orders, verify email matches shipping_address email if provided
+  if (!customerId && email) {
+    const shippingEmail = order.shipping_address && typeof order.shipping_address === 'object' && 'email' in order.shipping_address
+      ? (order.shipping_address as any).email
+      : null;
+    
+    if (shippingEmail && shippingEmail.toLowerCase() !== email.toLowerCase()) {
+      // Email doesn't match - deny access
+      notFound();
+    }
+  }
+
+  // For guest orders without email param, allow access if order is fresh (within 10 minutes)
+  // This handles immediate redirect after checkout
+  if (!customerId && !email) {
+    const orderAge = order.created_at 
+      ? Date.now() - new Date(order.created_at).getTime()
+      : Infinity;
+    const isFreshOrder = orderAge < 10 * 60 * 1000; // 10 minutes
+    
+    if (!isFreshOrder) {
+      // Order is not fresh and no email provided - deny access
+      notFound();
+    }
   }
 
   // Convert Decimal to number and ensure order_details is included

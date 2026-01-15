@@ -153,7 +153,11 @@ export default function StorefrontHeader({
         abortController.abort();
       }
       
-      // Small delay to ensure database write completes before fetching
+      // Immediate update with optimistic increment, then verify
+      // Optimistically increment the count for immediate UI feedback
+      setCartItemCount(prev => prev + 1);
+      
+      // Then verify with server after a short delay
       setTimeout(() => {
         if (!isMounted) return;
         
@@ -188,7 +192,7 @@ export default function StorefrontHeader({
               console.debug('Cart count update failed:', error);
             }
           });
-      }, 150); // 150ms delay to ensure DB write completes
+      }, 100); // Reduced delay for faster verification
     };
     
     window.addEventListener('cartUpdated', handleCartUpdate);

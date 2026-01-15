@@ -191,9 +191,6 @@ export default function ProductReviewsSection({
             )}
             {!showReviewForm && !canReview && reviewEligibility && (
               <div className="text-sm text-muted-foreground">
-                {reviewEligibility.code === 'PURCHASE_REQUIRED' && (
-                  <span>Purchase required to review</span>
-                )}
                 {reviewEligibility.code === 'LOGIN_REQUIRED' && (
                   <span>Login required to review</span>
                 )}

@@ -78,14 +78,27 @@ export default function ProductDetailClient({
   product,
   relatedProducts,
 }: Readonly<ProductDetailClientProps>) {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(product.image);
   const [hasInteractedWithQuantity, setHasInteractedWithQuantity] = useState(false);
 
-  // Using formatCurrency from useCurrency hook
-  const formatPrice = (price: number) => formatCurrency(price);
+  // Format currency with space between symbol and amount
+  const formatCurrencyWithSpace = (amount: number): string => {
+    const formatted = formatCurrency(amount);
+    // Add space between currency symbol and number
+    if (currency.symbolPosition === 'left') {
+      // Match currency symbol (letters/symbols) followed by a digit, add space
+      return formatted.replace(/([^\d\s.,-]+)([\d-])/, '$1 $2');
+    } else {
+      // Match digit followed by currency symbol, add space
+      return formatted.replace(/([\d.,-]+)([^\d\s.,-]+)/, '$1 $2');
+    }
+  };
+  
+  // Using formatCurrencyWithSpace for all price displays
+  const formatPrice = (price: number) => formatCurrencyWithSpace(price);
 
   // Get selected variant
   const selectedVariantData = selectedVariant
@@ -232,9 +245,12 @@ export default function ProductDetailClient({
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-            {/* Rating Display - Modern e-commerce style */}
+            {product.sku && (
+              <p className="text-sm text-muted-foreground mb-2">SKU: {product.sku}</p>
+            )}
+            {/* Rating Display - Only stars/rating below SKU */}
             {product.averageRating !== undefined && product.averageRating > 0 && (
-              <div className="mb-2">
+              <div className="mb-4">
                 <RatingDisplay
                   rating={product.averageRating}
                   totalReviews={product.totalReviews}
@@ -243,14 +259,6 @@ export default function ProductDetailClient({
                 />
               </div>
             )}
-            {product.sku && (
-              <p className="text-sm text-muted-foreground mb-4">SKU: {product.sku}</p>
-            )}
-            
-            {/* Product Reviews Section - Below SKU, following e-commerce best practices */}
-            <div className="mb-6">
-              <ProductReviewsSection productId={product.id} />
-            </div>
           </div>
 
           {/* Price */}
@@ -452,6 +460,11 @@ export default function ProductDetailClient({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Customer Reviews Section - Below image and full description (Amazon-style) */}
+      <div className="mt-12">
+        <ProductReviewsSection productId={product.id} />
       </div>
 
       {/* Related Products */}
