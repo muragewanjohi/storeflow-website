@@ -248,14 +248,14 @@ export default function ProductDetailClient({
             {product.sku && (
               <p className="text-sm text-muted-foreground mb-2">SKU: {product.sku}</p>
             )}
-            {/* Rating Display - Only stars/rating below SKU (reduced by 50%) */}
+            {/* Rating Display - Only stars/rating below SKU (reduced by 25% from previous) */}
             {product.averageRating !== undefined && product.averageRating > 0 && (
-              <div className="mb-4">
+              <div className="mb-4 flex justify-start">
                 <RatingDisplay
                   rating={product.averageRating}
                   size="sm"
                   showCount={false}
-                  className="scale-[0.5] origin-left"
+                  className="scale-[0.375] origin-left"
                 />
               </div>
             )}

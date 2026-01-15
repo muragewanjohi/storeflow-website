@@ -9,6 +9,9 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { revalidateTag } from 'next/cache';
+import { getProductCachePatterns } from '@/lib/cache/product-cache-keys';
+import { deleteCachePattern } from '@/lib/cache/redis';
 
 const createReviewSchema = z.object({
   product_id: z.string().uuid('Product ID must be a valid UUID'),
@@ -128,6 +131,22 @@ export async function POST(request: NextRequest) {
         status: 'approved', // Reviews are published immediately
       },
     });
+
+    // Invalidate product caches to show new rating immediately
+    try {
+      // Invalidate Next.js cache tags
+      revalidateTag(`products-ratings-${tenant.id}`);
+      revalidateTag(`product-${validatedData.product_id}`);
+      
+      // Invalidate Redis cache patterns
+      const cachePatterns = getProductCachePatterns(tenant.id);
+      await Promise.all(
+        cachePatterns.map(pattern => deleteCachePattern(pattern))
+      );
+    } catch (cacheError) {
+      // Don't fail the review creation if cache invalidation fails
+      console.warn('Error invalidating cache after review creation:', cacheError);
+    }
 
     return NextResponse.json(
       {

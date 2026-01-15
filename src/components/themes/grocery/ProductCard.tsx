@@ -236,15 +236,15 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           </Link>
         )}
         
-        {/* Rating Display - Reduced by 40% */}
+        {/* Rating Display - Reduced by 20% from previous */}
         {(product.averageRating !== undefined && product.averageRating > 0) && (
-          <div className="mb-2">
+          <div className="mb-2 flex justify-start">
             <RatingDisplay
               rating={product.averageRating}
               totalReviews={product.totalReviews}
               size="sm"
               showCount={false}
-              className="scale-[0.6] origin-left"
+              className="scale-[0.48] origin-left"
             />
           </div>
         )}

@@ -499,12 +499,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Add rating stats to products
+    // Only include averageRating and totalReviews if they are > 0 (match homepage behavior)
     const productsWithRatings = products.map((product: any) => {
       const stats = ratingMap.get(String(product.id)) || { averageRating: 0, totalReviews: 0 };
       return {
         ...product,
-        averageRating: stats.averageRating,
-        totalReviews: stats.totalReviews,
+        averageRating: stats.averageRating > 0 ? stats.averageRating : undefined,
+        totalReviews: stats.totalReviews > 0 ? stats.totalReviews : undefined,
       };
     });
 

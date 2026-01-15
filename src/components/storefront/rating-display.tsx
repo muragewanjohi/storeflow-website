@@ -65,7 +65,7 @@ export function RatingDisplay({
   const containerClass = className.replace(/(scale-\S+\s*origin-\S+)/g, '').trim();
 
   return (
-    <div className={`flex items-center gap-2 ${containerClass}`}>
+    <div className={`flex items-center justify-start gap-2 ${containerClass}`}>
       <div className={scaleClass}>
         <Rating
           value={rating}
