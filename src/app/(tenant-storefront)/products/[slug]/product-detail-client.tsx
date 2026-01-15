@@ -16,6 +16,7 @@ import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon } fro
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import ProductReviewsSection from '@/components/storefront/product-reviews-section';
+import { RatingDisplay } from '@/components/storefront/rating-display';
 
 interface ProductVariant {
   id: string;
@@ -54,6 +55,8 @@ interface Product {
   image: string | null;
   gallery: any;
   product_variants: ProductVariant[];
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 interface RelatedProduct {
@@ -229,6 +232,17 @@ export default function ProductDetailClient({
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+            {/* Rating Display - Modern e-commerce style */}
+            {product.averageRating !== undefined && product.averageRating > 0 && (
+              <div className="mb-2">
+                <RatingDisplay
+                  rating={product.averageRating}
+                  totalReviews={product.totalReviews}
+                  size="sm"
+                  showCount={true}
+                />
+              </div>
+            )}
             {product.sku && (
               <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
             )}

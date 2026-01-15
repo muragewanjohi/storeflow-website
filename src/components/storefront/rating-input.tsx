@@ -246,6 +246,7 @@ export default function RatingInput({
               // Only show hover when actually hovering (value > 0)
               setHoveredRating(value > 0 ? value : null);
             }}
+            highlightOnlySelected={true}
             itemStyles={{
               itemShapes: Star,
               activeFillColor: '#ffb700',

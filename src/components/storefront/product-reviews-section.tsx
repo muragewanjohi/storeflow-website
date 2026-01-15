@@ -174,11 +174,11 @@ export default function ProductReviewsSection({
             <div>
               <CardTitle className="text-2xl mb-2">Customer Reviews</CardTitle>
               {!isLoading && (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   <RatingDisplay
                     rating={averageRating}
                     totalReviews={totalReviews}
-                    size="lg"
+                    size="sm"
                     showCount={true}
                   />
                 </div>

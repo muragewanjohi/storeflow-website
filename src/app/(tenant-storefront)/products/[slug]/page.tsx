@@ -140,6 +140,22 @@ export default async function ProductDetailPage({
     effectiveSalePrice = Number(product.sale_price);
   }
 
+  // Fetch rating stats for this product
+  const ratingStats = await prisma.product_reviews.aggregate({
+    where: {
+      product_id: product.id,
+      tenant_id: tenant.id,
+      status: 'approved',
+      rating: { not: null },
+    },
+    _avg: {
+      rating: true,
+    },
+    _count: {
+      rating: true,
+    },
+  });
+
   // Parallel fetch: Convert product data AND fetch related products simultaneously
   // This reduces total wait time - Amazon/Shopify technique
   const [productData, relatedProducts] = await Promise.all([
@@ -149,6 +165,8 @@ export default async function ProductDetailPage({
       price: regularPrice,
       sale_price: effectiveSalePrice, // Use sale price from active sale or product's sale_price
       // stock_quantity is already synced with variant totals in the database
+      averageRating: ratingStats._avg.rating ? Number(ratingStats._avg.rating) : undefined,
+      totalReviews: ratingStats._count.rating || 0,
       product_variants: product.product_variants.map((variant: any) => ({
         ...variant,
         price: variant.price ? Number(variant.price) : null,
