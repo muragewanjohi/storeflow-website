@@ -11,6 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { getOrSetCache, cacheKeys, CACHE_TTL } from '@/lib/cache/redis';
 
+// Force dynamic rendering to prevent build-time static analysis
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/analytics/aggregate
  * Aggregate analytics data for all tenants

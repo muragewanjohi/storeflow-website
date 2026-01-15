@@ -21,29 +21,47 @@ function createPrismaClient() {
                        (process.env.VERCEL === '1' && !databaseUrl);
   
   // Prisma 7: Create PostgreSQL connection pool for adapter
-  // Only create pool if we have a real DATABASE_URL (not during build)
-  let pool: Pool | undefined;
-  let adapter: PrismaPg | undefined;
+  // Prisma Client with engine type "client" REQUIRES an adapter
+  // During build, use a dummy URL to create adapter (won't actually connect)
+  let pool: Pool;
+  let adapter: PrismaPg;
   
-  if (databaseUrl && !isBuildPhase) {
-    try {
+  try {
+    if (databaseUrl && !isBuildPhase) {
+      // Runtime: Use real DATABASE_URL
       pool = new Pool({
         connectionString: databaseUrl,
         max: 10, // Maximum number of clients in the pool
       });
-      
-      // Prisma 7: Use PostgreSQL adapter (required for "client" engine type)
       adapter = new PrismaPg(pool);
-    } catch (error) {
-      // If pool creation fails (e.g., during build), continue without adapter
-      // This allows Prisma Client to be generated even if connection fails
-      console.warn('[Prisma] Could not create connection pool, continuing without adapter:', error);
+    } else {
+      // Build phase: Use dummy URL to satisfy Prisma Client requirement
+      // The adapter will be created but won't actually connect during build
+      const dummyUrl = 'postgresql://dummy:dummy@localhost:5432/dummy';
+      pool = new Pool({
+        connectionString: dummyUrl,
+        max: 1,
+        // Disable connection attempts during build
+        connectionTimeoutMillis: 0,
+      });
+      adapter = new PrismaPg(pool);
     }
+  } catch (error) {
+    // If pool creation fails during build, create a minimal pool
+    // This should rarely happen, but provides a fallback
+    console.warn('[Prisma] Pool creation failed, using fallback:', error);
+    const dummyUrl = 'postgresql://dummy:dummy@localhost:5432/dummy';
+    pool = new Pool({
+      connectionString: dummyUrl,
+      max: 1,
+      connectionTimeoutMillis: 0,
+    });
+    adapter = new PrismaPg(pool);
   }
   
   return new PrismaClient({
     log: logLevel,
-    adapter,
+    adapter, // Always provide adapter (required for "client" engine type)
     // Optimize connection settings for Supabase serverless
     // The connection pool is managed by Supabase PgBouncer
   });
