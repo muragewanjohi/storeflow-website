@@ -154,7 +154,7 @@ export default function OrderConfirmationClient({
         body: JSON.stringify({
           product_id: selectedProduct.product_id,
           rating,
-          comment,
+          comment: comment.trim() || undefined, // Comment is optional
         }),
       });
 

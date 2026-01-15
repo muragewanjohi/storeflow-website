@@ -14,7 +14,7 @@ import { z } from 'zod';
 
 const createReviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
-  comment: z.string().min(1, 'Comment is required').max(1000, 'Comment must be less than 1000 characters'),
+  comment: z.string().max(1000, 'Comment must be less than 1000 characters').optional().or(z.literal('')),
   customer_name: z.string().optional(),
   customer_email: z.string().email().optional(),
 });
@@ -237,14 +237,14 @@ export async function POST(
       );
     }
 
-    // Create review
+    // Create review (comment is optional)
     const review = await prisma.product_reviews.create({
       data: {
         tenant_id: tenant.id,
         product_id: productId,
         user_id: userId,
         rating: validatedData.rating,
-        comment: validatedData.comment,
+        comment: validatedData.comment?.trim() || null, // Allow empty comment
         status: 'pending', // Reviews need approval before showing
       },
     });

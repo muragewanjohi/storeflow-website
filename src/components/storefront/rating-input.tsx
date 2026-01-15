@@ -40,7 +40,7 @@ export default function RatingInput({
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hoveredRating, setHoveredRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
 
@@ -82,10 +82,7 @@ export default function RatingInput({
       return;
     }
 
-    if (!comment.trim()) {
-      toast.error('Please write a review');
-      return;
-    }
+    // Comment is optional, but rating is mandatory
 
     // Check eligibility before submitting
     if (eligibility && !eligibility.canReview) {
@@ -121,7 +118,7 @@ export default function RatingInput({
           body: JSON.stringify({
             product_id: productId,
             rating,
-            comment: comment.trim(),
+            comment: comment.trim() || undefined, // Send undefined if empty
           }),
         });
 
@@ -151,8 +148,10 @@ export default function RatingInput({
         toast.success('Review submitted successfully!', {
           description: 'Your review will be visible after approval',
         });
+        // Reset form
         setRating(0);
         setComment('');
+        setHoveredRating(null);
         
         // Refresh eligibility check
         const eligibilityResponse = await fetch(`/api/products/${productId}/can-review`);
@@ -237,9 +236,16 @@ export default function RatingInput({
         <Label className="text-base font-medium mb-2 block">Your Rating</Label>
         <div className="flex items-center gap-3">
           <Rating
-            value={hoveredRating || rating}
-            onChange={setRating}
-            onHoverChange={setHoveredRating}
+            value={hoveredRating !== null ? hoveredRating : rating}
+            onChange={(value: number) => {
+              setRating(value);
+              // Clear hover state when rating is clicked to show selected rating
+              setHoveredRating(null);
+            }}
+            onHoverChange={(value: number) => {
+              // Only show hover when actually hovering (value > 0)
+              setHoveredRating(value > 0 ? value : null);
+            }}
             itemStyles={{
               itemShapes: Star,
               activeFillColor: '#ffb700',
@@ -259,11 +265,11 @@ export default function RatingInput({
 
       <div>
         <Label htmlFor="review-comment" className="text-base font-medium mb-2 block">
-          Your Review
+          Your Review <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
         </Label>
         <Textarea
           id="review-comment"
-          placeholder="Share your experience with this product..."
+          placeholder="Share your experience with this product... (Optional)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={4}
@@ -277,7 +283,7 @@ export default function RatingInput({
 
       <Button
         onClick={handleSubmit}
-        disabled={isSubmitting || rating === 0 || !comment.trim() || (eligibility ? !eligibility.canReview : false)}
+        disabled={isSubmitting || rating === 0 || (eligibility ? !eligibility.canReview : false)}
         className="w-full md:w-auto"
       >
         {isSubmitting ? 'Submitting...' : 'Submit Review'}
