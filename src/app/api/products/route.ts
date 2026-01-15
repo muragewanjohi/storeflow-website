@@ -290,6 +290,7 @@ export async function GET(request: NextRequest) {
       ),
     });
 
+    const queryStartTime = Date.now();
     console.log('[Products API] Query parameters', {
       where,
       skip: useFullTextSearch ? 0 : skip,
@@ -303,12 +304,19 @@ export async function GET(request: NextRequest) {
     // Hybrid approach: Next.js cache (60s) wrapping Redis cache (5min)
     const getCachedProducts = unstable_cache(
       async () => {
+        const dbQueryStart = Date.now();
         // Layer 2: Redis cache (5 minutes)
-        return await getOrSetCache(
+        const result = await getOrSetCache(
           cacheKey,
           async () => {
             // Layer 3: Database query (only on cache miss)
-            return await prisma.products.findMany({
+            console.log('[Products API] Cache MISS - Querying database', {
+              cacheKey,
+              orderBy,
+              where: Object.keys(where),
+            });
+            const dbStart = Date.now();
+            const products = await prisma.products.findMany({
               where,
               skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
               take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
@@ -324,11 +332,26 @@ export async function GET(request: NextRequest) {
                 created_at: true, // Include for sorting by newest
               },
             });
+            const dbDuration = Date.now() - dbStart;
+            console.log('[Products API] Database query completed', {
+              productsCount: products.length,
+              dbDuration: `${dbDuration}ms`,
+              performance: dbDuration > 1000 ? '⚠️ SLOW' : dbDuration > 500 ? '⚠️ MODERATE' : '✅ FAST',
+            });
+            return products;
           },
           {
             ttl: CACHE_TTL.PRODUCTS_LIST, // 5 minutes (Redis cache)
           }
         );
+        const cacheDuration = Date.now() - dbQueryStart;
+        if (cacheDuration < 100) {
+          console.log('[Products API] Cache HIT - Served from cache', {
+            cacheDuration: `${cacheDuration}ms`,
+            cacheKey,
+          });
+        }
+        return result;
       },
       [cacheKey, `products-${tenant.id}`],
       {
@@ -362,12 +385,16 @@ export async function GET(request: NextRequest) {
     );
 
     // Fetch products with pagination (cached)
+    const fetchStartTime = Date.now();
     let products = await getCachedProducts();
+    const fetchDuration = Date.now() - fetchStartTime;
 
-    console.log('[Products API] Products fetched from database', {
+    console.log('[Products API] Products fetched', {
       productsCount: products.length,
       useFullTextSearch,
       cacheKey,
+      fetchDuration: `${fetchDuration}ms`,
+      isCached: fetchDuration < 100, // Likely cached if < 100ms
     });
 
     // If using full-text search, sort by relevance (order in searchProductIds)
@@ -380,12 +407,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count (cached)
+    const countStartTime = Date.now();
     const total = await getCachedCount();
+    const countDuration = Date.now() - countStartTime;
 
     console.log('[Products API] Total count and pagination', {
       total,
       limitNum,
       pageNum,
+      countDuration: `${countDuration}ms`,
+      isCached: countDuration < 50, // Likely cached if < 50ms
     });
 
     // Fetch rating stats for all products in batch (with error handling and caching)
@@ -478,11 +509,14 @@ export async function GET(request: NextRequest) {
       },
     };
 
+    const totalDuration = Date.now() - queryStartTime;
     console.log('[Products API] Returning response', {
       productsCount: products.length,
       total,
       page: pageNum,
       limit: limitNum,
+      totalDuration: `${totalDuration}ms`,
+      performance: totalDuration > 1000 ? '⚠️ SLOW' : totalDuration > 500 ? '⚠️ MODERATE' : '✅ FAST',
     });
 
     // Add cache headers for better performance

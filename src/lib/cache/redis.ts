@@ -19,11 +19,16 @@ let redisClient: Redis | null = null;
 try {
   // Redis.fromEnv() automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
   // Falls back gracefully if environment variables are not set
-  redisClient = Redis.fromEnv();
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redisClient = Redis.fromEnv();
+    console.log('[Cache] Upstash Redis initialized successfully');
+  } else {
+    console.warn('[Cache] Upstash Redis not configured (missing env vars), using in-memory cache');
+  }
 } catch (error) {
   // If environment variables are not set, redisClient will be null
   // This is expected in development - we'll use in-memory cache instead
-  console.warn('[Cache] Upstash Redis not configured, using in-memory cache:', error);
+  console.warn('[Cache] Upstash Redis initialization failed, using in-memory cache:', error);
 }
 
 interface CacheOptions {
