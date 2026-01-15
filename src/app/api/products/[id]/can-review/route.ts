@@ -72,12 +72,16 @@ export async function GET(
     }
 
     // Check if customer has purchased this product
-    // First, find order_products for this user and product
+    // Check both order_products.user_id and orders.user_id (for guest orders that were later linked)
     const orderProduct = await prisma.order_products.findFirst({
       where: {
         tenant_id: tenant.id,
-        user_id: customer.id,
         product_id: productId,
+        OR: [
+          { user_id: customer.id }, // Direct user_id match
+          { orders: { user_id: customer.id } }, // Match through order relationship
+          { orders: { email: customer.email } }, // Match guest orders by email (case-insensitive)
+        ],
       },
       include: {
         orders: {
@@ -85,6 +89,8 @@ export async function GET(
             id: true,
             status: true,
             payment_status: true,
+            user_id: true,
+            email: true,
           },
         },
       },

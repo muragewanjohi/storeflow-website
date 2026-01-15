@@ -216,6 +216,7 @@ export default function ProductReviewsSection({
                         rating={averageRating}
                         size="md"
                         showCount={false}
+                        className="scale-[0.7] origin-left"
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -281,6 +282,7 @@ export default function ProductReviewsSection({
                                 rating={review.rating}
                                 size="sm"
                                 showCount={false}
+                                className="scale-[0.4] origin-left"
                               />
                             </div>
                           </div>

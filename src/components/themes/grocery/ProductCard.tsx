@@ -236,7 +236,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
           </Link>
         )}
         
-        {/* Rating Display */}
+        {/* Rating Display - Reduced by 40% */}
         {(product.averageRating !== undefined && product.averageRating > 0) && (
           <div className="mb-2">
             <RatingDisplay
@@ -244,6 +244,7 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
               totalReviews={product.totalReviews}
               size="sm"
               showCount={false}
+              className="scale-[0.6] origin-left"
             />
           </div>
         )}

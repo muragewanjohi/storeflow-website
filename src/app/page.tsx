@@ -149,16 +149,60 @@ export default async function HomePage() {
       name: true,
       slug: true,
       price: true,
+      sale_price: true,
       image: true,
       stock_quantity: true,
     },
   });
 
-  // Convert Decimal to number for client components
-  const featuredProducts = featuredProductsRaw.map((product: any) => ({
-    ...product,
-    price: Number(product.price),
-  }));
+  // Fetch rating stats for featured products
+  const productIds = featuredProductsRaw.map((p: any) => p.id);
+  let ratingMap = new Map<string, { averageRating: number; totalReviews: number }>();
+  
+  if (productIds.length > 0) {
+    try {
+      const ratingStats = await prisma.product_reviews.groupBy({
+        by: ['product_id'],
+        where: {
+          product_id: { in: productIds },
+          tenant_id: tenant.id,
+          status: 'approved',
+          rating: { not: null },
+        },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      });
+
+      ratingMap = new Map(
+        ratingStats.map((stat: any) => [
+          String(stat.product_id),
+          {
+            averageRating: stat._avg.rating ? Number(stat._avg.rating) : 0,
+            totalReviews: stat._count.rating || 0,
+          },
+        ])
+      );
+    } catch (error) {
+      console.error('Error fetching rating stats for homepage:', error);
+    }
+  }
+
+  // Convert Decimal to number and add rating data for client components
+  const featuredProducts = featuredProductsRaw.map((product: any) => {
+    const stats = ratingMap.get(product.id) || { averageRating: 0, totalReviews: 0 };
+    return {
+      ...product,
+      price: Number(product.price),
+      sale_price: product.sale_price ? Number(product.sale_price) : null,
+      compareAtPrice: product.sale_price ? Number(product.sale_price) : undefined,
+      averageRating: stats.averageRating > 0 ? stats.averageRating : undefined,
+      totalReviews: stats.totalReviews > 0 ? stats.totalReviews : undefined,
+    };
+  });
 
   return (
     <ThemeProviderWrapper>

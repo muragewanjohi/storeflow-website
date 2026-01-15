@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/currency-context';
 
 // Decimal type from Prisma
 type Decimal = Prisma.Decimal;
@@ -28,6 +29,70 @@ export function getTenantContactEmail(tenant: Tenant): string {
     return `support@${tenant.custom_domain}`;
   }
   return `support@${tenant.subdomain}.dukanest.com`;
+}
+
+/**
+ * Get currency settings for a tenant
+ */
+async function getTenantCurrencySettings(tenantId: string): Promise<CurrencySettings> {
+  try {
+    const options = await prisma.static_options.findMany({
+      where: {
+        tenant_id: tenantId,
+        option_name: {
+          in: [
+            'currency_code',
+            'currency_symbol',
+            'currency_symbol_position',
+            'currency_thousand_separator',
+            'currency_decimal_separator',
+            'currency_decimal_places',
+          ],
+        },
+      },
+    });
+
+    // Build currency object from options
+    const optionsMap: Record<string, string | null> = {};
+    for (const opt of options) {
+      optionsMap[opt.option_name] = opt.option_value;
+    }
+
+    return {
+      code: optionsMap.currency_code || 'USD',
+      symbol: optionsMap.currency_symbol || '$',
+      symbolPosition: (optionsMap.currency_symbol_position as 'left' | 'right') || 'left',
+      thousandSeparator: optionsMap.currency_thousand_separator || ',',
+      decimalSeparator: optionsMap.currency_decimal_separator || '.',
+      decimalPlaces: optionsMap.currency_decimal_places 
+        ? parseInt(optionsMap.currency_decimal_places, 10) 
+        : 2,
+    };
+  } catch (error) {
+    console.error('Error fetching currency settings:', error);
+    // Return defaults on error
+    return {
+      code: 'USD',
+      symbol: '$',
+      symbolPosition: 'left',
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+      decimalPlaces: 2,
+    };
+  }
+}
+
+/**
+ * Format currency with space between symbol and amount (for emails)
+ */
+function formatCurrencyForEmail(amount: number, currency: CurrencySettings): string {
+  const formatted = formatCurrencyServer(amount, currency);
+  // Add space between currency symbol and number
+  if (currency.symbolPosition === 'left') {
+    return formatted.replace(/([^\d\s.,-]+)([\d-])/, '$1 $2');
+  } else {
+    return formatted.replace(/([\d.,-]+)([^\d\s.,-]+)/, '$1 $2');
+  }
 }
 
 // Note: getVerifiedSenderEmail() and getSenderName() have been moved to @/lib/email/service
@@ -74,6 +139,9 @@ export async function sendOrderPlacedEmail({
   customerEmail: string;
   customerName: string;
 }) {
+  // Fetch currency settings for the tenant
+  const currency = await getTenantCurrencySettings(tenant.id);
+  
   const orderItems = order.order_products.map((item: any) => ({
     name: item.products?.name || 'Unknown Product',
     quantity: item.quantity,
@@ -85,6 +153,9 @@ export async function sendOrderPlacedEmail({
   const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
+  
+  // Format currency amounts with proper symbol and spacing
+  const formattedTotal = formatCurrencyForEmail(totalAmount, currency);
 
   const html = `
     <!DOCTYPE html>
@@ -108,7 +179,7 @@ export async function sendOrderPlacedEmail({
             <h2 style="margin-top: 0; color: #667eea;">Order Details</h2>
             <p><strong>Order Number:</strong> ${order.order_number}</p>
             <p><strong>Order Date:</strong> ${new Date(order.created_at || '').toLocaleDateString()}</p>
-            <p><strong>Total Amount:</strong> $${totalAmount.toFixed(2)}</p>
+            <p><strong>Total Amount:</strong> ${formattedTotal}</p>
             <p><strong>Status:</strong> ${order.status}</p>
             <p><strong>Payment Status:</strong> ${order.payment_status}</p>
           </div>
@@ -124,16 +195,19 @@ export async function sendOrderPlacedEmail({
                 </tr>
               </thead>
               <tbody>
-                ${orderItems.map((item: any) => `
+                ${orderItems.map((item: any) => {
+                  const formattedItemTotal = formatCurrencyForEmail(item.total, currency);
+                  return `
                   <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 10px 0;">${item.name}</td>
                     <td style="text-align: center; padding: 10px 0;">${item.quantity}</td>
-                    <td style="text-align: right; padding: 10px 0;">$${item.total.toFixed(2)}</td>
+                    <td style="text-align: right; padding: 10px 0;">${formattedItemTotal}</td>
                   </tr>
-                `).join('')}
+                `;
+                }).join('')}
                 <tr>
                   <td colspan="2" style="text-align: right; padding: 10px 0; font-weight: bold;">Total:</td>
-                  <td style="text-align: right; padding: 10px 0; font-weight: bold;">$${totalAmount.toFixed(2)}</td>
+                  <td style="text-align: right; padding: 10px 0; font-weight: bold;">${formattedTotal}</td>
                 </tr>
               </tbody>
             </table>
@@ -168,14 +242,17 @@ Thank you for your order! We've received your order and will begin processing it
 Order Details:
 - Order Number: ${order.order_number}
 - Order Date: ${new Date(order.created_at || '').toLocaleDateString()}
-- Total Amount: $${totalAmount.toFixed(2)}
+- Total Amount: ${formattedTotal}
 - Status: ${order.status}
 - Payment Status: ${order.payment_status}
 
 Order Items:
-${orderItems.map((item: any) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
+${orderItems.map((item: any) => {
+  const formattedItemTotal = formatCurrencyForEmail(item.total, currency);
+  return `- ${item.name} x${item.quantity} - ${formattedItemTotal}`;
+}).join('\n')}
 
-Total: $${totalAmount.toFixed(2)}
+Total: ${formattedTotal}
 
 View your order: ${orderUrl}
 
@@ -204,6 +281,9 @@ export async function sendNewOrderAlertEmail({
   order: OrderWithItems;
   tenant: Tenant;
 }) {
+  // Fetch currency settings for the tenant
+  const currency = await getTenantCurrencySettings(tenant.id);
+  
   // Get tenant admin email from Supabase Auth for notifications
   // Use contact_email if available, otherwise get admin email
   let adminEmail: string;
@@ -230,6 +310,9 @@ export async function sendNewOrderAlertEmail({
 
   const totalAmount = Number(order.total_amount);
   const dashboardUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/orders/${order.id}`;
+  
+  // Format currency amounts with proper symbol and spacing
+  const formattedTotal = formatCurrencyForEmail(totalAmount, currency);
 
   const html = `
     <!DOCTYPE html>
@@ -255,7 +338,7 @@ export async function sendNewOrderAlertEmail({
             <p><strong>Customer:</strong> ${order.name || 'N/A'}</p>
             <p><strong>Email:</strong> ${order.email || 'N/A'}</p>
             <p><strong>Phone:</strong> ${order.phone || 'N/A'}</p>
-            <p><strong>Total Amount:</strong> $${totalAmount.toFixed(2)}</p>
+            <p><strong>Total Amount:</strong> ${formattedTotal}</p>
             <p><strong>Payment Status:</strong> ${order.payment_status}</p>
             <p><strong>Order Date:</strong> ${new Date(order.created_at || '').toLocaleDateString()}</p>
           </div>
@@ -271,16 +354,19 @@ export async function sendNewOrderAlertEmail({
                 </tr>
               </thead>
               <tbody>
-                ${orderItems.map((item: any) => `
+                ${orderItems.map((item: any) => {
+                  const formattedItemTotal = formatCurrencyForEmail(item.total, currency);
+                  return `
                   <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 10px 0;">${item.name}</td>
                     <td style="text-align: center; padding: 10px 0;">${item.quantity}</td>
-                    <td style="text-align: right; padding: 10px 0;">$${item.total.toFixed(2)}</td>
+                    <td style="text-align: right; padding: 10px 0;">${formattedItemTotal}</td>
                   </tr>
-                `).join('')}
+                `;
+                }).join('')}
                 <tr>
                   <td colspan="2" style="text-align: right; padding: 10px 0; font-weight: bold;">Total:</td>
-                  <td style="text-align: right; padding: 10px 0; font-weight: bold;">$${totalAmount.toFixed(2)}</td>
+                  <td style="text-align: right; padding: 10px 0; font-weight: bold;">${formattedTotal}</td>
                 </tr>
               </tbody>
             </table>
@@ -312,14 +398,17 @@ Order Details:
 - Customer: ${order.name || 'N/A'}
 - Email: ${order.email || 'N/A'}
 - Phone: ${order.phone || 'N/A'}
-- Total Amount: $${totalAmount.toFixed(2)}
+- Total Amount: ${formattedTotal}
 - Payment Status: ${order.payment_status}
 - Order Date: ${new Date(order.created_at || '').toLocaleDateString()}
 
 Order Items:
-${orderItems.map((item: any) => `- ${item.name} x${item.quantity} - $${item.total.toFixed(2)}`).join('\n')}
+${orderItems.map((item: any) => {
+  const formattedItemTotal = formatCurrencyForEmail(item.total, currency);
+  return `- ${item.name} x${item.quantity} - ${formattedItemTotal}`;
+}).join('\n')}
 
-Total: $${totalAmount.toFixed(2)}
+Total: ${formattedTotal}
 
 View order in dashboard: ${dashboardUrl}
 

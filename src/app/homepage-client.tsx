@@ -10,17 +10,20 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import DefaultProductCard from '@/components/themes/default/ProductCard';
 import Image from 'next/image';
-import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
   name: string;
   slug: string | null;
   price: number;
+  sale_price?: number | null;
+  compareAtPrice?: number;
   image: string | null;
   stock_quantity: number | null;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 interface HomepageClientProps {
@@ -32,11 +35,6 @@ export default function HomepageClient({
   featuredProducts,
   tenantName,
 }: Readonly<HomepageClientProps>) {
-  const { formatCurrency } = useCurrency();
-  
-  // Using formatCurrency from useCurrency hook
-  const formatPrice = (price: number) => formatCurrency(price);
-
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -108,40 +106,7 @@ export default function HomepageClient({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product: any) => (
-                <Link key={product.id} href={`/products/${product.slug}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                    <CardContent className="p-0">
-                      <div className="relative aspect-square bg-muted rounded-t-lg overflow-hidden">
-                        {product.image ? (
-                          <Image
-                            src={product.image}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                            No Image
-                          </div>
-                        )}
-                        {product.stock_quantity === 0 && (
-                          <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2 py-1 rounded text-xs font-medium">
-                            Out of Stock
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                        <p className="text-lg font-bold">{formatPrice(product.price)}</p>
-                        {product.stock_quantity !== null && product.stock_quantity > 0 && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {product.stock_quantity} in stock
-                          </p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <DefaultProductCard key={product.id} product={product} />
               ))}
             </div>
           </div>
