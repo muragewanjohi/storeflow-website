@@ -42,11 +42,25 @@ interface DefaultProductCardProps {
 
 export default function DefaultProductCard({ product, className }: DefaultProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currency } = useCurrency();
   const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  
+  // Format currency with space between symbol and amount
+  const formatCurrencyWithSpace = (amount: number): string => {
+    const formatted = formatCurrency(amount);
+    // Add space between currency symbol and number
+    // Handles both left and right positioned symbols
+    if (currency.symbolPosition === 'left') {
+      // Match currency symbol (letters/symbols) followed by a digit, add space
+      return formatted.replace(/([^\d\s.,-]+)([\d-])/, '$1 $2');
+    } else {
+      // Match digit followed by currency symbol, add space
+      return formatted.replace(/([\d.,-]+)([^\d\s.,-]+)/, '$1 $2');
+    }
+  };
   
   // Determine sale badge text and color
   const saleBadgeText = product.saleBadge || (isOnSale ? 'Sale' : null);
@@ -266,10 +280,10 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">{formatCurrency(product.price)}</span>
+            <span className="text-lg font-bold">{formatCurrencyWithSpace(product.price)}</span>
             {isOnSale && product.compareAtPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                {formatCurrency(product.compareAtPrice)}
+                {formatCurrencyWithSpace(product.compareAtPrice)}
               </span>
             )}
           </div>

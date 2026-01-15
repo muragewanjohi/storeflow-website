@@ -8,14 +8,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Rating, Star } from '@smastrom/react-rating';
-import '@smastrom/react-rating/style.css';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoIcon, ShoppingBagIcon } from 'lucide-react';
+import { InfoIcon, ShoppingBagIcon, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface RatingInputProps {
   productId: string;
@@ -230,32 +229,57 @@ export default function RatingInput({
     );
   }
 
+  // Custom star rating component with proper hover and click behavior
+  const StarRating = () => {
+    const displayRating = hoveredRating !== null ? hoveredRating : rating;
+    
+    return (
+      <div 
+        className="flex items-center gap-1" 
+        role="radiogroup" 
+        aria-label="Rating"
+        onMouseLeave={() => setHoveredRating(null)}
+      >
+        {[1, 2, 3, 4, 5].map((starValue) => {
+          const isFilled = starValue <= displayRating;
+          return (
+            <button
+              key={starValue}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setRating(starValue);
+                setHoveredRating(null); // Clear hover to show selected rating
+              }}
+              onMouseEnter={() => setHoveredRating(starValue)}
+              className={cn(
+                "transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded",
+                "cursor-pointer p-0.5"
+              )}
+              aria-label={`Rate ${starValue} ${starValue === 1 ? 'star' : 'stars'}`}
+              aria-checked={starValue === rating}
+            >
+              <Star
+                className={cn(
+                  "w-6 h-6 transition-all",
+                  isFilled
+                    ? "fill-yellow-400 text-yellow-400"
+                    : "fill-gray-300 text-gray-300"
+                )}
+              />
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className={`space-y-4 ${className}`}>
       <div>
         <Label className="text-base font-medium mb-2 block">Your Rating</Label>
         <div className="flex items-center gap-3">
-          <Rating
-            value={hoveredRating !== null ? hoveredRating : rating}
-            onChange={(value: number) => {
-              setRating(value);
-              // Clear hover state when rating is clicked to show selected rating
-              setHoveredRating(null);
-            }}
-            onHoverChange={(value: number) => {
-              // Only show hover when actually hovering (value > 0)
-              setHoveredRating(value > 0 ? value : null);
-            }}
-            highlightOnlySelected={true}
-            itemStyles={{
-              itemShapes: Star,
-              activeFillColor: '#ffb700',
-              inactiveFillColor: '#d1d5db',
-            }}
-            spaceBetween="medium"
-            radius="large"
-            style={{ maxWidth: 'fit-content' }}
-          />
+          <StarRating />
           {rating > 0 && (
             <span className="text-sm text-muted-foreground">
               {rating} {rating === 1 ? 'star' : 'stars'}

@@ -16,7 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { usePreview } from '@/lib/themes/preview-context';
+import { useCurrency } from '@/lib/currency/currency-context';
 import { toast } from 'sonner';
+import RatingDisplay from '@/components/storefront/rating-display';
 
 interface Product {
   id: string;
@@ -27,6 +29,8 @@ interface Product {
   image: string | null;
   stock_quantity: number | null;
   metadata?: Record<string, unknown>;
+  averageRating?: number;
+  totalReviews?: number;
 }
 
 interface ModernProductCardProps {
@@ -36,10 +40,25 @@ interface ModernProductCardProps {
 
 export default function ModernProductCard({ product, className }: ModernProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
+  const { formatCurrency, currency } = useCurrency();
   const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  
+  // Format currency with space between symbol and amount
+  const formatCurrencyWithSpace = (amount: number): string => {
+    const formatted = formatCurrency(amount);
+    // Add space between currency symbol and number
+    // Handles both left and right positioned symbols
+    if (currency.symbolPosition === 'left') {
+      // Match currency symbol (letters/symbols) followed by a digit, add space
+      return formatted.replace(/([^\d\s.,-]+)([\d-])/, '$1 $2');
+    } else {
+      // Match digit followed by currency symbol, add space
+      return formatted.replace(/([\d.,-]+)([^\d\s.,-]+)/, '$1 $2');
+    }
+  };
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -211,6 +230,18 @@ export default function ModernProductCard({ product, className }: ModernProductC
           </Link>
         )}
         
+        {/* Rating Display */}
+        {(product.averageRating !== undefined && product.averageRating > 0) && (
+          <div className="mb-2">
+            <RatingDisplay
+              rating={product.averageRating}
+              totalReviews={product.totalReviews}
+              size="sm"
+              showCount={false}
+            />
+          </div>
+        )}
+        
         {/* Tech specs preview */}
         {product.metadata && (
           <div className="text-xs text-muted-foreground mb-2 space-y-1">
@@ -225,10 +256,10 @@ export default function ModernProductCard({ product, className }: ModernProductC
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+            <span className="text-lg font-bold">{formatCurrencyWithSpace(product.price)}</span>
             {isOnSale && product.compareAtPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                ${product.compareAtPrice.toFixed(2)}
+                {formatCurrencyWithSpace(product.compareAtPrice)}
               </span>
             )}
           </div>
