@@ -127,7 +127,7 @@ export default function ProductReviewsSection({
       }
 
       toast.success('Review submitted successfully!', {
-        description: 'Your review will be visible after approval',
+        description: 'Your review has been published',
       });
       setShowReviewForm(false);
 

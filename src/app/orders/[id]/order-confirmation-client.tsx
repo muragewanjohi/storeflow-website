@@ -348,9 +348,6 @@ export default function OrderConfirmationClient({
                                     <StarIcon className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                                     Review Submitted
                                   </Badge>
-                                  {reviewStatus?.reviewStatus === 'pending' && (
-                                    <span className="text-xs text-muted-foreground">(Pending approval)</span>
-                                  )}
                                 </div>
                               ) : (
                                 <p className="text-sm text-muted-foreground">

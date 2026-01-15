@@ -145,7 +145,7 @@ export default function RatingInput({
         }
 
         toast.success('Review submitted successfully!', {
-          description: 'Your review will be visible after approval',
+          description: 'Your review has been published',
         });
         // Reset form
         setRating(0);
@@ -257,7 +257,7 @@ export default function RatingInput({
                 "cursor-pointer p-0.5"
               )}
               aria-label={`Rate ${starValue} ${starValue === 1 ? 'star' : 'stars'}`}
-              aria-checked={starValue === rating}
+              aria-pressed={starValue === rating}
             >
               <Star
                 className={cn(

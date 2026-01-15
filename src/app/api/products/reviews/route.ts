@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create review (comment is optional)
+    // Reviews are published immediately (no approval needed)
     const review = await prisma.product_reviews.create({
       data: {
         tenant_id: tenant.id,
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         rating: validatedData.rating,
         comment: validatedData.comment?.trim() || null, // Allow empty comment
-        status: 'pending', // Reviews need approval
+        status: 'approved', // Reviews are published immediately
       },
     });
 
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
           status: review.status,
           created_at: review.created_at,
         },
-        message: 'Review submitted successfully. It will be visible after approval.',
+        message: 'Review submitted successfully!',
       },
       { status: 201 }
     );

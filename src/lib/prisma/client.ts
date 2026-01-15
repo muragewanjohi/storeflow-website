@@ -15,18 +15,31 @@ function createPrismaClient() {
   // Prisma 7: Connection URLs
   const databaseUrl = process.env.DATABASE_URL;
   
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL environment variable is not set');
-  }
+  // During build time on Vercel, DATABASE_URL might not be available
+  // Check if we're in build phase
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build' || 
+                       (process.env.VERCEL === '1' && !databaseUrl);
   
   // Prisma 7: Create PostgreSQL connection pool for adapter
-  const pool = new Pool({
-    connectionString: databaseUrl,
-    max: 10, // Maximum number of clients in the pool
-  });
+  // Only create pool if we have a real DATABASE_URL (not during build)
+  let pool: Pool | undefined;
+  let adapter: PrismaPg | undefined;
   
-  // Prisma 7: Use PostgreSQL adapter (required for "client" engine type)
-  const adapter = new PrismaPg(pool);
+  if (databaseUrl && !isBuildPhase) {
+    try {
+      pool = new Pool({
+        connectionString: databaseUrl,
+        max: 10, // Maximum number of clients in the pool
+      });
+      
+      // Prisma 7: Use PostgreSQL adapter (required for "client" engine type)
+      adapter = new PrismaPg(pool);
+    } catch (error) {
+      // If pool creation fails (e.g., during build), continue without adapter
+      // This allows Prisma Client to be generated even if connection fails
+      console.warn('[Prisma] Could not create connection pool, continuing without adapter:', error);
+    }
+  }
   
   return new PrismaClient({
     log: logLevel,
@@ -57,4 +70,3 @@ export async function measureQuery<T>(
   }
   return result;
 }
-

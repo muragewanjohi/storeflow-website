@@ -10,6 +10,9 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { linkGuestOrdersToCustomer } from '@/lib/orders/link-guest-orders';
 
+// Force dynamic rendering to prevent build-time static analysis
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const tenant = await requireTenant();

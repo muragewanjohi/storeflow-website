@@ -186,7 +186,8 @@ function ProductsListingClient({
       }
     }
     setSelectedAttributes(attrFilters);
-  }, []); // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount - searchParams is intentionally excluded
 
   // Fetch products when page, limit, sort, or filters change
   useEffect(() => {

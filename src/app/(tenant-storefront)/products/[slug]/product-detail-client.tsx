@@ -244,8 +244,13 @@ export default function ProductDetailClient({
               </div>
             )}
             {product.sku && (
-              <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
+              <p className="text-sm text-muted-foreground mb-4">SKU: {product.sku}</p>
             )}
+            
+            {/* Product Reviews Section - Below SKU, following e-commerce best practices */}
+            <div className="mb-6">
+              <ProductReviewsSection productId={product.id} />
+            </div>
           </div>
 
           {/* Price */}
@@ -447,11 +452,6 @@ export default function ProductDetailClient({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Product Reviews Section */}
-      <div className="mt-12">
-        <ProductReviewsSection productId={product.id} />
       </div>
 
       {/* Related Products */}
