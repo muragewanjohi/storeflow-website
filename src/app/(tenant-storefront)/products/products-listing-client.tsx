@@ -9,11 +9,13 @@
 
 import { useState, useEffect, useMemo, memo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { loadThemeProductCard } from '@/lib/themes/theme-loader';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface Product {
   id: string;
@@ -55,6 +57,20 @@ function ProductsListingClient({
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter sidebar state
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string | null }>>([]);
+  const [attributes, setAttributes] = useState<Array<{ 
+    id: string; 
+    name: string; 
+    type: string | null; 
+    attribute_values: Array<{ id: string; value: string; color_code: string | null }> 
+  }>>([]);
+  const [showFilters, setShowFilters] = useState(false); // Mobile: start collapsed
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    categories: true,
+    attributes: true,
+  });
 
   // Load theme-specific product card - memoize to prevent re-creation
   const ThemeProductCard = useMemo(() => {
@@ -128,6 +144,31 @@ function ProductsListingClient({
   useEffect(() => {
     fetchProducts(currentPage, currentLimit, currentSort);
   }, [currentPage, currentLimit, currentSort, fetchProducts]);
+
+  // Fetch categories and attributes on mount
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        // Fetch categories
+        const categoriesResponse = await fetch('/api/categories?status=active&include_children=false');
+        if (categoriesResponse.ok) {
+          const categoriesData = await categoriesResponse.json();
+          setCategories(categoriesData.categories || []);
+        }
+
+        // Fetch attributes
+        const attributesResponse = await fetch('/api/attributes');
+        if (attributesResponse.ok) {
+          const attributesData = await attributesResponse.json();
+          setAttributes(attributesData.attributes || []);
+        }
+      } catch (err) {
+        console.error('Error fetching filters:', err);
+      }
+    };
+
+    fetchFilters();
+  }, []);
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / currentLimit);
@@ -249,8 +290,123 @@ function ProductsListingClient({
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header with results count and per-page selector */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+      {/* Mobile Filter Toggle Button */}
+      <div className="md:hidden mb-4">
+        <Button
+          variant="outline"
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full justify-between"
+        >
+          <span>Filters</span>
+          {showFilters ? (
+            <ChevronUpIcon className="w-4 h-4" />
+          ) : (
+            <ChevronDownIcon className="w-4 h-4" />
+          )}
+        </Button>
+      </div>
+
+      <div className="flex gap-6">
+        {/* Filters Sidebar - Popular E-commerce Layout */}
+        <aside className={`w-full md:w-64 flex-shrink-0 ${showFilters ? 'block' : 'hidden'} md:block`}>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 sticky top-4">
+            <h2 className="text-lg font-semibold mb-4 pb-3 border-b">Filters</h2>
+
+            {/* Categories Section */}
+            {categories.length > 0 && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setExpandedSections(prev => ({ ...prev, categories: !prev.categories }))}
+                  className="flex items-center justify-between w-full mb-3 group"
+                >
+                  <h3 className="text-base font-semibold text-gray-900">Categories</h3>
+                  {expandedSections.categories ? (
+                    <ChevronUpIcon className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-4 h-4 text-gray-500" />
+                  )}
+                </button>
+                {expandedSections.categories && (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {categories.map((category) => (
+                      <div key={category.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`category-${category.id}`}
+                          disabled
+                          className="cursor-not-allowed"
+                        />
+                        <Label
+                          htmlFor={`category-${category.id}`}
+                          className="text-sm text-gray-700 cursor-pointer flex-1"
+                        >
+                          {category.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Attributes Section */}
+            {attributes.length > 0 && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setExpandedSections(prev => ({ ...prev, attributes: !prev.attributes }))}
+                  className="flex items-center justify-between w-full mb-3 group"
+                >
+                  <h3 className="text-base font-semibold text-gray-900">Filter by</h3>
+                  {expandedSections.attributes ? (
+                    <ChevronUpIcon className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-4 h-4 text-gray-500" />
+                  )}
+                </button>
+                {expandedSections.attributes && (
+                  <div className="space-y-6">
+                    {attributes.map((attribute) => (
+                      <div key={attribute.id} className="pb-4 border-b last:border-b-0">
+                        <h4 className="text-sm font-medium text-gray-900 mb-3">{attribute.name}</h4>
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                          {attribute.attribute_values.map((value) => {
+                            const isColor = attribute.type === 'color';
+                            return (
+                              <div key={value.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`attr-${attribute.id}-${value.id}`}
+                                  disabled
+                                  className="cursor-not-allowed"
+                                />
+                                <Label
+                                  htmlFor={`attr-${attribute.id}-${value.id}`}
+                                  className="text-sm text-gray-700 cursor-pointer flex-1 flex items-center gap-2"
+                                >
+                                  {isColor && value.color_code && (
+                                    <span
+                                      className="w-4 h-4 rounded-full border border-gray-300"
+                                      style={{ backgroundColor: value.color_code }}
+                                      aria-label={value.value}
+                                    />
+                                  )}
+                                  <span>{value.value}</span>
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex-1 min-w-0">
+          {/* Header with results count and per-page selector */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold mb-2">Products</h1>
           {total > 0 && (
@@ -433,6 +589,8 @@ function ProductsListingClient({
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
