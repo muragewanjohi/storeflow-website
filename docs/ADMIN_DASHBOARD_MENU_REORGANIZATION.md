@@ -156,6 +156,40 @@ Reorganized the admin dashboard menu to follow best practices from popular e-com
 - **Role-Based Access**: Admin-only items still properly filtered
 - **Mobile Support**: Mobile menu updated with new structure
 
+## Accordion Behavior (Latest Update)
+
+### ✅ Implemented Features
+
+1. **Groups Closed by Default**
+   - All collapsible groups start closed when dashboard loads
+   - Cleaner initial view
+   - Reduces visual clutter
+
+2. **Accordion Behavior**
+   - Only one group can be open at a time
+   - Opening a group automatically closes others
+   - Clicking an open group closes it
+   - Standard accordion UX pattern
+
+3. **Auto-Expand Active Group**
+   - If user navigates to a page within a group, that group auto-expands
+   - Other groups remain closed
+   - Provides context while maintaining clean UI
+
+### User Experience Benefits
+
+- **Less Visual Clutter**: Only relevant section is expanded
+- **Focused Navigation**: Users see only what they need
+- **Familiar Pattern**: Matches common accordion behavior
+- **Smart Auto-Expand**: Active page's group opens automatically
+
+### Technical Implementation
+
+- All groups initialize with `expanded: false`
+- `handleGroupToggle()` function manages accordion logic
+- `useEffect` auto-expands active group based on current route
+- Works for both mobile and desktop views
+
 ## Future Enhancements (Optional)
 
 1. **Customizable Menu**: Allow users to reorder menu items
@@ -163,6 +197,7 @@ Reorganized the admin dashboard menu to follow best practices from popular e-com
 3. **Recent Items**: Show recently accessed pages
 4. **Search**: Add menu search functionality
 5. **Keyboard Shortcuts**: Quick navigation with keyboard
+6. **Remember State**: Save user's preferred expanded groups (localStorage)
 
 ---
 

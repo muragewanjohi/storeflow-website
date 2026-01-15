@@ -100,10 +100,11 @@ const CatalogIcon = Squares2X2Icon;
 export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externalMobileMenuOpen, setMobileMenuOpen: externalSetMobileMenuOpen, collapsed = false }: Readonly<SidebarProps>) {
   const router = useRouter();
   const [internalMobileMenuOpen, setInternalMobileMenuOpen] = useState(false);
-  const [productsExpanded, setProductsExpanded] = useState(true);
-  const [marketingExpanded, setMarketingExpanded] = useState(true);
-  const [contentExpanded, setContentExpanded] = useState(true);
-  const [supportExpanded, setSupportExpanded] = useState(true);
+  // All groups closed by default (accordion behavior)
+  const [productsExpanded, setProductsExpanded] = useState(false);
+  const [marketingExpanded, setMarketingExpanded] = useState(false);
+  const [contentExpanded, setContentExpanded] = useState(false);
+  const [supportExpanded, setSupportExpanded] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
@@ -209,6 +210,64 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     (item) => item.group === 'Support' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
+  // Auto-expand active group on mount and when pathname changes
+  useEffect(() => {
+    if (isProductsActive) {
+      setProductsExpanded(true);
+      setMarketingExpanded(false);
+      setContentExpanded(false);
+      setSupportExpanded(false);
+    } else if (isMarketingActive) {
+      setProductsExpanded(false);
+      setMarketingExpanded(true);
+      setContentExpanded(false);
+      setSupportExpanded(false);
+    } else if (isContentActive) {
+      setProductsExpanded(false);
+      setMarketingExpanded(false);
+      setContentExpanded(true);
+      setSupportExpanded(false);
+    } else if (isSupportActive) {
+      setProductsExpanded(false);
+      setMarketingExpanded(false);
+      setContentExpanded(false);
+      setSupportExpanded(true);
+    }
+    // Only run when pathname or active states change, not when expanded states change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, isProductsActive, isMarketingActive, isContentActive, isSupportActive]);
+
+  // Accordion handler - opens one group and closes others
+  const handleGroupToggle = (groupName: string) => {
+    const isCurrentlyExpanded = 
+      (groupName === 'Products' && productsExpanded) ||
+      (groupName === 'Marketing' && marketingExpanded) ||
+      (groupName === 'Content' && contentExpanded) ||
+      (groupName === 'Support' && supportExpanded);
+
+    // If clicking an already expanded group, close it
+    // Otherwise, close all and open the clicked one
+    if (isCurrentlyExpanded) {
+      // Close the group
+      if (groupName === 'Products') setProductsExpanded(false);
+      if (groupName === 'Marketing') setMarketingExpanded(false);
+      if (groupName === 'Content') setContentExpanded(false);
+      if (groupName === 'Support') setSupportExpanded(false);
+    } else {
+      // Close all groups first, then open the clicked one
+      setProductsExpanded(false);
+      setMarketingExpanded(false);
+      setContentExpanded(false);
+      setSupportExpanded(false);
+      
+      // Open the clicked group
+      if (groupName === 'Products') setProductsExpanded(true);
+      if (groupName === 'Marketing') setMarketingExpanded(true);
+      if (groupName === 'Content') setContentExpanded(true);
+      if (groupName === 'Support') setSupportExpanded(true);
+    }
+  };
+
   // Navigation handler with loading state
   const navigateWithLoading = (href: string) => {
     if (pathname === href) return;
@@ -275,17 +334,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                       {!isMainGroup && (
                         <button
                           type="button"
-                          onClick={() => {
-                            if (isProductsGroup) {
-                              setProductsExpanded(!productsExpanded);
-                            } else if (isMarketingGroup) {
-                              setMarketingExpanded(!marketingExpanded);
-                            } else if (isContentGroup) {
-                              setContentExpanded(!contentExpanded);
-                            } else if (isSupportGroup) {
-                              setSupportExpanded(!supportExpanded);
-                            }
-                          }}
+                          onClick={() => handleGroupToggle(groupName)}
                           className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
                             (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                           }`}
@@ -396,17 +445,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                     {!collapsed && !isMainGroup && (
                       <button
                         type="button"
-                        onClick={() => {
-                          if (isProductsGroup) {
-                            setProductsExpanded(!productsExpanded);
-                          } else if (isMarketingGroup) {
-                            setMarketingExpanded(!marketingExpanded);
-                          } else if (isContentGroup) {
-                            setContentExpanded(!contentExpanded);
-                          } else if (isSupportGroup) {
-                            setSupportExpanded(!supportExpanded);
-                          }
-                        }}
+                        onClick={() => handleGroupToggle(groupName)}
                         className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
                           (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
                         }`}
