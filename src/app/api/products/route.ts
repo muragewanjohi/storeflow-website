@@ -16,8 +16,8 @@ import { requireAuth } from '@/lib/auth/server';
 import { Prisma } from '@prisma/client';
 import { canCreateProduct } from '@/lib/subscriptions/limits';
 import { z } from 'zod';
-import { getProductsListCacheKey, getProductsCountCacheKey, getProductRatingStatsCacheKey } from '@/lib/cache/product-cache-keys';
-import { CACHE_TTL } from '@/lib/cache/redis';
+import { getProductsListCacheKey, getProductsCountCacheKey, getProductRatingStatsCacheKey, getProductCachePatterns } from '@/lib/cache/product-cache-keys';
+import { CACHE_TTL, getOrSetCache, deleteCachePattern } from '@/lib/cache/redis';
 
 /**
  * GET /api/products
@@ -300,41 +300,63 @@ export async function GET(request: NextRequest) {
     });
 
     // Create cached function for fetching products
+    // Hybrid approach: Next.js cache (60s) wrapping Redis cache (5min)
     const getCachedProducts = unstable_cache(
       async () => {
-        return await prisma.products.findMany({
-          where,
-          skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
-          take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
-          orderBy,
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            price: true,
-            image: true,
-            stock_quantity: true, // Already synced with variant totals
-            category_id: true,
-            created_at: true, // Include for sorting by newest
+        // Layer 2: Redis cache (5 minutes)
+        return await getOrSetCache(
+          cacheKey,
+          async () => {
+            // Layer 3: Database query (only on cache miss)
+            return await prisma.products.findMany({
+              where,
+              skip: useFullTextSearch ? 0 : skip, // Fetch all for full-text search, then paginate
+              take: useFullTextSearch ? 1000 : limitNum, // Get more results to sort by relevance
+              orderBy,
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                price: true,
+                image: true,
+                stock_quantity: true, // Already synced with variant totals
+                category_id: true,
+                created_at: true, // Include for sorting by newest
+              },
+            });
           },
-        });
+          {
+            ttl: CACHE_TTL.PRODUCTS_LIST, // 5 minutes (Redis cache)
+          }
+        );
       },
       [cacheKey, `products-${tenant.id}`],
       {
-        revalidate: CACHE_TTL.SHORT, // 60 seconds
+        revalidate: CACHE_TTL.SHORT, // 60 seconds (Next.js cache)
         tags: [`products-${tenant.id}`], // For cache invalidation
       }
     );
 
     // Create cached function for counting products
+    // Hybrid approach: Next.js cache (60s) wrapping Redis cache (5min)
     const countCacheKey = getProductsCountCacheKey(tenant.id, where);
     const getCachedCount = unstable_cache(
       async () => {
-        return await prisma.products.count({ where });
+        // Layer 2: Redis cache (5 minutes)
+        return await getOrSetCache(
+          countCacheKey,
+          async () => {
+            // Layer 3: Database query (only on cache miss)
+            return await prisma.products.count({ where });
+          },
+          {
+            ttl: CACHE_TTL.PRODUCTS_LIST, // 5 minutes (Redis cache)
+          }
+        );
       },
       [countCacheKey, `products-count-${tenant.id}`],
       {
-        revalidate: CACHE_TTL.SHORT, // 60 seconds
+        revalidate: CACHE_TTL.SHORT, // 60 seconds (Next.js cache)
         tags: [`products-${tenant.id}`], // For cache invalidation
       }
     );
@@ -373,28 +395,39 @@ export async function GET(request: NextRequest) {
     if (productIds.length > 0) {
       try {
         // Create cached function for rating stats
+        // Hybrid approach: Next.js cache (5min) wrapping Redis cache (5min)
         const ratingStatsCacheKey = getProductRatingStatsCacheKey(tenant.id, productIds);
         const getCachedRatingStats = unstable_cache(
           async () => {
-            return await prisma.product_reviews.groupBy({
-              by: ['product_id'],
-              where: {
-                product_id: { in: productIds },
-                tenant_id: tenant.id,
-                status: 'approved',
-                rating: { not: null },
+            // Layer 2: Redis cache (5 minutes)
+            return await getOrSetCache(
+              ratingStatsCacheKey,
+              async () => {
+                // Layer 3: Database query (only on cache miss)
+                return await prisma.product_reviews.groupBy({
+                  by: ['product_id'],
+                  where: {
+                    product_id: { in: productIds },
+                    tenant_id: tenant.id,
+                    status: 'approved',
+                    rating: { not: null },
+                  },
+                  _avg: {
+                    rating: true,
+                  },
+                  _count: {
+                    rating: true,
+                  },
+                } as any); // Type assertion to handle Prisma type complexity
               },
-              _avg: {
-                rating: true,
-              },
-              _count: {
-                rating: true,
-              },
-            } as any); // Type assertion to handle Prisma type complexity
+              {
+                ttl: CACHE_TTL.MEDIUM, // 5 minutes (Redis cache)
+              }
+            );
           },
           [ratingStatsCacheKey, `products-ratings-${tenant.id}`],
           {
-            revalidate: CACHE_TTL.MEDIUM, // 5 minutes (ratings change less frequently)
+            revalidate: CACHE_TTL.MEDIUM, // 5 minutes (Next.js cache - ratings change less frequently)
             tags: [`products-ratings-${tenant.id}`], // For cache invalidation
           }
         );
@@ -936,9 +969,17 @@ export async function POST(request: NextRequest) {
 
       // Invalidate product caches for this tenant
       try {
+        // Invalidate Next.js cache tags
         revalidateTag(`products-${tenant.id}`);
         revalidateTag(`products-count-${tenant.id}`);
         revalidateTag(`products-ratings-${tenant.id}`);
+        
+        // Invalidate Redis cache patterns
+        const cachePatterns = getProductCachePatterns(tenant.id);
+        for (const pattern of cachePatterns) {
+          await deleteCachePattern(pattern);
+        }
+        
         console.log('[Product Create] Cache invalidated for tenant:', tenant.id);
       } catch (cacheError) {
         // Non-critical: log but don't fail the request

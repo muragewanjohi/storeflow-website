@@ -68,8 +68,27 @@ export default async function ProductsPage({
   const limit = 12;
   const search = (params.search as string) || '';
   const categoryParam = (params.category as string) || '';
-  const sort_by = (params.sort as string) || 'created_at';
-  const sort_order = (params.order as string) || 'desc';
+  
+  // Map sort parameter to Prisma field (same as client component)
+  const sortParam = (params.sort as string) || 'popular';
+  let sort_by: string;
+  let sort_order: string;
+  
+  if (sortParam === 'new') {
+    sort_by = 'created_at';
+    sort_order = 'desc';
+  } else if (sortParam === 'low_price') {
+    sort_by = 'price';
+    sort_order = 'asc';
+  } else if (sortParam === 'popular') {
+    // For popular, sort by created_at desc as a proxy (in real app, would use views/sales)
+    sort_by = 'created_at';
+    sort_order = 'desc';
+  } else {
+    // Default fallback
+    sort_by = 'created_at';
+    sort_order = 'desc';
+  }
 
   // Build where clause
   const where: any = {

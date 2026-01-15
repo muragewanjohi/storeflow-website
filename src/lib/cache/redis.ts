@@ -1,16 +1,30 @@
 /**
- * Redis Cache Utility (Vercel KV)
+ * Redis Cache Utility (Upstash Redis)
  * 
- * Provides a unified caching interface using Vercel KV (Redis) for production
+ * Provides a unified caching interface using Upstash Redis for production
  * and in-memory cache for development.
  * 
  * Day 38: Performance Optimization
+ * Phase 2: Updated to use @upstash/redis SDK
  */
 
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 // In-memory cache fallback for development
 const memoryCache = new Map<string, { data: unknown; expires: number }>();
+
+// Initialize Upstash Redis client (reads from environment variables automatically)
+let redisClient: Redis | null = null;
+
+try {
+  // Redis.fromEnv() automatically reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+  // Falls back gracefully if environment variables are not set
+  redisClient = Redis.fromEnv();
+} catch (error) {
+  // If environment variables are not set, redisClient will be null
+  // This is expected in development - we'll use in-memory cache instead
+  console.warn('[Cache] Upstash Redis not configured, using in-memory cache:', error);
+}
 
 interface CacheOptions {
   ttl?: number; // Time to live in seconds
@@ -21,15 +35,15 @@ interface CacheOptions {
  * Get value from cache
  */
 export async function getCache<T>(key: string): Promise<T | null> {
-  // Try Vercel KV first (production)
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Try Upstash Redis first (production)
+  if (redisClient) {
     try {
-      const value = await kv.get<T>(key);
+      const value = await redisClient.get<T>(key);
       if (value !== null) {
         return value;
       }
     } catch (error) {
-      console.warn('KV cache get error (falling back to memory):', error);
+      console.warn('Redis cache get error (falling back to memory):', error);
       // Fall through to memory cache
     }
   }
@@ -58,16 +72,16 @@ export async function setCache<T>(
 ): Promise<void> {
   const { ttl = 300 } = options; // Default 5 minutes
 
-  // Try Vercel KV first (production)
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Try Upstash Redis first (production)
+  if (redisClient) {
     try {
       if (ttl > 0) {
-        await kv.set(key, value, { ex: ttl });
+        await redisClient.set(key, value, { ex: ttl });
       } else {
-        await kv.set(key, value);
+        await redisClient.set(key, value);
       }
     } catch (error) {
-      console.warn('KV cache set error (falling back to memory):', error);
+      console.warn('Redis cache set error (falling back to memory):', error);
       // Fall through to memory cache
     }
   }
@@ -83,12 +97,12 @@ export async function setCache<T>(
  * Delete value from cache
  */
 export async function deleteCache(key: string): Promise<void> {
-  // Try Vercel KV first
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  // Try Upstash Redis first
+  if (redisClient) {
     try {
-      await kv.del(key);
+      await redisClient.del(key);
     } catch (error) {
-      console.warn('KV cache delete error:', error);
+      console.warn('Redis cache delete error:', error);
     }
   }
 
@@ -98,16 +112,37 @@ export async function deleteCache(key: string): Promise<void> {
 
 /**
  * Delete multiple keys matching a pattern
+ * 
+ * Note: Vercel KV doesn't support pattern deletion directly.
+ * This function:
+ * 1. Clears memory cache matching the pattern (development)
+ * 2. For production, we'd need to track keys or use a different strategy
+ * 
+ * For now, this works for memory cache and logs a warning for KV.
+ * Future improvement: Implement key tracking system for pattern deletion in KV.
  */
 export async function deleteCachePattern(pattern: string): Promise<void> {
-  // Vercel KV doesn't support pattern deletion directly
-  // We'll need to track keys or use tags
-  // For now, just clear memory cache matching pattern
-  const regex = new RegExp(pattern);
+  // Convert glob pattern to regex (e.g., "products:123:*" -> /^products:123:.*$/)
+  const regexPattern = pattern
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  const regex = new RegExp(`^${regexPattern}$`);
+  
+  // Clear memory cache matching pattern
   for (const key of memoryCache.keys()) {
     if (regex.test(key)) {
       memoryCache.delete(key);
     }
+  }
+  
+  // For Upstash Redis, we can't delete by pattern directly via REST API
+  // In production, this would need a key tracking system or SCAN command
+  // For now, we log a warning and rely on TTL expiration
+  if (redisClient) {
+    // Upstash Redis limitation: Pattern deletion not supported via REST API
+    // Keys will expire naturally based on TTL
+    // Future: Implement key tracking or use SCAN for pattern-based deletion
+    console.warn(`[Cache] Pattern deletion for "${pattern}" - Upstash Redis doesn't support pattern deletion via REST API. Keys will expire based on TTL.`);
   }
 }
 

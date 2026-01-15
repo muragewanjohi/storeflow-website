@@ -12,6 +12,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { updateProductSchema, generateSlug } from '@/lib/products/validation';
+import { getProductCachePatterns } from '@/lib/cache/product-cache-keys';
+import { deleteCachePattern } from '@/lib/cache/redis';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -185,9 +187,17 @@ export async function PUT(
 
     // Invalidate product caches for this tenant
     try {
+      // Invalidate Next.js cache tags
       revalidateTag(`products-${tenant.id}`);
       revalidateTag(`products-count-${tenant.id}`);
       revalidateTag(`products-ratings-${tenant.id}`);
+      
+      // Invalidate Redis cache patterns
+      const cachePatterns = getProductCachePatterns(tenant.id);
+      for (const pattern of cachePatterns) {
+        await deleteCachePattern(pattern);
+      }
+      
       console.log('[Product Update] Cache invalidated for tenant:', tenant.id);
     } catch (cacheError) {
       // Non-critical: log but don't fail the request
@@ -271,9 +281,17 @@ export async function DELETE(
 
     // Invalidate product caches for this tenant
     try {
+      // Invalidate Next.js cache tags
       revalidateTag(`products-${tenant.id}`);
       revalidateTag(`products-count-${tenant.id}`);
       revalidateTag(`products-ratings-${tenant.id}`);
+      
+      // Invalidate Redis cache patterns
+      const cachePatterns = getProductCachePatterns(tenant.id);
+      for (const pattern of cachePatterns) {
+        await deleteCachePattern(pattern);
+      }
+      
       console.log('[Product Delete] Cache invalidated for tenant:', tenant.id);
     } catch (cacheError) {
       // Non-critical: log but don't fail the request

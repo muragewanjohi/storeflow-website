@@ -112,3 +112,16 @@ export function getProductRatingStatsCacheKey(
   const idsHash = hashObject({ ids: sortedIds });
   return `products:${tenantId}:ratings:${idsHash}`;
 }
+
+/**
+ * Invalidate all product caches for a tenant
+ * Returns cache key patterns that should be invalidated
+ */
+export function getProductCachePatterns(tenantId: string): string[] {
+  return [
+    `products:${tenantId}:list:*`,
+    `products:${tenantId}:count:*`,
+    `products:${tenantId}:ratings:*`,
+    `products:${tenantId}:detail:*`,
+  ];
+}
