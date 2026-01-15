@@ -45,6 +45,10 @@ export async function GET(request: NextRequest) {
         queryParams[key] = parseFloat(value);
       } else if (key === 'in_stock') {
         queryParams[key] = value === 'true';
+      } else if (key === 'category') {
+        // Map 'category' parameter to 'category_id' for schema validation
+        // The API code handles comma-separated values, so we pass it through
+        queryParams.category_id = value;
       } else {
         queryParams[key] = value;
       }
@@ -129,6 +133,8 @@ export async function GET(request: NextRequest) {
 
     // Category filter - support multiple categories (comma-separated) and slugs
     if (category_id) {
+      console.log('[Products API] Processing category filter', { category_id, tenantId: tenant.id });
+      
       // Split by comma and clean up each param
       const categoryParams = category_id
         .split(',')
@@ -148,9 +154,11 @@ export async function GET(request: NextRequest) {
         
         if (uuidRegex.test(param)) {
           // It's a UUID, use directly
+          console.log('[Products API] Category is UUID, using directly:', param);
           categoryIds.push(param);
         } else {
           // It's a slug, look up the category
+          console.log('[Products API] Category is slug, looking up:', param);
           const category = await prisma.categories.findFirst({
             where: {
               tenant_id: tenant.id,
@@ -163,7 +171,10 @@ export async function GET(request: NextRequest) {
           });
           
           if (category) {
+            console.log('[Products API] Found category by slug:', category.id);
             categoryIds.push(category.id);
+          } else {
+            console.warn('[Products API] Category not found by slug:', param);
           }
         }
       }
@@ -171,9 +182,13 @@ export async function GET(request: NextRequest) {
       if (categoryIds.length > 0) {
         if (categoryIds.length === 1) {
           where.category_id = categoryIds[0];
+          console.log('[Products API] Applied single category filter:', categoryIds[0]);
         } else {
           where.category_id = { in: categoryIds };
+          console.log('[Products API] Applied multiple category filter:', categoryIds);
         }
+      } else {
+        console.warn('[Products API] No valid category IDs found after processing');
       }
     }
 
@@ -273,12 +288,13 @@ export async function GET(request: NextRequest) {
     orderBy[sort_by] = sort_order;
 
     // Generate cache key for this query
+    // Use category_id from validated query (which may have been mapped from 'category' parameter)
     const cacheKey = getProductsListCacheKey(tenant.id, {
       page: pageNum,
       limit: limitNum,
       search,
       status,
-      category_id,
+      category_id: category_id || searchParams.get('category') || undefined, // Support both category_id and category
       brand_id,
       min_price,
       max_price,

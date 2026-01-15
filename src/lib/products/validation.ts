@@ -62,7 +62,15 @@ export const productQuerySchema = z.object({
   ).default(20).optional(),
   search: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft', 'archived']).optional(),
-  category_id: z.string().uuid().optional(),
+  category_id: z.union([
+    z.string().uuid(),
+    z.string().refine((val) => {
+      // Allow comma-separated UUIDs for multiple categories
+      const parts = val.split(',').map(p => p.trim()).filter(Boolean);
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return parts.every(part => uuidRegex.test(part) || part.length > 0); // Allow UUIDs or slugs
+    }, { message: "Invalid category format" })
+  ]).optional(),
   brand_id: z.string().uuid().optional(),
   min_price: z.preprocess(
     (val) => {

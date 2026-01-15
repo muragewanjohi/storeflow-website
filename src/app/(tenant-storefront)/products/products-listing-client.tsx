@@ -126,13 +126,23 @@ function ProductsListingClient({
       if (search) params.append('search', search);
       
       // Fetch products from API with pagination and filters
-      const response = await fetch(`/api/products?${params.toString()}`);
+      const apiUrl = `/api/products?${params.toString()}`;
+      console.log('[Products Client] Fetching products:', apiUrl);
+      
+      const response = await fetch(apiUrl);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        const errorText = await response.text();
+        console.error('[Products Client] API error:', response.status, errorText);
+        throw new Error(`Failed to fetch products: ${response.status} ${errorText}`);
       }
       
       const data = await response.json();
+      console.log('[Products Client] Products fetched:', {
+        count: data.products?.length || 0,
+        total: data.pagination?.total || 0,
+        filters: { categoryIds, attributeFilters },
+      });
       
       // Convert products to match Product interface
       const fetchedProducts: Product[] = (data.products || []).map((p: any) => ({
@@ -403,16 +413,8 @@ function ProductsListingClient({
     );
   }
 
-  if (products.length === 0 && !isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6">Products</h1>
-        <div className="text-center py-12">
-          <p className="text-lg text-muted-foreground">No products found</p>
-        </div>
-      </div>
-    );
-  }
+  // Don't return early - always show filters even when no products
+  const hasNoProducts = products.length === 0 && !isLoading;
 
   const pageNumbers = getPageNumbers();
 
@@ -644,7 +646,14 @@ function ProductsListingClient({
       </div>
 
       {/* Products Grid */}
-      {isLoading && products.length > 0 ? (
+      {hasNoProducts ? (
+        <div className="text-center py-12">
+          <p className="text-lg text-muted-foreground mb-4">No products found</p>
+          <p className="text-sm text-muted-foreground">
+            Try adjusting your filters or clearing them to see more products.
+          </p>
+        </div>
+      ) : isLoading && products.length > 0 ? (
         <div className="relative">
           <div className="opacity-50 pointer-events-none">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
