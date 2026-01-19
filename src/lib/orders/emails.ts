@@ -332,6 +332,10 @@ export async function sendNewOrderAlertEmail({
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
           <p>Hello,</p>
           
+          <p style="font-size: 18px; font-weight: bold; margin: 20px 0;">
+            Order ${order.order_number} - ${formattedTotal}
+          </p>
+          
           <p>A new order has been placed in your store <strong>${tenant.name}</strong>.</p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
@@ -340,7 +344,7 @@ export async function sendNewOrderAlertEmail({
             <p><strong>Customer:</strong> ${order.name || 'N/A'}</p>
             <p><strong>Email:</strong> ${order.email || 'N/A'}</p>
             <p><strong>Phone:</strong> ${order.phone || 'N/A'}</p>
-            <p><strong>Total Amount:</strong> ${formattedTotal}</p>
+            <p><strong>Total Amount:</strong> <strong style="font-size: 18px; color: #059669;">${formattedTotal}</strong></p>
             <p><strong>Payment Status:</strong> ${order.payment_status}</p>
             <p><strong>Order Date:</strong> ${new Date(order.created_at || '').toLocaleDateString()}</p>
           </div>
@@ -419,7 +423,7 @@ Please process this order as soon as possible.
 
   return sendAdminEmail({
     to: adminEmail,
-    subject: `New Order Alert - ${order.order_number}`,
+    subject: `New Order: ${order.order_number} - ${formattedTotal}`,
     html,
     text,
     tenant,
@@ -860,6 +864,125 @@ ${tenant.name}
   return sendCustomerEmail({
     to: customerEmail,
     subject: `Payment Status Update - ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}
+
+/**
+ * Send delivery fee quote email to customer
+ * Sent when store owner calculates and sends a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteEmail({
+  order,
+  tenant,
+  deliveryFeeQuote,
+  notes,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  deliveryFeeQuote: number;
+  notes?: string | null;
+}) {
+  const customerEmail = order.email;
+  const customerName = order.name || 'Customer';
+
+  if (!customerEmail) {
+    console.warn('No customer email for order', order.order_number);
+    return { success: false, error: 'No customer email' };
+  }
+
+  const storeUrl = getTenantStoreUrl(tenant);
+  const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const contactEmail = getTenantContactEmail(tenant);
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(deliveryFeeQuote, currency);
+  const formattedTotal = formatCurrencyForEmail(Number(order.total_amount) + deliveryFeeQuote, currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+          <h1 style="color: #92400e; margin-top: 0;">📦 Delivery Fee Quote Required</h1>
+          <p style="margin: 0; color: #78350f;">We've calculated the delivery fee for your order.</p>
+        </div>
+
+        <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+          <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Order: ${order.order_number}</h2>
+          
+          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #92400e;">📦 Delivery Fee Quote</p>
+            <p style="margin: 0; font-size: 24px; font-weight: bold; color: #92400e;">${formattedQuote}</p>
+            ${notes ? `<p style="margin: 10px 0 0 0; color: #78350f; font-size: 14px;">${notes}</p>` : ''}
+          </div>
+
+          <div style="margin: 20px 0;">
+            <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Order Subtotal</p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold;">${formatCurrencyForEmail(Number(order.total_amount), currency)}</p>
+          </div>
+
+          <div style="margin: 20px 0; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+            <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">New Total (including delivery)</p>
+            <p style="margin: 0; font-size: 24px; font-weight: bold; color: #059669;">${formattedTotal}</p>
+          </div>
+
+          <div style="margin: 30px 0; padding: 20px; background-color: #f0f9ff; border-radius: 8px;">
+            <p style="margin: 0 0 15px 0; font-weight: bold; color: #1e40af;">Action Required</p>
+            <p style="margin: 0 0 20px 0; color: #1e3a8a;">
+              Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
+            </p>
+            <a href="${orderUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-right: 10px;">
+              Review & Approve Quote
+            </a>
+          </div>
+        </div>
+        
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+          If you have any questions about this delivery fee, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
+        </p>
+        
+        <p style="color: #666; font-size: 14px;">
+          Best regards,<br>
+          ${tenant.name}
+        </p>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote - ${order.order_number}
+
+Hello ${customerName},
+
+We've calculated the delivery fee for your order ${order.order_number}.
+
+Delivery Fee Quote: ${formattedQuote}
+${notes ? `Notes: ${notes}` : ''}
+
+Order Subtotal: ${formatCurrencyForEmail(Number(order.total_amount), currency)}
+New Total (including delivery): ${formattedTotal}
+
+Action Required:
+Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
+
+Review your order: ${orderUrl}
+
+If you have any questions about this delivery fee, please contact us at ${contactEmail}.
+
+Best regards,
+${tenant.name}
+  `;
+
+  return sendCustomerEmail({
+    to: customerEmail,
+    subject: `Delivery Fee Quote for Order ${order.order_number}`,
     html,
     text,
     tenant,

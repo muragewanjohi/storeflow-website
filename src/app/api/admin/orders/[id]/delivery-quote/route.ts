@@ -10,6 +10,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { sendDeliveryFeeQuoteEmail } from '@/lib/orders/emails';
 
 const deliveryQuoteSchema = z.object({
   delivery_fee_quote: z.number().min(0, 'Delivery fee must be positive'),
@@ -62,9 +63,32 @@ export async function PUT(
         total_amount: newTotal,
         updated_at: new Date(),
       },
+      include: {
+        order_products: {
+          include: {
+            products: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                slug: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    // TODO: Send notification email to customer about the quote
+    // Send notification email to customer about the quote
+    sendDeliveryFeeQuoteEmail({
+      order: updated as any,
+      tenant,
+      deliveryFeeQuote: deliveryFee,
+      notes: validatedData.delivery_fee_notes || null,
+    }).catch((error) => {
+      console.error('Error sending delivery fee quote email:', error);
+      // Don't fail the request if email fails
+    });
 
     return NextResponse.json({
       success: true,

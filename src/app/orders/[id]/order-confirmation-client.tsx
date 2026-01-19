@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingInput from '@/components/storefront/rating-input';
@@ -23,7 +23,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 interface OrderProduct {
@@ -84,6 +96,11 @@ export default function OrderConfirmationClient({
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<OrderProduct | null>(null);
   const [isLoadingReviews, setIsLoadingReviews] = useState(true);
+  const [isProcessingQuote, setIsProcessingQuote] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
@@ -93,6 +110,100 @@ export default function OrderConfirmationClient({
   const shippingCarrier = order.order_details?.shipping_carrier || null;
   const isShipped = order.status?.toLowerCase() === 'shipped';
   const isPaid = order.payment_status?.toLowerCase() === 'paid';
+
+  // Handle approve delivery quote
+  const handleApproveQuote = async () => {
+    setIsProcessingQuote(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/delivery-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to approve quote');
+      }
+
+      toast.success('Delivery fee approved! Your order will proceed.');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve delivery fee');
+    } finally {
+      setIsProcessingQuote(false);
+    }
+  };
+
+  // Handle reject delivery quote
+  const handleRejectQuote = async () => {
+    setIsProcessingQuote(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/delivery-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reject',
+          reason: rejectReason || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to reject quote');
+      }
+
+      toast.success('Delivery fee rejected. You can cancel the order if needed.');
+      setRejectReason('');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject delivery fee');
+    } finally {
+      setIsProcessingQuote(false);
+      setShowRejectDialog(false);
+    }
+  };
+
+  // Handle cancel order
+  const handleCancelOrder = async () => {
+    setIsProcessingQuote(true);
+    try {
+      // First reject the quote if not already rejected
+      if (order.delivery_fee_status === 'quoted') {
+        await fetch(`/api/orders/${order.id}/delivery-fee`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'reject',
+            reason: cancelReason || 'Customer cancelled due to delivery fee',
+          }),
+        });
+      }
+
+      // Then cancel the order
+      const response = await fetch(`/api/customers/orders/${order.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reason: cancelReason || 'Order cancelled by customer due to delivery fee rejection',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to cancel order');
+      }
+
+      toast.success('Order cancelled successfully.');
+      setCancelReason('');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to cancel order');
+    } finally {
+      setIsProcessingQuote(false);
+      setShowCancelDialog(false);
+    }
+  };
 
   // Check review status for all products in order
   useEffect(() => {
@@ -553,6 +664,87 @@ export default function OrderConfirmationClient({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Reject Quote Dialog */}
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Delivery Fee Quote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              If you reject this delivery fee quote, you can choose to cancel the order. 
+              Would you like to provide a reason for rejecting the quote?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="reject-reason">Reason (optional)</Label>
+              <Textarea
+                id="reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g., Delivery fee is too high, location is too far..."
+                rows={3}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRejectReason('')}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowRejectDialog(false);
+                setShowCancelDialog(true);
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              Reject & Cancel Order
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleRejectQuote}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Reject Only
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Order Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel order {order.order_number}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="cancel-reason">Reason for cancellation (optional)</Label>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g., Delivery fee too high..."
+                rows={3}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setCancelReason('');
+              setRejectReason('');
+            }}>Keep Order</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelOrder}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Yes, Cancel Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

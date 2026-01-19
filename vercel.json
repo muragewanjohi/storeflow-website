@@ -1,4 +1,7 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/admin/subscriptions/expiry-checker",
@@ -28,6 +31,10 @@
       "path": "/api/admin/sales/automate",
       "schedule": "*/15 * * * *"
     }
-  ]
+  ],
+  "healthCheck": {
+    "path": "/api/health",
+    "interval": 60
+  }
 }
 
