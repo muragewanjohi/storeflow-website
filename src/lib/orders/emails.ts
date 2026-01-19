@@ -10,6 +10,7 @@ import type { Prisma } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/currency-context';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 // Decimal type from Prisma
 type Decimal = Prisma.Decimal;
@@ -28,7 +29,8 @@ export function getTenantContactEmail(tenant: Tenant): string {
   if (tenant.custom_domain) {
     return `support@${tenant.custom_domain}`;
   }
-  return `support@${tenant.subdomain}.dukanest.com`;
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+  return `support@${tenant.subdomain}.${baseDomain}`;
 }
 
 /**
@@ -150,7 +152,7 @@ export async function sendOrderPlacedEmail({
   }));
 
   const totalAmount = Number(order.total_amount);
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
   
@@ -309,7 +311,7 @@ export async function sendNewOrderAlertEmail({
   }));
 
   const totalAmount = Number(order.total_amount);
-  const dashboardUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/orders/${order.id}`;
+  const dashboardUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
   
   // Format currency amounts with proper symbol and spacing
   const formattedTotal = formatCurrencyForEmail(totalAmount, currency);
@@ -448,7 +450,7 @@ export async function sendOrderShippedEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -530,7 +532,7 @@ export async function sendOrderDeliveredEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -615,7 +617,7 @@ export async function sendOrderStatusUpdateEmail({
     return { success: true, skipped: true };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -740,7 +742,7 @@ export async function sendPaymentStatusUpdateEmail({
     return { success: true, skipped: true };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -886,7 +888,7 @@ export async function sendOrderCancelledEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 

@@ -91,8 +91,9 @@ export async function PUT(
     }
 
     const projectId = process.env.VERCEL_PROJECT_ID;
-    const oldSubdomainUrl = `${tenant.subdomain}.dukanest.com`;
-    const newSubdomainUrl = `${newSubdomain}.dukanest.com`;
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const oldSubdomainUrl = `${tenant.subdomain}.${baseDomain}`;
+    const newSubdomainUrl = `${newSubdomain}.${baseDomain}`;
 
     // Update subdomain in database first
     const updatedTenant = await prisma.tenants.update({

@@ -333,7 +333,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                             title="Visit Store"
                           >
                             <a
-                              href={`https://${tenant.subdomain}.dukanest.com`}
+                              href={`https://${tenant.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

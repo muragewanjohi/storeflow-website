@@ -250,7 +250,8 @@ export async function DELETE(
     // Remove subdomain from Vercel (non-blocking)
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId && tenant.subdomain) {
-      const subdomainUrl = `${tenant.subdomain}.dukanest.com`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      const subdomainUrl = `${tenant.subdomain}.${baseDomain}`;
       removeTenantDomain(subdomainUrl, projectId).catch((error) => {
         // Log error but don't fail tenant deletion
         console.error(`Failed to remove subdomain ${subdomainUrl} from Vercel:`, error);

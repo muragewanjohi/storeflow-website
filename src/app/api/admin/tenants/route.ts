@@ -265,7 +265,8 @@ export async function POST(request: NextRequest) {
     // Automatically add subdomain to Vercel (non-blocking)
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId) {
-      const subdomainUrl = `${normalizedSubdomain}.dukanest.com`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      const subdomainUrl = `${normalizedSubdomain}.${baseDomain}`;
       addTenantDomain(subdomainUrl, projectId).catch((error) => {
         // Log error but don't fail tenant creation
         // Subdomain can be added manually later if needed

@@ -205,32 +205,26 @@ DISABLE_MFA_TEMPORARILY=false
 
 If you want to deploy a development environment on Vercel (useful for testing without local setup), follow these steps:
 
-### Option 1: Create a Development Branch (Recommended)
+### Recommended: Use Preview Deployments
 
-This allows you to have separate production and development deployments:
+This is the simplest approach - use a development branch with Vercel's automatic preview deployments. No need to create a separate project!
 
 #### Step 1: Create Development Branch
 
 ```bash
 # Create and switch to development branch
-git checkout -b development
+git checkout -b dev
 
 # Push to GitHub
-git push -u origin development
+git push -u origin dev
 ```
 
-#### Step 2: Create Separate Vercel Project for Development
+**What happens:** Vercel automatically creates a preview deployment for your `dev` branch.
 
-1. **Go to Vercel Dashboard:** https://vercel.com/dashboard
-2. **Click "Add New Project"**
-3. **Import the same repository** but select the `development` branch
-4. **Project Name:** Use something like `storeflow-dev` or `storeflow-development`
-5. **Click "Import"**
+#### Step 2: Configure Environment Variables for Preview
 
-#### Step 3: Configure Environment Variables for Development
-
-1. **Go to Project Settings → Environment Variables**
-2. **Add/Update these variables for Development environment:**
+1. **Go to your existing Vercel project → Settings → Environment Variables**
+2. **Add/Update these variables with "Preview" environment selected:**
 
 ```env
 # Set NODE_ENV to development (required for bypass to work)
@@ -245,8 +239,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-dev-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-dev-service-role-key
 DATABASE_URL=postgresql://...your-dev-database...
 
-# Development app URL
-NEXT_PUBLIC_APP_URL=https://storeflow-dev.vercel.app
+# Development app URL (will be your preview URL)
+NEXT_PUBLIC_APP_URL=https://storeflow-git-dev-yourteam.vercel.app
 
 # SendGrid (optional - can be same as production or different)
 SENDGRID_API_KEY=your-sendgrid-key
@@ -254,55 +248,37 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 SENDGRID_FROM_NAME=StoreFlow Dev
 ```
 
-3. **Important:** Make sure to select **"Development"** environment when adding variables
+3. **Important:** Make sure to select **"Preview"** environment when adding variables
 4. **Click "Save"**
-
-#### Step 4: Deploy Development Branch
-
-1. **Push changes to development branch:**
-   ```bash
-   git checkout development
-   # Make any changes
-   git add .
-   git commit -m "Development setup"
-   git push origin development
-   ```
-
-2. **Vercel will automatically deploy** the development branch
-3. **Access your dev environment** at: `https://storeflow-dev.vercel.app`
-
-### Option 2: Use Preview Deployments (Alternative)
-
-If you prefer to keep one branch, you can use Vercel's preview deployments:
-
-#### Step 1: Configure Environment Variables for Preview
-
-1. **Go to your existing Vercel project → Settings → Environment Variables**
-2. **Add variables with "Preview" environment selected:**
-
-```env
-NODE_ENV=development
-DISABLE_MFA_TEMPORARILY=true
-# ... other variables
-```
-
-3. **Click "Save"**
-
-#### Step 2: Create Preview Branch
-
-```bash
-# Create a feature branch for development
-git checkout -b dev-preview
-
-# Push to GitHub
-git push -u origin dev-preview
-```
 
 #### Step 3: Access Preview Deployment
 
 - Vercel automatically creates preview deployments for all branches
-- Access at: `https://storeflow-git-dev-preview-yourteam.vercel.app`
+- Access at: `https://storeflow-git-dev-yourteam.vercel.app`
 - Or check the Vercel dashboard for the preview URL
+- The URL format is: `https://[project-name]-git-[branch-name]-[team].vercel.app`
+
+#### Workflow Summary
+
+| Step | Command / Action | What Happens on Vercel |
+|------|-----------------|------------------------|
+| **Create branch** | `git checkout -b dev` | - |
+| **Push branch** | `git push -u origin dev` | ✅ Auto → Preview Deployment created |
+| **Make changes** | `Edit → commit → git push` | ✅ New preview build & URL (updates automatically) |
+| **Test/QA** | `Open preview URL` | ✅ Safe testing, no effect on production |
+| **Ready for prod?** | `Create PR: dev → main` | ✅ Vercel comments preview link in PR |
+| **Merge PR** | `Merge on GitHub` | ✅ Triggers Production Deployment on main |
+
+### Alternative: Separate Vercel Project
+
+If you prefer a completely separate project:
+
+1. **Create a new Vercel project**
+2. **Import the same repository** but select the `dev` branch
+3. **Configure environment variables** for "Development" environment
+4. **Access at:** `https://storeflow-dev.vercel.app`
+
+This gives you a separate project but requires more management. The preview deployment approach is simpler and recommended.
 
 ### Important Notes for Vercel Development Environment
 

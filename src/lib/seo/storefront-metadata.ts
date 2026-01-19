@@ -34,9 +34,10 @@ export function generateStorefrontMetadata({
   const defaultDescription = description || `Shop at ${siteName} - Discover our amazing products and deals.`;
   
   // Construct full URL
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const baseUrl = tenant.custom_domain 
     ? `https://${tenant.custom_domain}`
-    : `https://${tenant.subdomain}.dukanest.com`;
+    : `https://${tenant.subdomain}.${baseDomain}`;
   const fullUrl = url ? `${baseUrl}${url}` : baseUrl;
 
   // Default image (can be tenant logo or storefront image)
@@ -94,9 +95,10 @@ export function generateProductMetadata({
   currency?: string;
 }): Metadata {
   const siteName = tenant.name || `${tenant.subdomain} Store`;
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const baseUrl = tenant.custom_domain 
     ? `https://${tenant.custom_domain}`
-    : `https://${tenant.subdomain}.dukanest.com`;
+    : `https://${tenant.subdomain}.${baseDomain}`;
   const fullUrl = `${baseUrl}${productUrl}`;
   
   const description = productDescription || `Buy ${productName} at ${siteName}. ${price ? `Price: ${new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price)}` : ''}`;
@@ -151,9 +153,10 @@ export function generateProductStructuredData({
   };
   productUrl: string;
 }) {
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const baseUrl = tenant.custom_domain 
     ? `https://${tenant.custom_domain}`
-    : `https://${tenant.subdomain}.dukanest.com`;
+    : `https://${tenant.subdomain}.${baseDomain}`;
   const fullUrl = `${baseUrl}${productUrl}`;
 
   return {
@@ -181,9 +184,10 @@ export function generateOrganizationStructuredData({
 }: {
   tenant: Tenant;
 }) {
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const baseUrl = tenant.custom_domain 
     ? `https://${tenant.custom_domain}`
-    : `https://${tenant.subdomain}.dukanest.com`;
+    : `https://${tenant.subdomain}.${baseDomain}`;
 
   return {
     '@context': 'https://schema.org/',

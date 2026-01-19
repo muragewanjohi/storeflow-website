@@ -7,6 +7,7 @@
 import { sendCustomerEmail } from '@/lib/email/service';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 interface Customer {
   id: string;
@@ -26,7 +27,7 @@ export async function sendCustomerWelcomeEmail({
   tenant: Tenant;
   verificationToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const verificationUrl = `${storeUrl}/verify-email?token=${verificationToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 
@@ -110,7 +111,7 @@ export async function sendCustomerPasswordResetEmail({
   tenant: Tenant;
   resetToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const resetUrl = `${storeUrl}/reset-password?token=${resetToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 
@@ -185,7 +186,7 @@ export async function sendCustomerEmailVerificationEmail({
   tenant: Tenant;
   verificationToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const verificationUrl = `${storeUrl}/verify-email?token=${verificationToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 

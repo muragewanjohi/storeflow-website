@@ -243,12 +243,12 @@ export default function DashboardClient({
                 <p className="text-sm text-muted-foreground">
                   Your store <strong>{tenantName}</strong> is live at{' '}
                   <a 
-                    href={`https://${subdomain}.dukanest.com`} 
+                    href={`https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-primary hover:underline"
                   >
-                    {subdomain}.dukanest.com
+                    {subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
                   </a>
                 </p>
                 {planInfo && (

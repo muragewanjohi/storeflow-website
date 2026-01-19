@@ -141,11 +141,11 @@ export default function CreateTenantForm() {
                 maxLength={63}
               />
               <span className="text-sm text-muted-foreground whitespace-nowrap">
-                .dukanest.com
+                .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Only lowercase letters, numbers, and hyphens. Will be accessible at {formData.subdomain || 'subdomain'}.dukanest.com
+              Only lowercase letters, numbers, and hyphens. Will be accessible at {formData.subdomain || 'subdomain'}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
             </p>
           </div>
 

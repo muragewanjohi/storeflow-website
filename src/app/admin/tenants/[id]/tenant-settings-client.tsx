@@ -152,7 +152,8 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(`Subdomain changed successfully to ${newSubdomain}.dukanest.com`);
+        const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+        setSuccess(`Subdomain changed successfully to ${newSubdomain}.${baseDomain}`);
         setSubdomain(newSubdomain);
         setNewSubdomain('');
         router.refresh();
@@ -346,7 +347,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
               asChild
             >
               <a
-                href={`https://${subdomain}.dukanest.com/dashboard`}
+                href={`https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}/dashboard`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -421,7 +422,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
         <CardHeader>
           <CardTitle>Subdomain</CardTitle>
           <CardDescription>
-            Current subdomain: <code className="text-sm bg-muted px-2 py-1 rounded">{subdomain}.dukanest.com</code>
+            Current subdomain: <code className="text-sm bg-muted px-2 py-1 rounded">{subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}</code>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -438,7 +439,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
                   minLength={3}
                   maxLength={63}
                 />
-                <span className="flex items-center text-muted-foreground">.dukanest.com</span>
+                <span className="flex items-center text-muted-foreground">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}</span>
               </div>
               {subdomainError && (
                 <p className="text-sm text-destructive">{subdomainError}</p>

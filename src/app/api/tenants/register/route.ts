@@ -251,14 +251,16 @@ export async function POST(request: NextRequest) {
       const url = new URL(baseUrl);
       loginUrl = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard/login`;
     } else {
-      loginUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/login`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      loginUrl = `https://${tenant.subdomain}.${baseDomain}/dashboard/login`;
     }
 
     // Automatically add subdomain to Vercel
     // IMPORTANT: We await this to ensure domain is added before user tries to access it
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId && !isLocalhost) {
-      const subdomainUrl = `${tenant.subdomain}.dukanest.com`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      const subdomainUrl = `${tenant.subdomain}.${baseDomain}`;
       try {
         await addTenantDomain(subdomainUrl, projectId);
         console.log(`✅ Successfully added subdomain ${subdomainUrl} to Vercel`);
@@ -275,7 +277,8 @@ export async function POST(request: NextRequest) {
     // Clear any cached tenant data to ensure fresh lookup
     // This is important because the tenant was just created
     try {
-      const subdomainHostname = `${tenant.subdomain}.dukanest.com`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      const subdomainHostname = `${tenant.subdomain}.${baseDomain}`;
       await clearCachedTenant(subdomainHostname);
       // Also clear by subdomain alone (in case it was cached differently)
       await clearCachedTenant(tenant.subdomain);
