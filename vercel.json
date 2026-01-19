@@ -31,10 +31,6 @@
       "path": "/api/admin/sales/automate",
       "schedule": "*/15 * * * *"
     }
-  ],
-  "healthCheck": {
-    "path": "/api/health",
-    "interval": 60
-  }
+  ]
 }
 
