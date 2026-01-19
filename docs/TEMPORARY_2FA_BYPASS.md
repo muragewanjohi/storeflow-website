@@ -229,8 +229,17 @@ git push -u origin dev
 
 #### Step 2: Configure Environment Variables for Preview
 
+⚠️ **CRITICAL:** You must set these variables for the **"Preview"** environment specifically!
+
 1. **Go to your existing Vercel project → Settings → Environment Variables**
-2. **Add/Update these variables with "Preview" environment selected:**
+2. **Click "Add Environment Variable"**
+3. **For EACH variable, make sure to:**
+   - Select **"Preview"** from the environment dropdown (NOT "Production" or "Development")
+   - Enter the exact variable name
+   - Enter the exact value (case-sensitive)
+   - Click "Save"
+
+4. **Add/Update these variables with "Preview" environment selected:**
 
 ```env
 # Set NODE_ENV to development (required for bypass to work)
