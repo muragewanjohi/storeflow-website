@@ -25,11 +25,16 @@ const loginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  console.log('[Login API] Request received', {
+  
+  // Log immediately with clear markers for Vercel logs
+  console.log('========================================');
+  console.log('[LOGIN API] POST /api/auth/tenant/login');
+  console.log('[LOGIN API] Request received', {
     url: request.url,
     method: request.method,
     timestamp: new Date().toISOString(),
   });
+  console.log('========================================');
 
   try {
     console.log('[Login API] Step 1: Parsing request body');
@@ -236,12 +241,14 @@ export async function POST(request: NextRequest) {
     const nodeEnv = process.env.NODE_ENV;
     
     // Debug logging to help diagnose bypass issues
-    console.log('[Login API] Bypass check:', {
-      DISABLE_MFA_TEMPORARILY: disableMFA,
-      NODE_ENV: nodeEnv,
-      disableMFAIsTrue: disableMFA === 'true',
-      nodeEnvIsDev: nodeEnv === 'development' || nodeEnv === 'test',
-    });
+    console.log('========================================');
+    console.log('[LOGIN API] BYPASS CHECK');
+    console.log('[LOGIN API] DISABLE_MFA_TEMPORARILY:', disableMFA);
+    console.log('[LOGIN API] NODE_ENV:', nodeEnv);
+    console.log('[LOGIN API] disableMFA === "true":', disableMFA === 'true');
+    console.log('[LOGIN API] nodeEnv is dev/test:', nodeEnv === 'development' || nodeEnv === 'test');
+    console.log('[LOGIN API] BYPASS WILL BE:', disableMFA === 'true' && (nodeEnv === 'development' || nodeEnv === 'test'));
+    console.log('========================================');
     
     const bypassMFA = disableMFA === 'true' && 
                       (nodeEnv === 'development' || nodeEnv === 'test');
