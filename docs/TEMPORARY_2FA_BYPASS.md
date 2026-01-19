@@ -7,12 +7,15 @@
 ## When to Use This
 
 Use this bypass **only** when:
-- ✅ Waiting for SendGrid account approval (up to 72 hours)
+- ✅ Waiting for SendGrid account approval (up to 72 hours) - **Recommended!**
 - ✅ Email service is temporarily unavailable
 - ✅ Testing in development environment
 - ✅ Email service configuration is in progress
+- ✅ SendGrid account was rejected and switching to alternative service
 
 **⚠️ NEVER use this in production!**
+
+**💡 Don't Wait for SendGrid!** Use this bypass to continue development while waiting for approval. See [SendGrid Alternatives Guide](./SENDGRID_ALTERNATIVES.md) for what to do if SendGrid rejects your request.
 
 ---
 

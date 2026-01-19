@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MapPinIcon } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
@@ -666,6 +667,26 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* Shipping Methods Tab */}
         <TabsContent value="shipping" className="space-y-6">
+          {/* Delivery Zones Link */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Delivery Zones</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Manage delivery zones and pricing for different locations
+                  </p>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="/dashboard/settings/delivery-zones">
+                    <MapPinIcon className="mr-2 h-4 w-4" />
+                    Manage Zones
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
         <form onSubmit={handleSettingsSubmit}>
           <CardHeader>

@@ -25,8 +25,25 @@ This means the environment variables are either:
 2. Click **"Settings"** (in the top navigation)
 3. Click **"Environment Variables"** (in the left sidebar)
 
-### Step 2: Add NODE_ENV for Preview
+### Step 2: Check Existing Variables
 
+**IMPORTANT:** You might already have these variables set for "Development" or "Preview development", but you need them for **"Preview"** (without "development" suffix).
+
+**What to look for:**
+- ❌ "Development" environment - This is NOT used for branch deployments
+- ❌ "Preview development" - This might work, but "Preview" is clearer
+- ✅ "Preview" environment - This is what you need!
+
+### Step 3: Add/Update NODE_ENV for Preview
+
+**If variable exists for "Development" or "Preview development":**
+1. Click the "..." menu on the existing `NODE_ENV` variable
+2. Click "Edit"
+3. Make sure **"Preview"** is checked in the environment list
+4. If "Development" is checked, uncheck it (or keep both if you want)
+5. Click "Save"
+
+**If variable doesn't exist for Preview:**
 1. **Click "Add Environment Variable"** button
 2. **Key:** `NODE_ENV`
 3. **Value:** `development` (exactly, lowercase, no quotes)
@@ -35,26 +52,44 @@ This means the environment variables are either:
    - ⚠️ Select "Preview" - this applies to all branch deployments
 5. **Click "Save"**
 
-### Step 3: Add DISABLE_MFA_TEMPORARILY for Preview
+### Step 4: Add/Update DISABLE_MFA_TEMPORARILY for Preview
 
+**If variable exists for "Development" or "Preview development":**
+1. Click the "..." menu on the existing `DISABLE_MFA_TEMPORARILY` variable
+2. Click "Edit"
+3. Make sure **"Preview"** is checked in the environment list
+4. If "Development" is checked, uncheck it (or keep both if you want)
+5. Click "Save"
+
+**If variable doesn't exist for Preview:**
 1. **Click "Add Environment Variable"** button again
 2. **Key:** `DISABLE_MFA_TEMPORARILY`
 3. **Value:** `true` (exactly, lowercase, no quotes)
 4. **Environment:** Select **"Preview"** (this is critical!)
 5. **Click "Save"**
 
-### Step 4: Verify Variables Are Set
+### Step 5: Verify Variables Are Set
 
-After adding both variables, you should see in the list:
+After adding/updating both variables, you should see in the list:
 
+**Option A: Separate entries (Recommended)**
 | Key | Value | Environments |
 |-----|-------|--------------|
 | `NODE_ENV` | `development` | Preview ✓ |
 | `DISABLE_MFA_TEMPORARILY` | `true` | Preview ✓ |
 
-**Important:** Make sure both show "Preview" in the Environments column.
+**Option B: Combined entries (Also works)**
+| Key | Value | Environments |
+|-----|-------|--------------|
+| `NODE_ENV` | `development` | Preview ✓, Development ✓ |
+| `DISABLE_MFA_TEMPORARILY` | `true` | Preview ✓, Development ✓ |
 
-### Step 5: Redeploy (REQUIRED!)
+**Important:** 
+- Both variables MUST have "Preview" checked
+- "Development" environment is optional (not used for branch deployments)
+- "Preview" is what applies to your `dev` branch deployments
+
+### Step 6: Redeploy (REQUIRED!)
 
 ⚠️ **Environment variables only apply to NEW deployments!**
 
@@ -71,7 +106,7 @@ git commit --allow-empty -m "Trigger redeploy for env vars"
 git push origin dev
 ```
 
-### Step 6: Verify It Works
+### Step 7: Verify It Works
 
 1. **Wait for deployment to complete** (2-3 minutes)
 2. **Visit test endpoint:** `https://dev.dukanest.com/api/test-env`
@@ -93,9 +128,11 @@ git push origin dev
 - Variables set for "Production" don't apply to Preview deployments
 - Preview deployments need "Preview" environment variables
 
-### ❌ Wrong: Setting for "Development" Environment
+### ❌ Wrong: Setting for "Development" Environment Only
 - "Development" is a separate environment type
-- For branch deployments, use "Preview"
+- For branch deployments, you need "Preview" environment
+- "Development" environment is NOT used for Vercel deployments
+- You can have both checked, but "Preview" is required
 
 ### ❌ Wrong: Not Redeploying
 - Environment variables only apply to NEW deployments

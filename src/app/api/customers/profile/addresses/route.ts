@@ -17,35 +17,21 @@ export async function GET(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     
-    // TODO: Get customer from session
-    const customerId = new URL(request.url).searchParams.get('customer_id');
+    // Get customer from session
+    const { getCurrentCustomer } = await import('@/lib/customers/get-current-customer');
+    const customer = await getCurrentCustomer();
     
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Customer ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer exists
-    const customer = await prisma.customers.findFirst({
-      where: {
-        id: customerId,
-        tenant_id: tenant.id,
-      },
-    });
-
     if (!customer) {
       return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
     // Get addresses
     const addresses = await prisma.user_delivery_addresses.findMany({
       where: {
-        user_id: customerId,
+        user_id: customer.id,
         tenant_id: tenant.id,
       },
       orderBy: [
@@ -64,7 +50,9 @@ export async function GET(request: NextRequest) {
         address: address.address,
         city: address.city,
         state_id: address.state_id,
+        state: address.state_id, // For backward compatibility
         country_id: address.country_id,
+        country: address.country_id, // For backward compatibility
         postal_code: address.postal_code,
         is_default: address.is_default,
         created_at: address.created_at,
@@ -89,28 +77,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = customerAddressSchema.parse(body);
     
-    // TODO: Get customer from session
-    const customerId = body.customer_id;
+    // Get customer from session
+    const { getCurrentCustomer } = await import('@/lib/customers/get-current-customer');
+    const customer = await getCurrentCustomer();
     
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Customer ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer exists
-    const customer = await prisma.customers.findFirst({
-      where: {
-        id: customerId,
-        tenant_id: tenant.id,
-      },
-    });
-
     if (!customer) {
       return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
@@ -118,7 +92,7 @@ export async function POST(request: NextRequest) {
     if (validatedData.is_default) {
       await prisma.user_delivery_addresses.updateMany({
         where: {
-          user_id: customerId,
+          user_id: customer.id,
           tenant_id: tenant.id,
           is_default: true,
         },
@@ -132,7 +106,7 @@ export async function POST(request: NextRequest) {
     const address = await prisma.user_delivery_addresses.create({
       data: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        user_id: customer.id,
         name: validatedData.name,
         email: validatedData.email,
         phone: validatedData.phone,

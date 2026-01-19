@@ -32,6 +32,7 @@ export const updateCartItemSchema = z.object({
  */
 export const checkoutSchema = z.object({
   items: z.array(cartItemSchema).min(1, 'At least one item is required'),
+  delivery_method: z.enum(['delivery', 'pickup']).optional(),
   shipping_address: z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
@@ -42,7 +43,17 @@ export const checkoutSchema = z.object({
     state: z.string().min(1, 'State is required'),
     postal_code: z.string().min(1, 'Postal code is required'),
     country: z.string().min(1, 'Country is required'),
-  }),
+  }).optional().nullable(),
+  pickup_address: z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Invalid email address'),
+    phone: z.string().min(1, 'Phone is required'),
+    address: z.string().min(1, 'Address is required'),
+  }).optional().nullable(),
+  delivery_zone_id: z.string().uuid().optional().nullable(),
+  delivery_zone_name: z.string().optional().nullable(),
+  delivery_fee: z.number().min(0).optional().nullable(),
+  delivery_fee_status: z.enum(['pending', 'quoted', 'approved', 'rejected']).optional().nullable(),
   billing_address: z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),

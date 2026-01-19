@@ -165,6 +165,23 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Determine delivery method and address
+    const deliveryMethod = validatedData.delivery_method || 'delivery';
+    const isPickup = deliveryMethod === 'pickup';
+    
+    // Get customer info from appropriate address
+    const customerInfo = isPickup && validatedData.pickup_address
+      ? validatedData.pickup_address
+      : validatedData.shipping_address
+        ? validatedData.shipping_address
+        : { name: '', email: '', phone: '' };
+
+    // Calculate total with delivery fee
+    let finalTotal = totalAmount - (couponDiscounted || 0);
+    if (!isPickup && validatedData.delivery_fee) {
+      finalTotal += validatedData.delivery_fee;
+    }
+
     // Create order
     // For guest orders, user_id will be null (order tracked by email + order_number)
     const order = await prisma.orders.create({
@@ -172,18 +189,25 @@ export async function POST(request: NextRequest) {
         tenant_id: tenant.id,
         order_number: orderNumber,
         user_id: customerId, // null for guest orders
-        name: validatedData.shipping_address.name,
-        email: validatedData.shipping_address.email,
-        phone: validatedData.shipping_address.phone,
-        total_amount: totalAmount - (couponDiscounted || 0),
+        name: customerInfo.name,
+        email: customerInfo.email,
+        phone: customerInfo.phone,
+        total_amount: finalTotal,
         status: 'pending',
         payment_status: validatedData.payment_method === 'cash_on_delivery' ? 'pending' : 'pending',
         payment_gateway: validatedData.payment_method,
-        shipping_address: validatedData.shipping_address as any,
-        billing_address: (validatedData.billing_address || validatedData.shipping_address) as any,
+        shipping_address: isPickup 
+          ? (validatedData.pickup_address as any)
+          : (validatedData.shipping_address as any),
+        billing_address: (validatedData.billing_address || validatedData.shipping_address || validatedData.pickup_address) as any,
         coupon: validatedData.coupon_code || null,
         coupon_discounted: couponDiscounted,
         message: validatedData.notes || null,
+        checkout_type: isPickup ? 'pickup' : 'delivery',
+        delivery_zone_id: validatedData.delivery_zone_id || null,
+        delivery_zone_name: validatedData.delivery_zone_name || null,
+        delivery_fee: validatedData.delivery_fee || null,
+        delivery_fee_status: validatedData.delivery_fee_status || null,
         order_products: {
           create: orderItems.map((item: any) => ({
             tenant_id: tenant.id,
@@ -275,8 +299,8 @@ export async function POST(request: NextRequest) {
       sendOrderPlacedEmail({
         order,
         tenant,
-        customerEmail: validatedData.shipping_address.email,
-        customerName: validatedData.shipping_address.name,
+        customerEmail: customerInfo.email,
+        customerName: customerInfo.name,
       }),
       sendNewOrderAlertEmail({
         order,

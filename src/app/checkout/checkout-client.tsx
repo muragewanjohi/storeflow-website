@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -50,6 +52,8 @@ interface ShippingAddress {
 }
 
 type PaymentMethod = 'pesapal' | 'paypal' | 'cash_on_delivery';
+
+type DeliveryMethod = 'delivery' | 'pickup';
 
 type Step = 'shipping' | 'payment' | 'review';
 
@@ -94,6 +98,28 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pesapal');
   const [couponCode, setCouponCode] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // Delivery method state
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
+  const [checkoutSettings, setCheckoutSettings] = useState<{
+    pickup_enabled: boolean;
+    shipping_enabled: boolean;
+    store_full_address: string | null;
+    store_phone: string | null;
+  } | null>(null);
+  
+  // Delivery zones state
+  const [deliveryZones, setDeliveryZones] = useState<any[]>([]);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedZone, setSelectedZone] = useState<any | null>(null);
+  const [zoneDetectionStatus, setZoneDetectionStatus] = useState<'detecting' | 'matched' | 'not_matched' | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
+  
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [useNewAddress, setUseNewAddress] = useState(false);
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -101,9 +127,6 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       if (response.ok) {
         const data = await response.json();
         setCart(data.cart);
-        
-        // Pre-fill email if available (from user session)
-        // This would come from the authenticated user's profile
       } else {
         toast.error('Failed to load cart');
         router.push('/cart');
@@ -117,12 +140,295 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     }
   }, [router]);
 
+  // Fetch customer profile and pre-fill address if authenticated
+  const fetchCustomerProfile = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const response = await fetch('/api/customers/profile');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.customer) {
+          const customer = data.customer;
+          
+          // Pre-fill shipping address from customer profile
+          setShippingAddress({
+            name: customer.name || '',
+            email: customer.email || '',
+            phone: customer.mobile || '',
+            address_line_1: customer.address || '',
+            address_line_2: null,
+            city: customer.city || '',
+            state: customer.state || '',
+            postal_code: customer.postal_code || '',
+            country: customer.country || '',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer profile:', error);
+      // Don't show error to user - just continue without pre-filling
+    }
+  }, [isAuthenticated]);
+
+  // Check for saved delivery addresses
+  const fetchSavedAddresses = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    try {
+      const response = await fetch('/api/customers/profile/addresses');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.addresses && data.addresses.length > 0) {
+          setSavedAddresses(data.addresses);
+          
+          // Find default address or use first one
+          const defaultAddress = data.addresses.find((addr: any) => addr.is_default) || data.addresses[0];
+          
+          if (defaultAddress) {
+            // Pre-select default address
+            setSelectedAddressId(defaultAddress.id);
+            setUseNewAddress(false);
+            
+            // Pre-fill with saved delivery address
+            setShippingAddress({
+              name: defaultAddress.name || '',
+              email: defaultAddress.email || '',
+              phone: defaultAddress.phone || '',
+              address_line_1: defaultAddress.address || '',
+              address_line_2: null,
+              city: defaultAddress.city || '',
+              state: defaultAddress.state || '',
+              postal_code: defaultAddress.postal_code || '',
+              country: defaultAddress.country || '',
+            });
+          } else {
+            // No default, but addresses exist - use profile address and let user select
+            fetchCustomerProfile();
+            setUseNewAddress(true);
+          }
+        } else {
+          // No saved addresses, use profile address
+          setSavedAddresses([]);
+          fetchCustomerProfile();
+          setUseNewAddress(true);
+        }
+      } else {
+        // API call failed, fall back to profile address
+        setSavedAddresses([]);
+        fetchCustomerProfile();
+        setUseNewAddress(true);
+      }
+    } catch (error) {
+      console.error('Error fetching saved addresses:', error);
+      // Fall back to profile address if saved addresses fail
+      setSavedAddresses([]);
+      fetchCustomerProfile();
+      setUseNewAddress(true);
+    }
+  }, [isAuthenticated, fetchCustomerProfile]);
+  
+  // Handle address selection
+  const handleAddressSelect = (addressId: string) => {
+    if (addressId === 'new') {
+      setUseNewAddress(true);
+      setSelectedAddressId(null);
+      // Clear form or keep current values
+      return;
+    }
+    
+    const selectedAddress = savedAddresses.find((addr: any) => addr.id === addressId);
+    if (selectedAddress) {
+      setSelectedAddressId(addressId);
+      setUseNewAddress(false);
+      
+      // Fill form with selected address
+      setShippingAddress({
+        name: selectedAddress.name || '',
+        email: selectedAddress.email || '',
+        phone: selectedAddress.phone || '',
+        address_line_1: selectedAddress.address || '',
+        address_line_2: null,
+        city: selectedAddress.city || '',
+        state: selectedAddress.state || '',
+        postal_code: selectedAddress.postal_code || '',
+        country: selectedAddress.country || '',
+      });
+    }
+  };
+
+  // Fetch checkout settings (pickup enabled, store address, etc.)
+  const fetchCheckoutSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/checkout/settings');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.settings) {
+          setCheckoutSettings(data.settings);
+          
+          // Set default delivery method based on available options
+          if (data.settings.pickup_enabled && !data.settings.shipping_enabled) {
+            // Only pickup available
+            setDeliveryMethod('pickup');
+          } else if (!data.settings.pickup_enabled && data.settings.shipping_enabled) {
+            // Only delivery available
+            setDeliveryMethod('delivery');
+          } else {
+            // Both available, default to delivery
+            setDeliveryMethod('delivery');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching checkout settings:', error);
+      // Default to delivery if settings fetch fails
+      setCheckoutSettings({
+        pickup_enabled: false,
+        shipping_enabled: true,
+        store_full_address: null,
+        store_phone: null,
+      });
+    }
+  }, []);
+
+  // Fetch delivery zones
+  const fetchDeliveryZones = useCallback(async () => {
+    if (deliveryMethod !== 'delivery') return;
+
+    try {
+      const response = await fetch('/api/checkout/delivery-zones');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.zones) {
+          setDeliveryZones(data.zones);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching delivery zones:', error);
+    }
+  }, [deliveryMethod]);
+
+  // Auto-detect zone based on address
+  const detectZone = useCallback(async () => {
+    if (deliveryMethod !== 'delivery' || !shippingAddress.city && !shippingAddress.state && !shippingAddress.address_line_1) {
+      return;
+    }
+
+    setZoneDetectionStatus('detecting');
+
+    try {
+      const response = await fetch('/api/checkout/delivery-zones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          address_line_1: shippingAddress.address_line_1,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          if (data.matched && data.zone) {
+            setSelectedZoneId(data.zone.id);
+            setSelectedZone(data.zone);
+            setDeliveryFee(Number(data.zone.price));
+            setZoneDetectionStatus('matched');
+          } else {
+            setSelectedZoneId(null);
+            setSelectedZone(null);
+            setDeliveryFee(null);
+            setZoneDetectionStatus('not_matched');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error detecting zone:', error);
+      setZoneDetectionStatus(null);
+    }
+  }, [deliveryMethod, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1]);
+
+  // Handle zone selection
+  const handleZoneSelect = (zoneId: string) => {
+    if (zoneId === 'out_of_zone') {
+      setSelectedZoneId(null);
+      setSelectedZone(null);
+      setDeliveryFee(null);
+      setZoneDetectionStatus('not_matched');
+      return;
+    }
+    
+    const zone = deliveryZones.find((z: any) => z.id === zoneId);
+    if (zone) {
+      setSelectedZoneId(zoneId);
+      setSelectedZone(zone);
+      setDeliveryFee(Number(zone.price));
+      setZoneDetectionStatus('matched');
+    }
+  };
+
   // Fetch cart on mount
   useEffect(() => {
     fetchCart();
-  }, [fetchCart]);
+    fetchCheckoutSettings();
+  }, [fetchCart, fetchCheckoutSettings]);
+
+  // Fetch delivery zones when delivery method is selected
+  useEffect(() => {
+    if (deliveryMethod === 'delivery') {
+      fetchDeliveryZones();
+    } else {
+      setDeliveryZones([]);
+      setSelectedZoneId(null);
+      setSelectedZone(null);
+      setDeliveryFee(null);
+      setZoneDetectionStatus(null);
+    }
+  }, [deliveryMethod, fetchDeliveryZones]);
+
+  // Auto-detect zone when address changes (debounced)
+  useEffect(() => {
+    if (deliveryMethod === 'delivery' && deliveryZones.length > 0) {
+      const timer = setTimeout(() => {
+        if (shippingAddress.city || shippingAddress.state || shippingAddress.address_line_1) {
+          detectZone();
+        }
+      }, 500); // Debounce for 500ms
+
+      return () => clearTimeout(timer);
+    }
+  }, [deliveryMethod, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1, deliveryZones.length, detectZone]);
+
+  // Fetch customer data when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      // First try to get saved delivery addresses (preferred)
+      fetchSavedAddresses();
+    }
+  }, [isAuthenticated, fetchSavedAddresses]);
 
   const validateShipping = (): boolean => {
+    // For pickup, only require name, email, and phone
+    if (deliveryMethod === 'pickup') {
+      if (!shippingAddress.name.trim()) {
+        toast.error('Name is required');
+        return false;
+      }
+      if (!shippingAddress.email.trim() || !shippingAddress.email.includes('@')) {
+        toast.error('Valid email is required');
+        return false;
+      }
+      if (!shippingAddress.phone.trim()) {
+        toast.error('Phone is required');
+        return false;
+      }
+      return true;
+    }
+    
+    // For delivery, require full address
     if (!shippingAddress.name.trim()) {
       toast.error('Name is required');
       return false;
@@ -155,6 +461,10 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       toast.error('Country is required');
       return false;
     }
+    
+    // Zone validation (optional - can proceed without zone if out-of-zone)
+    // We allow orders to proceed even if zone is not selected (out-of-zone orders)
+    
     return true;
   };
 
@@ -185,13 +495,62 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     setSubmitting(true);
 
     try {
+      // Save new address if requested
+      if (isAuthenticated && useNewAddress && saveNewAddress) {
+        try {
+          const addressResponse = await fetch('/api/customers/profile/addresses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: shippingAddress.name,
+              email: shippingAddress.email,
+              phone: shippingAddress.phone,
+              address: shippingAddress.address_line_1,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postal_code: shippingAddress.postal_code,
+              country: shippingAddress.country,
+              is_default: savedAddresses.length === 0, // Set as default if it's the first address
+            }),
+          });
+          
+          if (addressResponse.ok) {
+            toast.success('Address saved successfully');
+            // Refresh saved addresses
+            fetchSavedAddresses();
+          }
+        } catch (error) {
+          console.error('Error saving address:', error);
+          // Don't block checkout if address save fails
+        }
+      }
+
       const checkoutData = {
         items: cart.items.map(item => ({
           product_id: item.product_id,
           variant_id: item.variant_id,
           quantity: item.quantity,
         })),
-        shipping_address: shippingAddress,
+        delivery_method: deliveryMethod,
+        shipping_address: deliveryMethod === 'delivery' ? shippingAddress : null,
+        pickup_address: deliveryMethod === 'pickup' && checkoutSettings?.store_full_address 
+          ? {
+              name: shippingAddress.name,
+              email: shippingAddress.email,
+              phone: shippingAddress.phone,
+              address: checkoutSettings.store_full_address,
+            }
+          : null,
+        delivery_zone_id: deliveryMethod === 'delivery' ? (selectedZoneId || null) : null,
+        delivery_zone_name: deliveryMethod === 'delivery' ? (selectedZone?.name || null) : null,
+        delivery_fee: deliveryMethod === 'delivery' ? (deliveryFee || null) : null,
+        delivery_fee_status: deliveryMethod === 'delivery' && !selectedZoneId 
+          ? 'pending' 
+          : deliveryMethod === 'delivery' && selectedZoneId 
+            ? 'approved' 
+            : null,
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
         coupon_code: couponCode || null,
@@ -345,10 +704,220 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
             {currentStep === 'shipping' && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Shipping Address</CardTitle>
+                  <CardTitle>Delivery Method</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Delivery Method Selection (if both options available) */}
+                  {checkoutSettings && checkoutSettings.pickup_enabled && checkoutSettings.shipping_enabled && (
+                    <div className="space-y-2">
+                      <Label>Choose how you want to receive your order</Label>
+                      <RadioGroup
+                        value={deliveryMethod}
+                        onValueChange={(value) => setDeliveryMethod(value as DeliveryMethod)}
+                      >
+                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                          <RadioGroupItem value="delivery" id="delivery" />
+                          <Label htmlFor="delivery" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Delivery</div>
+                              <div className="text-sm text-muted-foreground">We&apos;ll deliver to your address</div>
+                            </div>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                          <RadioGroupItem value="pickup" id="pickup" />
+                          <Label htmlFor="pickup" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Store Pickup</div>
+                              <div className="text-sm text-muted-foreground">Pick up from our store location</div>
+                            </div>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  )}
+                  
+                  {/* Show pickup location info when pickup is selected */}
+                  {deliveryMethod === 'pickup' && checkoutSettings?.store_full_address && (
+                    <div className="p-4 border rounded-lg bg-primary/5">
+                      <div className="space-y-2">
+                        <h3 className="font-semibold">Pickup Location</h3>
+                        <p className="text-sm text-muted-foreground">{checkoutSettings.store_full_address}</p>
+                        {checkoutSettings.store_phone && (
+                          <p className="text-sm text-muted-foreground">Phone: {checkoutSettings.store_phone}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          You&apos;ll receive a notification when your order is ready for pickup.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Separator />
+                  
+                  {/* Contact Information Form (shown for pickup) */}
+                  {deliveryMethod === 'pickup' && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <Label htmlFor="pickup_name">Full Name *</Label>
+                          <Input
+                            id="pickup_name"
+                            value={shippingAddress.name}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, name: e.target.value })}
+                            placeholder="John Doe"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="pickup_email">Email *</Label>
+                          <Input
+                            id="pickup_email"
+                            type="email"
+                            value={shippingAddress.email}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, email: e.target.value })}
+                            placeholder="john@example.com"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="pickup_phone">Phone *</Label>
+                          <Input
+                            id="pickup_phone"
+                            type="tel"
+                            value={shippingAddress.phone}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                            placeholder="+1 234 567 8900"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Shipping Address Form (only shown for delivery) */}
+                  {deliveryMethod === 'delivery' && (
+                    <>
+                      {/* Saved Addresses Selector (only for authenticated users) */}
+                      {isAuthenticated && savedAddresses.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Select Delivery Address</Label>
+                      <Select
+                        value={useNewAddress ? 'new' : (selectedAddressId || '')}
+                        onValueChange={handleAddressSelect}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose an address" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {savedAddresses.map((address: any) => (
+                            <SelectItem key={address.id} value={address.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{address.name}</span>
+                                {address.is_default && (
+                                  <Badge variant="secondary" className="text-xs">Default</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="new">Add New Address</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {/* Display selected saved address details */}
+                      {!useNewAddress && selectedAddressId && (
+                        <div className="p-4 border rounded-lg bg-muted/50">
+                          {(() => {
+                            const selected = savedAddresses.find((a: any) => a.id === selectedAddressId);
+                            if (!selected) return null;
+                            return (
+                              <div className="text-sm space-y-1">
+                                <p className="font-medium">{selected.name}</p>
+                                <p className="text-muted-foreground">{selected.address}</p>
+                                <p className="text-muted-foreground">
+                                  {selected.city}, {selected.state} {selected.postal_code}
+                                </p>
+                                <p className="text-muted-foreground">{selected.country}</p>
+                                <p className="text-muted-foreground">{selected.phone}</p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Delivery Zone Selection (shown after address is entered) */}
+                  {deliveryZones.length > 0 && (useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (selectedAddressId && !useNewAddress)) && (
+                    <div className="space-y-2">
+                      <Label>Delivery Zone *</Label>
+                      {zoneDetectionStatus === 'detecting' && (
+                        <p className="text-sm text-muted-foreground">Detecting zone...</p>
+                      )}
+                      {zoneDetectionStatus === 'matched' && selectedZone && (
+                        <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                            Zone detected: {selectedZone.name}
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            Delivery fee: {formatPrice(selectedZone.price)}
+                          </p>
+                        </div>
+                      )}
+                      {zoneDetectionStatus === 'not_matched' && (
+                        <div className="p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                            ⚠️ Location not in standard delivery zones
+                          </p>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                            We&apos;ll calculate a custom delivery fee and contact you with the quote.
+                          </p>
+                        </div>
+                      )}
+                      <Select
+                        value={selectedZoneId || (zoneDetectionStatus === 'not_matched' ? 'out_of_zone' : '')}
+                        onValueChange={handleZoneSelect}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select delivery zone or let us detect it" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deliveryZones.map((zone: any) => (
+                            <SelectItem key={zone.id} value={zone.id}>
+                              <div>
+                                <span className="font-medium">{zone.name}</span>
+                                <span className="text-muted-foreground ml-2">
+                                  - {formatPrice(zone.price)}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="out_of_zone">
+                            <div>
+                              <span className="font-medium">Out of Zone</span>
+                              <span className="text-muted-foreground ml-2">
+                                - Custom quote
+                              </span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {selectedZone && (
+                        <p className="text-xs text-muted-foreground">
+                          Locations covered: {selectedZone.locations.join(', ')}
+                        </p>
+                      )}
+                      <Separator />
+                    </div>
+                  )}
+                  
+                  {/* Address Form (shown when "Add New Address" is selected or no saved addresses) */}
+                  {(useNewAddress || savedAddresses.length === 0 || !isAuthenticated) && (
+                    <>
+                      <Separator />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <Label htmlFor="name">Full Name *</Label>
                       <Input
@@ -449,6 +1018,24 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                       />
                     </div>
                   </div>
+                  
+                  {/* Option to save new address (only for authenticated users) */}
+                  {isAuthenticated && useNewAddress && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="save_address"
+                        checked={saveNewAddress}
+                        onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
+                      />
+                      <Label htmlFor="save_address" className="cursor-pointer text-sm">
+                        Save this address for future orders
+                      </Label>
+                    </div>
+                  )}
+                    </>
+                  )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -638,17 +1225,35 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <CardTitle>Order Review</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Shipping Address Summary */}
+                  {/* Delivery Method Summary */}
                   <div>
-                    <h3 className="font-semibold mb-2">Shipping Address</h3>
+                    <h3 className="font-semibold mb-2">
+                      {deliveryMethod === 'pickup' ? 'Pickup Information' : 'Shipping Address'}
+                    </h3>
                     <div className="text-sm text-muted-foreground">
-                      <p>{shippingAddress.name}</p>
-                      <p>{shippingAddress.email}</p>
-                      <p>{shippingAddress.phone}</p>
-                      <p>{shippingAddress.address_line_1}</p>
-                      {shippingAddress.address_line_2 && <p>{shippingAddress.address_line_2}</p>}
-                      <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
-                      <p>{shippingAddress.country}</p>
+                      {deliveryMethod === 'pickup' ? (
+                        <>
+                          <p className="font-medium">{shippingAddress.name}</p>
+                          <p>{shippingAddress.email}</p>
+                          <p>{shippingAddress.phone}</p>
+                          <Separator className="my-2" />
+                          <p className="font-medium mt-2">Pickup Location:</p>
+                          <p>{checkoutSettings?.store_full_address || 'Store location'}</p>
+                          {checkoutSettings?.store_phone && (
+                            <p>Phone: {checkoutSettings.store_phone}</p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p>{shippingAddress.name}</p>
+                          <p>{shippingAddress.email}</p>
+                          <p>{shippingAddress.phone}</p>
+                          <p>{shippingAddress.address_line_1}</p>
+                          {shippingAddress.address_line_2 && <p>{shippingAddress.address_line_2}</p>}
+                          <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+                          <p>{shippingAddress.country}</p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -745,7 +1350,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span className="text-muted-foreground">Calculated at checkout</span>
+                    <span className="text-muted-foreground">
+                      {deliveryMethod === 'pickup' ? 'Free (Store Pickup)' : 'Calculated at checkout'}
+                    </span>
                   </div>
                   {couponCode && (
                     <div className="flex justify-between text-sm text-green-600">
@@ -756,8 +1363,22 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>{formatPrice(cart.total)}</span>
+                    <span>
+                      {formatPrice(
+                        cart.total + (deliveryMethod === 'delivery' && deliveryFee ? deliveryFee : 0)
+                      )}
+                    </span>
                   </div>
+                  {deliveryMethod === 'delivery' && deliveryFee && (
+                    <p className="text-xs text-muted-foreground text-right">
+                      Includes delivery fee: {formatPrice(deliveryFee)}
+                    </p>
+                  )}
+                  {deliveryMethod === 'delivery' && !deliveryFee && selectedZoneId === null && (
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 text-right">
+                      ⚠️ Delivery fee will be calculated and quoted
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

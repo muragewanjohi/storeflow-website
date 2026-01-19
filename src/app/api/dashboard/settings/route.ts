@@ -54,6 +54,9 @@ const settingsUpdateSchema = z.object({
   free_shipping_enabled: z.boolean().optional(),
   free_shipping_threshold: z.number().optional().nullable(),
   
+  // Pickup Options
+  pickup_enabled: z.boolean().optional(),
+  
   // Payment Methods
   payment_pesapal_enabled: z.boolean().optional(),
   payment_paypal_enabled: z.boolean().optional(),
@@ -102,6 +105,9 @@ export async function GET(request: NextRequest) {
       'default_shipping_method',
       'free_shipping_enabled',
       'free_shipping_threshold',
+      
+      // Pickup Options
+      'pickup_enabled',
       
       // Payment Methods
       'payment_pesapal_enabled',
@@ -295,6 +301,31 @@ export async function PUT(request: NextRequest) {
     }
     if (validatedData.free_shipping_threshold !== undefined) {
       optionsToSave.free_shipping_threshold = validatedData.free_shipping_threshold?.toString() || null;
+    }
+    
+    // Pickup Options
+    if (validatedData.pickup_enabled !== undefined) {
+      // Get current settings to check if address exists
+      const currentSettings = await getStaticOptions(tenant.id, [
+        'store_address',
+        'store_city',
+        'store_country',
+      ]);
+      
+      // Validate that pickup can only be enabled if store has physical address
+      const hasPhysicalAddress = !!(
+        validatedData.store_address ||
+        (currentSettings.store_address && currentSettings.store_city && currentSettings.store_country)
+      );
+      
+      if (validatedData.pickup_enabled && !hasPhysicalAddress) {
+        return NextResponse.json(
+          { error: 'Store pickup requires a physical address. Please add store address first.' },
+          { status: 400 }
+        );
+      }
+      
+      optionsToSave.pickup_enabled = validatedData.pickup_enabled.toString();
     }
 
     // Payment Methods
