@@ -425,6 +425,72 @@
    - Use domain-based sender email
    - Avoid generic email addresses
 
+### SendGrid Credits Exceeded (2FA Login Issues)
+
+**Symptoms:**
+- "Maximum credits exceeded" error during login
+- "Unable to send verification code" message
+- 2FA codes not being sent to email
+- Login fails at the OTP verification step
+
+**Causes:**
+1. SendGrid free tier limit reached (100 emails/day)
+2. Paid SendGrid account monthly limit exceeded
+3. SendGrid account suspended or deactivated
+
+**Solutions:**
+
+1. **Check SendGrid account status:**
+   - Log in to [SendGrid Dashboard](https://app.sendgrid.com/)
+   - Check Account → Settings → Account Details
+   - Review billing and usage statistics
+   - Verify account is active and in good standing
+
+2. **Upgrade SendGrid plan:**
+   - Go to SendGrid Dashboard → Settings → Plan & Billing
+   - Upgrade to a paid plan with higher email limits
+   - Essential for production use with 2FA enabled
+
+3. **Upgrade SendGrid plan:**
+   - Go to SendGrid Dashboard → Settings → Plan & Billing
+   - Select an appropriate plan based on your email volume
+   - See `SENDGRID_PACKAGE_RECOMMENDATIONS.md` for detailed package selection guide
+
+4. **Switch to alternative email provider (if needed):**
+   ```bash
+   # Option 1: Use Resend (alternative)
+   # Add to your .env.local:
+   RESEND_API_KEY=re_your_resend_api_key_here
+
+   # Note: You'll need to update the email sending code to use Resend
+   # SendGrid is currently the primary email service provider
+   ```
+
+4. **Temporary development workaround:**
+   - **Option A:** Automatic bypass (already implemented)
+     - In development mode (`NODE_ENV=development`), the system will automatically bypass 2FA when SendGrid credits are exhausted
+     - This allows development/testing to continue while email service is resolved
+   
+   - **Option B:** Manual bypass (for waiting on SendGrid approval)
+     - Add `DISABLE_MFA_TEMPORARILY=true` to your `.env.local` file
+     - Only works in development/test mode
+     - See [Temporary 2FA Bypass Guide](./TEMPORARY_2FA_BYPASS.md) for detailed instructions
+     - **⚠️ Remove this flag once SendGrid is approved and configured**
+   
+   - Production deployments will still require proper 2FA regardless of bypass settings
+
+5. **Monitor email usage:**
+   - Set up SendGrid alerts for credit usage
+   - Monitor Activity Feed for email delivery statistics
+   - Consider implementing email usage tracking in your application
+
+**Prevention:**
+- Set up billing alerts in SendGrid Dashboard
+- Monitor email usage patterns in SendGrid Activity Feed
+- Upgrade plan proactively before reaching limits
+- Consider SendGrid Essentials plan ($14.95/month) for production use
+- Review package recommendations in `SENDGRID_PACKAGE_RECOMMENDATIONS.md`
+
 ---
 
 ## Domain & DNS Issues

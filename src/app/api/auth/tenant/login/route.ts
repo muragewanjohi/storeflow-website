@@ -229,7 +229,33 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    // 2FA is MANDATORY for tenant admin accounts (unless device is trusted)
+    // TEMPORARY: Check if 2FA bypass is enabled (development/testing only)
+    // ⚠️ WARNING: Only use this while waiting for email service setup
+    // Remove this flag once SendGrid is properly configured
+    const bypassMFA = process.env.DISABLE_MFA_TEMPORARILY === 'true' && 
+                      (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
+    
+    if (bypassMFA) {
+      console.warn('[Login API] ⚠️ 2FA BYPASS ENABLED - This should only be used temporarily while email service is unavailable');
+      console.warn('[Login API] Set DISABLE_MFA_TEMPORARILY=false and remove this flag once SendGrid is configured');
+      
+      // Complete login without 2FA
+      const response = NextResponse.json({
+        success: true,
+        requiresMFA: false,
+        message: 'Login successful (2FA temporarily disabled)',
+        warning: '2FA is currently bypassed. Re-enable it once email service is configured.',
+        user: {
+          id: authData.user.id,
+          email: authData.user.email,
+        },
+      });
+      
+      console.log('[Login API] Login completed with 2FA bypass (temporary flag enabled)');
+      return response;
+    }
+
+    // 2FA is MANDATORY for tenant admin accounts (unless device is trusted or bypassed)
     // Always require 2FA verification, regardless of mfa_enabled flag
     // Import here to avoid circular dependencies
     console.log('[Login API] Step 8: Generating and sending OTP');
@@ -303,18 +329,52 @@ export async function POST(request: NextRequest) {
         userId: authData.user.id,
         email: authData.user.email,
       });
-      await supabase.auth.signOut();
-      
-      // Provide more specific error message in development
+
+      // Check if this is a SendGrid credit exhaustion error
+      const isSendGridCreditError = otpError.message?.includes('Maximum credits exceeded') ||
+                                   otpError.message?.includes('Unauthorized') && otpError.response?.body?.errors?.[0]?.message?.includes('Maximum credits exceeded');
+
       const isDevelopment = process.env.NODE_ENV === 'development';
-      const errorMessage = isDevelopment && otpError.message 
-        ? `Unable to send verification code: ${otpError.message}`
-        : 'Unable to send verification code. Please try again.';
-      
+
+      // In development, if SendGrid credits are exhausted, allow login without 2FA as a temporary workaround
+      if (isDevelopment && isSendGridCreditError) {
+        console.warn('[Login API] SendGrid credits exhausted in development mode. Allowing login without 2FA as temporary workaround.');
+
+        // Set session cookies (Supabase handles this automatically via middleware)
+        const response = NextResponse.json({
+          success: true,
+          requiresMFA: false,
+          message: 'Login successful (2FA temporarily bypassed due to email service issue)',
+          warning: 'SendGrid credits exceeded - 2FA was bypassed for this login. Please resolve email service configuration.',
+          user: {
+            id: authData.user.id,
+            email: authData.user.email,
+          },
+        });
+
+        console.log('[Login API] Login completed with 2FA bypass due to SendGrid credits');
+        return response;
+      }
+
+      // For production or other errors, require proper 2FA
+      await supabase.auth.signOut();
+
+      // Provide more specific error message
+      let errorMessage = 'Unable to send verification code. Please try again.';
+      let errorCode = 'EMAIL_SERVICE_ERROR';
+
+      if (isSendGridCreditError) {
+        errorMessage = 'Email service temporarily unavailable due to sending limits exceeded. Please contact support or try again later.';
+        errorCode = 'SENDGRID_CREDITS_EXCEEDED';
+      } else if (isDevelopment && otpError.message) {
+        errorMessage = `Unable to send verification code: ${otpError.message}`;
+      }
+
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to send code',
           message: errorMessage,
+          code: errorCode,
           ...(isDevelopment && { details: otpError.message })
         },
         { status: 500 }

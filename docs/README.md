@@ -1,53 +1,92 @@
-# StoreFlow Documentation
+# StoreFlow Technical Documentation
 
-**Complete documentation for the StoreFlow multi-tenant ecommerce platform**
+**Complete technical documentation for the StoreFlow multi-tenant ecommerce platform**
 
 ---
 
-## 📚 Documentation Index
+## 📚 Core Documentation
 
-### Getting Started
-- **[DEVELOPMENT.md](../DEVELOPMENT.md)** - Complete development setup guide ⭐ **Start here!**
-- **[README.md](../README.md)** - Project overview and quick start
-
-### Architecture & Design
+### 🏗️ **Architecture & Design**
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete system architecture and design patterns
 - **[SECURITY.md](./SECURITY.md)** - Row-Level Security (RLS) implementation guide
 - **[PRISMA_EXPLANATION.md](./PRISMA_EXPLANATION.md)** - Prisma ORM integration guide
 
-### Development Guides
-- **[AI_PROMPT_LIBRARY.md](./AI_PROMPT_LIBRARY.md)** - AI assistant prompts and context
-- **[APPLY_RLS_MIGRATION.md](./APPLY_RLS_MIGRATION.md)** - How to apply RLS migration
-- **[MIGRATION_EXPLANATION.md](./MIGRATION_EXPLANATION.md)** - Understanding migrations
+### 🔌 **API & Integration**
+- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Complete API reference and endpoints
 
-### Project Configuration
-- **[STOREFLOW_CONFIG.md](./STOREFLOW_CONFIG.md)** - Configuration guide
-- **[STOREFLOW_DYNAMIC_URLS.md](./STOREFLOW_DYNAMIC_URLS.md)** - Dynamic URL configuration
-- **[STOREFLOW_BRANDING_GUIDE.md](./STOREFLOW_BRANDING_GUIDE.md)** - Branding and customization
+### 🚀 **Deployment & Operations**
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Production deployment and hosting
+- **[TROUBLESHOOTING_GUIDE.md](./TROUBLESHOOTING_GUIDE.md)** - Common issues and solutions
 
-### Day-by-Day Progress
-
-### External Documentation
-All migration planning and roadmap docs are in the [`../../docs/`](../../docs/) folder.
+### 👥 **Administration**
+- **[ADMIN_DOCUMENTATION.md](./ADMIN_DOCUMENTATION.md)** - Admin panel usage and management
 
 ---
 
-## 🎯 Quick Links
+## 📁 **Project Structure**
 
-**Setup:**
-- [Development Guide](../DEVELOPMENT.md)
-- [Environment Setup](../../docs/ENV_SETUP_GUIDE.md)
-
-**Architecture:**
-- [System Architecture](./ARCHITECTURE.md)
-- [Security Implementation](./SECURITY.md)
-- [Database with Prisma](./PRISMA_EXPLANATION.md)
-
-**Migration:**
-- [Complete Roadmap](../../docs/NODEJS_MIGRATION_UPDATED.md)
-- [Apply RLS Migration](./APPLY_RLS_MIGRATION.md)
+```
+storeflow/
+├── docs/                          # 📚 Technical documentation
+│   ├── README.md                  # This index
+│   ├── ARCHITECTURE.md            # System architecture
+│   ├── SECURITY.md                # Security implementation
+│   ├── API_DOCUMENTATION.md       # API reference
+│   ├── DEPLOYMENT_GUIDE.md        # Deployment guide
+│   ├── TROUBLESHOOTING_GUIDE.md   # Troubleshooting
+│   ├── ADMIN_DOCUMENTATION.md     # Admin documentation
+│   └── PRISMA_EXPLANATION.md      # Database layer
+├── src/                           # Application source code
+├── supabase/                      # Database migrations
+└── [other files]
+```
 
 ---
 
-**Last Updated:** 2024
+## 🎯 **Quick Start**
+
+### For Developers
+1. **[Development Setup](../DEVELOPMENT.md)** - Complete development environment setup
+2. **[System Architecture](./ARCHITECTURE.md)** - Understand the platform design
+3. **[API Reference](./API_DOCUMENTATION.md)** - Integrate with the platform
+
+### For Administrators
+1. **[Admin Documentation](./ADMIN_DOCUMENTATION.md)** - Platform management
+2. **[Deployment Guide](./DEPLOYMENT_GUIDE.md)** - Production setup
+
+### For DevOps
+1. **[Security Implementation](./SECURITY.md)** - Security architecture
+2. **[Troubleshooting Guide](./TROUBLESHOOTING_GUIDE.md)** - Issue resolution
+
+---
+
+## 🔗 **Related Documentation**
+
+- **[Project Overview](../README.md)** - High-level project information
+- **[Development Guide](../DEVELOPMENT.md)** - Development environment setup
+- **[Migration Roadmap](../../docs/NODEJS_MIGRATION_UPDATED.md)** - Platform migration guide
+- **[Environment Setup](../../docs/ENV_SETUP_GUIDE.md)** - Configuration guide
+
+---
+
+## 📋 **Documentation Standards**
+
+### ✅ **Best Practices Applied:**
+- **Focused Scope:** Each document serves a specific purpose
+- **Progressive Disclosure:** Start broad, dive deep when needed
+- **Practical Examples:** Include working code and configurations
+- **Security First:** Security considerations throughout
+- **Maintainable:** Clear structure with regular updates
+
+### 📝 **Maintenance:**
+- Review quarterly for accuracy
+- Update with latest best practices
+- Keep content current with platform evolution
+- Remove outdated information promptly
+
+---
+
+**🚀 Ready to work with StoreFlow? Start with the [Development Setup](../DEVELOPMENT.md) or explore the [System Architecture](./ARCHITECTURE.md).**
+
+**Last Updated:** January 2026
 
