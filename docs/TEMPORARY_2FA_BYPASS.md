@@ -116,26 +116,32 @@ npm run dev
 
 ### Bypass Not Working?
 
-1. **Check environment variable:**
-   ```bash
-   # Verify it's set correctly
-   echo $DISABLE_MFA_TEMPORARILY  # Linux/Mac
-   $env:DISABLE_MFA_TEMPORARILY   # Windows PowerShell
-   ```
+1. **Redeploy after setting environment variables:**
+   - ⚠️ **CRITICAL:** Vercel requires a new deployment for environment variables to take effect
+   - Go to Vercel Dashboard → Deployments
+   - Click "Redeploy" on your latest deployment
+   - OR push a new commit to trigger a deployment
 
-2. **Check NODE_ENV:**
-   ```bash
-   # Must be 'development' or 'test'
-   echo $NODE_ENV
-   ```
+2. **Verify environment variable scope:**
+   - In Vercel, make sure variables are set for **"Preview"** environment (not just "Production")
+   - Check: Vercel Dashboard → Your Project → Settings → Environment Variables
+   - For each variable, verify it shows "Preview" in the scope column
 
-3. **Check server logs:**
-   - Look for: `[Login API] ⚠️ 2FA BYPASS ENABLED`
-   - If you don't see this, the bypass isn't active
+3. **Check variable values:**
+   - `DISABLE_MFA_TEMPORARILY` must be exactly `true` (lowercase, no quotes)
+   - `NODE_ENV` must be exactly `development` (lowercase)
+   - No extra spaces or quotes
 
-4. **Restart server:**
-   - Environment variables are loaded at startup
-   - Changes require server restart
+4. **Check deployment logs:**
+   - Go to Vercel Dashboard → Your Deployment → Logs
+   - Look for: `[Login API] Bypass check:` - this shows the actual values being read
+   - Look for: `[Login API] ⚠️ 2FA BYPASS ENABLED` - confirms bypass is active
+   - If you see the bypass check but it's false, the environment variables aren't being read correctly
+
+5. **Verify you're on the correct branch:**
+   - Make sure you're accessing the `dev` branch deployment
+   - Preview deployments use Preview environment variables
+   - Production deployments use Production environment variables
 
 ### Still Seeing 2FA Prompt?
 

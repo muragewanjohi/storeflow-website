@@ -351,7 +351,7 @@ function TenantRegisterForm() {
                     className="rounded-r-none"
                   />
                   <span className="px-4 py-2 bg-muted border border-l-0 rounded-r-md text-muted-foreground">
-                    .{process.env.NEXT_PUBLIC_APP_DOMAIN || 'dukanest.com'}
+                    .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">

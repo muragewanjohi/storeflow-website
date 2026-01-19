@@ -232,8 +232,19 @@ export async function POST(request: NextRequest) {
     // TEMPORARY: Check if 2FA bypass is enabled (development/testing only)
     // ⚠️ WARNING: Only use this while waiting for email service setup
     // Remove this flag once SendGrid is properly configured
-    const bypassMFA = process.env.DISABLE_MFA_TEMPORARILY === 'true' && 
-                      (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
+    const disableMFA = process.env.DISABLE_MFA_TEMPORARILY;
+    const nodeEnv = process.env.NODE_ENV;
+    
+    // Debug logging to help diagnose bypass issues
+    console.log('[Login API] Bypass check:', {
+      DISABLE_MFA_TEMPORARILY: disableMFA,
+      NODE_ENV: nodeEnv,
+      disableMFAIsTrue: disableMFA === 'true',
+      nodeEnvIsDev: nodeEnv === 'development' || nodeEnv === 'test',
+    });
+    
+    const bypassMFA = disableMFA === 'true' && 
+                      (nodeEnv === 'development' || nodeEnv === 'test');
     
     if (bypassMFA) {
       console.warn('[Login API] ⚠️ 2FA BYPASS ENABLED - This should only be used temporarily while email service is unavailable');
