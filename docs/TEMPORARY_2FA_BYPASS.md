@@ -201,4 +201,168 @@ DISABLE_MFA_TEMPORARILY=false
 
 ---
 
+## Setting Up Development Environment on Vercel
+
+If you want to deploy a development environment on Vercel (useful for testing without local setup), follow these steps:
+
+### Option 1: Create a Development Branch (Recommended)
+
+This allows you to have separate production and development deployments:
+
+#### Step 1: Create Development Branch
+
+```bash
+# Create and switch to development branch
+git checkout -b development
+
+# Push to GitHub
+git push -u origin development
+```
+
+#### Step 2: Create Separate Vercel Project for Development
+
+1. **Go to Vercel Dashboard:** https://vercel.com/dashboard
+2. **Click "Add New Project"**
+3. **Import the same repository** but select the `development` branch
+4. **Project Name:** Use something like `storeflow-dev` or `storeflow-development`
+5. **Click "Import"**
+
+#### Step 3: Configure Environment Variables for Development
+
+1. **Go to Project Settings → Environment Variables**
+2. **Add/Update these variables for Development environment:**
+
+```env
+# Set NODE_ENV to development (required for bypass to work)
+NODE_ENV=development
+
+# Enable 2FA bypass
+DISABLE_MFA_TEMPORARILY=true
+
+# Use development Supabase project (or same as production)
+NEXT_PUBLIC_SUPABASE_URL=https://your-dev-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-dev-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-dev-service-role-key
+DATABASE_URL=postgresql://...your-dev-database...
+
+# Development app URL
+NEXT_PUBLIC_APP_URL=https://storeflow-dev.vercel.app
+
+# SendGrid (optional - can be same as production or different)
+SENDGRID_API_KEY=your-sendgrid-key
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+SENDGRID_FROM_NAME=StoreFlow Dev
+```
+
+3. **Important:** Make sure to select **"Development"** environment when adding variables
+4. **Click "Save"**
+
+#### Step 4: Deploy Development Branch
+
+1. **Push changes to development branch:**
+   ```bash
+   git checkout development
+   # Make any changes
+   git add .
+   git commit -m "Development setup"
+   git push origin development
+   ```
+
+2. **Vercel will automatically deploy** the development branch
+3. **Access your dev environment** at: `https://storeflow-dev.vercel.app`
+
+### Option 2: Use Preview Deployments (Alternative)
+
+If you prefer to keep one branch, you can use Vercel's preview deployments:
+
+#### Step 1: Configure Environment Variables for Preview
+
+1. **Go to your existing Vercel project → Settings → Environment Variables**
+2. **Add variables with "Preview" environment selected:**
+
+```env
+NODE_ENV=development
+DISABLE_MFA_TEMPORARILY=true
+# ... other variables
+```
+
+3. **Click "Save"**
+
+#### Step 2: Create Preview Branch
+
+```bash
+# Create a feature branch for development
+git checkout -b dev-preview
+
+# Push to GitHub
+git push -u origin dev-preview
+```
+
+#### Step 3: Access Preview Deployment
+
+- Vercel automatically creates preview deployments for all branches
+- Access at: `https://storeflow-git-dev-preview-yourteam.vercel.app`
+- Or check the Vercel dashboard for the preview URL
+
+### Important Notes for Vercel Development Environment
+
+1. **NODE_ENV Requirement:**
+   - The bypass **only works** when `NODE_ENV=development` or `NODE_ENV=test`
+   - Vercel sets `NODE_ENV=production` by default
+   - **You must explicitly set `NODE_ENV=development`** in Vercel environment variables
+
+2. **Environment Variable Scope:**
+   - **Production:** Used for main branch deployments
+   - **Preview:** Used for all branch deployments (except main)
+   - **Development:** Only used if you create a separate project
+
+3. **Database Considerations:**
+   - Use a **separate Supabase project** for development (recommended)
+   - Or use the same database but be careful with test data
+   - Development database can be reset without affecting production
+
+4. **SendGrid Setup:**
+   - You can use the same SendGrid account for both environments
+   - Or wait for approval and use bypass in development only
+
+### Quick Setup Checklist
+
+- [ ] Create `development` branch (or use preview)
+- [ ] Create separate Vercel project (or configure preview env vars)
+- [ ] Set `NODE_ENV=development` in Vercel environment variables
+- [ ] Set `DISABLE_MFA_TEMPORARILY=true` in Vercel environment variables
+- [ ] Configure Supabase credentials (dev project recommended)
+- [ ] Deploy and test login
+- [ ] Verify bypass is working (check console logs)
+
+### Testing the Bypass on Vercel
+
+1. **Deploy your development branch/preview**
+2. **Check deployment logs** for:
+   ```
+   [Login API] ⚠️ 2FA BYPASS ENABLED
+   ```
+3. **Try logging in** - should work without 2FA code
+4. **Check response** - should include warning message about bypass
+
+### Switching Between Environments
+
+**To work on development:**
+```bash
+git checkout development
+# Make changes
+git push origin development
+# Vercel auto-deploys
+```
+
+**To work on production:**
+```bash
+git checkout main  # or master
+# Make changes
+git push origin main
+# Vercel auto-deploys to production
+```
+
+---
+
 **Questions?** Check the [Troubleshooting Guide](./TROUBLESHOOTING_GUIDE.md) or review the login route code.
