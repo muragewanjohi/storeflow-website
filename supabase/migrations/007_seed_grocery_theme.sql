@@ -15,7 +15,7 @@ VALUES (
   false,
   'grocery-theme-v1',
   'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=800&fit=crop',
-  '{"primary": "#16a34a", "secondary": "#10b981", "accent": "#059669", "background": "#ffffff", "text": "#1f2937", "muted": "#6b7280"}'::jsonb,
+  '{"primary": "#4CAF50", "secondary": "#10b981", "accent": "#FF9800", "background": "#ffffff", "text": "#212121", "muted": "#6B7280", "buttonBackground": "#4CAF50", "buttonText": "#FFFFFF"}'::jsonb,
   '{"headingFont": "Inter", "bodyFont": "Inter", "baseFontSize": 16, "headingWeight": 700, "bodyWeight": 400}'::jsonb,
   '{"features": {"megaMenu": false, "quickView": true, "wishlist": true, "compareProducts": false, "ajaxSearch": true, "stickyCart": true}}'::jsonb
 )

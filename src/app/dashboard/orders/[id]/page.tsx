@@ -94,6 +94,12 @@ export default async function OrderDetailPage({
         coupon: orderData.coupon,
         coupon_discounted: orderData.coupon_discounted ? Number(orderData.coupon_discounted) : null,
         message: orderData.message,
+        delivery_zone_id: orderData.delivery_zone_id,
+        delivery_zone_name: orderData.delivery_zone_name,
+        delivery_fee: orderData.delivery_fee ? Number(orderData.delivery_fee) : null,
+        delivery_fee_status: orderData.delivery_fee_status,
+        delivery_fee_quote: orderData.delivery_fee_quote ? Number(orderData.delivery_fee_quote) : null,
+        delivery_fee_notes: orderData.delivery_fee_notes,
         items: orderData.order_products.map((item: any) => ({
           id: item.id,
           product_id: item.product_id,

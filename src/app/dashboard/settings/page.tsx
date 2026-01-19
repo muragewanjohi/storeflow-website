@@ -52,7 +52,6 @@ export default async function TenantSettingsPage() {
       'shipping_enabled',
       'shipping_method_type',
       'flat_rate_amount',
-      'dynamic_rate_per_km',
       'free_shipping_enabled',
       'free_shipping_threshold',
       
@@ -123,7 +122,6 @@ export default async function TenantSettingsPage() {
     shipping_enabled: settings.shipping_enabled === 'true' || settings.shipping_enabled === null,
     shipping_method_type: settings.shipping_method_type || 'flat_rate',
     flat_rate_amount: settings.flat_rate_amount ? parseFloat(settings.flat_rate_amount) : null,
-    dynamic_rate_per_km: settings.dynamic_rate_per_km ? parseFloat(settings.dynamic_rate_per_km) : null,
     free_shipping_enabled: settings.free_shipping_enabled === 'true',
     free_shipping_threshold: settings.free_shipping_threshold ? parseFloat(settings.free_shipping_threshold) : null,
     

@@ -36,8 +36,9 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { formatOrderStatus, formatPaymentStatus } from '@/lib/orders/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CalculatorIcon, MapPinIcon } from 'lucide-react';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { toast } from 'sonner';
 
 interface OrderItem {
   id: string;
@@ -68,6 +69,12 @@ interface Order {
   coupon: string | null;
   coupon_discounted: number | null;
   message: string | null;
+  delivery_zone_id: string | null;
+  delivery_zone_name: string | null;
+  delivery_fee: number | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: number | null;
+  delivery_fee_notes: string | null;
   items: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -97,6 +104,15 @@ export default function OrderDetailClient({
   const [isCancelling, setIsCancelling] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Delivery quote state
+  const [deliveryFeeQuote, setDeliveryFeeQuote] = useState<string>(
+    order?.delivery_fee_quote?.toString() || ''
+  );
+  const [deliveryFeeNotes, setDeliveryFeeNotes] = useState<string>(
+    order?.delivery_fee_notes || ''
+  );
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
 
   if (error || !order) {
     return (
@@ -283,6 +299,58 @@ export default function OrderDetailClient({
     // Placeholder for shipping label printing
     // In production, this would integrate with shipping providers (e.g., ShipStation, EasyPost)
     window.print();
+  };
+
+  const handleSubmitDeliveryQuote = async () => {
+    const fee = parseFloat(deliveryFeeQuote);
+    if (isNaN(fee) || fee < 0) {
+      toast.error('Please enter a valid delivery fee');
+      return;
+    }
+
+    setIsSubmittingQuote(true);
+    setUpdateError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}/delivery-quote`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          delivery_fee_quote: fee,
+          delivery_fee_notes: deliveryFeeNotes || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit delivery quote');
+      }
+
+      if (data.success) {
+        setOrder({ 
+          ...order, 
+          delivery_fee_quote: fee,
+          delivery_fee_notes: deliveryFeeNotes || null,
+          delivery_fee_status: 'quoted'
+        });
+        setSuccessMessage('Delivery quote sent to customer successfully');
+        toast.success('Delivery quote sent to customer');
+        
+        // Refresh page after a short delay
+        setTimeout(() => {
+          router.refresh();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setUpdateError(err.message || 'Failed to submit delivery quote');
+      toast.error(err.message || 'Failed to submit delivery quote');
+    } finally {
+      setIsSubmittingQuote(false);
+    }
   };
 
   // Build order timeline
@@ -650,6 +718,189 @@ export default function OrderDetailClient({
               )}
             </CardContent>
           </Card>
+
+          {/* Delivery Zone & Quote Section */}
+          {order.delivery_fee_status === 'pending' && (
+            <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalculatorIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                  Delivery Fee Quote Required
+                </CardTitle>
+                <CardDescription>
+                  This order is outside standard delivery zones. Calculate and send a delivery fee quote to the customer.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.shipping_address && (
+                  <div>
+                    <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <MapPinIcon className="h-4 w-4" />
+                      Delivery Address
+                    </Label>
+                    <div className="p-3 bg-background rounded-lg border text-sm">
+                      {order.shipping_address.address_line_1 && <p>{order.shipping_address.address_line_1}</p>}
+                      {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
+                      <p>
+                        {[
+                          order.shipping_address.city,
+                          order.shipping_address.state,
+                          order.shipping_address.postal_code,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                      {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <Label htmlFor="delivery_fee_quote">Delivery Fee *</Label>
+                  <Input
+                    id="delivery_fee_quote"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={deliveryFeeQuote}
+                    onChange={(e) => setDeliveryFeeQuote(e.target.value)}
+                    placeholder="0.00"
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the calculated delivery fee for this location
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="delivery_fee_notes">Notes (Optional)</Label>
+                  <Textarea
+                    id="delivery_fee_notes"
+                    value={deliveryFeeNotes}
+                    onChange={(e) => setDeliveryFeeNotes(e.target.value)}
+                    placeholder="Add any notes about the delivery fee calculation..."
+                    className="mt-2"
+                    rows={3}
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleSubmitDeliveryQuote}
+                  disabled={isSubmittingQuote || !deliveryFeeQuote}
+                  className="w-full"
+                >
+                  {isSubmittingQuote ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Quote...
+                    </>
+                  ) : (
+                    <>
+                      <CalculatorIcon className="mr-2 h-4 w-4" />
+                      Send Quote to Customer
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Delivery Zone Info (if zone is assigned) - Show for all orders with a zone */}
+          {order.delivery_zone_name && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPinIcon className="h-5 w-5" />
+                  Delivery Zone
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-sm font-semibold">Zone Name</Label>
+                  <p className="text-sm text-muted-foreground mt-1">{order.delivery_zone_name}</p>
+                </div>
+                {order.delivery_fee && (
+                  <div>
+                    <Label className="text-sm font-semibold">Delivery Fee</Label>
+                    <p className="text-sm font-semibold text-primary mt-1">{formatCurrency(order.delivery_fee)}</p>
+                  </div>
+                )}
+                {order.delivery_fee_status && (
+                  <div>
+                    <Label className="text-sm font-semibold">Fee Status</Label>
+                    <div className="mt-1">
+                      {order.delivery_fee_status === 'approved' && (
+                        <Badge variant="default" className="bg-green-600">
+                          Customer Approved
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'rejected' && (
+                        <Badge variant="destructive">
+                          Customer Rejected
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'quoted' && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                          Quote Sent
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'pending' && (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
+                          Quote Pending
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                  <div>
+                    <Label className="text-sm font-semibold">Quoted Fee</Label>
+                    <p className="text-sm font-semibold mt-1">{formatCurrency(order.delivery_fee_quote)}</p>
+                    {order.delivery_fee_notes && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">{order.delivery_fee_notes}</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Show delivery info even when no zone assigned (for orders without zones) */}
+          {!order.delivery_zone_name && order.shipping_address && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPinIcon className="h-5 w-5" />
+                  Delivery Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <Label className="text-sm font-semibold">Delivery Address</Label>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {order.shipping_address.address_line_1 && <p>{order.shipping_address.address_line_1}</p>}
+                    {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
+                    <p>
+                      {[
+                        order.shipping_address.city,
+                        order.shipping_address.state,
+                        order.shipping_address.postal_code,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </p>
+                    {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
+                  </div>
+                </div>
+                {order.delivery_fee && (
+                  <div>
+                    <Label className="text-sm font-semibold">Delivery Fee</Label>
+                    <p className="text-sm font-semibold text-primary mt-1">{formatCurrency(order.delivery_fee)}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Customer Information */}
           <Card>

@@ -48,9 +48,8 @@ const settingsUpdateSchema = z.object({
   
   // Shipping Methods
   shipping_enabled: z.boolean().optional(),
-  shipping_method_type: z.enum(['flat_rate', 'dynamic_rate']).optional(),
+  shipping_method_type: z.enum(['flat_rate', 'delivery_zones']).optional(),
   flat_rate_amount: z.number().min(0).optional().nullable(),
-  dynamic_rate_per_km: z.number().min(0).optional().nullable(),
   free_shipping_enabled: z.boolean().optional(),
   free_shipping_threshold: z.number().optional().nullable(),
   
@@ -182,9 +181,6 @@ export async function GET(request: NextRequest) {
     if (result.flat_rate_amount !== undefined && result.flat_rate_amount !== null) {
       result.flat_rate_amount = parseFloat(result.flat_rate_amount);
     }
-    if (result.dynamic_rate_per_km !== undefined && result.dynamic_rate_per_km !== null) {
-      result.dynamic_rate_per_km = parseFloat(result.dynamic_rate_per_km);
-    }
 
     // Add store name and domain from tenants table
     result.store_name = tenant.name;
@@ -292,9 +288,6 @@ export async function PUT(request: NextRequest) {
     }
     if (validatedData.flat_rate_amount !== undefined) {
       optionsToSave.flat_rate_amount = validatedData.flat_rate_amount?.toString() || null;
-    }
-    if (validatedData.dynamic_rate_per_km !== undefined) {
-      optionsToSave.dynamic_rate_per_km = validatedData.dynamic_rate_per_km?.toString() || null;
     }
     if (validatedData.free_shipping_enabled !== undefined) {
       optionsToSave.free_shipping_enabled = validatedData.free_shipping_enabled.toString();

@@ -39,6 +39,7 @@ interface Order {
   status: string | null;
   payment_status: string | null;
   payment_gateway: string | null;
+  order_details: any | null; // Contains tracking_number and shipping_carrier
   item_count: number;
   created_at: string;
   updated_at: string;
@@ -516,9 +517,27 @@ export default function OrdersListClient({
                         <TableCell>{order.item_count}</TableCell>
                         <TableCell>{formatCurrency(order.total_amount)}</TableCell>
                         <TableCell>
-                          <Badge variant={getStatusBadgeVariant(order.status)}>
-                            {formatOrderStatus(order.status || 'pending')}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge variant={getStatusBadgeVariant(order.status)}>
+                              {formatOrderStatus(order.status || 'pending')}
+                            </Badge>
+                            {order.status?.toLowerCase() === 'shipped' && order.order_details && (
+                              <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                                {order.order_details.tracking_number && (
+                                  <div>
+                                    <span className="font-medium">Tracking:</span>{' '}
+                                    <span className="font-mono">{order.order_details.tracking_number}</span>
+                                  </div>
+                                )}
+                                {order.order_details.shipping_carrier && (
+                                  <div>
+                                    <span className="font-medium">Carrier:</span>{' '}
+                                    {order.order_details.shipping_carrier}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant={getPaymentStatusBadgeVariant(order.payment_status)}>

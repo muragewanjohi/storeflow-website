@@ -33,9 +33,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, PlusIcon, PencilIcon, TrashIcon, MapPinIcon } from 'lucide-react';
+import { Loader2, PlusIcon, PencilIcon, TrashIcon, MapPinIcon, ArrowLeftIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
+import Link from 'next/link';
 
 interface DeliveryZone {
   id: string;
@@ -232,6 +233,15 @@ export default function DeliveryZonesClient() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center gap-4 mb-4">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/dashboard/settings">
+            <ArrowLeftIcon className="mr-2 h-4 w-4" />
+            Back to Settings
+          </Link>
+        </Button>
+      </div>
+      
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Delivery Zones</h1>

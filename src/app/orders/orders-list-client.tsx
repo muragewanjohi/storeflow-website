@@ -9,10 +9,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useCurrency } from '@/lib/currency/currency-context';
 
 interface OrderProduct {
@@ -40,11 +41,26 @@ interface Order {
   order_products: OrderProduct[];
 }
 
-interface OrdersListClientProps {
-  initialOrders: Order[];
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
 }
 
-export default function OrdersListClient({ initialOrders }: Readonly<OrdersListClientProps>) {
+interface OrdersListClientProps {
+  initialOrders: Order[];
+  initialPagination: Pagination | null;
+}
+
+export default function OrdersListClient({ 
+  initialOrders, 
+  initialPagination 
+}: Readonly<OrdersListClientProps>) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders] = useState<Order[]>(initialOrders);
   const { formatCurrency } = useCurrency();
 
@@ -193,6 +209,47 @@ export default function OrdersListClient({ initialOrders }: Readonly<OrdersListC
             </Card>
           ))}
         </div>
+
+        {/* Pagination */}
+        {initialPagination && initialPagination.totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {((initialPagination.page - 1) * initialPagination.limit) + 1} to{' '}
+              {Math.min(initialPagination.page * initialPagination.limit, initialPagination.total)} of{' '}
+              {initialPagination.total} orders
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set('page', (initialPagination.page - 1).toString());
+                  router.push(`/orders?${params.toString()}`);
+                }}
+                disabled={!initialPagination.hasPrevPage}
+                className="flex items-center gap-1"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Previous</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set('page', (initialPagination.page + 1).toString());
+                  router.push(`/orders?${params.toString()}`);
+                }}
+                disabled={!initialPagination.hasNextPage}
+                className="flex items-center gap-1"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRightIcon className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -52,6 +52,10 @@ interface Order {
   billing_address: any;
   order_details: any; // Contains tracking_number and shipping_carrier
   created_at: Date | null;
+  delivery_fee: number | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: number | null;
+  delivery_zone_name: string | null;
   order_products: OrderProduct[];
 }
 
@@ -430,12 +434,38 @@ export default function OrderConfirmationClient({
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span className="text-muted-foreground">Included</span>
+                    <span className={order.delivery_fee_status === 'pending' ? 'text-yellow-600 font-medium' : 'text-muted-foreground'}>
+                      {order.delivery_fee_status === 'pending' 
+                        ? 'Excluded' 
+                        : order.delivery_fee && order.delivery_fee > 0
+                        ? formatPrice(order.delivery_fee)
+                        : order.delivery_fee_quote && order.delivery_fee_quote > 0
+                        ? formatPrice(order.delivery_fee_quote)
+                        : 'Included'}
+                    </span>
                   </div>
+                  {order.delivery_fee_status === 'pending' && (
+                    <div className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded">
+                      Delivery fee will be calculated and sent to you separately.
+                    </div>
+                  )}
+                  {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                    <div className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 p-2 rounded">
+                      Delivery fee quote sent. Please check your email or order details to approve.
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>{formatPrice(order.total_amount)}</span>
+                    <span>
+                      {order.delivery_fee_status === 'pending'
+                        ? formatPrice(order.total_amount)
+                        : order.delivery_fee && order.delivery_fee > 0
+                        ? formatPrice(order.total_amount + order.delivery_fee)
+                        : order.delivery_fee_quote && order.delivery_fee_quote > 0
+                        ? formatPrice(order.total_amount + order.delivery_fee_quote)
+                        : formatPrice(order.total_amount)}
+                    </span>
                   </div>
                 </div>
 

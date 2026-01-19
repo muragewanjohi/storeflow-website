@@ -95,7 +95,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     country: '',
   });
   
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pesapal');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
   const [couponCode, setCouponCode] = useState('');
   const [notes, setNotes] = useState('');
   
@@ -104,6 +104,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   const [checkoutSettings, setCheckoutSettings] = useState<{
     pickup_enabled: boolean;
     shipping_enabled: boolean;
+    shipping_method_type: string | null;
     store_full_address: string | null;
     store_phone: string | null;
   } | null>(null);
@@ -285,15 +286,17 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       setCheckoutSettings({
         pickup_enabled: false,
         shipping_enabled: true,
+        shipping_method_type: 'flat_rate',
         store_full_address: null,
         store_phone: null,
       });
     }
   }, []);
 
-  // Fetch delivery zones
+  // Fetch delivery zones (only if shipping method is delivery_zones)
   const fetchDeliveryZones = useCallback(async () => {
     if (deliveryMethod !== 'delivery') return;
+    if (checkoutSettings?.shipping_method_type !== 'delivery_zones') return;
 
     try {
       const response = await fetch('/api/checkout/delivery-zones');
@@ -306,7 +309,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     } catch (error) {
       console.error('Error fetching delivery zones:', error);
     }
-  }, [deliveryMethod]);
+  }, [deliveryMethod, checkoutSettings?.shipping_method_type]);
 
   // Auto-detect zone based on address
   const detectZone = useCallback(async () => {
@@ -849,8 +852,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     </div>
                   )}
                   
-                  {/* Delivery Zone Selection (shown after address is entered) */}
-                  {deliveryZones.length > 0 && (useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (selectedAddressId && !useNewAddress)) && (
+                  {/* Delivery Zone Selection (only shown if shipping method is delivery_zones) */}
+                  {checkoutSettings?.shipping_method_type === 'delivery_zones' && deliveryZones.length > 0 && (useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (selectedAddressId && !useNewAddress)) && (
                     <div className="space-y-2">
                       <Label>Delivery Zone *</Label>
                       {zoneDetectionStatus === 'detecting' && (
@@ -1047,37 +1050,17 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <CardTitle>Payment Method</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="pesapal" id="pesapal" />
-                      <Label htmlFor="pesapal" className="flex-1 cursor-pointer">
-                        <div>
-                          <div className="font-semibold">Pesapal</div>
-                          <div className="text-sm text-muted-foreground">Pay securely with Pesapal</div>
-                        </div>
-                      </Label>
+                  <div className="flex items-center space-x-2 p-4 border rounded-lg bg-primary/5">
+                    <div className="w-4 h-4 rounded-full border-2 border-primary bg-primary flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-primary-foreground" />
                     </div>
-                    
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="paypal" id="paypal" />
-                      <Label htmlFor="paypal" className="flex-1 cursor-pointer">
-                        <div>
-                          <div className="font-semibold">PayPal</div>
-                          <div className="text-sm text-muted-foreground">Pay with your PayPal account</div>
-                        </div>
-                      </Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="cash_on_delivery" id="cash_on_delivery" />
-                      <Label htmlFor="cash_on_delivery" className="flex-1 cursor-pointer">
-                        <div>
-                          <div className="font-semibold">Cash on Delivery</div>
-                          <div className="text-sm text-muted-foreground">Pay when you receive your order</div>
-                        </div>
-                      </Label>
-                    </div>
-                  </RadioGroup>
+                    <Label htmlFor="cash_on_delivery" className="flex-1 cursor-pointer">
+                      <div>
+                        <div className="font-semibold">Cash on Delivery</div>
+                        <div className="text-sm text-muted-foreground">Pay when you receive your order</div>
+                      </div>
+                    </Label>
+                  </div>
 
                   <Separator />
 
@@ -1263,9 +1246,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <div>
                     <h3 className="font-semibold mb-2">Payment Method</h3>
                     <div className="text-sm text-muted-foreground">
-                      {paymentMethod === 'pesapal' && 'Pesapal'}
-                      {paymentMethod === 'paypal' && 'PayPal'}
-                      {paymentMethod === 'cash_on_delivery' && 'Cash on Delivery'}
+                      Cash on Delivery
                     </div>
                   </div>
 
@@ -1350,8 +1331,25 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span className="text-muted-foreground">
-                      {deliveryMethod === 'pickup' ? 'Free (Store Pickup)' : 'Calculated at checkout'}
+                    <span className={
+                      deliveryMethod === 'delivery' && 
+                      checkoutSettings?.shipping_method_type === 'delivery_zones' && 
+                      !selectedZoneId && 
+                      zoneDetectionStatus === 'not_matched'
+                        ? 'text-yellow-600 font-medium' 
+                        : 'text-muted-foreground'
+                    }>
+                      {deliveryMethod === 'pickup' 
+                        ? 'Free (Store Pickup)' 
+                        : checkoutSettings?.shipping_method_type === 'delivery_zones'
+                          ? (deliveryFee 
+                              ? formatPrice(deliveryFee) 
+                              : !selectedZoneId && zoneDetectionStatus === 'not_matched'
+                                ? 'Excluded'
+                                : 'Calculated at checkout')
+                          : checkoutSettings?.shipping_method_type === 'flat_rate'
+                            ? 'Flat rate'
+                            : 'Calculated at checkout'}
                     </span>
                   </div>
                   {couponCode && (

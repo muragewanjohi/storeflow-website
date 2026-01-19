@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPinIcon } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
@@ -90,7 +91,6 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     shipping_enabled: initialSettings.shipping_enabled ?? true,
     shipping_method_type: initialSettings.shipping_method_type || 'flat_rate',
     flat_rate_amount: initialSettings.flat_rate_amount || '',
-    dynamic_rate_per_km: initialSettings.dynamic_rate_per_km || '',
     free_shipping_enabled: initialSettings.free_shipping_enabled ?? false,
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
     
@@ -183,8 +183,9 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         // Shipping Methods
         shipping_enabled: formData.shipping_enabled,
         shipping_method_type: formData.shipping_method_type,
-        flat_rate_amount: formData.flat_rate_amount ? parseFloat(formData.flat_rate_amount) : null,
-        dynamic_rate_per_km: formData.dynamic_rate_per_km ? parseFloat(formData.dynamic_rate_per_km) : null,
+        flat_rate_amount: formData.shipping_method_type === 'flat_rate' && formData.flat_rate_amount 
+          ? parseFloat(formData.flat_rate_amount) 
+          : null,
         free_shipping_enabled: formData.free_shipping_enabled,
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
         
@@ -708,21 +709,52 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </div>
             {formData.shipping_enabled && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="shipping_method_type">Shipping Method Type *</Label>
-                  <Select
+                <div className="space-y-4">
+                  <Label>Shipping Method Type *</Label>
+                  <RadioGroup
                     value={formData.shipping_method_type}
-                    onValueChange={(value) => setFormData({ ...formData, shipping_method_type: value as 'flat_rate' | 'dynamic_rate' })}
+                    onValueChange={(value) => setFormData({ ...formData, shipping_method_type: value as 'flat_rate' | 'delivery_zones' })}
                   >
-                    <SelectTrigger id="shipping_method_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="flat_rate">Flat Rate</SelectItem>
-                      <SelectItem value="dynamic_rate">Dynamic Rate (Charge per km)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                      <RadioGroupItem value="flat_rate" id="flat_rate" />
+                      <Label htmlFor="flat_rate" className="flex-1 cursor-pointer">
+                        <div>
+                          <div className="font-semibold">Flat Rate</div>
+                          <div className="text-sm text-muted-foreground">
+                            Fixed shipping cost for all orders
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                      <RadioGroupItem value="delivery_zones" id="delivery_zones" />
+                      <Label htmlFor="delivery_zones" className="flex-1 cursor-pointer">
+                        <div>
+                          <div className="font-semibold">Delivery Zones</div>
+                          <div className="text-sm text-muted-foreground">
+                            Different prices based on delivery location zones
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
                 </div>
+                
+                {/* Show delivery zones info when selected */}
+                {formData.shipping_method_type === 'delivery_zones' && (
+                  <div className="p-4 border rounded-lg bg-primary/5">
+                    <p className="text-sm text-muted-foreground">
+                      Configure your delivery zones and pricing in the{' '}
+                      <a 
+                        href="/dashboard/settings/delivery-zones" 
+                        className="text-primary underline hover:text-primary/80"
+                      >
+                        Delivery Zones
+                      </a>{' '}
+                      section above.
+                    </p>
+                  </div>
+                )}
                 {formData.shipping_method_type === 'flat_rate' && (
                   <div className="space-y-2">
                     <Label htmlFor="flat_rate_amount">Flat Rate Amount *</Label>
@@ -734,26 +766,10 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                       value={formData.flat_rate_amount}
                       onChange={(e) => setFormData({ ...formData, flat_rate_amount: e.target.value })}
                       placeholder="0.00"
+                      required
                     />
                     <p className="text-xs text-muted-foreground">
                       Fixed shipping cost for all orders
-                    </p>
-                  </div>
-                )}
-                {formData.shipping_method_type === 'dynamic_rate' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="dynamic_rate_per_km">Rate Per Kilometer *</Label>
-                    <Input
-                      id="dynamic_rate_per_km"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.dynamic_rate_per_km}
-                      onChange={(e) => setFormData({ ...formData, dynamic_rate_per_km: e.target.value })}
-                      placeholder="0.00"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Shipping cost per kilometer (calculated based on delivery distance)
                     </p>
                   </div>
                 )}

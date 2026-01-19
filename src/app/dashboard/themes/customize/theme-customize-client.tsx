@@ -471,12 +471,37 @@ export default function ThemeCustomizeClient() {
       </div>
 
       <Tabs defaultValue="colors" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="colors">Colors</TabsTrigger>
-          <TabsTrigger value="typography">Typography</TabsTrigger>
-          <TabsTrigger value="layout">Layout</TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="advanced" disabled title="Coming soon">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="colors"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Colors
+          </TabsTrigger>
+          <TabsTrigger 
+            value="typography"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Typography
+          </TabsTrigger>
+          <TabsTrigger 
+            value="layout"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Layout
+          </TabsTrigger>
+          <TabsTrigger 
+            value="branding"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Branding
+          </TabsTrigger>
+          <TabsTrigger 
+            value="advanced" 
+            disabled 
+            title="Coming soon"
+            className="data-[state=inactive]:text-muted-foreground/50"
+          >
             Advanced
             <span className="ml-1.5 text-xs">🚧</span>
           </TabsTrigger>
@@ -510,25 +535,103 @@ export default function ThemeCustomizeClient() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Recommended Color Schemes Info */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold mb-2 text-blue-900 dark:text-blue-100">
+                  💡 Color Scheme Recommendations
+                </h4>
+                <p className="text-xs text-blue-800 dark:text-blue-200 mb-3">
+                  Based on design best practices, ensure proper contrast ratios (WCAG AA: 4.5:1 for text, 3:1 for UI elements).
+                  Avoid using similar shades for background and muted colors to maintain visibility.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <strong className="text-blue-900 dark:text-blue-100">E-commerce Best Practices:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-700 dark:text-blue-300">
+                      <li>Primary: Use brand color (blue/green recommended)</li>
+                      <li>Background: Light neutral (#FFFFFF or #FAFAFA)</li>
+                      <li>Text: Dark neutral (#212121 or #1A1A1A)</li>
+                      <li>Muted: Medium grey (#6B7280 or #9CA3AF)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-blue-900 dark:text-blue-100">Contrast Guidelines:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-700 dark:text-blue-300">
+                      <li>Text on background: ≥ 4.5:1</li>
+                      <li>UI components: ≥ 3:1</li>
+                      <li>Muted should be 40-60% lighter than text</li>
+                      <li>Test with contrast checker tools</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
               {[
-                { key: 'primary', description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements' },
-                { key: 'secondary', description: 'Used for: Secondary buttons, hover states, complementary UI elements' },
-                { key: 'accent', description: 'Used for: Highlights, special features, decorative elements, hover effects, and active links' },
-                { key: 'background', description: 'Used for: Page background color (applied via CSS variables)' },
-                { key: 'text', description: 'Used for: Main text color, headings, body text (applied via CSS variables)' },
-                { key: 'muted', description: 'Used for: Muted text, placeholders, secondary text, borders' },
-                { key: 'buttonBackground', description: 'Used for: Button background color (applied via CSS variables --button-background)' },
-                { key: 'buttonText', description: 'Used for: Button text color (applied via CSS variables --button-text)' },
-              ].map(({ key: colorKey, description }) => {
-                const defaultValue = (defaultColors as ThemeColors)[colorKey] || '#000000';
+                { 
+                  key: 'primary', 
+                  description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements',
+                  recommended: '#4CAF50', // Green - e-commerce friendly
+                  note: 'Recommended: Blue (#2196F3) or Green (#4CAF50) for trust and action'
+                },
+                { 
+                  key: 'secondary', 
+                  description: 'Used for: Secondary buttons, hover states, complementary UI elements',
+                  recommended: '#10b981', // Emerald
+                  note: 'Should complement primary color'
+                },
+                { 
+                  key: 'accent', 
+                  description: 'Used for: Highlights, special features, decorative elements, hover effects, and active links',
+                  recommended: '#FF9800', // Orange
+                  note: 'Use sparingly for emphasis'
+                },
+                { 
+                  key: 'background', 
+                  description: 'Used for: Page background color (applied via CSS variables)',
+                  recommended: '#FFFFFF',
+                  note: 'Keep light (#FFFFFF or #FAFAFA) for readability'
+                },
+                { 
+                  key: 'text', 
+                  description: 'Used for: Main text color, headings, body text (applied via CSS variables)',
+                  recommended: '#212121',
+                  note: 'Dark neutral (#212121 or #1A1A1A) for contrast'
+                },
+                { 
+                  key: 'muted', 
+                  description: 'Used for: Muted text, placeholders, secondary text, borders',
+                  recommended: '#6B7280',
+                  note: '⚠️ Important: Use medium grey (#6B7280 or #9CA3AF) - avoid too light or too dark to prevent visibility issues'
+                },
+                { 
+                  key: 'buttonBackground', 
+                  description: 'Used for: Button background color (applied via CSS variables --button-background)',
+                  recommended: '#4CAF50',
+                  note: 'Typically matches primary color'
+                },
+                { 
+                  key: 'buttonText', 
+                  description: 'Used for: Button text color (applied via CSS variables --button-text)',
+                  recommended: '#FFFFFF',
+                  note: 'White or light color for contrast on button background'
+                },
+              ].map(({ key: colorKey, description, recommended, note }) => {
+                const defaultValue = (defaultColors as ThemeColors)[colorKey] || recommended || '#000000';
                 const currentValue = customColors[colorKey] || defaultValue;
                 return (
                   <div key={colorKey} className="space-y-2">
                     <div>
                       <Label htmlFor={`color-${colorKey}`} className="capitalize">
-                        {colorKey} Color
+                        {colorKey === 'buttonBackground' ? 'Button Background' : 
+                         colorKey === 'buttonText' ? 'Button Text' : 
+                         colorKey} Color
                       </Label>
                       <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                      {note && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                          💡 {note}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <Input
@@ -536,27 +639,33 @@ export default function ThemeCustomizeClient() {
                         type="color"
                         value={currentValue}
                         onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                        className="w-20 h-10 cursor-pointer"
+                        className="w-20 h-10 cursor-pointer border border-border rounded"
                       />
                       <Input
                         type="text"
                         value={currentValue}
                         onChange={(e) => handleColorChange(colorKey, e.target.value)}
                         placeholder={defaultValue}
-                        className="flex-1"
+                        className="flex-1 font-mono text-sm"
+                        pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setCustomColors((prev) => {
-                            const newColors = { ...prev };
-                            delete newColors[colorKey];
-                            return newColors;
-                          });
+                          if (recommended) {
+                            handleColorChange(colorKey, recommended);
+                          } else {
+                            setCustomColors((prev) => {
+                              const newColors = { ...prev };
+                              delete newColors[colorKey];
+                              return newColors;
+                            });
+                          }
                         }}
+                        title={recommended ? `Set to recommended: ${recommended}` : 'Reset to default'}
                       >
-                        Reset
+                        {recommended ? 'Use Recommended' : 'Reset'}
                       </Button>
                     </div>
                   </div>

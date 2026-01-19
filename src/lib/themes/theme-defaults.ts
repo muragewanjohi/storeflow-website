@@ -20,17 +20,17 @@ export interface ThemeDefaults {
  */
 export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
   const defaults: Record<string, ThemeDefaults> = {
-    // Grocery Theme - Fresh, vibrant colors for food/grocery stores
+    // Grocery Theme - E-commerce-friendly color scheme (based on Figma & Shopify best practices)
     grocery: {
       colors: {
-        primary: '#4CAF50',      // Fresh green
-        secondary: '#FF9800',    // Orange accent
-        accent: '#8BC34A',       // Light green
-        background: '#FFFFFF',   // White background
-        text: '#212121',         // Dark gray text
-        muted: '#757575',        // Medium gray
-        buttonBackground: '#4CAF50', // Green button background
-        buttonText: '#FFFFFF',   // White button text
+        primary: '#4CAF50',      // Green - trust and action (e-commerce friendly)
+        secondary: '#10b981',    // Emerald - complements primary
+        accent: '#FF9800',       // Orange - use sparingly for emphasis
+        background: '#FFFFFF',   // White background - clean and professional
+        text: '#212121',         // Dark gray text - optimal contrast
+        muted: '#6B7280',        // Medium gray - 40-60% lighter than text for visibility
+        buttonBackground: '#4CAF50', // Green button background - matches primary
+        buttonText: '#FFFFFF',   // White button text - optimal contrast
       },
       fonts: {
         headingFont: 'Inter',

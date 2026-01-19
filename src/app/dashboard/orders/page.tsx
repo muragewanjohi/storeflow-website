@@ -124,6 +124,7 @@ export default async function OrdersPage({
       status: order.status,
       payment_status: order.payment_status,
       payment_gateway: order.payment_gateway,
+      order_details: order.order_details || null,
       item_count: order.order_products.reduce((sum: any, item: any) => sum + item.quantity, 0),
       created_at: order.created_at?.toISOString() || '',
       updated_at: order.updated_at?.toISOString() || '',

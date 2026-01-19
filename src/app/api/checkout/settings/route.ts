@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const settings = await getStaticOptions(tenant.id, [
       'pickup_enabled',
       'shipping_enabled',
+      'shipping_method_type',
       'store_address',
       'store_city',
       'store_state',
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
       settings: {
         pickup_enabled: pickupEnabled,
         shipping_enabled: shippingEnabled,
+        shipping_method_type: settings.shipping_method_type || 'flat_rate',
         store_address: settings.store_address || null,
         store_city: settings.store_city || null,
         store_state: settings.store_state || null,
