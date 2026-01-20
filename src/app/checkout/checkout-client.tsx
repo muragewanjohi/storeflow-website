@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -51,7 +52,7 @@ interface ShippingAddress {
   country: string;
 }
 
-type PaymentMethod = 'pesapal' | 'paypal' | 'cash_on_delivery';
+type PaymentMethod = 'cash' | 'mpesa';
 
 type DeliveryMethod = 'delivery' | 'pickup';
 
@@ -95,9 +96,14 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     country: '',
   });
   
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash_on_delivery');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [couponCode, setCouponCode] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // Payment verification fields (for M-Pesa)
+  const [paymentTransactionId, setPaymentTransactionId] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentVerificationNotes, setPaymentVerificationNotes] = useState('');
   
   // Delivery method state
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
@@ -107,6 +113,15 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     shipping_method_type: string | null;
     store_full_address: string | null;
     store_phone: string | null;
+    payment_cash_enabled: boolean;
+    payment_mpesa_enabled: boolean;
+    payment_mpesa_option: string | null;
+    payment_mpesa_send_money_number: string | null;
+    payment_mpesa_buy_goods_till: string | null;
+    payment_mpesa_paybill_number: string | null;
+    payment_mpesa_paybill_account: string | null;
+    payment_mpesa_pochi_phone: string | null;
+    default_payment_method: string;
   } | null>(null);
   
   // Delivery zones state
@@ -267,6 +282,15 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
         if (data.success && data.settings) {
           setCheckoutSettings(data.settings);
           
+          // Set default payment method
+          if (data.settings.default_payment_method) {
+            setPaymentMethod(data.settings.default_payment_method as PaymentMethod);
+          } else if (data.settings.payment_cash_enabled) {
+            setPaymentMethod('cash');
+          } else if (data.settings.payment_mpesa_enabled) {
+            setPaymentMethod('mpesa');
+          }
+          
           // Set default delivery method based on available options
           if (data.settings.pickup_enabled && !data.settings.shipping_enabled) {
             // Only pickup available
@@ -289,6 +313,15 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
         shipping_method_type: 'flat_rate',
         store_full_address: null,
         store_phone: null,
+        payment_cash_enabled: true,
+        payment_mpesa_enabled: false,
+        payment_mpesa_option: null,
+        payment_mpesa_send_money_number: null,
+        payment_mpesa_buy_goods_till: null,
+        payment_mpesa_paybill_number: null,
+        payment_mpesa_paybill_account: null,
+        payment_mpesa_pochi_phone: null,
+        default_payment_method: 'cash',
       });
     }
   }, []);
@@ -496,6 +529,12 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       return;
     }
 
+    // Validate M-Pesa payment verification details
+    if (paymentMethod === 'mpesa' && !paymentTransactionId.trim()) {
+      toast.error('Please provide your M-Pesa Transaction ID / Receipt Number');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -557,6 +596,11 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
             : null,
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
+        payment_verification: paymentMethod === 'mpesa' ? {
+          transaction_id: paymentTransactionId.trim(),
+          reference: paymentReference.trim() || null,
+          notes: paymentVerificationNotes.trim() || null,
+        } : null,
         coupon_code: couponCode || null,
         notes: notes || null,
       };
@@ -1056,17 +1100,63 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <CardTitle>Payment Method</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-2 p-4 border rounded-lg bg-primary/5">
-                    <div className="w-4 h-4 rounded-full border-2 border-primary bg-primary flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-primary-foreground" />
+                  {(!checkoutSettings?.payment_cash_enabled && !checkoutSettings?.payment_mpesa_enabled) ? (
+                    <div className="p-4 border border-destructive rounded-lg bg-destructive/10">
+                      <p className="text-sm text-destructive">
+                        No payment methods are currently enabled. Please contact the store administrator.
+                      </p>
                     </div>
-                    <Label htmlFor="cash_on_delivery" className="flex-1 cursor-pointer">
-                      <div>
-                        <div className="font-semibold">Cash on Delivery</div>
-                        <div className="text-sm text-muted-foreground">Pay when you receive your order</div>
+                  ) : (
+                    <RadioGroup
+                      value={paymentMethod}
+                      onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+                    >
+                      <div className="space-y-3">
+                        {/* Cash Payment Method */}
+                        {checkoutSettings?.payment_cash_enabled && (
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="cash" id="payment_cash" className="mt-1" />
+                            <Label htmlFor="payment_cash" className="flex-1 cursor-pointer">
+                              <div>
+                                <div className="font-semibold">Cash</div>
+                                <div className="text-sm text-muted-foreground">Pay with cash (on delivery or before delivery)</div>
+                              </div>
+                            </Label>
+                          </div>
+                        )}
+
+                        {/* M-Pesa Payment Method */}
+                        {checkoutSettings?.payment_mpesa_enabled && (
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                            <RadioGroupItem value="mpesa" id="payment_mpesa" className="mt-1" />
+                            <Label htmlFor="payment_mpesa" className="flex-1 cursor-pointer">
+                              <div>
+                                <div className="font-semibold">M-Pesa</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {checkoutSettings.payment_mpesa_option === 'send_money' && checkoutSettings.payment_mpesa_send_money_number && (
+                                    <>Send money to {checkoutSettings.payment_mpesa_send_money_number}</>
+                                  )}
+                                  {checkoutSettings.payment_mpesa_option === 'buy_goods' && checkoutSettings.payment_mpesa_buy_goods_till && (
+                                    <>Pay using Till Number {checkoutSettings.payment_mpesa_buy_goods_till}</>
+                                  )}
+                                  {checkoutSettings.payment_mpesa_option === 'paybill' && checkoutSettings.payment_mpesa_paybill_number && (
+                                    <>Paybill {checkoutSettings.payment_mpesa_paybill_number} Account {checkoutSettings.payment_mpesa_paybill_account}</>
+                                  )}
+                                  {checkoutSettings.payment_mpesa_option === 'pochi' && checkoutSettings.payment_mpesa_pochi_phone && (
+                                    <>Pochi la Biashara: {checkoutSettings.payment_mpesa_pochi_phone}</>
+                                  )}
+                                  {!checkoutSettings.payment_mpesa_option && 'Mobile money payment'}
+                                </div>
+                                <div className="text-xs text-yellow-600 mt-1 font-medium">
+                                  ⚠️ Payment requires manual verification
+                                </div>
+                              </div>
+                            </Label>
+                          </div>
+                        )}
                       </div>
-                    </Label>
-                  </div>
+                    </RadioGroup>
+                  )}
 
                   <Separator />
 
@@ -1252,7 +1342,23 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                   <div>
                     <h3 className="font-semibold mb-2">Payment Method</h3>
                     <div className="text-sm text-muted-foreground">
-                      Cash on Delivery
+                      {paymentMethod === 'cash' ? 'Cash' : 'M-Pesa'}
+                      {paymentMethod === 'mpesa' && checkoutSettings?.payment_mpesa_option && (
+                        <div className="text-xs mt-1">
+                          {checkoutSettings.payment_mpesa_option === 'send_money' && checkoutSettings.payment_mpesa_send_money_number && (
+                            <>Send to {checkoutSettings.payment_mpesa_send_money_number}</>
+                          )}
+                          {checkoutSettings.payment_mpesa_option === 'buy_goods' && checkoutSettings.payment_mpesa_buy_goods_till && (
+                            <>Till: {checkoutSettings.payment_mpesa_buy_goods_till}</>
+                          )}
+                          {checkoutSettings.payment_mpesa_option === 'paybill' && checkoutSettings.payment_mpesa_paybill_number && (
+                            <>Paybill: {checkoutSettings.payment_mpesa_paybill_number} (Account: {checkoutSettings.payment_mpesa_paybill_account})</>
+                          )}
+                          {checkoutSettings.payment_mpesa_option === 'pochi' && checkoutSettings.payment_mpesa_pochi_phone && (
+                            <>Pochi: {checkoutSettings.payment_mpesa_pochi_phone}</>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

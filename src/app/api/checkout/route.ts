@@ -194,8 +194,18 @@ export async function POST(request: NextRequest) {
         phone: customerInfo.phone,
         total_amount: finalTotal,
         status: 'pending',
-        payment_status: validatedData.payment_method === 'cash_on_delivery' ? 'pending' : 'pending',
+        payment_status: validatedData.payment_method === 'mpesa' && validatedData.payment_verification 
+          ? 'paid' 
+          : 'pending',
         payment_gateway: validatedData.payment_method,
+        transaction_id: validatedData.payment_verification?.transaction_id || null,
+        payment_meta: validatedData.payment_verification ? JSON.parse(JSON.stringify({
+          transaction_id: validatedData.payment_verification.transaction_id,
+          reference: validatedData.payment_verification.reference,
+          notes: validatedData.payment_verification.notes,
+          submitted_at: new Date().toISOString(),
+          verification_status: 'pending', // pending, verified, rejected
+        })) : null,
         shipping_address: isPickup 
           ? (validatedData.pickup_address as any)
           : (validatedData.shipping_address as any),
@@ -297,13 +307,13 @@ export async function POST(request: NextRequest) {
     // Send email notifications (async, don't wait)
     Promise.all([
       sendOrderPlacedEmail({
-        order,
+        order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
         customerEmail: customerInfo.email,
         customerName: customerInfo.name,
       }),
       sendNewOrderAlertEmail({
-        order,
+        order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
       }),
       // Send immediate notification email for new orders

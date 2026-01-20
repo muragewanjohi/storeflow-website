@@ -56,8 +56,14 @@ export default async function TenantSettingsPage() {
       'free_shipping_threshold',
       
       // Payment Methods
-      'payment_cash_before_delivery_enabled',
-      'payment_cash_after_delivery_enabled',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_mpesa_option',
+      'payment_mpesa_send_money_number',
+      'payment_mpesa_buy_goods_till',
+      'payment_mpesa_paybill_number',
+      'payment_mpesa_paybill_account',
+      'payment_mpesa_pochi_phone',
       'default_payment_method',
       
       // Tax Settings
@@ -125,10 +131,15 @@ export default async function TenantSettingsPage() {
     free_shipping_threshold: settings.free_shipping_threshold ? parseFloat(settings.free_shipping_threshold) : null,
     
     // Payment Methods
-    payment_pesapal_enabled: settings.payment_pesapal_enabled === 'true' || settings.payment_pesapal_enabled === null,
-    payment_paypal_enabled: settings.payment_paypal_enabled === 'true',
-    payment_cash_on_delivery_enabled: settings.payment_cash_on_delivery_enabled === 'true' || settings.payment_cash_on_delivery_enabled === null,
-    default_payment_method: settings.default_payment_method || '',
+    payment_cash_enabled: settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null,
+    payment_mpesa_enabled: settings.payment_mpesa_enabled === 'true',
+    payment_mpesa_option: settings.payment_mpesa_option || 'send_money',
+    payment_mpesa_send_money_number: settings.payment_mpesa_send_money_number || '',
+    payment_mpesa_buy_goods_till: settings.payment_mpesa_buy_goods_till || '',
+    payment_mpesa_paybill_number: settings.payment_mpesa_paybill_number || '',
+    payment_mpesa_paybill_account: settings.payment_mpesa_paybill_account || '',
+    payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || '',
+    default_payment_method: settings.default_payment_method || 'cash',
     
     // Tax Settings
     tax_enabled: settings.tax_enabled === 'true',

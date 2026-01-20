@@ -30,7 +30,9 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPinIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { MapPinIcon, AlertCircle } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
@@ -96,9 +98,15 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
     
     // Payment Methods
-    payment_cash_before_delivery_enabled: initialSettings.payment_cash_before_delivery_enabled ?? true,
-    payment_cash_after_delivery_enabled: initialSettings.payment_cash_after_delivery_enabled ?? true,
-    default_payment_method: initialSettings.default_payment_method || '',
+    payment_cash_enabled: initialSettings.payment_cash_enabled ?? true,
+    payment_mpesa_enabled: initialSettings.payment_mpesa_enabled ?? false,
+    payment_mpesa_option: initialSettings.payment_mpesa_option || 'send_money',
+    payment_mpesa_send_money_number: initialSettings.payment_mpesa_send_money_number || '',
+    payment_mpesa_buy_goods_till: initialSettings.payment_mpesa_buy_goods_till || '',
+    payment_mpesa_paybill_number: initialSettings.payment_mpesa_paybill_number || '',
+    payment_mpesa_paybill_account: initialSettings.payment_mpesa_paybill_account || '',
+    payment_mpesa_pochi_phone: initialSettings.payment_mpesa_pochi_phone || '',
+    default_payment_method: initialSettings.default_payment_method || 'cash',
     
     // Tax Settings
     tax_enabled: initialSettings.tax_enabled ?? false,
@@ -154,11 +162,28 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
   const handleSettingsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setSettingsError(null);
     setSettingsSuccess(null);
     setError(null);
     setSuccess(null);
+    
+    // Validate that at least one payment method is enabled
+    if (!formData.payment_cash_enabled && !formData.payment_mpesa_enabled) {
+      setSettingsError('At least one payment method must be enabled');
+      return;
+    }
+    
+    // Validate that default payment method is one of the enabled methods
+    if (formData.default_payment_method === 'cash' && !formData.payment_cash_enabled) {
+      setSettingsError('Default payment method must be one of the enabled payment methods');
+      return;
+    }
+    if (formData.default_payment_method === 'mpesa' && !formData.payment_mpesa_enabled) {
+      setSettingsError('Default payment method must be one of the enabled payment methods');
+      return;
+    }
+    
+    setIsSubmitting(true);
 
     try {
       const payload: any = {
@@ -190,9 +215,15 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
         
         // Payment Methods
-        payment_cash_before_delivery_enabled: formData.payment_cash_before_delivery_enabled,
-        payment_cash_after_delivery_enabled: formData.payment_cash_after_delivery_enabled,
-        default_payment_method: formData.default_payment_method || null,
+        payment_cash_enabled: formData.payment_cash_enabled,
+        payment_mpesa_enabled: formData.payment_mpesa_enabled,
+        payment_mpesa_option: formData.payment_mpesa_option,
+        payment_mpesa_send_money_number: formData.payment_mpesa_send_money_number || null,
+        payment_mpesa_buy_goods_till: formData.payment_mpesa_buy_goods_till || null,
+        payment_mpesa_paybill_number: formData.payment_mpesa_paybill_number || null,
+        payment_mpesa_paybill_account: formData.payment_mpesa_paybill_account || null,
+        payment_mpesa_pochi_phone: formData.payment_mpesa_pochi_phone || null,
+        default_payment_method: formData.default_payment_method || 'cash',
         
         // Tax Settings
         tax_enabled: formData.tax_enabled,
@@ -853,62 +884,238 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* Payment Methods Tab */}
         <TabsContent value="payment" className="space-y-6">
-          <Card>
-        <form onSubmit={handleSettingsSubmit}>
-          <CardHeader>
-            <CardTitle>Payment Methods</CardTitle>
-            <CardDescription>
-              Enable or disable payment methods for your store.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_cash_before_delivery_enabled"
-                checked={formData.payment_cash_before_delivery_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_before_delivery_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_cash_before_delivery_enabled" className="cursor-pointer">
-                Enable Cash Before Delivery
-              </Label>
+          <form onSubmit={handleSettingsSubmit}>
+            <div className="space-y-6">
+              {/* Cash Payment Method */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Cash</CardTitle>
+                      <CardDescription>
+                        Customers pay with cash (on delivery or before delivery)
+                      </CardDescription>
+                    </div>
+                    <Checkbox
+                      id="payment_cash_enabled"
+                      checked={formData.payment_cash_enabled}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        // Ensure at least one payment method is enabled
+                        if (!newValue && !formData.payment_mpesa_enabled) {
+                          setError('At least one payment method must be enabled');
+                          return;
+                        }
+                        setFormData({ 
+                          ...formData, 
+                          payment_cash_enabled: newValue,
+                          // If disabling cash and mpesa is enabled, set default to mpesa
+                          default_payment_method: !newValue && formData.payment_mpesa_enabled ? 'mpesa' : formData.default_payment_method
+                        });
+                        setError(null);
+                      }}
+                    />
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* M-Pesa */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>M-Pesa</CardTitle>
+                      <CardDescription>
+                        Mobile money payment method
+                      </CardDescription>
+                    </div>
+                    <Checkbox
+                      id="payment_mpesa_enabled"
+                      checked={formData.payment_mpesa_enabled}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        // Ensure at least one payment method is enabled
+                        if (!newValue && !formData.payment_cash_enabled) {
+                          setError('At least one payment method must be enabled');
+                          return;
+                        }
+                        setFormData({ 
+                          ...formData, 
+                          payment_mpesa_enabled: newValue,
+                          // If disabling mpesa and cash is enabled, set default to cash
+                          default_payment_method: !newValue && formData.payment_cash_enabled ? 'cash' : formData.default_payment_method
+                        });
+                        setError(null);
+                      }}
+                    />
+                  </div>
+                </CardHeader>
+                {formData.payment_mpesa_enabled && (
+                  <CardContent className="space-y-4">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Manual Verification Required</AlertTitle>
+                      <AlertDescription>
+                        All M-Pesa payment options require manual verification. The system cannot automatically verify payments. You will need to manually confirm payments before fulfilling orders.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="space-y-4">
+                      <Label>M-Pesa Payment Option</Label>
+                      <RadioGroup
+                        value={formData.payment_mpesa_option}
+                        onValueChange={(value) => setFormData({ ...formData, payment_mpesa_option: value })}
+                      >
+                        <div className="space-y-3">
+                          {/* Option 1: Send Money */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="send_money" id="mpesa_send_money" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_send_money" className="cursor-pointer font-medium">
+                                Send Money
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers send money directly to your M-Pesa number
+                              </p>
+                              {formData.payment_mpesa_option === 'send_money' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter M-Pesa number (e.g., 0712345678)"
+                                    value={formData.payment_mpesa_send_money_number}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_send_money_number: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 2: Buy Goods */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="buy_goods" id="mpesa_buy_goods" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_buy_goods" className="cursor-pointer font-medium">
+                                Buy Goods
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Till Number
+                              </p>
+                              {formData.payment_mpesa_option === 'buy_goods' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter Till Number (e.g., 123456)"
+                                    value={formData.payment_mpesa_buy_goods_till}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_buy_goods_till: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 3: Paybill */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="paybill" id="mpesa_paybill" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_paybill" className="cursor-pointer font-medium">
+                                Paybill
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Paybill number and account number
+                              </p>
+                              {formData.payment_mpesa_option === 'paybill' && (
+                                <div className="pt-2 space-y-2">
+                                  <Input
+                                    placeholder="Enter Paybill Number (e.g., 123456)"
+                                    value={formData.payment_mpesa_paybill_number}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_paybill_number: e.target.value })}
+                                  />
+                                  <Input
+                                    placeholder="Enter Account Number"
+                                    value={formData.payment_mpesa_paybill_account}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_paybill_account: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 4: Pochi la Biashara */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="pochi" id="mpesa_pochi" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_pochi" className="cursor-pointer font-medium">
+                                Pochi la Biashara
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Pochi la Biashara phone number
+                              </p>
+                              {formData.payment_mpesa_option === 'pochi' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter Phone Number (e.g., 0712345678)"
+                                    value={formData.payment_mpesa_pochi_phone}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_pochi_phone: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* Default Payment Method */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Default Payment Method</CardTitle>
+                  <CardDescription>
+                    The default payment method shown to customers during checkout
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={formData.default_payment_method}
+                    onValueChange={(value) => setFormData({ ...formData, default_payment_method: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select default payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.payment_cash_enabled && (
+                        <SelectItem value="cash">Cash</SelectItem>
+                      )}
+                      {formData.payment_mpesa_enabled && (
+                        <SelectItem value="mpesa">M-Pesa</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {!formData.payment_cash_enabled && !formData.payment_mpesa_enabled && (
+                    <p className="text-sm text-destructive mt-2">
+                      Please enable at least one payment method
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_cash_after_delivery_enabled"
-                checked={formData.payment_cash_after_delivery_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_after_delivery_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_cash_after_delivery_enabled" className="cursor-pointer">
-                Enable Cash After Delivery
-              </Label>
+
+            <div className="mt-6 flex items-center gap-4">
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+              {settingsSuccess && (
+                <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                  {settingsSuccess}
+                </div>
+              )}
+              {settingsError && (
+                <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                  {settingsError}
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="default_payment_method">Default Payment Method</Label>
-              <Input
-                id="default_payment_method"
-                value={formData.default_payment_method}
-                onChange={(e) => setFormData({ ...formData, default_payment_method: e.target.value })}
-                placeholder="e.g., pesapal"
-              />
-            </div>
-          </CardContent>
-          <div className="px-6 pb-6 flex items-center gap-4">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
-            {settingsSuccess && (
-              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
-                {settingsSuccess}
-              </div>
-            )}
-            {settingsError && (
-              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
-                {settingsError}
-              </div>
-            )}
-          </div>
-        </form>
-      </Card>
+          </form>
         </TabsContent>
 
         {/* Tax Settings Tab */}

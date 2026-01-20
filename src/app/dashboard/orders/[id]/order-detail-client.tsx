@@ -64,6 +64,7 @@ interface Order {
   payment_status: string | null;
   payment_gateway: string | null;
   transaction_id: string | null;
+  payment_meta: any | null;
   shipping_address: any;
   billing_address: any;
   coupon: string | null;
@@ -876,6 +877,126 @@ export default function OrderDetailClient({
                   <p className="text-sm text-muted-foreground mt-1 font-mono">{order.transaction_id}</p>
                 </div>
               )}
+              
+              {/* Payment Verification Details (for M-Pesa) */}
+              {order.payment_gateway === 'mpesa' && order.payment_meta && (
+                <div className="mt-4 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                  <h4 className="font-semibold text-sm mb-3">Payment Verification Details</h4>
+                  <div className="space-y-2 text-sm">
+                    {order.payment_meta.transaction_id && (
+                      <div>
+                        <span className="font-medium">Transaction ID:</span>{' '}
+                        <span className="font-mono">{order.payment_meta.transaction_id}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.reference && (
+                      <div>
+                        <span className="font-medium">Reference:</span>{' '}
+                        <span>{order.payment_meta.reference}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.notes && (
+                      <div>
+                        <span className="font-medium">Customer Notes:</span>{' '}
+                        <span className="text-muted-foreground">{order.payment_meta.notes}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.submitted_at && (
+                      <div>
+                        <span className="font-medium">Submitted:</span>{' '}
+                        <span className="text-muted-foreground">
+                          {new Date(order.payment_meta.submitted_at).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Verification Status:</span>
+                        <Badge 
+                          variant={
+                            order.payment_meta.verification_status === 'verified' ? 'default' :
+                            order.payment_meta.verification_status === 'rejected' ? 'destructive' :
+                            'secondary'
+                          }
+                        >
+                          {order.payment_meta.verification_status === 'verified' ? 'Verified' :
+                           order.payment_meta.verification_status === 'rejected' ? 'Rejected' :
+                           'Pending Verification'}
+                        </Badge>
+                      </div>
+                      {order.payment_meta.verified_at && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Verified: {new Date(order.payment_meta.verified_at).toLocaleString()}
+                          {order.payment_meta.verified_by && ` by ${order.payment_meta.verified_by}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Admin Verification Actions */}
+                  {order.payment_meta.verification_status === 'pending' && (
+                    <div className="mt-4 pt-4 border-t flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`/api/admin/orders/${order.id}/verify-payment`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'verify' }),
+                            });
+                            if (response.ok) {
+                              const data = await response.json();
+                              setOrder({ ...order, payment_meta: data.order.payment_meta });
+                              toast.success('Payment verified successfully');
+                              router.refresh();
+                            } else {
+                              const data = await response.json();
+                              toast.error(data.error || 'Failed to verify payment');
+                            }
+                          } catch (error) {
+                            toast.error('Failed to verify payment');
+                          }
+                        }}
+                      >
+                        <CheckCircleIcon className="h-4 w-4 mr-2" />
+                        Verify Payment
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={async () => {
+                          if (!confirm('Are you sure you want to reject this payment? The order payment status will be changed to pending.')) {
+                            return;
+                          }
+                          try {
+                            const response = await fetch(`/api/admin/orders/${order.id}/verify-payment`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'reject' }),
+                            });
+                            if (response.ok) {
+                              const data = await response.json();
+                              setOrder({ ...order, payment_status: data.order.payment_status, payment_meta: data.order.payment_meta });
+                              toast.success('Payment rejected');
+                              router.refresh();
+                            } else {
+                              const data = await response.json();
+                              toast.error(data.error || 'Failed to reject payment');
+                            }
+                          } catch (error) {
+                            toast.error('Failed to reject payment');
+                          }
+                        }}
+                      >
+                        <XMarkIcon className="h-4 w-4 mr-2" />
+                        Reject Payment
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {order.payment_status !== 'refunded' && (
                 <>
                   <div>

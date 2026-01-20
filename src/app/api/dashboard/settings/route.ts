@@ -57,9 +57,15 @@ const settingsUpdateSchema = z.object({
   pickup_enabled: z.boolean().optional(),
   
   // Payment Methods
-  payment_cash_before_delivery_enabled: z.boolean().optional(),
-  payment_cash_after_delivery_enabled: z.boolean().optional(),
-  default_payment_method: z.string().optional().nullable(),
+  payment_cash_enabled: z.boolean().optional(),
+  payment_mpesa_enabled: z.boolean().optional(),
+  payment_mpesa_option: z.enum(['send_money', 'buy_goods', 'paybill', 'pochi']).optional(),
+  payment_mpesa_send_money_number: z.string().optional().nullable(),
+  payment_mpesa_buy_goods_till: z.string().optional().nullable(),
+  payment_mpesa_paybill_number: z.string().optional().nullable(),
+  payment_mpesa_paybill_account: z.string().optional().nullable(),
+  payment_mpesa_pochi_phone: z.string().optional().nullable(),
+  default_payment_method: z.enum(['cash', 'mpesa']).optional(),
   
   // Tax Settings
   tax_enabled: z.boolean().optional(),
@@ -108,8 +114,14 @@ export async function GET(request: NextRequest) {
       'pickup_enabled',
       
       // Payment Methods
-      'payment_cash_before_delivery_enabled',
-      'payment_cash_after_delivery_enabled',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_mpesa_option',
+      'payment_mpesa_send_money_number',
+      'payment_mpesa_buy_goods_till',
+      'payment_mpesa_paybill_number',
+      'payment_mpesa_paybill_account',
+      'payment_mpesa_pochi_phone',
       'default_payment_method',
       
       // Tax Settings
@@ -129,8 +141,8 @@ export async function GET(request: NextRequest) {
       currency_decimal_places: '2',
       shipping_enabled: 'true',
       shipping_method_type: 'flat_rate',
-      payment_cash_before_delivery_enabled: 'true',
-      payment_cash_after_delivery_enabled: 'true',
+      payment_cash_enabled: 'true',
+      default_payment_method: 'cash',
       tax_enabled: 'false',
       tax_included_in_price: 'false',
       tax_calculation_based_on: 'billing_address',
@@ -320,14 +332,53 @@ export async function PUT(request: NextRequest) {
     }
 
     // Payment Methods
-    if (validatedData.payment_cash_before_delivery_enabled !== undefined) {
-      optionsToSave.payment_cash_before_delivery_enabled = validatedData.payment_cash_before_delivery_enabled.toString();
+    if (validatedData.payment_cash_enabled !== undefined) {
+      optionsToSave.payment_cash_enabled = validatedData.payment_cash_enabled.toString();
     }
-    if (validatedData.payment_cash_after_delivery_enabled !== undefined) {
-      optionsToSave.payment_cash_after_delivery_enabled = validatedData.payment_cash_after_delivery_enabled.toString();
+    if (validatedData.payment_mpesa_enabled !== undefined) {
+      optionsToSave.payment_mpesa_enabled = validatedData.payment_mpesa_enabled.toString();
+    }
+    if (validatedData.payment_mpesa_option !== undefined) {
+      optionsToSave.payment_mpesa_option = validatedData.payment_mpesa_option;
+    }
+    if (validatedData.payment_mpesa_send_money_number !== undefined) {
+      optionsToSave.payment_mpesa_send_money_number = validatedData.payment_mpesa_send_money_number || null;
+    }
+    if (validatedData.payment_mpesa_buy_goods_till !== undefined) {
+      optionsToSave.payment_mpesa_buy_goods_till = validatedData.payment_mpesa_buy_goods_till || null;
+    }
+    if (validatedData.payment_mpesa_paybill_number !== undefined) {
+      optionsToSave.payment_mpesa_paybill_number = validatedData.payment_mpesa_paybill_number || null;
+    }
+    if (validatedData.payment_mpesa_paybill_account !== undefined) {
+      optionsToSave.payment_mpesa_paybill_account = validatedData.payment_mpesa_paybill_account || null;
+    }
+    if (validatedData.payment_mpesa_pochi_phone !== undefined) {
+      optionsToSave.payment_mpesa_pochi_phone = validatedData.payment_mpesa_pochi_phone || null;
     }
     if (validatedData.default_payment_method !== undefined) {
-      optionsToSave.default_payment_method = validatedData.default_payment_method || null;
+      optionsToSave.default_payment_method = validatedData.default_payment_method;
+    }
+    
+    // Validation: Ensure at least one payment method is enabled
+    // Get current settings to check existing values
+    const currentPaymentSettings = await getStaticOptions(tenant.id, [
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+    ]);
+    
+    const cashEnabled = validatedData.payment_cash_enabled !== undefined 
+      ? validatedData.payment_cash_enabled 
+      : (currentPaymentSettings.payment_cash_enabled === 'true' || currentPaymentSettings.payment_cash_enabled === null);
+    const mpesaEnabled = validatedData.payment_mpesa_enabled !== undefined 
+      ? validatedData.payment_mpesa_enabled 
+      : (currentPaymentSettings.payment_mpesa_enabled === 'true');
+    
+    if (!cashEnabled && !mpesaEnabled) {
+      return NextResponse.json(
+        { error: 'At least one payment method must be enabled' },
+        { status: 400 }
+      );
     }
 
     // Tax Settings

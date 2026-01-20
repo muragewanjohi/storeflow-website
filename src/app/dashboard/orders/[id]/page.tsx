@@ -89,6 +89,7 @@ export default async function OrderDetailPage({
         payment_status: orderData.payment_status,
         payment_gateway: orderData.payment_gateway,
         transaction_id: orderData.transaction_id,
+        payment_meta: orderData.payment_meta,
         shipping_address: orderData.shipping_address,
         billing_address: orderData.billing_address,
         coupon: orderData.coupon,

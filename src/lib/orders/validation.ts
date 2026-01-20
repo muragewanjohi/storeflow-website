@@ -65,7 +65,12 @@ export const checkoutSchema = z.object({
     postal_code: z.string().min(1, 'Postal code is required'),
     country: z.string().min(1, 'Country is required'),
   }).optional(),
-  payment_method: z.enum(['pesapal', 'paypal', 'cash_on_delivery']),
+  payment_method: z.enum(['cash', 'mpesa']),
+  payment_verification: z.object({
+    transaction_id: z.string().min(1, 'Transaction ID is required'),
+    reference: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  }).optional().nullable(),
   coupon_code: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });

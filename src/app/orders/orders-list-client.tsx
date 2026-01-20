@@ -116,28 +116,6 @@ export default function OrdersListClient({
     }
   };
 
-  if (orders.length === 0) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <h2 className="text-2xl font-bold mb-4">No Orders Yet</h2>
-                <p className="text-muted-foreground mb-6">
-                  You haven&apos;t placed any orders yet. Start shopping to see your orders here.
-                </p>
-                <Link href="/products">
-                  <Button>Browse Products</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     const params = new URLSearchParams(searchParams.toString());

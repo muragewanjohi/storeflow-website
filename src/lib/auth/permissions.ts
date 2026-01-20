@@ -26,6 +26,34 @@ export type Permission =
   | 'settings.read'
   | 'settings.update'
   | 'analytics.read'
+  | 'dashboard.read'
+  | 'themes.read'
+  | 'themes.update'
+  | 'sales.read'
+  | 'sales.create'
+  | 'sales.update'
+  | 'sales.delete'
+  | 'subscription.read'
+  | 'pages.read'
+  | 'pages.create'
+  | 'pages.update'
+  | 'pages.delete'
+  | 'blogs.read'
+  | 'blogs.create'
+  | 'blogs.update'
+  | 'blogs.delete'
+  | 'forms.read'
+  | 'forms.create'
+  | 'forms.update'
+  | 'forms.delete'
+  | 'media.read'
+  | 'media.create'
+  | 'media.update'
+  | 'media.delete'
+  | 'support.read'
+  | 'support.create'
+  | 'support.update'
+  | 'support.platform.read'
   | 'tenants.create'
   | 'tenants.read'
   | 'tenants.update'
@@ -63,6 +91,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   tenant_admin: [
     // Full access to tenant resources
+    'dashboard.read',
     'products.create',
     'products.read',
     'products.update',
@@ -82,9 +111,37 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'settings.read',
     'settings.update',
     'analytics.read',
+    'themes.read',
+    'themes.update',
+    'sales.read',
+    'sales.create',
+    'sales.update',
+    'sales.delete',
+    'subscription.read',
+    'pages.read',
+    'pages.create',
+    'pages.update',
+    'pages.delete',
+    'blogs.read',
+    'blogs.create',
+    'blogs.update',
+    'blogs.delete',
+    'forms.read',
+    'forms.create',
+    'forms.update',
+    'forms.delete',
+    'media.read',
+    'media.create',
+    'media.update',
+    'media.delete',
+    'support.read',
+    'support.create',
+    'support.update',
+    'support.platform.read',
   ],
   tenant_staff: [
     // Limited access - read and update only
+    'dashboard.read',
     'products.read',
     'products.update',
     'orders.read',
@@ -92,6 +149,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'customers.read',
     'customers.update',
     'settings.read',
+    'pages.read',
+    'pages.update',
+    'blogs.read',
+    'blogs.update',
+    'forms.read',
+    'forms.update',
+    'media.read',
+    'media.update',
+    'support.read',
+    'support.create',
+    'support.update',
   ],
   customer: [
     // Customer-facing permissions
@@ -180,6 +248,7 @@ export function getRolePermissions(role: UserRole, customPermissions?: Permissio
  */
 export function getAllPermissions(): Permission[] {
   return [
+    'dashboard.read',
     'products.create',
     'products.read',
     'products.update',
@@ -199,5 +268,32 @@ export function getAllPermissions(): Permission[] {
     'settings.read',
     'settings.update',
     'analytics.read',
+    'themes.read',
+    'themes.update',
+    'sales.read',
+    'sales.create',
+    'sales.update',
+    'sales.delete',
+    'subscription.read',
+    'pages.read',
+    'pages.create',
+    'pages.update',
+    'pages.delete',
+    'blogs.read',
+    'blogs.create',
+    'blogs.update',
+    'blogs.delete',
+    'forms.read',
+    'forms.create',
+    'forms.update',
+    'forms.delete',
+    'media.read',
+    'media.create',
+    'media.update',
+    'media.delete',
+    'support.read',
+    'support.create',
+    'support.update',
+    'support.platform.read',
   ];
 }

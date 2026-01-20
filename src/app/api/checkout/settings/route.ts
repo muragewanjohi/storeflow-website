@@ -29,6 +29,15 @@ export async function GET(request: NextRequest) {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_mpesa_option',
+      'payment_mpesa_send_money_number',
+      'payment_mpesa_buy_goods_till',
+      'payment_mpesa_paybill_number',
+      'payment_mpesa_paybill_account',
+      'payment_mpesa_pochi_phone',
+      'default_payment_method',
     ]);
 
     // Check if pickup can be enabled (requires physical address)
@@ -40,6 +49,11 @@ export async function GET(request: NextRequest) {
 
     const pickupEnabled = settings.pickup_enabled === 'true' && hasPhysicalAddress;
     const shippingEnabled = settings.shipping_enabled !== 'false'; // Default to true
+
+    // Payment methods
+    const payment_cash_enabled = settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null;
+    const payment_mpesa_enabled = settings.payment_mpesa_enabled === 'true';
+    const default_payment_method = settings.default_payment_method || 'cash';
 
     return NextResponse.json({
       success: true,
@@ -65,6 +79,16 @@ export async function GET(request: NextRequest) {
               .filter(Boolean)
               .join(', ')
           : null,
+        // Payment methods
+        payment_cash_enabled,
+        payment_mpesa_enabled,
+        payment_mpesa_option: settings.payment_mpesa_option || null,
+        payment_mpesa_send_money_number: settings.payment_mpesa_send_money_number || null,
+        payment_mpesa_buy_goods_till: settings.payment_mpesa_buy_goods_till || null,
+        payment_mpesa_paybill_number: settings.payment_mpesa_paybill_number || null,
+        payment_mpesa_paybill_account: settings.payment_mpesa_paybill_account || null,
+        payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || null,
+        default_payment_method,
       },
     });
   } catch (error: any) {
