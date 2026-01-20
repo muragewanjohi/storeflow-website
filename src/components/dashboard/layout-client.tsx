@@ -13,6 +13,7 @@ import type { TenantAccessRestriction } from '@/lib/tenant-context/access-contro
 import DashboardSidebar from './sidebar';
 import DashboardHeader from './header';
 import { AccessRestrictionBanner } from './access-restriction-banner';
+import { UpdateNotificationBanner } from './update-notification-banner';
 import { CurrencyProvider } from '@/lib/currency/currency-context';
 
 interface LayoutClientProps {
@@ -52,6 +53,7 @@ export default function DashboardLayoutClient({
           <main className="py-6">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <AccessRestrictionBanner restriction={accessRestriction} />
+              <UpdateNotificationBanner />
               {children}
             </div>
           </main>

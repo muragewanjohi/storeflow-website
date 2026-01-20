@@ -34,6 +34,7 @@ import { MapPinIcon } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
+import { VersionInfo } from '@/components/dashboard/version-info';
 
 interface TenantSettingsClientProps {
   tenant: Tenant;
@@ -251,12 +252,13 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="currency">Currency</TabsTrigger>
           <TabsTrigger value="shipping">Shipping</TabsTrigger>
           <TabsTrigger value="payment">Payment</TabsTrigger>
           <TabsTrigger value="tax">Tax</TabsTrigger>
+          <TabsTrigger value="version">Version</TabsTrigger>
         </TabsList>
 
         {/* General Settings Tab */}
@@ -973,6 +975,11 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           </div>
         </form>
       </Card>
+        </TabsContent>
+
+        {/* Version Tab */}
+        <TabsContent value="version" className="space-y-6">
+          <VersionInfo />
         </TabsContent>
       </Tabs>
     </div>

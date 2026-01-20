@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Security: Check for Vercel Cron header OR valid token
-    const vercelCronHeader = request.headers.get('x-vercel-cron');
+    // Vercel Cron automatically sends 'x-vercel-cron' header (case-insensitive check)
+    // Manual calls require CRON_SECRET_TOKEN via Authorization header or query parameter
+    const allHeaders = Object.fromEntries(
+      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
+    );
+    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
     const authHeader = request.headers.get('authorization');
     const { searchParams } = new URL(request.url);
     const queryToken = searchParams.get('token');
@@ -39,11 +44,12 @@ export async function GET(request: NextRequest) {
     
     // Allow if it's a Vercel Cron call (has x-vercel-cron header)
     // OR if token is provided and valid
+    // OR if no token is configured (development mode)
     if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '');
+      const headerToken = authHeader?.replace('Bearer ', '').trim();
       const providedToken = queryToken || headerToken;
       
-      if (providedToken !== expectedToken) {
+      if (!providedToken || providedToken !== expectedToken) {
         await completeCronJobLog(logId, 'failed', {
           error: 'Unauthorized - Invalid token',
         });

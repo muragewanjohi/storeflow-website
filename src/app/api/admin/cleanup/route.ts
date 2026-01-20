@@ -14,22 +14,45 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
 /**
  * GET /api/admin/cleanup
  * Perform data cleanup tasks
  */
 export async function GET(request: NextRequest) {
+  const logId = await startCronJobLog({
+    jobName: 'Data Cleanup',
+    jobPath: '/api/admin/cleanup',
+  });
+
   try {
-    // Optional: Add secret token check for security
+    // Security: Check for Vercel Cron header OR valid token
+    const allHeaders = Object.fromEntries(
+      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
+    );
+    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
     const authHeader = request.headers.get('authorization');
+    const { searchParams } = new URL(request.url);
+    const queryToken = searchParams.get('token');
     const expectedToken = process.env.CRON_SECRET_TOKEN;
     
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
+    // OR if token is provided and valid
+    // OR if no token is configured (development mode)
+    if (expectedToken && !vercelCronHeader) {
+      const headerToken = authHeader?.replace('Bearer ', '').trim();
+      const providedToken = queryToken || headerToken;
+      
+      if (!providedToken || providedToken !== expectedToken) {
+        await completeCronJobLog(logId, 'failed', {
+          error: 'Unauthorized - Invalid token',
+        });
+        return NextResponse.json(
+          { message: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
     }
 
     const now = new Date();
@@ -95,6 +118,10 @@ export async function GET(request: NextRequest) {
     // 5. Clean up expired password reset tokens (if stored in database)
     // This would depend on your auth implementation
 
+    await completeCronJobLog(logId, 'success', {
+      result: results,
+    });
+
     return NextResponse.json(
       {
         message: 'Data cleanup completed',
@@ -105,6 +132,11 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error during data cleanup:', error);
+    
+    await completeCronJobLog(logId, 'failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       {
         message: process.env.NODE_ENV === 'development'

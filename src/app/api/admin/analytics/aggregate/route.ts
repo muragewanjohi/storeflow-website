@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { getOrSetCache, cacheKeys, CACHE_TTL } from '@/lib/cache/redis';
+import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
 // Force dynamic rendering to prevent build-time static analysis
 export const dynamic = 'force-dynamic';
@@ -24,16 +25,38 @@ export const dynamic = 'force-dynamic';
  * - Updates analytics summary tables (if needed)
  */
 export async function GET(request: NextRequest) {
+  const logId = await startCronJobLog({
+    jobName: 'Analytics Aggregate',
+    jobPath: '/api/admin/analytics/aggregate',
+  });
+
   try {
-    // Optional: Add secret token check for security
+    // Security: Check for Vercel Cron header OR valid token
+    const allHeaders = Object.fromEntries(
+      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
+    );
+    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
     const authHeader = request.headers.get('authorization');
+    const { searchParams } = new URL(request.url);
+    const queryToken = searchParams.get('token');
     const expectedToken = process.env.CRON_SECRET_TOKEN;
     
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
+    // OR if token is provided and valid
+    // OR if no token is configured (development mode)
+    if (expectedToken && !vercelCronHeader) {
+      const headerToken = authHeader?.replace('Bearer ', '').trim();
+      const providedToken = queryToken || headerToken;
+      
+      if (!providedToken || providedToken !== expectedToken) {
+        await completeCronJobLog(logId, 'failed', {
+          error: 'Unauthorized - Invalid token',
+        });
+        return NextResponse.json(
+          { message: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
     }
 
     const now = new Date();
@@ -109,6 +132,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    await completeCronJobLog(logId, 'success', {
+      result: results,
+    });
+
     return NextResponse.json(
       {
         message: 'Analytics aggregation completed',
@@ -120,6 +147,11 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error aggregating analytics:', error);
+    
+    await completeCronJobLog(logId, 'failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       {
         message: process.env.NODE_ENV === 'development'

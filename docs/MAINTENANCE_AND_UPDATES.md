@@ -16,8 +16,9 @@ This guide outlines best practices for maintaining and updating StoreFlow on Ver
 6. [Monitoring & Logging](#monitoring--logging)
 7. [Backup Strategy](#backup-strategy)
 8. [Version Management](#version-management)
-9. [Feature Flags](#feature-flags)
-10. [Scheduled Maintenance](#scheduled-maintenance)
+9. [Breaking Changes](#breaking-changes)
+10. [Feature Flags](#feature-flags)
+11. [Scheduled Maintenance](#scheduled-maintenance)
 
 ---
 
@@ -184,11 +185,62 @@ ALTER TABLE orders ALTER COLUMN new_field SET NOT NULL;
 
 ### Vercel's Built-in Zero-Downtime
 
-Vercel provides zero-downtime deployments by default:
-- ✅ Atomic deployments (switches traffic instantly)
-- ✅ Automatic rollback on build failure
-- ✅ Health checks before traffic switch
-- ✅ Gradual traffic rollout (Pro plan)
+Vercel provides **true zero-downtime deployments** by default:
+- ✅ **Atomic deployments** - Traffic switches instantly to new version
+- ✅ **No service interruption** - Old version serves requests until new version is ready
+- ✅ **Automatic rollback** - If build fails, old version continues serving
+- ✅ **Health checks** - New version is tested before traffic switch
+- ✅ **Gradual traffic rollout** - Pro plan supports gradual rollout (0% → 100%)
+
+### How Zero-Downtime Works
+
+When you promote a preview deployment to production or push to `main`:
+
+1. **Build Phase** (2-5 minutes)
+   - Vercel builds your application in the background
+   - Old version continues serving all traffic
+   - Users experience **zero interruption**
+
+2. **Deployment Phase** (< 1 second)
+   - New version is deployed to edge network
+   - Traffic instantly switches to new version
+   - Old version is kept for quick rollback
+
+3. **Result**
+   - **Zero downtime** - Users never see "site down" or "maintenance mode"
+   - **Instant updates** - Changes go live immediately
+   - **Safe rollback** - Can revert in ~30 seconds if needed
+
+### User Experience During Updates
+
+**What users see:**
+- ✅ Store remains fully accessible
+- ✅ Orders can be placed normally
+- ✅ No error messages or downtime
+- ✅ Updates appear instantly (may need browser refresh)
+
+**What users DON'T see:**
+- ❌ "Site under maintenance" messages
+- ❌ 503 errors or connection failures
+- ❌ Interrupted checkout processes
+- ❌ Lost sessions or data
+
+### Best Practices for Zero-Downtime
+
+1. **Database Migrations**
+   - Run backward-compatible migrations first
+   - Add columns as nullable, then populate, then make required
+   - Use feature flags for breaking changes
+
+2. **API Changes**
+   - Keep old endpoints working during transition
+   - Use API versioning (`/api/v1/`, `/api/v2/`)
+   - Deprecate gradually with warnings
+
+3. **Environment Variables**
+   - Update in Vercel dashboard BEFORE deployment
+   - Test variable changes on preview first
+   - Use Vercel's environment variable preview
 
 ### Best Practices
 
@@ -502,6 +554,92 @@ MAJOR.MINOR.PATCH
 1.1.0 → 2.0.0 (major - breaking changes)
 ```
 
+### Version Display for Users
+
+StoreFlow includes a **Version Information** section in Settings:
+
+**Location:** Dashboard → Settings → Version Tab
+
+**Displays:**
+- Current application version
+- Build timestamp
+- Git commit hash
+- Deployment environment
+- Node.js version
+- Deployment URL
+
+**User Benefits:**
+- Transparency about system version
+- Easy troubleshooting (share version with support)
+- Awareness of updates
+- Confidence in system reliability
+
+### Update Notifications
+
+**Automatic Notifications:**
+- Banner appears when new version is detected
+- Shows version number and update time
+- Dismissible (won't show again for same version)
+- Optional refresh button to load latest assets
+
+**Best Practices:**
+- Notify users of major updates (v1.0 → v2.0)
+- Notify users of security updates
+- Optional notifications for minor updates
+- Never interrupt critical user flows (checkout, etc.)
+
+### How Popular E-Commerce Platforms Handle Updates
+
+**Shopify:**
+- ✅ Zero-downtime deployments
+- ✅ Automatic updates (merchants don't manage)
+- ✅ Version info in admin panel
+- ✅ Email notifications for major changes
+- ✅ Release notes in admin dashboard
+
+**WooCommerce:**
+- ✅ Plugin update notifications
+- ✅ Version display in admin
+- ✅ Changelog for each version
+- ✅ Optional auto-updates
+- ✅ Maintenance mode for major updates (optional)
+
+**BigCommerce:**
+- ✅ Zero-downtime updates
+- ✅ Version info in admin
+- ✅ Release notes and changelog
+- ✅ Email notifications for breaking changes
+
+**StoreFlow Approach:**
+- ✅ **Single version model** - All users run same version (SaaS)
+- ✅ **Automatic updates** - No user action required
+- ✅ **Zero-downtime** - Vercel atomic deployments
+- ✅ **Version display** - Settings → Version tab
+- ✅ **Update notifications** - Dismissible banner
+- ✅ **No opt-out** - Updates are automatic (like Shopify, Stripe)
+- ✅ **Migration support** - Breaking changes include migration guides
+
+### Single Version vs Multiple Versions
+
+**StoreFlow uses a single version model** (standard for SaaS platforms):
+
+- **All users on same version** - No version fragmentation
+- **Automatic updates** - Deployed automatically to all users
+- **No opt-out** - Core platform updates are mandatory
+- **Notifications only** - Users informed, not asked to approve
+
+**Why Single Version?**
+- Reduces maintenance costs
+- Ensures security patches apply to all
+- Provides consistent user experience
+- Simplifies support and troubleshooting
+- Enables faster feature deployment
+
+**Comparison:**
+- **SaaS Platforms** (Shopify, Stripe, StoreFlow): Single version, automatic updates
+- **Self-Hosted** (WooCommerce, Magento): Multiple versions, user-controlled updates
+- **API Platforms** (Stripe API, Shopify API): Version pinning, platform auto-updates
+
 ### Version Tracking
 
 1. **package.json**
@@ -538,6 +676,90 @@ git push origin main --tags
 
 # 4. Deploy (Vercel auto-deploys on push)
 ```
+
+---
+
+## Breaking Changes
+
+### Overview
+
+Breaking changes are modifications that require users or integrations to update their code, configuration, or workflows. StoreFlow follows industry best practices for managing breaking changes, similar to Shopify, Stripe, and WooCommerce.
+
+### Policy
+
+- **Major versions only** - Breaking changes only in major versions (2.0.0, 3.0.0)
+- **Adequate notice** - 30-90 days notice before breaking changes
+- **Parallel support** - Old and new versions supported during migration
+- **Migration guides** - Comprehensive guides with examples
+- **Gradual rollout** - Beta/preview versions for testing
+
+### How Popular Platforms Handle Breaking Changes
+
+**Shopify:**
+- Quarterly API versions (every 3 months)
+- Date-based versioning (`2025-04`, `2025-07`)
+- 6+ month notice for major changes
+- Parallel support during migration
+- **Example**: JavaScript Buy SDK deprecation (6+ months notice, migration guide provided)
+
+**Stripe:**
+- Twice-yearly major releases
+- Account version pinning
+- Parallel endpoint support
+- **Example**: Billing capabilities reorganization (6 months notice, migration tools)
+
+**WooCommerce:**
+- Semantic versioning (major.minor.patch)
+- 12+ month deprecation periods
+- Migration scripts provided
+- **Example**: WooCommerce 3.0 database restructure (12+ months notice, migration scripts)
+
+### StoreFlow Breaking Change Process
+
+1. **Planning** (60-90 days before)
+   - Impact analysis
+   - Migration path planning
+   - Tool creation
+
+2. **Deprecation** (30-90 days before)
+   - Mark features as deprecated
+   - Show warnings
+   - Initial notifications
+
+3. **Beta/Preview** (14-30 days before)
+   - Release in preview
+   - Testing and feedback
+   - Migration guides
+
+4. **Release**
+   - Major version release
+   - Parallel support
+   - Migration period begins
+
+5. **Migration Period** (60-180 days)
+   - Both versions supported
+   - Migration assistance
+   - Monitoring
+
+6. **Removal**
+   - Deprecated features removed
+   - Final documentation update
+
+### Communication
+
+- **Email notifications** - 90, 60, 30, 14 days before
+- **In-app banners** - Dismissible notifications
+- **Dashboard warnings** - Persistent warnings (14 days before)
+- **Release notes** - Detailed changelog with migration guides
+- **Migration tools** - Scripts and tools for easy migration
+
+### Examples
+
+See [BREAKING_CHANGES.md](./BREAKING_CHANGES.md) for detailed examples including:
+- API endpoint rename (Shopify example)
+- Database schema changes (WooCommerce example)
+- Authentication method changes (Stripe example)
+- Migration strategies and communication templates
 
 ---
 

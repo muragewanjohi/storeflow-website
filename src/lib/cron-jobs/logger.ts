@@ -64,14 +64,30 @@ export async function completeCronJobLog(
 }
 
 /**
- * Get recent cron job logs
+ * Get recent cron job logs with pagination
  */
-export async function getCronJobLogs(limit: number = 50) {
+export async function getCronJobLogs(limit: number = 10, offset: number = 0) {
   // Type assertion: cron_job_logs model exists in schema but Prisma client may need regeneration
-  return await (prisma as any).cron_job_logs.findMany({
+  const logs = await (prisma as any).cron_job_logs.findMany({
     orderBy: { started_at: 'desc' },
     take: limit,
+    skip: offset,
   });
+
+  const total = await (prisma as any).cron_job_logs.count();
+
+  return {
+    logs,
+    pagination: {
+      total,
+      limit,
+      offset,
+      page: Math.floor(offset / limit) + 1,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: offset + limit < total,
+      hasPrevPage: offset > 0,
+    },
+  };
 }
 
 /**

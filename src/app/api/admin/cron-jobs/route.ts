@@ -11,6 +11,10 @@ import { getCronJobLogs, getCronJobStats, getCronJobLogsByName } from '@/lib/cro
 import { GET as paymentRemindersGET } from '../subscriptions/payment-reminders/route';
 import { GET as expiryCheckerGET } from '../subscriptions/expiry-checker/route';
 import { GET as processScheduledDowngradesGET } from '../subscriptions/process-scheduled-downgrades/route';
+import { GET as analyticsAggregateGET } from '../analytics/aggregate/route';
+import { GET as cleanupGET } from '../cleanup/route';
+import { GET as hardDeleteTenantsGET } from '../cleanup/hard-delete-tenants/route';
+import { GET as salesAutomateGET } from '../sales/automate/route';
 
 /**
  * GET /api/admin/cron-jobs
@@ -24,13 +28,19 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const jobName = searchParams.get('jobName');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const page = parseInt(searchParams.get('page') || '1');
+    const offset = (page - 1) * limit;
 
     let logs;
+    let pagination = null;
+    
     if (jobName) {
       logs = await getCronJobLogsByName(jobName, limit);
     } else {
-      logs = await getCronJobLogs(limit);
+      const result = await getCronJobLogs(limit, offset);
+      logs = result.logs;
+      pagination = result.pagination;
     }
 
     const stats = await getCronJobStats();
@@ -38,6 +48,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       logs,
       stats,
+      pagination,
     });
   } catch (error) {
     console.error('Error fetching cron job logs:', error);
@@ -76,6 +87,10 @@ export async function POST(request: NextRequest) {
       '/api/admin/subscriptions/payment-reminders': paymentRemindersGET,
       '/api/admin/subscriptions/expiry-checker': expiryCheckerGET,
       '/api/admin/subscriptions/process-scheduled-downgrades': processScheduledDowngradesGET,
+      '/api/admin/analytics/aggregate': analyticsAggregateGET,
+      '/api/admin/cleanup': cleanupGET,
+      '/api/admin/cleanup/hard-delete-tenants': hardDeleteTenantsGET,
+      '/api/admin/sales/automate': salesAutomateGET,
     };
 
     const handler = jobHandlers[jobPath];
@@ -87,11 +102,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a mock request with cron secret token
+    // Use the actual job path URL, not the current request URL
     const cronToken = process.env.CRON_SECRET_TOKEN;
-    const mockRequest = new NextRequest(request.url, {
+    const jobUrl = new URL(jobPath, request.url);
+    const mockRequest = new NextRequest(jobUrl.toString(), {
       method: 'GET',
       headers: {
         'authorization': `Bearer ${cronToken}`,
+        // Also add x-vercel-cron header to simulate Vercel cron call
+        'x-vercel-cron': '1',
       },
     });
 
