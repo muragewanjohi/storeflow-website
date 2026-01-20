@@ -25,6 +25,13 @@ export function getTenantStoreUrl(tenant: Tenant, path: string = ''): string {
   
   // Use subdomain
   if (tenant.subdomain) {
+    // Handle localhost with port for development
+    if (process.env.NODE_ENV !== 'production') {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const url = new URL(appUrl);
+      const port = url.port ? `:${url.port}` : '';
+      return `${protocol}://${tenant.subdomain}.${url.hostname}${port}${path}`;
+    }
     return `${protocol}://${tenant.subdomain}.${baseDomain}${path}`;
   }
   

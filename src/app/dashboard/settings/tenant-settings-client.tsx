@@ -96,9 +96,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
     
     // Payment Methods
-    payment_pesapal_enabled: initialSettings.payment_pesapal_enabled ?? true,
-    payment_paypal_enabled: initialSettings.payment_paypal_enabled ?? false,
-    payment_cash_on_delivery_enabled: initialSettings.payment_cash_on_delivery_enabled ?? true,
+    payment_cash_before_delivery_enabled: initialSettings.payment_cash_before_delivery_enabled ?? true,
+    payment_cash_after_delivery_enabled: initialSettings.payment_cash_after_delivery_enabled ?? true,
     default_payment_method: initialSettings.default_payment_method || '',
     
     // Tax Settings
@@ -191,9 +190,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
         
         // Payment Methods
-        payment_pesapal_enabled: formData.payment_pesapal_enabled,
-        payment_paypal_enabled: formData.payment_paypal_enabled,
-        payment_cash_on_delivery_enabled: formData.payment_cash_on_delivery_enabled,
+        payment_cash_before_delivery_enabled: formData.payment_cash_before_delivery_enabled,
+        payment_cash_after_delivery_enabled: formData.payment_cash_after_delivery_enabled,
         default_payment_method: formData.default_payment_method || null,
         
         // Tax Settings
@@ -252,23 +250,47 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="currency">Currency</TabsTrigger>
-          <TabsTrigger value="shipping">Shipping</TabsTrigger>
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-          <TabsTrigger value="tax">Tax</TabsTrigger>
-          <TabsTrigger value="version">Version</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6 bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="general"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            General
+          </TabsTrigger>
+          <TabsTrigger 
+            value="currency"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Currency
+          </TabsTrigger>
+          <TabsTrigger 
+            value="shipping"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Shipping
+          </TabsTrigger>
+          <TabsTrigger 
+            value="payment"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Payment
+          </TabsTrigger>
+          <TabsTrigger 
+            value="tax"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Tax
+          </TabsTrigger>
+          <TabsTrigger 
+            value="version"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Version
+          </TabsTrigger>
         </TabsList>
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
-          {/* Two-Factor Authentication */}
-          <MFASettings />
-
-          {/* Trusted Devices */}
-          <TrustedDevicesSettings />
-
           {/* Store Details */}
           <Card>
         <form onSubmit={handleSettingsSubmit}>
@@ -559,6 +581,12 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           </div>
         </form>
       </Card>
+
+          {/* Trusted Devices */}
+          <TrustedDevicesSettings />
+
+          {/* Two-Factor Authentication */}
+          <MFASettings />
         </TabsContent>
 
         {/* Currency Settings Tab */}
@@ -830,38 +858,28 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           <CardHeader>
             <CardTitle>Payment Methods</CardTitle>
             <CardDescription>
-              Enable or disable payment gateways for your store.
+              Enable or disable payment methods for your store.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="payment_pesapal_enabled"
-                checked={formData.payment_pesapal_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_pesapal_enabled: checked === true })}
+                id="payment_cash_before_delivery_enabled"
+                checked={formData.payment_cash_before_delivery_enabled}
+                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_before_delivery_enabled: checked === true })}
               />
-              <Label htmlFor="payment_pesapal_enabled" className="cursor-pointer">
-                Enable Pesapal
+              <Label htmlFor="payment_cash_before_delivery_enabled" className="cursor-pointer">
+                Enable Cash Before Delivery
               </Label>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="payment_paypal_enabled"
-                checked={formData.payment_paypal_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_paypal_enabled: checked === true })}
+                id="payment_cash_after_delivery_enabled"
+                checked={formData.payment_cash_after_delivery_enabled}
+                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_after_delivery_enabled: checked === true })}
               />
-              <Label htmlFor="payment_paypal_enabled" className="cursor-pointer">
-                Enable PayPal
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_cash_on_delivery_enabled"
-                checked={formData.payment_cash_on_delivery_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_on_delivery_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_cash_on_delivery_enabled" className="cursor-pointer">
-                Enable Cash on Delivery
+              <Label htmlFor="payment_cash_after_delivery_enabled" className="cursor-pointer">
+                Enable Cash After Delivery
               </Label>
             </div>
             <div className="space-y-2">

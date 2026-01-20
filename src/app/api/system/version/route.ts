@@ -26,27 +26,26 @@ export async function GET() {
     // Get build time from environment (set during build)
     const buildTime = process.env.BUILD_TIME || new Date().toISOString();
     
-    // Get git commit hash if available (set during build)
-    const commitHash = process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || 'unknown';
-    
-    // Get deployment environment
-    const environment = process.env.VERCEL_ENV || 'development';
-    
-    // Get deployment URL
-    const deploymentUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : null;
+    // Read changelog
+    let changelog = null;
+    try {
+      const changelogPath = join(process.cwd(), 'CHANGELOG.json');
+      const changelogContent = readFileSync(changelogPath, 'utf-8');
+      changelog = JSON.parse(changelogContent);
+    } catch {
+      // Changelog file not found or invalid, use empty structure
+      changelog = {
+        version: version,
+        entries: []
+      };
+    }
 
     return NextResponse.json({
       version,
       buildTime,
-      commitHash,
-      environment,
-      deploymentUrl,
-      nodeVersion: process.version,
-      // Additional metadata
       platform: 'StoreFlow',
       lastUpdated: buildTime,
+      changelog: changelog.entries || [],
     });
   } catch (error: any) {
     return NextResponse.json(

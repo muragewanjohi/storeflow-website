@@ -56,9 +56,8 @@ export default async function TenantSettingsPage() {
       'free_shipping_threshold',
       
       // Payment Methods
-      'payment_pesapal_enabled',
-      'payment_paypal_enabled',
-      'payment_cash_on_delivery_enabled',
+      'payment_cash_before_delivery_enabled',
+      'payment_cash_after_delivery_enabled',
       'default_payment_method',
       
       // Tax Settings

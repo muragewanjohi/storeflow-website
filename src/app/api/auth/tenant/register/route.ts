@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 import { z } from 'zod';
 
 const registerSchema = z.object({
@@ -48,11 +49,15 @@ export async function POST(request: NextRequest) {
       console.warn('Could not check existing user:', checkError);
     }
 
+    // Build tenant-specific redirect URL for email confirmation
+    const emailRedirectTo = getTenantStoreUrl(tenant, '/dashboard/login');
+
     // Create tenant user with role and tenant_id metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo,
         data: {
           role: role || 'tenant_admin',
           tenant_id: tenant.id,

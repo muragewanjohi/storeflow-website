@@ -13,6 +13,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { prisma } from '@/lib/prisma/client';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 import { z } from 'zod';
 
 const createUserSchema = z.object({
@@ -190,11 +191,16 @@ export async function POST(request: NextRequest) {
       console.warn('Could not check existing user:', checkError);
     }
 
+    // Build tenant-specific redirect URL for email confirmation
+    // This ensures users are redirected to their tenant's dashboard, not the marketing page
+    const emailRedirectTo = getTenantStoreUrl(tenant, '/dashboard/login');
+
     // Create user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo,
         data: {
           role,
           tenant_id: tenant.id,
@@ -247,6 +253,26 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update user metadata:', updateError);
       // Continue even if metadata update fails (metadata was set during signup)
     }
+
+    // Send welcome email with store details (non-blocking)
+    (async () => {
+      try {
+        const { sendUserWelcomeEmail } = await import('@/lib/email/sendgrid');
+        const loginUrl = getTenantStoreUrl(tenant, '/dashboard/login');
+        await sendUserWelcomeEmail({
+          to: email,
+          userName: name,
+          tenantName: tenant.name,
+          subdomain: tenant.subdomain,
+          loginUrl,
+          role,
+          customDomain: tenant.custom_domain,
+        });
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+        // Don't fail user creation if email fails
+      }
+    })();
 
     return NextResponse.json({
       success: true,

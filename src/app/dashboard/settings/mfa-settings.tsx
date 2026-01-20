@@ -155,6 +155,14 @@ export default function MFASettings() {
     );
   }
 
+  // Auto-enable 2FA if not enabled (mandatory)
+  useEffect(() => {
+    if (!isLoading && status && !status.enabled && !isEnabling) {
+      handleEnable();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, status?.enabled]);
+
   return (
     <Card>
       <CardHeader>
@@ -165,135 +173,48 @@ export default function MFASettings() {
               Two-Factor Authentication
             </CardTitle>
             <CardDescription>
-              Add an extra layer of security to your account
+              Mandatory security feature for your account
             </CardDescription>
           </div>
-          {status?.enabled && (
-            <Badge className="bg-green-500">Enabled</Badge>
-          )}
+          <Badge className="bg-green-500">Enabled</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {!status?.enabled ? (
-          // 2FA Not Enabled - Show Setup
-          <div className="space-y-4">
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-                <EnvelopeIcon className="h-5 w-5" />
-                Email-Based Two-Factor Authentication
+        <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <CheckIcon className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-green-900 dark:text-green-100 mb-1">
+                Two-Factor Authentication is Active
               </h3>
-              <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                When enabled, you&apos;ll receive a 6-digit code via email each time you log in.
+              <p className="text-sm text-green-800 dark:text-green-200">
+                Your account is protected with email-based 2FA. You&apos;ll receive a code via email each time you log in.
               </p>
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Email:</strong> {userEmail || 'Loading...'}
-              </p>
+              {userEmail && (
+                <p className="text-xs text-green-700 dark:text-green-300 mt-2">
+                  Codes are sent to: <strong>{userEmail}</strong>
+                </p>
+              )}
             </div>
-
-            <div className="space-y-2">
-              <h4 className="font-semibold">How it works:</h4>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                <li>Enter your email and password to log in</li>
-                <li>Receive a 6-digit code via email</li>
-                <li>Enter the code to complete login</li>
-                <li>Codes expire after 10 minutes</li>
-              </ol>
-            </div>
-
-            <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>Note:</strong> Make sure you have access to your email account. 
-                If you lose access to your email, contact support to disable 2FA.
-              </p>
-            </div>
-
-            <Button
-              onClick={handleEnable}
-              disabled={isEnabling}
-              className="w-full"
-            >
-              {isEnabling ? 'Enabling...' : 'Enable Two-Factor Authentication'}
-            </Button>
           </div>
-        ) : (
-          // 2FA Enabled - Show Disable Option
-          <div className="space-y-4">
-            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <CheckIcon className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-green-900 dark:text-green-100 mb-1">
-                    Two-Factor Authentication is Active
-                  </h3>
-                  <p className="text-sm text-green-800 dark:text-green-200">
-                    Your account is protected with email-based 2FA. You&apos;ll receive a code via email each time you log in.
-                  </p>
-                  {userEmail && (
-                    <p className="text-xs text-green-700 dark:text-green-300 mt-2">
-                      Codes are sent to: <strong>{userEmail}</strong>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+        </div>
 
-            {!showDisableConfirm ? (
-              <Button
-                variant="destructive"
-                onClick={() => setShowDisableConfirm(true)}
-                className="w-full"
-              >
-                <XMarkIcon className="h-4 w-4 mr-2" />
-                Disable Two-Factor Authentication
-              </Button>
-            ) : (
-              <form onSubmit={handleDisable} className="space-y-4 border border-destructive rounded-lg p-4">
-                <div className="bg-destructive/10 rounded-lg p-3">
-                  <h4 className="font-semibold text-destructive mb-2">Disable 2FA?</h4>
-                  <p className="text-sm text-destructive/80">
-                    This will remove the extra security layer from your account. You&apos;ll need to enter your password to confirm.
-                  </p>
-                </div>
+        <div className="space-y-2">
+          <h4 className="font-semibold">How it works:</h4>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+            <li>Enter your email and password to log in</li>
+            <li>Receive a 6-digit code via email</li>
+            <li>Enter the code to complete login</li>
+            <li>Codes expire after 10 minutes</li>
+          </ol>
+        </div>
 
-                <div>
-                  <Label htmlFor="disablePassword">Enter your password to confirm</Label>
-                  <Input
-                    id="disablePassword"
-                    type="password"
-                    value={disablePassword}
-                    onChange={(e) => setDisablePassword(e.target.value)}
-                    className="mt-2"
-                    placeholder="Your password"
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowDisableConfirm(false);
-                      setDisablePassword('');
-                    }}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="destructive"
-                    disabled={isDisabling || !disablePassword}
-                    className="flex-1"
-                  >
-                    {isDisabling ? 'Disabling...' : 'Disable 2FA'}
-                  </Button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Note:</strong> Two-factor authentication is mandatory for all accounts. 
+            If you lose access to your email, contact support for assistance.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

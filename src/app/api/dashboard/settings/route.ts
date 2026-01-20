@@ -57,9 +57,8 @@ const settingsUpdateSchema = z.object({
   pickup_enabled: z.boolean().optional(),
   
   // Payment Methods
-  payment_pesapal_enabled: z.boolean().optional(),
-  payment_paypal_enabled: z.boolean().optional(),
-  payment_cash_on_delivery_enabled: z.boolean().optional(),
+  payment_cash_before_delivery_enabled: z.boolean().optional(),
+  payment_cash_after_delivery_enabled: z.boolean().optional(),
   default_payment_method: z.string().optional().nullable(),
   
   // Tax Settings
@@ -109,9 +108,8 @@ export async function GET(request: NextRequest) {
       'pickup_enabled',
       
       // Payment Methods
-      'payment_pesapal_enabled',
-      'payment_paypal_enabled',
-      'payment_cash_on_delivery_enabled',
+      'payment_cash_before_delivery_enabled',
+      'payment_cash_after_delivery_enabled',
       'default_payment_method',
       
       // Tax Settings
@@ -131,8 +129,8 @@ export async function GET(request: NextRequest) {
       currency_decimal_places: '2',
       shipping_enabled: 'true',
       shipping_method_type: 'flat_rate',
-      payment_pesapal_enabled: 'true',
-      payment_cash_on_delivery_enabled: 'true',
+      payment_cash_before_delivery_enabled: 'true',
+      payment_cash_after_delivery_enabled: 'true',
       tax_enabled: 'false',
       tax_included_in_price: 'false',
       tax_calculation_based_on: 'billing_address',
@@ -322,14 +320,11 @@ export async function PUT(request: NextRequest) {
     }
 
     // Payment Methods
-    if (validatedData.payment_pesapal_enabled !== undefined) {
-      optionsToSave.payment_pesapal_enabled = validatedData.payment_pesapal_enabled.toString();
+    if (validatedData.payment_cash_before_delivery_enabled !== undefined) {
+      optionsToSave.payment_cash_before_delivery_enabled = validatedData.payment_cash_before_delivery_enabled.toString();
     }
-    if (validatedData.payment_paypal_enabled !== undefined) {
-      optionsToSave.payment_paypal_enabled = validatedData.payment_paypal_enabled.toString();
-    }
-    if (validatedData.payment_cash_on_delivery_enabled !== undefined) {
-      optionsToSave.payment_cash_on_delivery_enabled = validatedData.payment_cash_on_delivery_enabled.toString();
+    if (validatedData.payment_cash_after_delivery_enabled !== undefined) {
+      optionsToSave.payment_cash_after_delivery_enabled = validatedData.payment_cash_after_delivery_enabled.toString();
     }
     if (validatedData.default_payment_method !== undefined) {
       optionsToSave.default_payment_method = validatedData.default_payment_method || null;

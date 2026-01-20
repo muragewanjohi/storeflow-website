@@ -231,3 +231,127 @@ The Dukanest Team
   });
 }
 
+/**
+ * Send welcome email to new tenant user (admin/staff)
+ * Includes store details for easy reference
+ */
+export async function sendUserWelcomeEmail({
+  to,
+  userName,
+  tenantName,
+  subdomain,
+  loginUrl,
+  role,
+}: {
+  to: string;
+  userName: string;
+  tenantName: string;
+  subdomain: string;
+  loginUrl: string;
+  role: string;
+}) {
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+  const storeUrl = tenant.custom_domain 
+    ? `${protocol}://${tenant.custom_domain}`
+    : `${protocol}://${subdomain}.${baseDomain}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to ${tenantName}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">Welcome to ${tenantName}!</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello ${userName},</p>
+          
+          <p>You have been added as a <strong>${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'}</strong> to <strong>${tenantName}</strong> on Dukanest.</p>
+          
+          <p>Please check your email for a confirmation link to activate your account. Once confirmed, you can access your dashboard using the details below.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+            <h2 style="margin-top: 0; color: #667eea;">Store Details</h2>
+            <p><strong>Store Name:</strong> ${tenantName}</p>
+            <p><strong>Store URL:</strong> <a href="${storeUrl}">${storeUrl}</a></p>
+            <p><strong>Admin Dashboard:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
+            <p><strong>Your Role:</strong> ${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'}</p>
+          </div>
+          
+          <p>Once your account is confirmed, you can:</p>
+          <ul>
+            <li>Access your admin dashboard to manage the store</li>
+            <li>Add and manage products</li>
+            <li>View and process orders</li>
+            <li>Manage customers</li>
+            ${role === 'tenant_admin' ? '<li>Configure store settings</li>' : ''}
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${loginUrl}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              Go to Dashboard
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            <strong>Important:</strong> Please check your email and click the confirmation link to activate your account before logging in.
+          </p>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            If you have any questions, please contact the store owner or our support team.
+          </p>
+          
+          <p style="color: #666; font-size: 14px;">
+            Best regards,<br>
+            The Dukanest Team
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Welcome to ${tenantName}!
+
+Hello ${userName},
+
+You have been added as a ${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'} to ${tenantName} on Dukanest.
+
+Please check your email for a confirmation link to activate your account. Once confirmed, you can access your dashboard using the details below.
+
+Store Details:
+- Store Name: ${tenantName}
+- Store URL: ${storeUrl}
+- Admin Dashboard: ${loginUrl}
+- Your Role: ${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'}
+
+Once your account is confirmed, you can:
+- Access your admin dashboard to manage the store
+- Add and manage products
+- View and process orders
+- Manage customers
+${role === 'tenant_admin' ? '- Configure store settings' : ''}
+
+Visit your dashboard: ${loginUrl}
+
+Important: Please check your email and click the confirmation link to activate your account before logging in.
+
+If you have any questions, please contact the store owner or our support team.
+
+Best regards,
+The Dukanest Team
+  `;
+
+  return sendEmail({
+    to,
+    subject: `Welcome to ${tenantName} - Your Account Details`,
+    html,
+    text,
+  });
+}
