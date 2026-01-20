@@ -13,7 +13,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useCurrency } from '@/lib/currency/currency-context';
 
 interface OrderProduct {
@@ -38,6 +39,7 @@ interface Order {
   status: string | null;
   payment_status: string | null;
   created_at: Date | null;
+  delivery_fee_status: string | null;
   order_products: OrderProduct[];
 }
 
@@ -48,20 +50,24 @@ interface Pagination {
   totalPages: number;
   hasPrevPage: boolean;
   hasNextPage: boolean;
+  totalRequiringAction?: number;
 }
 
 interface OrdersListClientProps {
   initialOrders: Order[];
   initialPagination: Pagination | null;
+  initialFilter?: string;
 }
 
 export default function OrdersListClient({ 
   initialOrders, 
-  initialPagination 
+  initialPagination,
+  initialFilter = 'all'
 }: Readonly<OrdersListClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orders] = useState<Order[]>(initialOrders);
+  const [activeTab, setActiveTab] = useState<string>(initialFilter);
   const { formatCurrency } = useCurrency();
 
   // Using formatCurrency from useCurrency hook
@@ -121,6 +127,18 @@ export default function OrdersListClient({
     );
   }
 
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') {
+      params.delete('filter');
+    } else {
+      params.set('filter', value);
+    }
+    params.set('page', '1'); // Reset to first page when changing tabs
+    router.push(`/orders?${params.toString()}`);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
@@ -131,7 +149,60 @@ export default function OrdersListClient({
           </p>
         </div>
 
-        <div className="space-y-4">
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-6">
+          <TabsList className="bg-muted/50 border border-border">
+            <TabsTrigger 
+              value="all"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              All Orders
+            </TabsTrigger>
+            <TabsTrigger 
+              value="requiring_action"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground relative"
+            >
+              Requiring Action
+              {initialPagination?.totalRequiringAction && initialPagination.totalRequiringAction > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="ml-2 h-5 min-w-5 flex items-center justify-center px-1.5 text-xs"
+                >
+                  {initialPagination.totalRequiringAction > 9 ? '9+' : initialPagination.totalRequiringAction}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={activeTab} className="mt-6">
+            {orders.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-12">
+                    <h2 className="text-2xl font-bold mb-4">
+                      {activeTab === 'requiring_action' 
+                        ? 'No Orders Requiring Action' 
+                        : 'No Orders Yet'}
+                    </h2>
+                    <p className="text-muted-foreground mb-6">
+                      {activeTab === 'requiring_action'
+                        ? 'All your orders are up to date. No action needed at this time.'
+                        : 'You haven\'t placed any orders yet. Start shopping to see your orders here.'}
+                    </p>
+                    {activeTab === 'requiring_action' ? (
+                      <Button onClick={() => handleTabChange('all')}>
+                        View All Orders
+                      </Button>
+                    ) : (
+                      <Link href="/products">
+                        <Button>Browse Products</Button>
+                      </Link>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
           {orders.map((order: any) => (
             <Card key={order.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
@@ -151,13 +222,19 @@ export default function OrdersListClient({
                             : 'N/A'}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Badge className={getStatusColor(order.status)}>
                           {order.status?.toUpperCase() || 'PENDING'}
                         </Badge>
                         <Badge className={getPaymentStatusColor(order.payment_status)}>
                           {order.payment_status?.toUpperCase() || 'PENDING'}
                         </Badge>
+                        {order.delivery_fee_status === 'quoted' && (
+                          <Badge className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                            <ExclamationTriangleIcon className="h-3 w-3" />
+                            Action Required
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -208,7 +285,10 @@ export default function OrdersListClient({
               </CardContent>
             </Card>
           ))}
-        </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Pagination */}
         {initialPagination && initialPagination.totalPages > 1 && (

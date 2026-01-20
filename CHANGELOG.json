@@ -1,6 +1,24 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "entries": [
+    {
+      "version": "0.1.2",
+      "date": "2025-01-20",
+      "features": [
+        "Fixed delivery quote email sending to properly await and send notifications to customers",
+        "Added notification badge to Account button in storefront header showing pending delivery quotes count",
+        "Implemented tabs in customer orders list: 'All Orders' and 'Requiring Action' for better order management",
+        "Enhanced order detail page with prominent delivery quote action UI (approve/reject buttons) when quote is sent",
+        "Added 'Action Required' badge on orders with pending delivery quotes in orders list",
+        "Improved notification polling in header (updates every 30 seconds) for real-time delivery quote alerts"
+      ],
+      "bugfixes": [
+        "Fixed Vercel deployment errors by adding 'force-dynamic' export to pages using headers/cookies",
+        "Fixed ESLint configuration format for better compatibility",
+        "Fixed notification count fetching logic in header component",
+        "Fixed orders page query to properly fetch delivery_fee_status for filtering"
+      ]
+    },
     {
       "version": "0.1.1",
       "date": "2025-01-20",

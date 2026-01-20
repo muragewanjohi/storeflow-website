@@ -1,10 +1,10 @@
+'use client';
+
 /**
  * Tenant Registration Page
  * 
  * Public page where users can register a new tenant/store
  */
-
-'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';

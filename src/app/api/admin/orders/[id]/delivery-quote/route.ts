@@ -80,15 +80,17 @@ export async function PUT(
     });
 
     // Send notification email to customer about the quote
-    sendDeliveryFeeQuoteEmail({
-      order: updated as any,
-      tenant,
-      deliveryFeeQuote: deliveryFee,
-      notes: validatedData.delivery_fee_notes || null,
-    }).catch((error) => {
+    try {
+      await sendDeliveryFeeQuoteEmail({
+        order: updated as any,
+        tenant,
+        deliveryFeeQuote: deliveryFee,
+        notes: validatedData.delivery_fee_notes || null,
+      });
+    } catch (error) {
       console.error('Error sending delivery fee quote email:', error);
-      // Don't fail the request if email fails
-    });
+      // Don't fail the request if email fails, but log it
+    }
 
     return NextResponse.json({
       success: true,

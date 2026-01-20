@@ -3,6 +3,8 @@
  * Simple test to verify anchor tags work
  */
 
+export const dynamic = 'force-dynamic';
+
 export default function TestNavigationPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-8">

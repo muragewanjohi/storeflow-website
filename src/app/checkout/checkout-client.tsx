@@ -830,35 +830,36 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                         </SelectContent>
                       </Select>
                       
-                      {/* Display selected saved address details (only if not out of zone) */}
-                      {!useNewAddress && selectedAddressId && zoneDetectionStatus !== 'not_matched' && (
-                        <div className="p-4 border rounded-lg bg-muted/50">
+                      {/* Display selected saved address info (informational only - form fields are always visible below) */}
+                      {!useNewAddress && selectedAddressId && (
+                        <div className="p-3 border rounded-lg bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-1">
+                            Using saved address:
+                          </p>
                           {(() => {
                             const selected = savedAddresses.find((a: any) => a.id === selectedAddressId);
                             if (!selected) return null;
                             return (
-                              <div className="text-sm space-y-1">
-                                <p className="font-medium">{selected.name}</p>
-                                <p className="text-muted-foreground">{selected.address || selected.address_line_1}</p>
-                                <p className="text-muted-foreground">
+                              <div className="text-xs space-y-0.5 text-blue-700 dark:text-blue-300">
+                                <p>{selected.name}</p>
+                                <p>{selected.address || selected.address_line_1}</p>
+                                <p>
                                   {selected.city}{selected.state ? `, ${selected.state}` : ''} {selected.postal_code || ''}
                                 </p>
-                                {selected.country && (
-                                  <p className="text-muted-foreground">{selected.country}</p>
-                                )}
-                                {selected.phone && (
-                                  <p className="text-muted-foreground">{selected.phone}</p>
-                                )}
+                                {selected.country && <p>{selected.country}</p>}
                               </div>
                             );
                           })()}
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                            You can edit any field below if needed.
+                          </p>
                         </div>
                       )}
                     </div>
                   )}
                   
                   {/* Delivery Zone Selection (only shown if shipping method is delivery_zones) */}
-                  {checkoutSettings?.shipping_method_type === 'delivery_zones' && deliveryZones.length > 0 && (useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (selectedAddressId && !useNewAddress)) && (
+                  {checkoutSettings?.shipping_method_type === 'delivery_zones' && deliveryZones.length > 0 && (
                     <div className="space-y-2">
                       <Label>Delivery Zone *</Label>
                       {zoneDetectionStatus === 'detecting' && (
@@ -921,8 +922,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     </div>
                   )}
                   
-                  {/* Address Form (shown when "Add New Address" is selected, no saved addresses, or when out of zone is selected) */}
-                  {(useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (zoneDetectionStatus === 'not_matched' && selectedZoneId === null)) && (
+                  {/* Address Form (always shown for delivery to allow editing all fields) */}
+                  {deliveryMethod === 'delivery' && (
                     <>
                       <Separator />
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

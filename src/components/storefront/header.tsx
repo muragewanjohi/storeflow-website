@@ -33,6 +33,7 @@ export default function StorefrontHeader({
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Removed debug logging
 
@@ -116,11 +117,14 @@ export default function StorefrontHeader({
         
         if (response.ok && isMounted) {
           setIsAuthenticated(true);
+          // Fetch notification count after confirming authentication
+          fetchNotificationCount();
         } else {
           // 401 is expected for unauthenticated users - don't treat as error
           // Only set to false if component is still mounted
           if (isMounted) {
             setIsAuthenticated(false);
+            setNotificationCount(0);
           }
         }
       } catch (error: any) {
@@ -133,6 +137,34 @@ export default function StorefrontHeader({
       }
     }
 
+    // Fetch notification count
+    async function fetchNotificationCount() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      try {
+        const response = await fetch('/api/customers/notifications/count', {
+          signal: controller.signal,
+          cache: 'default',
+          next: { revalidate: 30 }, // Cache for 30 seconds
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok && isMounted) {
+          const data: { count: number } = await response.json();
+          setNotificationCount(data.count || 0);
+        } else if (isMounted) {
+          setNotificationCount(0);
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (isMounted && error.name !== 'AbortError') {
+          setNotificationCount(0);
+        }
+      }
+    }
+
     // Check auth only once on mount
     checkAuth();
 
@@ -140,6 +172,10 @@ export default function StorefrontHeader({
     const timeoutId = setTimeout(() => {
       if (isMounted) {
         fetchCartCount();
+        // Fetch notification count after auth check
+        if (isAuthenticated) {
+          fetchNotificationCount();
+        }
       }
     }, 100);
     

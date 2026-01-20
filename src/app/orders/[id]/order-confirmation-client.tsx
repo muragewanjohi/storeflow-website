@@ -582,6 +582,42 @@ export default function OrderConfirmationClient({
 
                 <Separator />
 
+                {/* Delivery Fee Quote Action - Show when quote is sent */}
+                {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                  <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                          Delivery Fee Quote Received
+                        </h3>
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+                          A delivery fee quote of <strong>{formatPrice(order.delivery_fee_quote)}</strong> has been sent for your order. Please review and take action.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            onClick={handleApproveQuote}
+                            disabled={isProcessingQuote}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            {isProcessingQuote ? 'Processing...' : 'Approve Quote'}
+                          </Button>
+                          <Button
+                            onClick={() => setShowRejectDialog(true)}
+                            disabled={isProcessingQuote}
+                            variant="outline"
+                            className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
+                          >
+                            Reject Quote
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Payment Method</p>
                   <p className="font-semibold capitalize">

@@ -4,6 +4,8 @@
  * Explains how DukaNest uses cookies and similar tracking technologies
  */
 
+export const dynamic = 'force-dynamic';
+
 import MarketingHeader from '@/components/marketing/header';
 import { Footer } from '@/components/marketing/footer';
 

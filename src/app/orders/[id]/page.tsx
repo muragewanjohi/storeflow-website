@@ -70,6 +70,7 @@ export default async function OrderConfirmationPage({
       delivery_fee: true,
       delivery_fee_status: true,
       delivery_fee_quote: true,
+      delivery_fee_notes: true,
       delivery_zone_name: true,
       order_products: {
         include: {

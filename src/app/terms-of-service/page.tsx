@@ -4,6 +4,8 @@
  * Legal terms and conditions for using DukaNest
  */
 
+export const dynamic = 'force-dynamic';
+
 import MarketingHeader from '@/components/marketing/header';
 import { Footer } from '@/components/marketing/footer';
 

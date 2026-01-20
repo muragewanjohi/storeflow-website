@@ -1,10 +1,10 @@
+'use client';
+
 /**
  * Pricing Page
  * 
  * Public page where users can view and select pricing plans
  */
-
-'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

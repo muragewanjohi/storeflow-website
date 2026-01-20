@@ -4,6 +4,8 @@
  * Privacy policy explaining how DukaNest collects, uses, and protects user data
  */
 
+export const dynamic = 'force-dynamic';
+
 import MarketingHeader from '@/components/marketing/header';
 import { Footer } from '@/components/marketing/footer';
 

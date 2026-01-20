@@ -1,11 +1,11 @@
+'use client';
+
 /**
  * Reset Password Page
  * 
  * Page for resetting password with token from email
  * Accessible via tenant subdomain
  */
-
-'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';

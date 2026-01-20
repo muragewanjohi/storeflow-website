@@ -36,22 +36,38 @@ export default async function OrdersPage({
   const page = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
   const limit = typeof params.limit === 'string' ? parseInt(params.limit, 10) : 10;
   const skip = (page - 1) * limit;
+  const filter = typeof params.filter === 'string' ? params.filter : 'all'; // 'all' or 'requiring_action'
 
   // Build where clause
-  const where = {
+  const baseWhere = {
     tenant_id: tenant.id,
     user_id: customerId,
   };
+
+  // Add filter for orders requiring action (pending delivery quotes)
+  const where = filter === 'requiring_action' 
+    ? {
+        ...baseWhere,
+        delivery_fee_status: 'quoted', // Orders with pending delivery quotes
+      }
+    : baseWhere;
 
   let orders: any[] = [];
   let pagination: any = null;
 
   try {
     // Fetch orders and total count
-    const [ordersData, total] = await Promise.all([
+    const [ordersData, total, totalRequiringAction] = await Promise.all([
       prisma.orders.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          order_number: true,
+          total_amount: true,
+          status: true,
+          payment_status: true,
+          created_at: true,
+          delivery_fee_status: true,
           order_products: {
             include: {
               products: {
@@ -73,6 +89,13 @@ export default async function OrdersPage({
         take: limit,
       }),
       prisma.orders.count({ where }),
+      // Also get count of orders requiring action
+      prisma.orders.count({
+        where: {
+          ...baseWhere,
+          delivery_fee_status: 'quoted',
+        },
+      }),
     ]);
 
     // Calculate pagination metadata
@@ -84,6 +107,7 @@ export default async function OrdersPage({
       totalPages,
       hasPrevPage: page > 1,
       hasNextPage: page < totalPages,
+      totalRequiringAction,
     };
 
     // Convert Decimal to number
@@ -106,7 +130,11 @@ export default async function OrdersPage({
     <div className="min-h-screen flex flex-col">
       <StorefrontHeader />
       <main className="flex-1">
-        <OrdersListClient initialOrders={orders} initialPagination={pagination} />
+        <OrdersListClient 
+          initialOrders={orders} 
+          initialPagination={pagination}
+          initialFilter={filter}
+        />
       </main>
       <StorefrontFooter />
     </div>
