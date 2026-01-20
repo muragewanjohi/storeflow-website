@@ -243,6 +243,7 @@ export async function sendUserWelcomeEmail({
   loginUrl,
   role,
   customDomain,
+  confirmationLink,
 }: {
   to: string;
   userName: string;
@@ -251,6 +252,7 @@ export async function sendUserWelcomeEmail({
   loginUrl: string;
   role: string;
   customDomain?: string | null;
+  confirmationLink?: string;
 }) {
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
@@ -276,7 +278,23 @@ export async function sendUserWelcomeEmail({
           
           <p>You have been added as a <strong>${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'}</strong> to <strong>${tenantName}</strong> on Dukanest.</p>
           
+          ${confirmationLink ? `
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h2 style="margin-top: 0; color: #10b981;">Confirm Your Account</h2>
+            <p>Please click the button below to confirm your email address and activate your account:</p>
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${confirmationLink}" style="background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                Confirm Your Email
+              </a>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">
+              Or copy and paste this link into your browser:<br>
+              <a href="${confirmationLink}" style="color: #667eea; word-break: break-all;">${confirmationLink}</a>
+            </p>
+          </div>
+          ` : `
           <p>Please check your email for a confirmation link to activate your account. Once confirmed, you can access your dashboard using the details below.</p>
+          `}
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
             <h2 style="margin-top: 0; color: #667eea;">Store Details</h2>
@@ -301,9 +319,11 @@ export async function sendUserWelcomeEmail({
             </a>
           </div>
           
+          ${confirmationLink ? '' : `
           <p style="color: #666; font-size: 14px; margin-top: 30px;">
             <strong>Important:</strong> Please check your email and click the confirmation link to activate your account before logging in.
           </p>
+          `}
           
           <p style="color: #666; font-size: 14px; margin-top: 30px;">
             If you have any questions, please contact the store owner or our support team.
@@ -325,8 +345,15 @@ Hello ${userName},
 
 You have been added as a ${role === 'tenant_admin' ? 'Store Admin' : 'Staff Member'} to ${tenantName} on Dukanest.
 
+${confirmationLink ? `
+CONFIRM YOUR ACCOUNT:
+Please click the link below to confirm your email address and activate your account:
+${confirmationLink}
+
+` : `
 Please check your email for a confirmation link to activate your account. Once confirmed, you can access your dashboard using the details below.
 
+`}
 Store Details:
 - Store Name: ${tenantName}
 - Store URL: ${storeUrl}

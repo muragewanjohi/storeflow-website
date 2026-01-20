@@ -111,10 +111,25 @@ export default function AdminDashboardClient({
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="pageviews">Pageviews</TabsTrigger>
-          <TabsTrigger value="tenants">Tenants</TabsTrigger>
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="overview"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="pageviews"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Pageviews
+          </TabsTrigger>
+          <TabsTrigger 
+            value="tenants"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Tenants
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">

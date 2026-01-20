@@ -173,54 +173,151 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
-    // Check if email already exists by listing users and filtering
+    // Check max staff users limit from pricing plan
+    const { canAddStaffUser } = await import('@/lib/subscriptions/limits');
+    
+    // Check if user already exists to determine if we should exclude them from count
+    let existingUserForLimitCheck = null;
     try {
       const { data: { users } } = await adminClient.auth.admin.listUsers();
-      const existingUser = users.find((u) => u.email === email);
-      if (existingUser) {
-        return NextResponse.json(
-          { 
-            error: 'Email already registered',
-            message: 'A user with this email address already exists'
-          },
-          { status: 409 } // 409 Conflict is more appropriate for duplicate resources
-        );
-      }
-    } catch (checkError: any) {
-      // Log but continue - signup will also check for duplicates
-      console.warn('Could not check existing user:', checkError);
+      existingUserForLimitCheck = users.find((u) => 
+        u.email?.toLowerCase() === email.toLowerCase()
+      );
+    } catch (listError) {
+      // Continue with check even if listing fails
+    }
+
+    const staffLimitCheck = await canAddStaffUser(
+      tenant,
+      existingUserForLimitCheck?.id // Exclude existing user from count if updating
+    );
+
+    if (!staffLimitCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: 'Staff user limit reached',
+          message: staffLimitCheck.reason || 'Cannot add more staff users. Please upgrade your plan.'
+        },
+        { status: 403 }
+      );
     }
 
     // Build tenant-specific redirect URL for email confirmation
-    // This ensures users are redirected to their tenant's dashboard, not the marketing page
     const emailRedirectTo = getTenantStoreUrl(tenant, '/dashboard/login');
 
-    // Create user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Check if user already exists and if they're associated with THIS tenant
+    // Users can exist and be admins/staff in other stores, but shouldn't be added twice to the same store
+    let existingUser = null;
+    try {
+      const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers();
+      
+      if (!listError && users) {
+        existingUser = users.find((u) => 
+          u.email?.toLowerCase() === email.toLowerCase()
+        );
+        
+        if (existingUser) {
+          // Check if user is already associated with this tenant
+          const userTenantId = existingUser.user_metadata?.tenant_id;
+          const userRole = existingUser.user_metadata?.role;
+          
+          // Only reject if user is already associated with THIS tenant AND has admin/staff role
+          if (userTenantId === tenant.id && 
+              (userRole === 'tenant_admin' || userRole === 'tenant_staff')) {
+            return NextResponse.json(
+              { 
+                error: 'User already exists',
+                message: 'This user is already associated with this store. They may be an admin or staff member in another store, but cannot be added twice to the same store.'
+              },
+              { status: 409 }
+            );
+          }
+          
+          // If user exists but belongs to a different tenant, update their metadata to associate with this tenant
+          // Note: This will move them to this tenant (they'll lose access to the previous tenant)
+          try {
+            const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
+              existingUser.id,
+              {
+                user_metadata: {
+                  ...existingUser.user_metadata,
+                  role, // Update role for this tenant
+                  tenant_id: tenant.id, // Update to current tenant
+                  name, // Update name
+                },
+              }
+            );
+
+            if (updateError || !updatedUser) {
+              return NextResponse.json(
+                { 
+                  error: 'Failed to update user',
+                  message: updateError?.message || 'Could not associate existing user with this store'
+                },
+                { status: 400 }
+              );
+            }
+
+            // User was updated successfully - send welcome email with store details
+            // Note: No confirmation link needed for existing users - they can log in with their existing password
+            (async () => {
+              try {
+                const { sendUserWelcomeEmail } = await import('@/lib/email/sendgrid');
+                const loginUrl = getTenantStoreUrl(tenant, '/dashboard/login');
+                await sendUserWelcomeEmail({
+                  to: email,
+                  userName: name,
+                  tenantName: tenant.name,
+                  subdomain: tenant.subdomain,
+                  loginUrl,
+                  role,
+                  customDomain: tenant.custom_domain,
+                  // No confirmation link for existing users
+                });
+              } catch (emailError) {
+                console.error('Failed to send welcome email:', emailError);
+              }
+            })();
+
+            return NextResponse.json({
+              success: true,
+              user: {
+                id: updatedUser.user.id,
+                email: updatedUser.user.email,
+                role,
+                tenant_id: tenant.id,
+                name,
+              },
+            }, { status: 200 }); // 200 OK since user was updated, not created
+          } catch (updateErr: any) {
+            return NextResponse.json(
+              { 
+                error: 'Failed to update user',
+                message: updateErr.message || 'An error occurred while updating user'
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    } catch (checkError: any) {
+      // Log but continue - will try to create user
+      console.warn('Could not check existing user:', checkError);
+    }
+
+    // User doesn't exist - create new user
+    const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
       email,
       password,
-      options: {
-        emailRedirectTo,
-        data: {
-          role,
-          tenant_id: tenant.id,
-          name,
-        },
+      email_confirm: false, // Don't auto-confirm, we'll send our own email with confirmation link
+      user_metadata: {
+        role,
+        tenant_id: tenant.id,
+        name,
       },
     });
 
     if (authError) {
-      // Handle duplicate email error
-      if (authError.message?.includes('already registered') || authError.message?.includes('already exists')) {
-        return NextResponse.json(
-          { 
-            error: 'Email already registered',
-            message: 'A user with this email address already exists'
-          },
-          { status: 409 }
-        );
-      }
-      
       return NextResponse.json(
         { 
           error: 'Failed to create user',
@@ -230,7 +327,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!authData.user) {
+    if (!authUser?.user) {
       return NextResponse.json(
         { 
           error: 'Failed to create user',
@@ -240,21 +337,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update user metadata
+    // Generate confirmation link using Supabase admin API (only for new users)
+    let confirmationLink: string | null = null;
     try {
-      await adminClient.auth.admin.updateUserById(authData.user.id, {
-        user_metadata: {
-          role,
-          tenant_id: tenant.id,
-          name,
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: 'signup',
+        email: email,
+        password: password, // Required for signup type
+        options: {
+          redirectTo: emailRedirectTo,
         },
       });
-    } catch (updateError: any) {
-      console.error('Failed to update user metadata:', updateError);
-      // Continue even if metadata update fails (metadata was set during signup)
+
+      if (!linkError && linkData?.properties?.action_link) {
+        confirmationLink = linkData.properties.action_link;
+      } else {
+        console.warn('Failed to generate confirmation link:', linkError);
+      }
+    } catch (linkGenError) {
+      console.error('Error generating confirmation link:', linkGenError);
     }
 
-    // Send welcome email with store details (non-blocking)
+    // Send welcome email with store details and confirmation link (non-blocking)
     (async () => {
       try {
         const { sendUserWelcomeEmail } = await import('@/lib/email/sendgrid');
@@ -267,6 +371,7 @@ export async function POST(request: NextRequest) {
           loginUrl,
           role,
           customDomain: tenant.custom_domain,
+          confirmationLink: confirmationLink || undefined,
         });
       } catch (emailError) {
         console.error('Failed to send welcome email:', emailError);
@@ -277,8 +382,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user: {
-        id: authData.user.id,
-        email: authData.user.email,
+        id: authUser.user.id,
+        email: authUser.user.email,
         role,
         tenant_id: tenant.id,
         name,

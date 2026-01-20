@@ -337,9 +337,19 @@ export default function BulkInventoryClient({
           <div className="lg:col-span-2 space-y-6">
             {/* Import Method Tabs */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'csv')}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-                <TabsTrigger value="csv">CSV Import</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-border">
+                <TabsTrigger 
+                  value="manual"
+                  className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                >
+                  Manual Entry
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="csv"
+                  className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                >
+                  CSV Import
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="manual" className="space-y-4">

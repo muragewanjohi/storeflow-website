@@ -327,12 +327,37 @@ export default function AnalyticsDashboardClient() {
 
       {/* Charts Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="overview"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="revenue"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Revenue
+          </TabsTrigger>
+          <TabsTrigger 
+            value="sales"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Sales
+          </TabsTrigger>
+          <TabsTrigger 
+            value="customers"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Customers
+          </TabsTrigger>
+          <TabsTrigger 
+            value="inventory"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Inventory
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">

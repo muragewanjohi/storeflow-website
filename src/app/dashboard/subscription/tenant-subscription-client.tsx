@@ -369,17 +369,31 @@ export default function TenantSubscriptionClient({
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="usage">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="overview"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="usage"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Usage & Limits
             <ChartBarIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="plans">
+          <TabsTrigger 
+            value="plans"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Plans & Pricing
             <CreditCardIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="billing">
+          <TabsTrigger 
+            value="billing"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Billing History
             <DocumentTextIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>

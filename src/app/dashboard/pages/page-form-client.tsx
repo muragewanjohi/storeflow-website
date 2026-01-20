@@ -395,9 +395,19 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               <div className="space-y-2">
                 <Label htmlFor="content">Content</Label>
                 <Tabs value={contentMode} onValueChange={(value) => setContentMode(value as 'rich-text' | 'page-builder')}>
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="rich-text">Rich Text Editor</TabsTrigger>
-                    <TabsTrigger value="page-builder">Page Builder</TabsTrigger>
+                  <TabsList className="mb-4 bg-muted/50 border border-border">
+                    <TabsTrigger 
+                      value="rich-text"
+                      className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                    >
+                      Rich Text Editor
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="page-builder"
+                      className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                    >
+                      Page Builder
+                    </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="rich-text" className="mt-0">

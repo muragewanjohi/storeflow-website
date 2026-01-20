@@ -324,10 +324,25 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
 
       <form onSubmit={handleSubmit}>
         <Tabs defaultValue="basic" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="products">Products ({safeProducts.length})</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsList className="bg-muted/50 border border-border">
+            <TabsTrigger 
+              value="basic"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Basic Info
+            </TabsTrigger>
+            <TabsTrigger 
+              value="products"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Products ({safeProducts.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="preview"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Preview
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">

@@ -210,14 +210,23 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
 
           {/* Type Filter Tabs (Demo vs Regular) */}
           <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">
+            <TabsList className="grid w-full grid-cols-3 bg-muted/50 border border-border">
+              <TabsTrigger 
+                value="all"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 All ({typeCounts.all})
               </TabsTrigger>
-              <TabsTrigger value="demo">
+              <TabsTrigger 
+                value="demo"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Demo Stores ({typeCounts.demo})
               </TabsTrigger>
-              <TabsTrigger value="regular">
+              <TabsTrigger 
+                value="regular"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Regular ({typeCounts.regular})
               </TabsTrigger>
             </TabsList>
@@ -225,20 +234,35 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
 
           {/* Status Tabs */}
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all">
+            <TabsList className="grid w-full grid-cols-5 bg-muted/50 border border-border">
+              <TabsTrigger 
+                value="all"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 All ({statusCounts.all})
               </TabsTrigger>
-              <TabsTrigger value="active">
+              <TabsTrigger 
+                value="active"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Active ({statusCounts.active})
               </TabsTrigger>
-              <TabsTrigger value="suspended">
+              <TabsTrigger 
+                value="suspended"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Suspended ({statusCounts.suspended})
               </TabsTrigger>
-              <TabsTrigger value="expired">
+              <TabsTrigger 
+                value="expired"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Expired ({statusCounts.expired})
               </TabsTrigger>
-              <TabsTrigger value="deleted">
+              <TabsTrigger 
+                value="deleted"
+                className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              >
                 Deleted ({statusCounts.deleted})
               </TabsTrigger>
             </TabsList>

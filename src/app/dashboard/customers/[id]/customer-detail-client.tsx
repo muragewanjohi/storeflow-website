@@ -198,13 +198,31 @@ export default function CustomerDetailClient({
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="orders">Orders ({customer.stats.orders})</TabsTrigger>
-          <TabsTrigger value="addresses">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="overview"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="orders"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Orders ({customer.stats.orders})
+          </TabsTrigger>
+          <TabsTrigger 
+            value="addresses"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Addresses ({customer.stats.saved_addresses})
           </TabsTrigger>
-          <TabsTrigger value="reviews">Reviews ({customer.stats.reviews})</TabsTrigger>
+          <TabsTrigger 
+            value="reviews"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Reviews ({customer.stats.reviews})
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}

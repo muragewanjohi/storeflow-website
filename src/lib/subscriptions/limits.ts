@@ -242,6 +242,77 @@ export async function canCreateBlog(tenant: Tenant): Promise<{ allowed: boolean;
 }
 
 /**
+ * Check if tenant can add more staff users
+ * 
+ * @param tenant - Tenant object
+ * @param excludeUserId - Optional user ID to exclude from count (e.g., when updating existing user)
+ * @returns Object with allowed status and reason if not allowed
+ */
+export async function canAddStaffUser(
+  tenant: Tenant,
+  excludeUserId?: string
+): Promise<{ allowed: boolean; reason?: string; current?: number; limit?: number }> {
+  if (!tenant.plan_id) {
+    return { allowed: false, reason: 'No active subscription plan' };
+  }
+
+  const plan = await prisma.price_plans.findUnique({
+    where: { id: tenant.plan_id },
+  });
+
+  if (!plan) {
+    return { allowed: false, reason: 'Subscription plan not found' };
+  }
+
+  const limits = getPlanLimits(plan.features);
+  const maxStaffUsers = limits.max_staff_users;
+
+  // Unlimited
+  if (isUnlimited(maxStaffUsers)) {
+    return { allowed: true };
+  }
+
+  // Count current staff users (tenant_admin and tenant_staff) for this tenant
+  // We need to query Supabase Auth to get users with matching tenant_id
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  const adminClient = createAdminClient();
+  
+  const { data: { users }, error } = await adminClient.auth.admin.listUsers();
+  
+  if (error) {
+    console.error('Error listing users for staff limit check:', error);
+    return { allowed: false, reason: 'Failed to check staff user limit' };
+  }
+
+  // Filter users by tenant_id and role (tenant_admin or tenant_staff)
+  const staffUsers = users.filter((u: any) => {
+    const userTenantId = u.user_metadata?.tenant_id;
+    const userRole = u.user_metadata?.role;
+    const isStaffUser = userRole === 'tenant_admin' || userRole === 'tenant_staff';
+    
+    // Exclude the user being updated if provided
+    if (excludeUserId && u.id === excludeUserId) {
+      return false;
+    }
+    
+    return userTenantId === tenant.id && isStaffUser;
+  });
+
+  const currentCount = staffUsers.length;
+
+  if (currentCount >= maxStaffUsers!) {
+    return {
+      allowed: false,
+      reason: `Staff user limit reached (${currentCount}/${maxStaffUsers}). Please upgrade your plan to add more staff users.`,
+      current: currentCount,
+      limit: maxStaffUsers,
+    };
+  }
+
+  return { allowed: true, current: currentCount, limit: maxStaffUsers };
+}
+
+/**
  * Get tenant usage statistics
  */
 export async function getTenantUsage(tenant: Tenant): Promise<{
