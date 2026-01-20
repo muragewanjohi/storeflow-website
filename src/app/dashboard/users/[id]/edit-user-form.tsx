@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { type Permission } from '@/lib/auth/permissions';
 import { PERMISSION_CATEGORIES, PERMISSION_LABELS } from '@/app/dashboard/users/roles/roles-permissions-client';
 
@@ -98,9 +99,17 @@ export default function EditUserForm({ user, currentUserId }: Readonly<EditUserF
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
-        <p className="text-muted-foreground mt-2">Update user details and permissions</p>
+      <div className="mb-6 flex items-center gap-4">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/dashboard/users">
+            <ArrowLeftIcon className="mr-2 h-4 w-4" />
+            Back to Users
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
+          <p className="text-muted-foreground mt-2">Update user details and permissions</p>
+        </div>
       </div>
 
       <Card>
@@ -202,48 +211,61 @@ export default function EditUserForm({ user, currentUserId }: Readonly<EditUserF
                         Select the specific permissions this user should have
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {Object.entries(PERMISSION_CATEGORIES).map(([category, categoryPermissions]) => (
-                        <div key={category} className="space-y-2">
-                          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            {category}
-                          </h4>
-                          <div className="space-y-2 pl-4">
-                            {categoryPermissions.map((perm) => {
-                              const permission = perm as Permission;
-                              const isChecked = formData.customPermissions.includes(permission);
-                              return (
-                                <div key={permission} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`perm-${permission}`}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setFormData({
-                                          ...formData,
-                                          customPermissions: [...formData.customPermissions, permission],
-                                        });
-                                      } else {
-                                        setFormData({
-                                          ...formData,
-                                          customPermissions: formData.customPermissions.filter((p) => p !== permission),
-                                        });
-                                      }
-                                    }}
-                                    disabled={isCurrentUser}
-                                  />
-                                  <Label
-                                    htmlFor={`perm-${permission}`}
-                                    className="text-sm cursor-pointer font-normal"
-                                  >
-                                    {PERMISSION_LABELS[permission]}
-                                  </Label>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {Object.entries(PERMISSION_CATEGORIES).map(([category, categoryPermissions]) => {
+                          // Filter out permissions that tenants cannot have
+                          const filteredPermissions = categoryPermissions.filter(
+                            (perm) => perm !== 'orders.create' && perm !== 'customers.create'
+                          ) as Permission[];
+
+                          // Skip category if all permissions are filtered out
+                          if (filteredPermissions.length === 0) {
+                            return null;
+                          }
+
+                          return (
+                            <div key={category} className="space-y-2">
+                              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                                {category}
+                              </h4>
+                              <div className="space-y-2">
+                                {filteredPermissions.map((permission) => {
+                                  const isChecked = formData.customPermissions.includes(permission);
+                                  return (
+                                    <div key={permission} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`perm-${permission}`}
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            setFormData({
+                                              ...formData,
+                                              customPermissions: [...formData.customPermissions, permission],
+                                            });
+                                          } else {
+                                            setFormData({
+                                              ...formData,
+                                              customPermissions: formData.customPermissions.filter((p) => p !== permission),
+                                            });
+                                          }
+                                        }}
+                                        disabled={isCurrentUser}
+                                      />
+                                      <Label
+                                        htmlFor={`perm-${permission}`}
+                                        className="text-sm cursor-pointer font-normal"
+                                      >
+                                        {PERMISSION_LABELS[permission]}
+                                      </Label>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </CardContent>
                   </Card>
                 )}

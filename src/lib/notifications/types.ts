@@ -8,7 +8,9 @@ export type NotificationType =
   | 'failed_payment' 
   | 'low_stock'
   | 'new_support_ticket'
-  | 'support_ticket_reply';
+  | 'support_ticket_reply'
+  | 'delivery_fee_approved'
+  | 'delivery_fee_rejected';
 
 export interface Notification {
   id: string;

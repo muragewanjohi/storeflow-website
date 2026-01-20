@@ -406,12 +406,13 @@ export default function OrderDetailClient({
         <div className="flex gap-2">
           {order.status !== 'cancelled' && order.status !== 'delivered' && (
             <Button
-              variant="destructive"
+              variant={order.delivery_fee_status === 'rejected' ? 'destructive' : 'outline'}
               size="sm"
               onClick={() => setShowCancelDialog(true)}
+              className={order.delivery_fee_status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
             >
               <XMarkIcon className="mr-2 h-4 w-4" />
-              Cancel Order
+              {order.delivery_fee_status === 'rejected' ? 'Cancel Order (Required)' : 'Cancel Order'}
             </Button>
           )}
           {order.status === 'processing' && (
@@ -573,153 +574,7 @@ export default function OrderDetailClient({
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Order Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Current Status</Label>
-                <div className="mt-2">
-                  <Badge variant={getStatusBadgeVariant(order.status)} className="text-sm">
-                    {formatOrderStatus(order.status || 'pending')}
-                  </Badge>
-                </div>
-              </div>
-              {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                <>
-                  <div>
-                    <Label htmlFor="new_status">Update Status</Label>
-                    <Select value={newStatus} onValueChange={setNewStatus}>
-                      <SelectTrigger id="new_status" className="mt-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="shipped">Shipped</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {newStatus === 'shipped' && (
-                    <>
-                      <div>
-                        <Label htmlFor="tracking_number">Tracking Number</Label>
-                        <Input
-                          id="tracking_number"
-                          value={trackingNumber}
-                          onChange={(e) => setTrackingNumber(e.target.value)}
-                          placeholder="Enter tracking number"
-                          className="mt-2"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="shipping_carrier">Shipping Carrier</Label>
-                        <Input
-                          id="shipping_carrier"
-                          value={shippingCarrier}
-                          onChange={(e) => setShippingCarrier(e.target.value)}
-                          placeholder="e.g., UPS, FedEx, DHL"
-                          className="mt-2"
-                        />
-                      </div>
-                    </>
-                  )}
-                  <div>
-                    <Label htmlFor="status_notes">Notes (optional)</Label>
-                    <Textarea
-                      id="status_notes"
-                      value={statusNotes}
-                      onChange={(e) => setStatusNotes(e.target.value)}
-                      placeholder="Add notes about this status update"
-                      className="mt-2"
-                      rows={3}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleStatusUpdate}
-                    disabled={isUpdating || newStatus === order.status}
-                    className="w-full"
-                  >
-                    {isUpdating ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update Status'
-                    )}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Payment Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Current Payment Status</Label>
-                <div className="mt-2">
-                  <Badge variant={getPaymentStatusBadgeVariant(order.payment_status)} className="text-sm">
-                    {formatPaymentStatus(order.payment_status || 'pending')}
-                  </Badge>
-                </div>
-              </div>
-              {order.payment_gateway && (
-                <div>
-                  <Label>Payment Gateway</Label>
-                  <p className="text-sm text-muted-foreground mt-1">{order.payment_gateway}</p>
-                </div>
-              )}
-              {order.transaction_id && (
-                <div>
-                  <Label>Transaction ID</Label>
-                  <p className="text-sm text-muted-foreground mt-1 font-mono">{order.transaction_id}</p>
-                </div>
-              )}
-              {order.payment_status !== 'refunded' && (
-                <>
-                  <div>
-                    <Label htmlFor="new_payment_status">Update Payment Status</Label>
-                    <Select value={newPaymentStatus} onValueChange={setNewPaymentStatus}>
-                      <SelectTrigger id="new_payment_status" className="mt-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                        <SelectItem value="refunded">Refunded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    onClick={handlePaymentStatusUpdate}
-                    disabled={isUpdating || newPaymentStatus === order.payment_status}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    {isUpdating ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      'Update Payment Status'
-                    )}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Delivery Zone & Quote Section */}
+          {/* Delivery Fee Quote Section - Show First */}
           {order.delivery_fee_status === 'pending' && (
             <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
               <CardHeader>
@@ -778,7 +633,7 @@ export default function OrderDetailClient({
                     id="delivery_fee_notes"
                     value={deliveryFeeNotes}
                     onChange={(e) => setDeliveryFeeNotes(e.target.value)}
-                    placeholder="Add any notes about the delivery fee calculation..."
+                    placeholder="Add any notes about the delivery fee calculation"
                     className="mt-2"
                     rows={3}
                   />
@@ -786,13 +641,13 @@ export default function OrderDetailClient({
                 
                 <Button
                   onClick={handleSubmitDeliveryQuote}
-                  disabled={isSubmittingQuote || !deliveryFeeQuote}
-                  className="w-full"
+                  disabled={!deliveryFeeQuote || isSubmittingQuote}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
                 >
                   {isSubmittingQuote ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending Quote...
+                      Sending...
                     </>
                   ) : (
                     <>
@@ -805,20 +660,22 @@ export default function OrderDetailClient({
             </Card>
           )}
 
-          {/* Delivery Zone Info (if zone is assigned) - Show for all orders with a zone */}
-          {order.delivery_zone_name && (
+          {/* Delivery Zone Info - Show for all orders with delivery zone info */}
+          {(order.delivery_zone_name || order.delivery_fee_status) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPinIcon className="h-5 w-5" />
-                  Delivery Zone
+                  Delivery Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-sm font-semibold">Zone Name</Label>
-                  <p className="text-sm text-muted-foreground mt-1">{order.delivery_zone_name}</p>
-                </div>
+                {order.delivery_zone_name && (
+                  <div>
+                    <Label className="text-sm font-semibold">Zone Name</Label>
+                    <p className="text-sm text-muted-foreground mt-1">{order.delivery_zone_name}</p>
+                  </div>
+                )}
                 {order.delivery_fee && (
                   <div>
                     <Label className="text-sm font-semibold">Delivery Fee</Label>
@@ -841,7 +698,7 @@ export default function OrderDetailClient({
                       )}
                       {order.delivery_fee_status === 'quoted' && (
                         <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
-                          Quote Sent
+                          Quote Sent - Awaiting Customer Approval
                         </Badge>
                       )}
                       {order.delivery_fee_status === 'pending' && (
@@ -861,46 +718,224 @@ export default function OrderDetailClient({
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Show delivery info even when no zone assigned (for orders without zones) */}
-          {!order.delivery_zone_name && order.shipping_address && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPinIcon className="h-5 w-5" />
-                  Delivery Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <Label className="text-sm font-semibold">Delivery Address</Label>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {order.shipping_address.address_line_1 && <p>{order.shipping_address.address_line_1}</p>}
-                    {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
-                    <p>
-                      {[
-                        order.shipping_address.city,
-                        order.shipping_address.state,
-                        order.shipping_address.postal_code,
-                      ]
-                        .filter(Boolean)
-                        .join(', ')}
+                {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      ⚠️ Order status and payment status cannot be updated until the customer approves the delivery fee quote.
                     </p>
-                    {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
                   </div>
-                </div>
-                {order.delivery_fee && (
-                  <div>
-                    <Label className="text-sm font-semibold">Delivery Fee</Label>
-                    <p className="text-sm font-semibold text-primary mt-1">{formatCurrency(order.delivery_fee)}</p>
+                )}
+                {order.delivery_fee_status === 'rejected' && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1">
+                      ❌ Customer Rejected Delivery Fee
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      The customer has rejected the delivery fee quote. Since delivery cannot proceed, you can only cancel this order.
+                    </p>
                   </div>
                 )}
               </CardContent>
             </Card>
           )}
+
+          {/* Order Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Order Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Current Status</Label>
+                <div className="mt-2">
+                  <Badge variant={getStatusBadgeVariant(order.status)} className="text-sm">
+                    {formatOrderStatus(order.status || 'pending')}
+                  </Badge>
+                </div>
+              </div>
+              {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                <>
+                  <div>
+                    <Label htmlFor="new_status">Update Status</Label>
+                    <Select 
+                      value={newStatus} 
+                      onValueChange={setNewStatus}
+                      disabled={
+                        order.delivery_fee_status === 'pending' || 
+                        order.delivery_fee_status === 'quoted' ||
+                        order.delivery_fee_status === 'rejected'
+                      }
+                    >
+                      <SelectTrigger id="new_status" className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="processing">Processing</SelectItem>
+                        <SelectItem value="shipped">Shipped</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Status cannot be updated until delivery fee is approved
+                      </p>
+                    )}
+                    {order.delivery_fee_status === 'rejected' && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        Status cannot be updated. Order must be cancelled since delivery was rejected.
+                      </p>
+                    )}
+                  </div>
+                  {newStatus === 'shipped' && (
+                    <>
+                      <div>
+                        <Label htmlFor="tracking_number">Tracking Number</Label>
+                        <Input
+                          id="tracking_number"
+                          value={trackingNumber}
+                          onChange={(e) => setTrackingNumber(e.target.value)}
+                          placeholder="Enter tracking number"
+                          className="mt-2"
+                          disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="shipping_carrier">Shipping Carrier</Label>
+                        <Input
+                          id="shipping_carrier"
+                          value={shippingCarrier}
+                          onChange={(e) => setShippingCarrier(e.target.value)}
+                          placeholder="e.g., UPS, FedEx, DHL"
+                          className="mt-2"
+                          disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <Label htmlFor="status_notes">Notes (optional)</Label>
+                    <Textarea
+                      id="status_notes"
+                      value={statusNotes}
+                      onChange={(e) => setStatusNotes(e.target.value)}
+                      placeholder="Add notes about this status update"
+                      className="mt-2"
+                      rows={3}
+                      disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleStatusUpdate}
+                    disabled={
+                      isUpdating || 
+                      newStatus === order.status ||
+                      order.delivery_fee_status === 'pending' ||
+                      order.delivery_fee_status === 'quoted' ||
+                      order.delivery_fee_status === 'rejected'
+                    }
+                    className="w-full"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Status'
+                    )}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payment Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Current Payment Status</Label>
+                <div className="mt-2">
+                  <Badge variant={getPaymentStatusBadgeVariant(order.payment_status)} className="text-sm">
+                    {formatPaymentStatus(order.payment_status || 'pending')}
+                  </Badge>
+                </div>
+              </div>
+              {order.payment_gateway && (
+                <div>
+                  <Label>Payment Gateway</Label>
+                  <p className="text-sm text-muted-foreground mt-1">{order.payment_gateway}</p>
+                </div>
+              )}
+              {order.transaction_id && (
+                <div>
+                  <Label>Transaction ID</Label>
+                  <p className="text-sm text-muted-foreground mt-1 font-mono">{order.transaction_id}</p>
+                </div>
+              )}
+              {order.payment_status !== 'refunded' && (
+                <>
+                  <div>
+                    <Label htmlFor="new_payment_status">Update Payment Status</Label>
+                    <Select 
+                      value={newPaymentStatus} 
+                      onValueChange={setNewPaymentStatus}
+                      disabled={
+                        order.delivery_fee_status === 'pending' || 
+                        order.delivery_fee_status === 'quoted' ||
+                        order.delivery_fee_status === 'rejected'
+                      }
+                    >
+                      <SelectTrigger id="new_payment_status" className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Payment status cannot be updated until delivery fee is approved
+                      </p>
+                    )}
+                    {order.delivery_fee_status === 'rejected' && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        Payment status cannot be updated. Order must be cancelled since delivery was rejected.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handlePaymentStatusUpdate}
+                    disabled={
+                      isUpdating || 
+                      newPaymentStatus === order.payment_status ||
+                      order.delivery_fee_status === 'pending' ||
+                      order.delivery_fee_status === 'quoted' ||
+                      order.delivery_fee_status === 'rejected'
+                    }
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Payment Status'
+                    )}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
 
           {/* Customer Information */}
           <Card>
@@ -943,10 +978,21 @@ export default function OrderDetailClient({
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Order</AlertDialogTitle>
+            <AlertDialogTitle>
+              {order.delivery_fee_status === 'rejected' ? 'Cancel Order (Required)' : 'Cancel Order'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this order? This action cannot be undone. A refund will be processed
-              automatically.
+              {order.delivery_fee_status === 'rejected' ? (
+                <>
+                  The customer has rejected the delivery fee quote. Since delivery cannot proceed, this order must be cancelled.
+                  {order.payment_status === 'paid' && ' A refund will be processed automatically.'}
+                </>
+              ) : (
+                <>
+                  Are you sure you want to cancel this order? This action cannot be undone. A refund will be processed
+                  automatically.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">

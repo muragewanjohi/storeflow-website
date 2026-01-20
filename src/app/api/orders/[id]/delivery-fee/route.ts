@@ -9,6 +9,8 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { z } from 'zod';
+import { sendDeliveryFeeQuoteApprovedEmail, sendDeliveryFeeQuoteRejectedEmail } from '@/lib/orders/emails';
+import { cache } from '@/lib/cache/simple-cache';
 
 const deliveryFeeActionSchema = z.object({
   action: z.enum(['approve', 'reject']),
@@ -87,9 +89,40 @@ export async function PUT(
           total_amount: newTotal,
           updated_at: new Date(),
         },
+        include: {
+          order_products: {
+            include: {
+              products: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
       });
 
-      // TODO: Send notification email to store owner about approval
+      // Send notification email to store owner about approval
+      try {
+        await sendDeliveryFeeQuoteApprovedEmail({
+          order: updated as any,
+          tenant,
+        });
+      } catch (error) {
+        console.error('Error sending delivery fee quote approved email:', error);
+        // Don't fail the request if email fails
+      }
+
+      // Invalidate notifications cache so the notification appears immediately
+      try {
+        cache.delete(`${tenant.id}:notifications`);
+      } catch (error) {
+        // Non-critical: log but don't fail
+        console.warn('Failed to invalidate notifications cache:', error);
+      }
 
       return NextResponse.json({
         success: true,
@@ -113,9 +146,41 @@ export async function PUT(
             : order.delivery_fee_notes,
           updated_at: new Date(),
         },
+        include: {
+          order_products: {
+            include: {
+              products: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
       });
 
-      // TODO: Send notification email to store owner about rejection
+      // Send notification email to store owner about rejection
+      try {
+        await sendDeliveryFeeQuoteRejectedEmail({
+          order: updated as any,
+          tenant,
+          reason: validatedData.reason || null,
+        });
+      } catch (error) {
+        console.error('Error sending delivery fee quote rejected email:', error);
+        // Don't fail the request if email fails
+      }
+
+      // Invalidate notifications cache so the notification appears immediately
+      try {
+        cache.delete(`${tenant.id}:notifications`);
+      } catch (error) {
+        // Non-critical: log but don't fail
+        console.warn('Failed to invalidate notifications cache:', error);
+      }
 
       return NextResponse.json({
         success: true,

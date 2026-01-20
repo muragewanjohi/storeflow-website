@@ -71,6 +71,10 @@ function getNotificationIcon(type: Notification['type']): string {
       return '🎫';
     case 'support_ticket_reply':
       return '💬';
+    case 'delivery_fee_approved':
+      return '✓';
+    case 'delivery_fee_rejected':
+      return '⚠';
     default:
       return '🔔';
   }
@@ -90,6 +94,10 @@ function getNotificationColor(type: Notification['type']): string {
       return 'text-purple-600';
     case 'support_ticket_reply':
       return 'text-indigo-600';
+    case 'delivery_fee_approved':
+      return 'text-green-600';
+    case 'delivery_fee_rejected':
+      return 'text-orange-600';
     default:
       return 'text-gray-600';
   }

@@ -146,6 +146,22 @@ export async function PUT(
 
     // Update order status if provided
     if (body.status) {
+      // Prevent status updates for out-of-zone orders until delivery fee is approved
+      if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
+        return NextResponse.json(
+          { error: 'Order status cannot be updated until the customer approves the delivery fee quote' },
+          { status: 400 }
+        );
+      }
+
+      // If delivery fee is rejected, only allow cancellation
+      if (existingOrder.delivery_fee_status === 'rejected' && body.status !== 'cancelled') {
+        return NextResponse.json(
+          { error: 'Order status cannot be updated. Since the customer rejected the delivery fee, the order must be cancelled.' },
+          { status: 400 }
+        );
+      }
+
       const { status, notes } = orderStatusUpdateSchema.parse({ status: body.status, notes: body.notes });
 
       // Validate status transition
@@ -234,6 +250,22 @@ export async function PUT(
 
     // Update payment status if provided
     if (body.payment_status) {
+      // Prevent payment status updates for out-of-zone orders until delivery fee is approved
+      if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
+        return NextResponse.json(
+          { error: 'Payment status cannot be updated until the customer approves the delivery fee quote' },
+          { status: 400 }
+        );
+      }
+
+      // If delivery fee is rejected, prevent payment status updates (order must be cancelled)
+      if (existingOrder.delivery_fee_status === 'rejected') {
+        return NextResponse.json(
+          { error: 'Payment status cannot be updated. Since the customer rejected the delivery fee, the order must be cancelled.' },
+          { status: 400 }
+        );
+      }
+
       const { payment_status, transaction_id, payment_gateway, notes } = orderPaymentStatusUpdateSchema.parse({
         payment_status: body.payment_status,
         transaction_id: body.transaction_id,

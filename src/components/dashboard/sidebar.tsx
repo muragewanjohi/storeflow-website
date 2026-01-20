@@ -144,7 +144,8 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const marketingItems = filteredNavigation.filter((item: any) => item.group === 'Marketing');
   const contentItems = filteredNavigation.filter((item: any) => item.group === 'Content');
   const supportItems = filteredNavigation.filter((item: any) => item.group === 'Support');
-  const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group);
+  // Exclude Themes from adminItems since it's already added separately above
+  const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group && item.name !== 'Themes');
   
   // Build grouped navigation in the correct order using an array to maintain sequence
   const orderedGroupedNavigation: Array<{ groupName: string; items: NavigationItem[] }> = [];

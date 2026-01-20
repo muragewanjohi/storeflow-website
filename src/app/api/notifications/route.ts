@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
       lowStockProducts,
       newSupportTickets,
       landlordTickets,
+      approvedDeliveryFees,
+      rejectedDeliveryFees,
     ] = await Promise.all([
       // 1. Pending/processing orders (limit 10)
       prisma.orders.findMany({
@@ -108,6 +110,43 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { updated_at: 'desc' },
         take: 5,
+      }),
+
+      // 5. Recently approved delivery fee quotes (last 24 hours)
+      prisma.orders.findMany({
+        where: {
+          tenant_id: tenant.id,
+          delivery_fee_status: 'approved',
+          updated_at: { gte: twentyFourHoursAgo },
+        },
+        select: {
+          id: true,
+          order_number: true,
+          total_amount: true,
+          delivery_fee_quote: true,
+          updated_at: true,
+        },
+        orderBy: { updated_at: 'desc' },
+        take: 10,
+      }),
+
+      // 6. Recently rejected delivery fee quotes (last 24 hours)
+      prisma.orders.findMany({
+        where: {
+          tenant_id: tenant.id,
+          delivery_fee_status: 'rejected',
+          updated_at: { gte: twentyFourHoursAgo },
+        },
+        select: {
+          id: true,
+          order_number: true,
+          total_amount: true,
+          delivery_fee_quote: true,
+          delivery_fee_notes: true,
+          updated_at: true,
+        },
+        orderBy: { updated_at: 'desc' },
+        take: 10,
       }),
     ]);
 
@@ -176,6 +215,43 @@ export async function GET(request: NextRequest) {
         metadata: {
           ticket_id: ticket.id,
           status: ticket.status,
+        },
+      });
+    }
+
+    // Process approved delivery fee quotes
+    for (const order of approvedDeliveryFees) {
+      notifications.push({
+        id: `delivery-approved-${order.id}`,
+        type: 'delivery_fee_approved',
+        title: 'Delivery Fee Quote Approved',
+        message: `Order ${order.order_number} - Customer approved delivery fee`,
+        link: `/dashboard/orders/${order.id}`,
+        created_at: order.updated_at || new Date(),
+        read: false,
+        metadata: {
+          order_id: order.id,
+          order_number: order.order_number,
+          delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
+        },
+      });
+    }
+
+    // Process rejected delivery fee quotes
+    for (const order of rejectedDeliveryFees) {
+      notifications.push({
+        id: `delivery-rejected-${order.id}`,
+        type: 'delivery_fee_rejected',
+        title: 'Delivery Fee Quote Rejected',
+        message: `Order ${order.order_number} - Customer rejected delivery fee`,
+        link: `/dashboard/orders/${order.id}`,
+        created_at: order.updated_at || new Date(),
+        read: false,
+        metadata: {
+          order_id: order.id,
+          order_number: order.order_number,
+          delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
+          rejection_reason: order.delivery_fee_notes || null,
         },
       });
     }

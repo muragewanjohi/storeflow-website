@@ -111,6 +111,10 @@ interface OrderWithItems {
   email: string | null;
   name: string | null;
   phone: string | null;
+  delivery_fee: Decimal | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: Decimal | null;
+  delivery_fee_notes: string | null;
   order_products: Array<{
     id: string;
     product_id: string | null;
@@ -1075,3 +1079,230 @@ export async function sendOrderCancelledEmail({
   });
 }
 
+/**
+ * Send delivery fee quote approved email to tenant admin
+ * Sent when customer approves a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteApprovedEmail({
+  order,
+  tenant,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+}) {
+  // Get tenant admin email
+  let adminEmail: string;
+  if (tenant.contact_email) {
+    adminEmail = tenant.contact_email;
+  } else if (tenant.user_id) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: user } = await adminClient.auth.admin.getUserById(tenant.user_id);
+      adminEmail = user?.user?.email || `${tenant.subdomain}@dukanest.com`;
+    } catch {
+      adminEmail = `${tenant.subdomain}@dukanest.com`;
+    }
+  } else {
+    adminEmail = `${tenant.subdomain}@dukanest.com`;
+  }
+
+  const customerName = order.name || 'Customer';
+  const customerEmail = order.email || 'N/A';
+  const dashboardUrl = getTenantStoreUrl(tenant, '/dashboard/orders');
+  const orderUrl = `${dashboardUrl}/${order.id}`;
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
+  const formattedTotal = formatCurrencyForEmail(Number(order.total_amount), currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote Approved - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">✓ Delivery Fee Quote Approved</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello,</p>
+          
+          <p>Great news! The customer has approved the delivery fee quote for order <strong>${order.order_number}</strong>.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h2 style="margin-top: 0; color: #10b981;">Order Details</h2>
+            <p><strong>Order Number:</strong> ${order.order_number}</p>
+            <p><strong>Customer:</strong> ${customerName}</p>
+            <p><strong>Customer Email:</strong> ${customerEmail}</p>
+            <p><strong>Delivery Fee Quote:</strong> ${formattedQuote}</p>
+            <p><strong>Order Total:</strong> ${formattedTotal}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            You can now proceed with processing and fulfilling this order.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote Approved - ${order.order_number}
+
+Hello,
+
+Great news! The customer has approved the delivery fee quote for order ${order.order_number}.
+
+Order Details:
+- Order Number: ${order.order_number}
+- Customer: ${customerName}
+- Customer Email: ${customerEmail}
+- Delivery Fee Quote: ${formattedQuote}
+- Order Total: ${formattedTotal}
+
+View order in dashboard: ${orderUrl}
+
+You can now proceed with processing and fulfilling this order.
+  `;
+
+  return sendAdminEmail({
+    to: adminEmail,
+    subject: `Delivery Fee Quote Approved - Order ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}
+
+/**
+ * Send delivery fee quote rejected email to tenant admin
+ * Sent when customer rejects a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteRejectedEmail({
+  order,
+  tenant,
+  reason,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  reason?: string | null;
+}) {
+  // Get tenant admin email
+  let adminEmail: string;
+  if (tenant.contact_email) {
+    adminEmail = tenant.contact_email;
+  } else if (tenant.user_id) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: user } = await adminClient.auth.admin.getUserById(tenant.user_id);
+      adminEmail = user?.user?.email || `${tenant.subdomain}@dukanest.com`;
+    } catch {
+      adminEmail = `${tenant.subdomain}@dukanest.com`;
+    }
+  } else {
+    adminEmail = `${tenant.subdomain}@dukanest.com`;
+  }
+
+  const customerName = order.name || 'Customer';
+  const customerEmail = order.email || 'N/A';
+  const dashboardUrl = getTenantStoreUrl(tenant, '/dashboard/orders');
+  const orderUrl = `${dashboardUrl}/${order.id}`;
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote Rejected - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">⚠ Delivery Fee Quote Rejected</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello,</p>
+          
+          <p>The customer has rejected the delivery fee quote for order <strong>${order.order_number}</strong>.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h2 style="margin-top: 0; color: #f59e0b;">Order Details</h2>
+            <p><strong>Order Number:</strong> ${order.order_number}</p>
+            <p><strong>Customer:</strong> ${customerName}</p>
+            <p><strong>Customer Email:</strong> ${customerEmail}</p>
+            <p><strong>Rejected Delivery Fee Quote:</strong> ${formattedQuote}</p>
+            ${reason ? `
+            <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 4px;">
+              <p style="margin: 0 0 5px 0; font-weight: bold; color: #92400e;">Customer's Reason:</p>
+              <p style="margin: 0; color: #78350f;">${reason}</p>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0; color: #92400e; font-weight: bold;">Next Steps:</p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #78350f;">
+              <li>Review the customer's reason for rejection</li>
+              <li>Consider offering an alternative delivery fee or solution</li>
+              <li>The customer may cancel the order if they choose</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            Please review the order and take appropriate action.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote Rejected - ${order.order_number}
+
+Hello,
+
+The customer has rejected the delivery fee quote for order ${order.order_number}.
+
+Order Details:
+- Order Number: ${order.order_number}
+- Customer: ${customerName}
+- Customer Email: ${customerEmail}
+- Rejected Delivery Fee Quote: ${formattedQuote}
+${reason ? `- Customer's Reason: ${reason}` : ''}
+
+Next Steps:
+- Review the customer's reason for rejection
+- Consider offering an alternative delivery fee or solution
+- The customer may cancel the order if they choose
+
+View order in dashboard: ${orderUrl}
+
+Please review the order and take appropriate action.
+  `;
+
+  return sendAdminEmail({
+    to: adminEmail,
+    subject: `Delivery Fee Quote Rejected - Order ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}

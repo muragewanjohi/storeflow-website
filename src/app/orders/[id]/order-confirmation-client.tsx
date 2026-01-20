@@ -67,6 +67,7 @@ interface Order {
   delivery_fee: number | null;
   delivery_fee_status: string | null;
   delivery_fee_quote: number | null;
+  delivery_fee_notes: string | null;
   delivery_zone_name: string | null;
   order_products: OrderProduct[];
 }
@@ -353,9 +354,9 @@ export default function OrderConfirmationClient({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Order Details */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Order Information */}
             <Card>
               <CardHeader>
@@ -532,8 +533,8 @@ export default function OrderConfirmationClient({
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
+          <div className="lg:col-span-2">
+            <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
@@ -584,31 +585,52 @@ export default function OrderConfirmationClient({
 
                 {/* Delivery Fee Quote Action - Show when quote is sent */}
                 {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
-                  <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-start gap-2">
+                  <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg overflow-hidden">
+                    <div className="flex items-start gap-3">
                       <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2 text-sm">
                           Delivery Fee Quote Received
                         </h3>
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-                          A delivery fee quote of <strong>{formatPrice(order.delivery_fee_quote)}</strong> has been sent for your order. Please review and take action.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="mb-3 space-y-2">
+                          <p className="text-xs text-yellow-800 dark:text-yellow-200 break-words">
+                            A delivery fee quote has been sent for your order. Please review and take action.
+                          </p>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded border border-yellow-200 dark:border-yellow-800">
+                            <p className="text-xs text-muted-foreground mb-1">Delivery Fee Quote</p>
+                            <p className="text-lg font-bold text-yellow-900 dark:text-yellow-100">
+                              {formatPrice(order.delivery_fee_quote)}
+                            </p>
+                            {order.delivery_fee_notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic break-words">
+                                &quot;{order.delivery_fee_notes}&quot;
+                              </p>
+                            )}
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded border border-yellow-200 dark:border-yellow-800">
+                            <p className="text-xs text-muted-foreground mb-1">New Total (including delivery)</p>
+                            <p className="text-base font-bold">
+                              {formatPrice(order.total_amount + order.delivery_fee_quote)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
                           <Button
                             onClick={handleApproveQuote}
                             disabled={isProcessingQuote}
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2"
+                            size="sm"
                           >
-                            {isProcessingQuote ? 'Processing...' : 'Approve Quote'}
+                            {isProcessingQuote ? 'Processing...' : '✓ Approve Quote'}
                           </Button>
                           <Button
                             onClick={() => setShowRejectDialog(true)}
                             disabled={isProcessingQuote}
                             variant="outline"
-                            className="flex-1 border-red-300 text-red-700 hover:bg-red-50"
+                            className="w-full border-red-300 text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-sm py-2"
+                            size="sm"
                           >
-                            Reject Quote
+                            ✗ Reject Quote
                           </Button>
                         </div>
                       </div>

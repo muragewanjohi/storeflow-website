@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -66,9 +66,20 @@ export default function OrdersListClient({
 }: Readonly<OrdersListClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [orders] = useState<Order[]>(initialOrders);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [activeTab, setActiveTab] = useState<string>(initialFilter);
   const { formatCurrency } = useCurrency();
+
+  // Sync activeTab with URL params
+  useEffect(() => {
+    const filter = searchParams.get('filter') || 'all';
+    setActiveTab(filter);
+  }, [searchParams]);
+
+  // Update orders when initialOrders or initialFilter changes (after navigation)
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
@@ -174,117 +185,208 @@ export default function OrdersListClient({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value={activeTab} className="mt-6">
+          <TabsContent value="all" className="mt-6">
             {orders.length === 0 ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold mb-4">
-                      {activeTab === 'requiring_action' 
-                        ? 'No Orders Requiring Action' 
-                        : 'No Orders Yet'}
-                    </h2>
+                    <h2 className="text-2xl font-bold mb-4">No Orders Yet</h2>
                     <p className="text-muted-foreground mb-6">
-                      {activeTab === 'requiring_action'
-                        ? 'All your orders are up to date. No action needed at this time.'
-                        : 'You haven\'t placed any orders yet. Start shopping to see your orders here.'}
+                      You haven&apos;t placed any orders yet. Start shopping to see your orders here.
                     </p>
-                    {activeTab === 'requiring_action' ? (
-                      <Button onClick={() => handleTabChange('all')}>
-                        View All Orders
-                      </Button>
-                    ) : (
-                      <Link href="/products">
-                        <Button>Browse Products</Button>
-                      </Link>
-                    )}
+                    <Link href="/products">
+                      <Button>Browse Products</Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
-          {orders.map((order: any) => (
-            <Card key={order.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  {/* Order Info */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {order.created_at
-                            ? new Date(order.created_at).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                              })
-                            : 'N/A'}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status?.toUpperCase() || 'PENDING'}
-                        </Badge>
-                        <Badge className={getPaymentStatusColor(order.payment_status)}>
-                          {order.payment_status?.toUpperCase() || 'PENDING'}
-                        </Badge>
-                        {order.delivery_fee_status === 'quoted' && (
-                          <Badge className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
-                            <ExclamationTriangleIcon className="h-3 w-3" />
-                            Action Required
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Order Items Preview */}
-                    <div className="flex gap-2 mb-3">
-                      {order.order_products.slice(0, 3).map((item: any) => (
-                        <div key={item.id} className="relative w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                          {item.products?.image ? (
-                            <Image
-                              src={item.products.image}
-                              alt={item.products.name}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                              No Image
+                {orders.map((order: any) => (
+                  <Card key={order.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        {/* Order Info */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {order.created_at
+                                  ? new Date(order.created_at).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                    })
+                                  : 'N/A'}
+                              </p>
                             </div>
-                          )}
-                        </div>
-                      ))}
-                      {order.order_products.length > 3 && (
-                        <div className="relative w-12 h-12 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                          +{order.order_products.length - 3}
-                        </div>
-                      )}
-                    </div>
+                            <div className="flex gap-2 flex-wrap">
+                              <Badge className={getStatusColor(order.status)}>
+                                {order.status?.toUpperCase() || 'PENDING'}
+                              </Badge>
+                              <Badge className={getPaymentStatusColor(order.payment_status)}>
+                                {order.payment_status?.toUpperCase() || 'PENDING'}
+                              </Badge>
+                              {order.delivery_fee_status === 'quoted' && (
+                                <Badge className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                                  <ExclamationTriangleIcon className="h-3 w-3" />
+                                  Action Required
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
 
-                    <p className="text-sm text-muted-foreground">
-                      {order.order_products.length} item{order.order_products.length !== 1 ? 's' : ''}
+                          {/* Order Items Preview */}
+                          <div className="flex gap-2 mb-3">
+                            {order.order_products.slice(0, 3).map((item: any) => (
+                              <div key={item.id} className="relative w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                                {item.products?.image ? (
+                                  <Image
+                                    src={item.products.image}
+                                    alt={item.products.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                                    No Image
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {order.order_products.length > 3 && (
+                              <div className="relative w-12 h-12 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                                +{order.order_products.length - 3}
+                              </div>
+                            )}
+                          </div>
+
+                          <p className="text-sm text-muted-foreground">
+                            {order.order_products.length} item{order.order_products.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+
+                        {/* Order Total & Actions */}
+                        <div className="flex flex-col items-end gap-3">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total</p>
+                            <p className="text-xl font-bold">{formatPrice(order.total_amount)}</p>
+                          </div>
+                          <Link href={`/orders/${order.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Details
+                              <ArrowRightIcon className="w-4 h-4 ml-2" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="requiring_action" className="mt-6">
+            {orders.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-12">
+                    <h2 className="text-2xl font-bold mb-4">No Orders Requiring Action</h2>
+                    <p className="text-muted-foreground mb-6">
+                      All your orders are up to date. No action needed at this time.
                     </p>
+                    <Button onClick={() => handleTabChange('all')}>
+                      View All Orders
+                    </Button>
                   </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order: any) => (
+                  <Card key={order.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        {/* Order Info */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-4 mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {order.created_at
+                                  ? new Date(order.created_at).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                    })
+                                  : 'N/A'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              <Badge className={getStatusColor(order.status)}>
+                                {order.status?.toUpperCase() || 'PENDING'}
+                              </Badge>
+                              <Badge className={getPaymentStatusColor(order.payment_status)}>
+                                {order.payment_status?.toUpperCase() || 'PENDING'}
+                              </Badge>
+                              {order.delivery_fee_status === 'quoted' && (
+                                <Badge className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                                  <ExclamationTriangleIcon className="h-3 w-3" />
+                                  Action Required
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
 
-                  {/* Order Total & Actions */}
-                  <div className="flex flex-col items-end gap-3">
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="text-xl font-bold">{formatPrice(order.total_amount)}</p>
-                    </div>
-                    <Link href={`/orders/${order.id}`}>
-                      <Button variant="outline" size="sm">
-                        View Details
-                        <ArrowRightIcon className="w-4 h-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                          {/* Order Items Preview */}
+                          <div className="flex gap-2 mb-3">
+                            {order.order_products.slice(0, 3).map((item: any) => (
+                              <div key={item.id} className="relative w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                                {item.products?.image ? (
+                                  <Image
+                                    src={item.products.image}
+                                    alt={item.products.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                                    No Image
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {order.order_products.length > 3 && (
+                              <div className="relative w-12 h-12 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                                +{order.order_products.length - 3}
+                              </div>
+                            )}
+                          </div>
+
+                          <p className="text-sm text-muted-foreground">
+                            {order.order_products.length} item{order.order_products.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+
+                        {/* Order Total & Actions */}
+                        <div className="flex flex-col items-end gap-3">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total</p>
+                            <p className="text-xl font-bold">{formatPrice(order.total_amount)}</p>
+                          </div>
+                          <Link href={`/orders/${order.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Details
+                              <ArrowRightIcon className="w-4 h-4 ml-2" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>
