@@ -242,6 +242,7 @@ export async function sendUserWelcomeEmail({
   subdomain,
   loginUrl,
   role,
+  customDomain,
 }: {
   to: string;
   userName: string;
@@ -249,11 +250,12 @@ export async function sendUserWelcomeEmail({
   subdomain: string;
   loginUrl: string;
   role: string;
+  customDomain?: string | null;
 }) {
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  const storeUrl = tenant.custom_domain 
-    ? `${protocol}://${tenant.custom_domain}`
+  const storeUrl = customDomain 
+    ? `${protocol}://${customDomain}`
     : `${protocol}://${subdomain}.${baseDomain}`;
 
   const html = `
