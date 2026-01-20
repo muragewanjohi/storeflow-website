@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon, ExclamationTriangleIcon, XCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingInput from '@/components/storefront/rating-input';

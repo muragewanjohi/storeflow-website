@@ -432,6 +432,7 @@ model orders {
   id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id                String           @db.Uuid
   order_number             String           @unique @db.VarChar(100)
+  invoice_number           String?          @db.VarChar(100)
   user_id                  String?          @db.Uuid
   name                     String?          @db.VarChar(255)
   email                    String?          @db.VarChar(255)

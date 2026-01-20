@@ -65,6 +65,7 @@ interface Order {
   payment_gateway: string | null;
   transaction_id: string | null;
   payment_meta: any | null;
+  invoice_number: string | null;
   shipping_address: any;
   billing_address: any;
   coupon: string | null;
@@ -422,6 +423,14 @@ export default function OrderDetailClient({
               Print Label
             </Button>
           )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.open(`/api/orders/${order.id}/invoice/download`, '_blank')}
+          >
+            <PrinterIcon className="mr-2 h-4 w-4" />
+            {order.payment_status === 'paid' ? 'Download Receipt' : 'Download Invoice'}
+          </Button>
         </div>
       </div>
 

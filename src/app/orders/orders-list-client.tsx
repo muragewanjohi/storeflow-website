@@ -143,13 +143,13 @@ export default function OrdersListClient({
           <TabsList className="bg-muted/50 border border-border">
             <TabsTrigger 
               value="all"
-              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground"
             >
               All Orders
             </TabsTrigger>
             <TabsTrigger 
               value="requiring_action"
-              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground relative"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-foreground/70 hover:text-foreground relative"
             >
               Requiring Action
               {initialPagination?.totalRequiringAction && initialPagination.totalRequiringAction > 0 && (

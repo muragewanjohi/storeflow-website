@@ -182,12 +182,17 @@ export async function POST(request: NextRequest) {
       finalTotal += validatedData.delivery_fee;
     }
 
+    // Generate invoice number
+    const { generateInvoiceNumber } = await import('@/lib/invoices/generate-invoice-number');
+    const invoiceNumber = await generateInvoiceNumber(tenant.id);
+
     // Create order
     // For guest orders, user_id will be null (order tracked by email + order_number)
     const order = await prisma.orders.create({
       data: {
         tenant_id: tenant.id,
         order_number: orderNumber,
+        invoice_number: invoiceNumber,
         user_id: customerId, // null for guest orders
         name: customerInfo.name,
         email: customerInfo.email,
@@ -305,7 +310,7 @@ export async function POST(request: NextRequest) {
     // This will be handled by the client-side event listener
 
     // Send email notifications (async, don't wait)
-    Promise.all([
+    const emailPromises = [
       sendOrderPlacedEmail({
         order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
@@ -316,8 +321,32 @@ export async function POST(request: NextRequest) {
         order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
       }),
-      // Send immediate notification email for new orders
-      (async () => {
+    ];
+
+    // Send invoice email for M-Pesa orders (with payment instructions)
+    if (validatedData.payment_method === 'mpesa') {
+      emailPromises.push(
+        (async () => {
+          const { sendInvoiceEmail } = await import('@/lib/orders/invoice-email');
+          return sendInvoiceEmail({
+            order: order as any,
+            tenant,
+            customerEmail: customerInfo.email,
+            customerName: customerInfo.name,
+          });
+        })()
+      );
+    }
+
+
+    Promise.all(emailPromises).catch((error) => {
+      console.error('Error sending order emails:', error);
+      // Don't fail the order creation if emails fail
+    });
+
+    // Send immediate notification email separately (different return type)
+    (async () => {
+      try {
         const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
         await sendImmediateNotificationEmail({
           tenant,
@@ -335,14 +364,11 @@ export async function POST(request: NextRequest) {
               amount: Number(order.total_amount),
             },
           },
-        }).catch((error) => {
-          console.error('Error sending notification email:', error);
         });
-      })(),
-    ]).catch((error) => {
-      console.error('Error sending order emails:', error);
-      // Don't fail the order creation if emails fail
-    });
+      } catch (error) {
+        console.error('Error sending notification email:', error);
+      }
+    })();
 
     return NextResponse.json({
       success: true,

@@ -529,8 +529,14 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       return;
     }
 
-    // Validate M-Pesa payment verification details
-    if (paymentMethod === 'mpesa' && !paymentTransactionId.trim()) {
+    // Check if order is in-zone (only for delivery with delivery_zones method)
+    const isInZone = deliveryMethod === 'delivery' && 
+                     checkoutSettings?.shipping_method_type === 'delivery_zones' && 
+                     zoneDetectionStatus === 'matched' && 
+                     selectedZoneId;
+
+    // Validate M-Pesa payment verification details (only required for in-zone orders)
+    if (paymentMethod === 'mpesa' && isInZone && !paymentTransactionId.trim()) {
       toast.error('Please provide your M-Pesa Transaction ID / Receipt Number');
       return;
     }
@@ -596,7 +602,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
             : null,
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
-        payment_verification: paymentMethod === 'mpesa' ? {
+        payment_verification: paymentMethod === 'mpesa' && isInZone ? {
           transaction_id: paymentTransactionId.trim(),
           reference: paymentReference.trim() || null,
           notes: paymentVerificationNotes.trim() || null,
@@ -1147,9 +1153,6 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                                   )}
                                   {!checkoutSettings.payment_mpesa_option && 'Mobile money payment'}
                                 </div>
-                                <div className="text-xs text-yellow-600 mt-1 font-medium">
-                                  ⚠️ Payment requires manual verification
-                                </div>
                               </div>
                             </Label>
                           </div>
@@ -1180,6 +1183,55 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                       placeholder="Special instructions for your order..."
                     />
                   </div>
+
+                  {/* Payment Verification Form (only for M-Pesa and in-zone orders) */}
+                  {paymentMethod === 'mpesa' && 
+                   deliveryMethod === 'delivery' && 
+                   checkoutSettings?.shipping_method_type === 'delivery_zones' && 
+                   zoneDetectionStatus === 'matched' && 
+                   selectedZoneId && (
+                    <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                      <CardHeader>
+                        <CardTitle className="text-sm">Payment Verification</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <Label htmlFor="payment_transaction_id">
+                            M-Pesa Transaction ID / Receipt Number *
+                          </Label>
+                          <Input
+                            id="payment_transaction_id"
+                            value={paymentTransactionId}
+                            onChange={(e) => setPaymentTransactionId(e.target.value)}
+                            placeholder="Enter your M-Pesa transaction ID"
+                            required
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            After making payment, enter the transaction ID from your M-Pesa confirmation message.
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="payment_reference">Reference (Optional)</Label>
+                          <Input
+                            id="payment_reference"
+                            value={paymentReference}
+                            onChange={(e) => setPaymentReference(e.target.value)}
+                            placeholder="Enter reference if any"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="payment_verification_notes">Notes (Optional)</Label>
+                          <Textarea
+                            id="payment_verification_notes"
+                            value={paymentVerificationNotes}
+                            onChange={(e) => setPaymentVerificationNotes(e.target.value)}
+                            placeholder="Any additional payment notes..."
+                            rows={3}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
