@@ -63,6 +63,14 @@ export default function MFASettings() {
     }
   };
 
+  // Auto-enable 2FA if not enabled (mandatory)
+  useEffect(() => {
+    if (!isLoading && status && !status.enabled && !isEnabling) {
+      handleEnable();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, status?.enabled]);
+
   const handleEnable = async () => {
     setIsEnabling(true);
     try {
@@ -154,14 +162,6 @@ export default function MFASettings() {
       </Card>
     );
   }
-
-  // Auto-enable 2FA if not enabled (mandatory)
-  useEffect(() => {
-    if (!isLoading && status && !status.enabled && !isEnabling) {
-      handleEnable();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, status?.enabled]);
 
   return (
     <Card>

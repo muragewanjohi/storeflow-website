@@ -1,6 +1,29 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "entries": [
+    {
+      "version": "0.1.1",
+      "date": "2025-01-20",
+      "features": [
+        "Added welcome email with store details for new tenant users (includes store name, URL, dashboard link, and user role)",
+        "Enhanced user registration with tenant-specific email confirmation redirect URLs",
+        "Updated payment method settings to support Cash Before Delivery and Cash After Delivery options",
+        "Implemented pagination for cron job execution logs (10 items per page)",
+        "Added version information display in dashboard settings with changelog",
+        "Enhanced delivery fee quote workflow with customer approval/rejection functionality",
+        "Improved order management with delivery zone and fee information display",
+        "Added delivery method selection in checkout (delivery vs store pickup)",
+        "Enhanced order detail pages to show delivery zone information and pending quotes"
+      ],
+      "bugfixes": [
+        "Fixed React Hook error in 2FA settings component (useEffect called conditionally)",
+        "Fixed TypeScript errors in sendUserWelcomeEmail function signature",
+        "Fixed Vercel deployment issues by removing unsupported healthCheck configuration",
+        "Fixed dotenv dependency issue for Vercel builds by moving to dependencies",
+        "Fixed email confirmation redirect to point to tenant dashboard instead of marketing page",
+        "Fixed cron job authentication to use consistent token for manual and automatic runs"
+      ]
+    },
     {
       "version": "0.1.0",
       "date": "2024-01-01",
