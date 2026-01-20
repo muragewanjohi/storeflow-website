@@ -57,39 +57,41 @@ const navigation: NavigationItem[] = [
   // 1. Dashboard (Most important - always first)
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   
-  // 2. Orders (Second most important - revenue center)
+  // 2. Themes (Design and customization - important for branding)
+  { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, adminOnly: true },
+  
+  // 3. Orders (Second most important - revenue center)
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
   
-  // 3. Products group (Catalog management)
+  // 4. Products group (Catalog management)
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Products' },
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Products' },
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Products' },
   { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon, group: 'Products' },
   { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, group: 'Products', adminOnly: true },
   
-  // 4. Customers (Standalone - important)
+  // 5. Customers (Standalone - important)
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
   
-  // 5. Marketing group (Sales, Promotions, Analytics)
+  // 6. Marketing group (Sales, Promotions, Analytics)
   { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Marketing' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon, group: 'Marketing' },
   
-  // 6. Content group (Website content)
+  // 7. Content group (Website content)
   { name: 'Pages', href: '/dashboard/pages', icon: DocumentTextIcon, group: 'Content' },
   { name: 'Blogs', href: '/dashboard/blogs', icon: NewspaperIcon, group: 'Content' },
   { name: 'Blog Categories', href: '/dashboard/blogs/categories', icon: TagIcon, group: 'Content', submenu: true },
   { name: 'Forms', href: '/dashboard/forms', icon: ClipboardDocumentListIcon, group: 'Content' },
   { name: 'Media Library', href: '/dashboard/media', icon: PhotoIcon, group: 'Content' },
-  { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, group: 'Content', adminOnly: true },
   
-  // 7. Settings (Standalone)
+  // 8. Settings (Standalone)
   { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
   
-  // 8. Support group
+  // 9. Support group
   { name: 'Support Tickets', href: '/dashboard/support/tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   
-  // 9. Admin-only items
+  // 10. Admin-only items
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
   { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
 ];
@@ -123,16 +125,18 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
 
   // Group navigation items following e-commerce best practices:
   // 1. Dashboard (standalone)
-  // 2. Orders (standalone - most important after dashboard)
-  // 3. Products group
-  // 4. Customers (standalone)
-  // 5. Marketing group
-  // 6. Content group
-  // 7. Settings (standalone)
-  // 8. Support group
-  // 9. Admin items (standalone)
+  // 2. Themes (standalone - design and customization)
+  // 3. Orders (standalone - most important after dashboard)
+  // 4. Products group
+  // 5. Customers (standalone)
+  // 6. Marketing group
+  // 7. Content group
+  // 8. Settings (standalone)
+  // 9. Support group
+  // 10. Admin items (standalone)
   
   const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
+  const themesItem = filteredNavigation.find((item) => item.name === 'Themes');
   const ordersItem = filteredNavigation.find((item) => item.name === 'Orders');
   const customersItem = filteredNavigation.find((item) => item.name === 'Customers');
   const settingsItem = filteredNavigation.find((item) => item.name === 'Settings');
@@ -150,12 +154,17 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     orderedGroupedNavigation.push({ groupName: 'Main', items: [dashboardItem] });
   }
   
-  // 2. Orders (standalone - most important)
+  // 2. Themes (standalone - design and customization)
+  if (themesItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [themesItem] });
+  }
+  
+  // 3. Orders (standalone - most important)
   if (ordersItem) {
     orderedGroupedNavigation.push({ groupName: 'Main', items: [ordersItem] });
   }
   
-  // 3. Products group
+  // 4. Products group
   if (productsItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Products', items: productsItems });
   }

@@ -14,12 +14,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { type Permission } from '@/lib/auth/permissions';
+import { PERMISSION_CATEGORIES, PERMISSION_LABELS } from '@/app/dashboard/users/roles/roles-permissions-client';
 
 interface User {
   id: string;
   email: string;
   name: string;
   role: 'tenant_admin' | 'tenant_staff';
+  customPermissions?: string[]; // Stored as string array, cast to Permission[] when needed
 }
 
 interface EditUserFormProps {
@@ -32,6 +36,8 @@ export default function EditUserForm({ user, currentUserId }: Readonly<EditUserF
   const [formData, setFormData] = useState({
     name: user.name,
     role: user.role,
+    customPermissions: user.customPermissions || [],
+    useCustomPermissions: (user.customPermissions && user.customPermissions.length > 0) || false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +74,7 @@ export default function EditUserForm({ user, currentUserId }: Readonly<EditUserF
         body: JSON.stringify({
           name: formData.name,
           role: formData.role,
+          customPermissions: formData.useCustomPermissions ? formData.customPermissions : undefined,
         }),
       });
 
@@ -136,35 +143,111 @@ export default function EditUserForm({ user, currentUserId }: Readonly<EditUserF
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, role: value as 'tenant_admin' | 'tenant_staff' })
-                }
-                disabled={isCurrentUser}
-              >
-                <SelectTrigger id="role" disabled={isCurrentUser}>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tenant_staff">Staff</SelectItem>
-                  <SelectItem value="tenant_admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              {isCurrentUser && (
-                <p className="text-xs text-muted-foreground">
-                  You cannot change your own role
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, role: value as 'tenant_admin' | 'tenant_staff' })
+                  }
+                  disabled={isCurrentUser}
+                >
+                  <SelectTrigger id="role" disabled={isCurrentUser}>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tenant_staff">Staff</SelectItem>
+                    <SelectItem value="tenant_admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isCurrentUser && (
+                  <p className="text-xs text-muted-foreground">
+                    You cannot change your own role
+                  </p>
+                )}
+                {!isCurrentUser && (
+                  <p className="text-xs text-muted-foreground">
+                    {formData.role === 'tenant_admin'
+                      ? 'Admin users have full access to manage products, orders, customers, and users.'
+                      : 'Staff users have limited access - they can view and update but cannot create or delete.'}
+                  </p>
+                )}
+              </div>
+
+              {/* Custom Permissions Option */}
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="useCustomPermissions"
+                    checked={formData.useCustomPermissions}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, useCustomPermissions: checked as boolean })
+                    }
+                    disabled={isCurrentUser}
+                  />
+                  <Label htmlFor="useCustomPermissions" className="font-medium cursor-pointer">
+                    Use custom permissions (override role defaults)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6">
+                  Select specific permissions for this user instead of using the default role permissions
                 </p>
-              )}
-              {!isCurrentUser && (
-                <p className="text-xs text-muted-foreground">
-                  {formData.role === 'tenant_admin'
-                    ? 'Admin users have full access to manage products, orders, customers, and users.'
-                    : 'Staff users have limited access - they can view and update but cannot create or delete.'}
-                </p>
-              )}
+
+                {formData.useCustomPermissions && (
+                  <Card className="mt-4">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Custom Permissions</CardTitle>
+                      <CardDescription className="text-xs">
+                        Select the specific permissions this user should have
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {Object.entries(PERMISSION_CATEGORIES).map(([category, categoryPermissions]) => (
+                        <div key={category} className="space-y-2">
+                          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            {category}
+                          </h4>
+                          <div className="space-y-2 pl-4">
+                            {categoryPermissions.map((perm) => {
+                              const permission = perm as Permission;
+                              const isChecked = formData.customPermissions.includes(permission);
+                              return (
+                                <div key={permission} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`perm-${permission}`}
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setFormData({
+                                          ...formData,
+                                          customPermissions: [...formData.customPermissions, permission],
+                                        });
+                                      } else {
+                                        setFormData({
+                                          ...formData,
+                                          customPermissions: formData.customPermissions.filter((p) => p !== permission),
+                                        });
+                                      }
+                                    }}
+                                    disabled={isCurrentUser}
+                                  />
+                                  <Label
+                                    htmlFor={`perm-${permission}`}
+                                    className="text-sm cursor-pointer font-normal"
+                                  >
+                                    {PERMISSION_LABELS[permission]}
+                                  </Label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
 
             <CardFooter className="flex justify-end gap-4 pt-4">

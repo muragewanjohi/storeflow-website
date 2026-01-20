@@ -16,6 +16,7 @@ import { z } from 'zod';
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
   role: z.enum(['tenant_admin', 'tenant_staff']).optional(),
+  customPermissions: z.array(z.string()).optional(),
 });
 
 /**
@@ -59,6 +60,7 @@ export async function GET(
         email: targetUser.user.email,
         name: targetUser.user.user_metadata?.name,
         role: targetUser.user.user_metadata?.role,
+        customPermissions: targetUser.user.user_metadata?.permissions || undefined,
         created_at: targetUser.user.created_at,
         last_sign_in_at: targetUser.user.last_sign_in_at,
       },
@@ -115,6 +117,10 @@ export async function PUT(
       ...targetUser.user.user_metadata,
       ...(validatedData.name && { name: validatedData.name }),
       ...(validatedData.role && { role: validatedData.role }),
+      // Handle custom permissions: if provided, set them; if explicitly set to empty array, remove them
+      ...(validatedData.customPermissions !== undefined && {
+        permissions: validatedData.customPermissions.length > 0 ? validatedData.customPermissions : undefined,
+      }),
     };
 
     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(

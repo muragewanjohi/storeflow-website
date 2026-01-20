@@ -106,9 +106,20 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
  * 
  * @param role - User role
  * @param permission - Permission to check
+ * @param customPermissions - Optional array of custom permissions that override/extend role permissions
  * @returns True if user has permission
  */
-export function hasPermission(role: UserRole, permission: Permission): boolean {
+export function hasPermission(
+  role: UserRole, 
+  permission: Permission,
+  customPermissions?: Permission[]
+): boolean {
+  // If custom permissions are provided, check them first
+  if (customPermissions && customPermissions.length > 0) {
+    return customPermissions.includes(permission);
+  }
+  
+  // Otherwise, check role-based permissions
   const permissions = ROLE_PERMISSIONS[role] || [];
   return permissions.includes(permission);
 }
@@ -118,10 +129,15 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
  * 
  * @param role - User role
  * @param permissions - Array of permissions to check
+ * @param customPermissions - Optional array of custom permissions that override/extend role permissions
  * @returns True if user has any of the permissions
  */
-export function hasAnyPermission(role: UserRole, permissions: Permission[]): boolean {
-  return permissions.some((permission) => hasPermission(role, permission));
+export function hasAnyPermission(
+  role: UserRole, 
+  permissions: Permission[],
+  customPermissions?: Permission[]
+): boolean {
+  return permissions.some((permission) => hasPermission(role, permission, customPermissions));
 }
 
 /**
@@ -129,19 +145,59 @@ export function hasAnyPermission(role: UserRole, permissions: Permission[]): boo
  * 
  * @param role - User role
  * @param permissions - Array of permissions to check
+ * @param customPermissions - Optional array of custom permissions that override/extend role permissions
  * @returns True if user has all permissions
  */
-export function hasAllPermissions(role: UserRole, permissions: Permission[]): boolean {
-  return permissions.every((permission) => hasPermission(role, permission));
+export function hasAllPermissions(
+  role: UserRole, 
+  permissions: Permission[],
+  customPermissions?: Permission[]
+): boolean {
+  return permissions.every((permission) => hasPermission(role, permission, customPermissions));
 }
 
 /**
  * Get all permissions for a role
  * 
  * @param role - User role
- * @returns Array of permissions
+ * @param customPermissions - Optional array of custom permissions that override/extend role permissions
+ * @returns Array of permissions (custom permissions if provided, otherwise role permissions)
  */
-export function getRolePermissions(role: UserRole): Permission[] {
+export function getRolePermissions(role: UserRole, customPermissions?: Permission[]): Permission[] {
+  // If custom permissions are provided, return them (they override role permissions)
+  if (customPermissions && customPermissions.length > 0) {
+    return customPermissions;
+  }
+  
+  // Otherwise, return role-based permissions
   return ROLE_PERMISSIONS[role] || [];
 }
 
+/**
+ * Get all available permissions
+ * 
+ * @returns Array of all available permissions
+ */
+export function getAllPermissions(): Permission[] {
+  return [
+    'products.create',
+    'products.read',
+    'products.update',
+    'products.delete',
+    'orders.create',
+    'orders.read',
+    'orders.update',
+    'orders.delete',
+    'customers.create',
+    'customers.read',
+    'customers.update',
+    'customers.delete',
+    'users.create',
+    'users.read',
+    'users.update',
+    'users.delete',
+    'settings.read',
+    'settings.update',
+    'analytics.read',
+  ];
+}

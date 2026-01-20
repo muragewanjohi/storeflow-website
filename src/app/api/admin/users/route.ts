@@ -21,6 +21,7 @@ const createUserSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1, 'Name is required'),
   role: z.enum(['tenant_admin', 'tenant_staff']),
+  customPermissions: z.array(z.string()).optional(),
 });
 
 /**
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validatedData = createUserSchema.parse(body);
-    const { email, password, name, role } = validatedData;
+    const { email, password, name, role, customPermissions } = validatedData;
 
     // Check if tenant is on Basic Plan - block adding users
     let currentPlan = null;
@@ -244,6 +245,7 @@ export async function POST(request: NextRequest) {
                   role, // Update role for this tenant
                   tenant_id: tenant.id, // Update to current tenant
                   name, // Update name
+                  permissions: customPermissions && customPermissions.length > 0 ? customPermissions : undefined, // Custom permissions
                 },
               }
             );
@@ -314,6 +316,7 @@ export async function POST(request: NextRequest) {
         role,
         tenant_id: tenant.id,
         name,
+        permissions: customPermissions && customPermissions.length > 0 ? customPermissions : undefined, // Custom permissions
       },
     });
 

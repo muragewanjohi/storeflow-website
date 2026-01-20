@@ -431,7 +431,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       return true;
     }
     
-    // For delivery, require full address
+    // For delivery, require full address (even for out-of-zone orders, we need the address)
     if (!shippingAddress.name.trim()) {
       toast.error('Name is required');
       return false;
@@ -453,7 +453,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       return false;
     }
     if (!shippingAddress.state.trim()) {
-      toast.error('State is required');
+      toast.error('State/Province is required');
       return false;
     }
     if (!shippingAddress.postal_code.trim()) {
@@ -467,6 +467,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     
     // Zone validation (optional - can proceed without zone if out-of-zone)
     // We allow orders to proceed even if zone is not selected (out-of-zone orders)
+    // The address is still required for delivery, even if out of zone
     
     return true;
   };
@@ -829,8 +830,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                         </SelectContent>
                       </Select>
                       
-                      {/* Display selected saved address details */}
-                      {!useNewAddress && selectedAddressId && (
+                      {/* Display selected saved address details (only if not out of zone) */}
+                      {!useNewAddress && selectedAddressId && zoneDetectionStatus !== 'not_matched' && (
                         <div className="p-4 border rounded-lg bg-muted/50">
                           {(() => {
                             const selected = savedAddresses.find((a: any) => a.id === selectedAddressId);
@@ -838,12 +839,16 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                             return (
                               <div className="text-sm space-y-1">
                                 <p className="font-medium">{selected.name}</p>
-                                <p className="text-muted-foreground">{selected.address}</p>
+                                <p className="text-muted-foreground">{selected.address || selected.address_line_1}</p>
                                 <p className="text-muted-foreground">
-                                  {selected.city}, {selected.state} {selected.postal_code}
+                                  {selected.city}{selected.state ? `, ${selected.state}` : ''} {selected.postal_code || ''}
                                 </p>
-                                <p className="text-muted-foreground">{selected.country}</p>
-                                <p className="text-muted-foreground">{selected.phone}</p>
+                                {selected.country && (
+                                  <p className="text-muted-foreground">{selected.country}</p>
+                                )}
+                                {selected.phone && (
+                                  <p className="text-muted-foreground">{selected.phone}</p>
+                                )}
                               </div>
                             );
                           })()}
@@ -916,8 +921,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     </div>
                   )}
                   
-                  {/* Address Form (shown when "Add New Address" is selected or no saved addresses) */}
-                  {(useNewAddress || savedAddresses.length === 0 || !isAuthenticated) && (
+                  {/* Address Form (shown when "Add New Address" is selected, no saved addresses, or when out of zone is selected) */}
+                  {(useNewAddress || savedAddresses.length === 0 || !isAuthenticated || (zoneDetectionStatus === 'not_matched' && selectedZoneId === null)) && (
                     <>
                       <Separator />
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
