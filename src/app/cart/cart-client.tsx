@@ -47,6 +47,11 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
   const [couponCode, setCouponCode] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [discount, setDiscount] = useState(0);
+  const [taxSettings, setTaxSettings] = useState<{
+    tax_enabled: boolean;
+    default_tax_rate: number | null;
+    tax_pricing_type: 'inclusive' | 'exclusive';
+  } | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -65,10 +70,30 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     }
   }, [isAuthenticated, router]);
 
-  // Fetch cart on mount
+  // Fetch tax settings
+  const fetchTaxSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/checkout/settings');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.settings) {
+          setTaxSettings({
+            tax_enabled: data.settings.tax_enabled || false,
+            default_tax_rate: data.settings.default_tax_rate || null,
+            tax_pricing_type: data.settings.tax_pricing_type || 'exclusive',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tax settings:', error);
+    }
+  }, []);
+
+  // Fetch cart and tax settings on mount
   useEffect(() => {
     fetchCart();
-  }, [fetchCart]);
+    fetchTaxSettings();
+  }, [fetchCart, fetchTaxSettings]);
 
   const updateQuantity = async (productId: string, variantId: string | null, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -267,7 +292,21 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
   }
 
   const subtotal = cart.total || cart.items.reduce((sum: any, item: any) => sum + item.price * item.quantity, 0);
-  const total = subtotal - discount;
+  
+  // Calculate tax
+  let taxAmount = 0;
+  if (taxSettings?.tax_enabled && taxSettings.default_tax_rate) {
+    const taxRate = taxSettings.default_tax_rate / 100;
+    if (taxSettings.tax_pricing_type === 'inclusive') {
+      // Tax is included in price, calculate what portion is tax
+      taxAmount = subtotal - (subtotal / (1 + taxRate));
+    } else {
+      // Tax is added on top
+      taxAmount = subtotal * taxRate;
+    }
+  }
+  
+  const total = subtotal - discount + (taxSettings?.tax_pricing_type === 'exclusive' ? taxAmount : 0);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -405,6 +444,20 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                   <span>Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
+                
+                {/* Tax Display */}
+                {taxSettings?.tax_enabled && taxSettings.default_tax_rate && (
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      Tax ({taxSettings.default_tax_rate}%)
+                      {taxSettings.tax_pricing_type === 'inclusive' && (
+                        <span className="text-xs text-muted-foreground ml-1">(included)</span>
+                      )}
+                    </span>
+                    <span>{formatCurrency(taxAmount)}</span>
+                  </div>
+                )}
+                
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount</span>

@@ -72,7 +72,8 @@ const settingsUpdateSchema = z.object({
   // Tax Settings
   tax_enabled: z.boolean().optional(),
   default_tax_rate: z.number().min(0).max(100).optional().nullable(),
-  tax_included_in_price: z.boolean().optional(),
+  tax_pricing_type: z.enum(['inclusive', 'exclusive']).optional(),
+  tax_included_in_price: z.boolean().optional(), // Keep for backward compatibility
   tax_calculation_based_on: z.enum(['billing_address', 'shipping_address', 'store_address']).optional(),
 });
 
@@ -399,8 +400,14 @@ export async function PUT(request: NextRequest) {
     if (validatedData.default_tax_rate !== undefined) {
       optionsToSave.default_tax_rate = validatedData.default_tax_rate?.toString() || null;
     }
-    if (validatedData.tax_included_in_price !== undefined) {
+    if (validatedData.tax_pricing_type !== undefined) {
+      optionsToSave.tax_pricing_type = validatedData.tax_pricing_type;
+      // Also update tax_included_in_price for backward compatibility
+      optionsToSave.tax_included_in_price = (validatedData.tax_pricing_type === 'inclusive').toString();
+    } else if (validatedData.tax_included_in_price !== undefined) {
+      // Fallback for backward compatibility
       optionsToSave.tax_included_in_price = validatedData.tax_included_in_price.toString();
+      optionsToSave.tax_pricing_type = validatedData.tax_included_in_price ? 'inclusive' : 'exclusive';
     }
     if (validatedData.tax_calculation_based_on !== undefined) {
       optionsToSave.tax_calculation_based_on = validatedData.tax_calculation_based_on;

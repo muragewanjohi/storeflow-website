@@ -71,7 +71,8 @@ export default async function TenantSettingsPage() {
       // Tax Settings
       'tax_enabled',
       'default_tax_rate',
-      'tax_included_in_price',
+      'tax_pricing_type',
+      'tax_included_in_price', // Keep for backward compatibility
       'tax_calculation_based_on',
     ]);
   } catch (error) {
@@ -148,7 +149,8 @@ export default async function TenantSettingsPage() {
     // Tax Settings
     tax_enabled: settings.tax_enabled === 'true',
     default_tax_rate: settings.default_tax_rate ? parseFloat(settings.default_tax_rate) : null,
-    tax_included_in_price: settings.tax_included_in_price === 'true',
+    tax_pricing_type: settings.tax_pricing_type || (settings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive'),
+    tax_included_in_price: settings.tax_included_in_price === 'true', // Keep for backward compatibility
     tax_calculation_based_on: settings.tax_calculation_based_on || 'billing_address',
   };
 

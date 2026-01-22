@@ -131,6 +131,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     payment_method: string;
     default_payment_method: string; // Keep for backward compatibility
     payment_timing: 'before_delivery' | 'after_delivery' | 'user_choice';
+    tax_enabled: boolean;
+    default_tax_rate: number | null;
+    tax_pricing_type: 'inclusive' | 'exclusive';
   } | null>(null);
   
   // Delivery zones state
@@ -408,6 +411,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
         payment_method: 'cash',
         default_payment_method: 'cash',
         payment_timing: 'user_choice',
+        tax_enabled: false,
+        default_tax_rate: null,
+        tax_pricing_type: 'exclusive',
       });
     }
   }, []);
@@ -1763,6 +1769,33 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     <span>Subtotal</span>
                     <span>{formatPrice(cart.total)}</span>
                   </div>
+                  
+                  {/* Tax Display */}
+                  {checkoutSettings?.tax_enabled && checkoutSettings.default_tax_rate && (
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        Tax ({checkoutSettings.default_tax_rate}%)
+                        {checkoutSettings.tax_pricing_type === 'inclusive' && (
+                          <span className="text-xs text-muted-foreground ml-1">(included)</span>
+                        )}
+                      </span>
+                      <span>
+                        {(() => {
+                          const taxRate = checkoutSettings.default_tax_rate / 100;
+                          let taxAmount = 0;
+                          if (checkoutSettings.tax_pricing_type === 'inclusive') {
+                            // Tax is included in price, calculate what portion is tax
+                            taxAmount = cart.total - (cart.total / (1 + taxRate));
+                          } else {
+                            // Tax is added on top
+                            taxAmount = cart.total * taxRate;
+                          }
+                          return formatPrice(taxAmount);
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
                     <span className={
@@ -1797,7 +1830,21 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     <span>Total</span>
                     <span>
                       {formatPrice(
-                        cart.total + (deliveryMethod === 'delivery' && deliveryFee ? deliveryFee : 0)
+                        (() => {
+                          let total = cart.total;
+                          const deliveryFeeAmount = deliveryMethod === 'delivery' && deliveryFee ? deliveryFee : 0;
+                          
+                          // Add tax if enabled and tax-exclusive
+                          if (checkoutSettings?.tax_enabled && checkoutSettings.default_tax_rate) {
+                            const taxRate = checkoutSettings.default_tax_rate / 100;
+                            if (checkoutSettings.tax_pricing_type === 'exclusive') {
+                              total += cart.total * taxRate;
+                            }
+                            // If inclusive, tax is already in cart.total
+                          }
+                          
+                          return total + deliveryFeeAmount;
+                        })()
                       )}
                     </span>
                   </div>

@@ -16,6 +16,7 @@ import { canCreateOrder } from '@/lib/subscriptions/limits';
 import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock';
 import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 import { getSessionId } from '@/lib/cart/session';
+import { getStaticOptions } from '@/lib/settings/static-options';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -176,8 +177,41 @@ export async function POST(request: NextRequest) {
         ? validatedData.shipping_address
         : { name: '', email: '', phone: '' };
 
-    // Calculate total with delivery fee
-    let finalTotal = totalAmount - (couponDiscounted || 0);
+    // Get tax settings
+    const taxSettings = await getStaticOptions(tenant.id, [
+      'tax_enabled',
+      'default_tax_rate',
+      'tax_pricing_type',
+      'tax_included_in_price', // Keep for backward compatibility
+    ]);
+    
+    const taxEnabled = taxSettings.tax_enabled === 'true';
+    const taxRate = taxSettings.default_tax_rate ? parseFloat(taxSettings.default_tax_rate) : null;
+    const taxPricingType = taxSettings.tax_pricing_type || (taxSettings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive');
+    
+    // Calculate subtotal (before tax and delivery)
+    let subtotal = totalAmount - (couponDiscounted || 0);
+    
+    // Calculate tax
+    let taxAmount = 0;
+    if (taxEnabled && taxRate) {
+      const taxRateDecimal = taxRate / 100;
+      if (taxPricingType === 'inclusive') {
+        // Tax is included in price, calculate what portion is tax
+        taxAmount = subtotal - (subtotal / (1 + taxRateDecimal));
+      } else {
+        // Tax is added on top
+        taxAmount = subtotal * taxRateDecimal;
+      }
+    }
+    
+    // Calculate total with tax and delivery fee
+    let finalTotal = subtotal;
+    if (taxEnabled && taxRate && taxPricingType === 'exclusive') {
+      finalTotal += taxAmount; // Add tax if exclusive
+    }
+    // If inclusive, tax is already in subtotal
+    
     if (!isPickup && validatedData.delivery_fee) {
       finalTotal += validatedData.delivery_fee;
     }

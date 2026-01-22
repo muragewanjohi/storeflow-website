@@ -112,7 +112,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     // Tax Settings
     tax_enabled: initialSettings.tax_enabled ?? false,
     default_tax_rate: initialSettings.default_tax_rate || '',
-    tax_included_in_price: initialSettings.tax_included_in_price ?? false,
+    tax_pricing_type: initialSettings.tax_pricing_type || (initialSettings.tax_included_in_price ? 'inclusive' : 'exclusive'),
     tax_calculation_based_on: initialSettings.tax_calculation_based_on || 'billing_address',
   });
 
@@ -231,7 +231,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         // Tax Settings
         tax_enabled: formData.tax_enabled,
         default_tax_rate: formData.default_tax_rate ? parseFloat(formData.default_tax_rate) : null,
-        tax_included_in_price: formData.tax_included_in_price,
+        tax_pricing_type: formData.tax_pricing_type || 'exclusive',
+        tax_included_in_price: formData.tax_pricing_type === 'inclusive', // Keep for backward compatibility
         tax_calculation_based_on: formData.tax_calculation_based_on,
       };
 
@@ -1203,17 +1204,51 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     onChange={(e) => setFormData({ ...formData, default_tax_rate: e.target.value })}
                     placeholder="0.00"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    The default tax rate applied to orders. Can be overridden per product or region.
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="tax_included_in_price"
-                    checked={formData.tax_included_in_price}
-                    onCheckedChange={(checked) => setFormData({ ...formData, tax_included_in_price: checked === true })}
-                  />
-                  <Label htmlFor="tax_included_in_price" className="cursor-pointer">
-                    Prices include tax
-                  </Label>
+                
+                <div className="space-y-4">
+                  <Label>Tax Pricing Type</Label>
+                  <RadioGroup
+                    value={formData.tax_pricing_type}
+                    onValueChange={(value) => setFormData({ ...formData, tax_pricing_type: value as 'inclusive' | 'exclusive' })}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                        <RadioGroupItem value="inclusive" id="tax_inclusive" className="mt-1" />
+                        <Label htmlFor="tax_inclusive" className="flex-1 cursor-pointer">
+                          <div>
+                            <div className="font-semibold">Tax-Inclusive Pricing</div>
+                            <div className="text-sm text-muted-foreground">
+                              Product prices already include tax. Tax amount is shown separately in cart and checkout for transparency.
+                              <br />
+                              <span className="text-xs">Example: Product shows $110 (includes $10 tax at 10% rate)</span>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                      <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                        <RadioGroupItem value="exclusive" id="tax_exclusive" className="mt-1" />
+                        <Label htmlFor="tax_exclusive" className="flex-1 cursor-pointer">
+                          <div>
+                            <div className="font-semibold">Tax-Exclusive Pricing</div>
+                            <div className="text-sm text-muted-foreground">
+                              Product prices do not include tax. Tax is added at checkout.
+                              <br />
+                              <span className="text-xs">Example: Product shows $100, tax ($10) added at checkout = $110 total</span>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    This follows the same pattern as Shopify and WooCommerce. Tax will always be displayed as a separate line item in cart and checkout for transparency.
+                  </p>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="tax_calculation_based_on">Calculate Tax Based On</Label>
                   <Select

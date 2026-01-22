@@ -127,6 +127,8 @@ export function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [useNewAPI, setUseNewAPI] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [allowManualInput, setAllowManualInput] = useState(false);
 
   // Load Google Maps script
   useEffect(() => {
@@ -194,26 +196,71 @@ export function AddressAutocomplete({
       }, 100);
     };
     
+    // Listen for Google Maps API errors via window error events
+    const handleWindowError = (event: ErrorEvent) => {
+      const errorMessage = event.message || '';
+      if (errorMessage.includes('RefererNotAllowedMapError') || 
+          errorMessage.includes('RefererNotAllowed')) {
+        setApiError('Google Maps API key is not authorized for this domain. Please update API key restrictions in Google Cloud Console.');
+        setAllowManualInput(true);
+      } else if (errorMessage.includes('Google Maps') || 
+                 errorMessage.includes('Maps JavaScript API')) {
+        setApiError('Google Maps API error detected. Manual input is available.');
+        setAllowManualInput(true);
+      }
+    };
+    
+    window.addEventListener('error', handleWindowError);
+    
     script.onerror = () => {
       console.error('Failed to load Google Maps script');
+      setApiError('Failed to load Google Maps. Please check your API key configuration.');
+      setAllowManualInput(true); // Allow manual input even if script fails
+      window.removeEventListener('error', handleWindowError);
       delete (window as any)[callbackName];
     };
+    
+    // Also check for Google Maps errors after script loads
+    const checkForErrors = setInterval(() => {
+      // Check if there are any Google Maps related errors in the console
+      // This is a fallback if error events don't fire
+      if (window.google?.maps && !window.google.maps.places) {
+        setApiError('Google Maps Places library failed to load. You can still type your address manually.');
+        setAllowManualInput(true);
+        clearInterval(checkForErrors);
+        window.removeEventListener('error', handleWindowError);
+      }
+    }, 1000);
+    
+    // Clear interval after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkForErrors);
+      window.removeEventListener('error', handleWindowError);
+    }, 10000);
 
     document.head.appendChild(script);
 
     return () => {
-      // Cleanup is handled in the callback
+      // Cleanup will be handled in the callback or error handlers
     };
   }, []);
 
   // Initialize autocomplete when script is loaded
   useEffect(() => {
-    if (!isScriptLoaded || !inputRef.current || disabled) return;
+    if (!isScriptLoaded || !inputRef.current || disabled) {
+      // If script failed to load, allow manual input
+      if (!isScriptLoaded && !disabled) {
+        setAllowManualInput(true);
+      }
+      return;
+    }
     
     // Wait a bit more to ensure Places library is fully initialized
     const initTimer = setTimeout(() => {
       if (!window.google?.maps?.places) {
         console.error('Google Maps Places library not loaded');
+        setApiError('Google Maps Places library failed to load. You can still type your address manually.');
+        setAllowManualInput(true);
         return;
       }
 
@@ -223,6 +270,8 @@ export function AddressAutocomplete({
         console.error('1. Your API key was created after March 1, 2025 (new customers must use PlaceAutocompleteElement)');
         console.error('2. Places API is not enabled in Google Cloud Console');
         console.error('3. The script has not fully loaded yet');
+        setApiError('Autocomplete is not available. You can still type your address manually.');
+        setAllowManualInput(true);
         return;
       }
 
@@ -273,6 +322,8 @@ export function AddressAutocomplete({
           hasPlaces: !!window.google?.maps?.places,
           hasAutocomplete: !!window.google?.maps?.places?.Autocomplete,
         });
+        setApiError('Failed to initialize address autocomplete. You can still type your address manually.');
+        setAllowManualInput(true);
       }
     }, 200); // Small delay to ensure library is ready
 
@@ -308,10 +359,10 @@ export function AddressAutocomplete({
           type="text"
           value={value}
           onChange={handleInputChange}
-          placeholder={placeholder}
+          placeholder={apiError ? 'Type your address manually...' : placeholder}
           required={required}
-          disabled={disabled || !isScriptLoaded}
-          className={error ? 'border-destructive' : ''}
+          disabled={disabled || (!isScriptLoaded && !allowManualInput)}
+          className={error || apiError ? 'border-destructive' : ''}
           autoComplete="off"
         />
         {isLoading && (
@@ -323,7 +374,33 @@ export function AddressAutocomplete({
       {error && (
         <p className="text-sm text-destructive mt-1">{error}</p>
       )}
-      {!isScriptLoaded && !process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+      {apiError && (
+        <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+          <p className="text-sm text-amber-900 dark:text-amber-100 font-medium mb-1">
+            ⚠️ Address Autocomplete Unavailable
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+            {apiError}
+          </p>
+          {apiError.includes('RefererNotAllowedMapError') && (
+            <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
+              <p className="font-medium">To fix this:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console → APIs & Services → Credentials</a></li>
+                <li>Click on your API key</li>
+                <li>Under &quot;Application restrictions&quot; → &quot;HTTP referrers (web sites)&quot;</li>
+                <li>Add: <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">https://matunda.dukanest.com/*</code></li>
+                <li>Or for all subdomains: <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">*.dukanest.com/*</code></li>
+                <li>Click &quot;Save&quot;</li>
+              </ol>
+            </div>
+          )}
+          <p className="text-xs text-amber-800 dark:text-amber-200 mt-2">
+            <strong>Note:</strong> You can still type your address manually in the field above.
+          </p>
+        </div>
+      )}
+      {!isScriptLoaded && !process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && !apiError && (
         <p className="text-xs text-muted-foreground mt-1">
           Address autocomplete requires Google Maps API key
         </p>

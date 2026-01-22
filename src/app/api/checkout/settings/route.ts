@@ -40,6 +40,11 @@ export async function GET(request: NextRequest) {
       'payment_method',
       'default_payment_method', // Keep for backward compatibility
       'payment_timing',
+      'tax_enabled',
+      'default_tax_rate',
+      'tax_pricing_type',
+      'tax_included_in_price', // Keep for backward compatibility
+      'tax_calculation_based_on',
     ]);
 
     // Check if pickup can be enabled (requires physical address)
@@ -57,6 +62,11 @@ export async function GET(request: NextRequest) {
     const payment_mpesa_enabled = settings.payment_mpesa_enabled === 'true';
     const payment_method = settings.payment_method || settings.default_payment_method || 'cash';
     const payment_timing = settings.payment_timing || 'user_choice';
+    
+    // Tax settings
+    const tax_enabled = settings.tax_enabled === 'true';
+    const default_tax_rate = settings.default_tax_rate ? parseFloat(settings.default_tax_rate) : null;
+    const tax_pricing_type = settings.tax_pricing_type || (settings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive');
 
     return NextResponse.json({
       success: true,
@@ -94,6 +104,10 @@ export async function GET(request: NextRequest) {
         payment_method,
         default_payment_method: payment_method, // Keep for backward compatibility
         payment_timing,
+        // Tax settings
+        tax_enabled,
+        default_tax_rate,
+        tax_pricing_type,
       },
     });
   } catch (error: any) {
