@@ -6,6 +6,15 @@ const nextConfig: NextConfig = {
   // Enable React compiler for better performance (if available)
   // reactCompiler: true,
   
+  // ESLint configuration
+  eslint: {
+    // ESLint will run during build and show warnings/errors
+    // Set to true if you want to ignore ESLint errors during builds (not recommended)
+    ignoreDuringBuilds: false,
+    // Specify directories to lint (defaults to all)
+    dirs: ['src', 'app'],
+  },
+  
   // Optimize images - critical for performance (Amazon/Shopify use CDN + optimization)
   images: {
     remotePatterns: [

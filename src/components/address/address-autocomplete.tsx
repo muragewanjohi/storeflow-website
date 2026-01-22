@@ -3,6 +3,12 @@
  * 
  * Uses Google Maps Places Autocomplete for address input
  * Follows Shopify/e-commerce best practices for address collection
+ * 
+ * Implementation Notes:
+ * - Migrated to new Places API using importLibrary and Place class (recommended)
+ * - Falls back to legacy Autocomplete API for backward compatibility
+ * - Uses modern dynamic library loading with importLibrary
+ * - Reference: https://developers.google.com/maps/documentation/javascript/legacy/places-migration-overview
  */
 
 'use client';
@@ -45,8 +51,74 @@ declare global {
   }
 }
 
-// Helper function to parse address components
-function parseAddressComponents(place: google.maps.places.PlaceResult): AddressComponents {
+// Helper function to parse address components from new Place class (camelCase)
+function parseAddressComponentsFromPlace(place: any): AddressComponents {
+  const components: AddressComponents = {
+    address_line_1: '',
+    address_line_2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: '',
+    formatted_address: place.formattedAddress || '',
+    place_id: place.id || undefined,
+    coordinates: place.location
+      ? {
+          lat: typeof place.location.lat === 'function' 
+            ? place.location.lat() 
+            : (place.location.lat as number),
+          lng: typeof place.location.lng === 'function'
+            ? place.location.lng()
+            : (place.location.lng as number),
+        }
+      : undefined,
+  };
+
+  // Parse address components (new API uses camelCase: longText, shortText)
+  place.addressComponents?.forEach((component: any) => {
+    const types = component.types || [];
+
+    if (types.includes('street_number')) {
+      components.address_line_1 = (component.longText || component.long_name || '') + ' ';
+    }
+    if (types.includes('route')) {
+      components.address_line_1 += (component.longText || component.long_name || '');
+    }
+    if (types.includes('subpremise')) {
+      components.address_line_2 = component.longText || component.long_name || '';
+    }
+    if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
+      if (!components.city) {
+        components.city = component.longText || component.long_name || '';
+      }
+    }
+    if (types.includes('locality')) {
+      components.city = component.longText || component.long_name || '';
+    }
+    if (types.includes('administrative_area_level_1')) {
+      components.state = (component.shortText || component.short_name || component.longText || component.long_name || '');
+    }
+    if (types.includes('postal_code')) {
+      components.postal_code = component.longText || component.long_name || '';
+    }
+    if (types.includes('country')) {
+      components.country = component.longText || component.long_name || '';
+    }
+  });
+
+  // Clean up address_line_1
+  components.address_line_1 = components.address_line_1.trim();
+
+  // If no street address, use formatted address
+  if (!components.address_line_1) {
+    components.address_line_1 = place.formattedAddress || '';
+  }
+
+  return components;
+}
+
+// Helper function to parse address components from legacy PlaceResult (snake_case)
+function parseAddressComponentsFromPlaceResult(place: google.maps.places.PlaceResult): AddressComponents {
   const components: AddressComponents = {
     address_line_1: '',
     address_line_2: '',
@@ -68,7 +140,7 @@ function parseAddressComponents(place: google.maps.places.PlaceResult): AddressC
       : undefined,
   };
 
-  // Parse address components
+  // Parse address components (legacy API uses snake_case)
   place.address_components?.forEach((component) => {
     const types = component.types;
 
@@ -123,165 +195,210 @@ export function AddressAutocomplete({
   className,
 }: Readonly<AddressAutocompleteProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | google.maps.places.PlaceAutocompleteElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [useNewAPI, setUseNewAPI] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [allowManualInput, setAllowManualInput] = useState(false);
+  const [allowManualInput, setAllowManualInput] = useState(true);
 
-  // Load Google Maps script
+  // Load Google Maps using modern importLibrary approach
   useEffect(() => {
-    // Check if already loaded
-    if (window.google?.maps?.places) {
-      // Check if new API is available
-      if (window.google.maps.places.PlaceAutocompleteElement) {
-        setUseNewAPI(true);
+    const loadGoogleMaps = async () => {
+      // Check if already loaded
+      if (window.google?.maps?.places) {
+        // Check if new API is available
+        if (window.google.maps.places.PlaceAutocompleteElement) {
+          setUseNewAPI(true);
+        }
+        setIsScriptLoaded(true);
+        return;
       }
-      setIsScriptLoaded(true);
-      return;
-    }
 
-    // Check if script is already in the DOM
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript) {
-      // Wait for it to load
-      const checkLoaded = () => {
-        if (window.google?.maps?.places) {
-          if (window.google.maps.places.PlaceAutocompleteElement) {
-            setUseNewAPI(true);
+      // Get API key
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+      if (!apiKey) {
+        console.warn('Google Maps API key not found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY');
+        setAllowManualInput(true);
+        return;
+      }
+
+      try {
+        // Use modern importLibrary approach (recommended by Google)
+        // This loads the Maps JavaScript API dynamically
+        if (!window.google) {
+          // Load the loader first
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+            document.head.appendChild(script);
+          });
+        }
+
+        // Now import the places library using the modern API
+        if (window.google?.maps?.importLibrary) {
+          const placesLibrary = await window.google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+          
+          // Check if new API is available (Place class with fetchFields method)
+          if (placesLibrary && 'Place' in placesLibrary) {
+            const Place = (placesLibrary as any).Place;
+            if (Place && typeof Place.prototype?.fetchFields === 'function') {
+              setUseNewAPI(true);
+            }
           }
+          
           setIsScriptLoaded(true);
         } else {
-          // Check again after a short delay
-          setTimeout(checkLoaded, 100);
+          // Fallback to legacy script loading
+          console.warn('importLibrary not available, using legacy script loading');
+          await loadLegacyScript(apiKey);
         }
-      };
-      existingScript.addEventListener('load', checkLoaded);
-      // Also check immediately in case it's already loaded
-      checkLoaded();
-      return;
-    }
-
-    // Get API key from environment or use a placeholder
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-    
-    if (!apiKey) {
-      console.warn('Google Maps API key not found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY');
-      return;
-    }
-
-    // Load Google Maps script with callback
-    const callbackName = `initGoogleMapsPlaces_${Date.now()}`;
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    
-    // Set up global callback
-    (window as any)[callbackName] = () => {
-      // Wait a bit for Places library to fully initialize
-      setTimeout(() => {
-        if (window.google?.maps?.places) {
-          // Check if new API is available
-          if (window.google.maps.places.PlaceAutocompleteElement) {
-            setUseNewAPI(true);
-          }
-          setIsScriptLoaded(true);
-        } else {
-          console.error('Google Maps Places library not available after script load');
+      } catch (error) {
+        console.error('Error loading Google Maps:', error);
+        setApiError('Failed to load Google Maps. You can still type your address manually.');
+        setAllowManualInput(true);
+        // Try legacy loading as fallback
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+        if (apiKey) {
+          await loadLegacyScript(apiKey);
         }
-        // Clean up callback
-        delete (window as any)[callbackName];
-      }, 100);
+      }
     };
-    
-    // Listen for Google Maps API errors via window error events
+
+    const loadLegacyScript = (apiKey: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        // Check if script already exists
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+        if (existingScript) {
+          const checkLoaded = () => {
+            if (window.google?.maps?.places) {
+              setIsScriptLoaded(true);
+              resolve();
+            } else {
+              setTimeout(checkLoaded, 100);
+            }
+          };
+          checkLoaded();
+          return;
+        }
+
+        const callbackName = `initGoogleMapsPlaces_${Date.now()}`;
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places&callback=${callbackName}`;
+        script.async = true;
+        script.defer = true;
+
+        (window as any)[callbackName] = () => {
+          setTimeout(() => {
+            if (window.google?.maps?.places) {
+              setIsScriptLoaded(true);
+              delete (window as any)[callbackName];
+              resolve();
+            } else {
+              reject(new Error('Places library not available'));
+            }
+          }, 100);
+        };
+
+        script.onerror = () => {
+          delete (window as any)[callbackName];
+          reject(new Error('Failed to load Google Maps script'));
+        };
+
+        document.head.appendChild(script);
+      });
+    };
+
+    loadGoogleMaps();
+
+    // Error handlers
     const handleWindowError = (event: ErrorEvent) => {
       const errorMessage = event.message || '';
       if (errorMessage.includes('RefererNotAllowedMapError') || 
           errorMessage.includes('RefererNotAllowed')) {
         setApiError('Google Maps API key is not authorized for this domain. Please update API key restrictions in Google Cloud Console.');
         setAllowManualInput(true);
+        if (inputRef.current) {
+          inputRef.current.disabled = false;
+        }
       } else if (errorMessage.includes('Google Maps') || 
                  errorMessage.includes('Maps JavaScript API')) {
         setApiError('Google Maps API error detected. Manual input is available.');
         setAllowManualInput(true);
+        if (inputRef.current) {
+          inputRef.current.disabled = false;
+        }
       }
     };
-    
-    window.addEventListener('error', handleWindowError);
-    
-    script.onerror = () => {
-      console.error('Failed to load Google Maps script');
-      setApiError('Failed to load Google Maps. Please check your API key configuration.');
-      setAllowManualInput(true); // Allow manual input even if script fails
-      window.removeEventListener('error', handleWindowError);
-      delete (window as any)[callbackName];
-    };
-    
-    // Also check for Google Maps errors after script loads
-    const checkForErrors = setInterval(() => {
-      // Check if there are any Google Maps related errors in the console
-      // This is a fallback if error events don't fire
-      if (window.google?.maps && !window.google.maps.places) {
-        setApiError('Google Maps Places library failed to load. You can still type your address manually.');
-        setAllowManualInput(true);
-        clearInterval(checkForErrors);
-        window.removeEventListener('error', handleWindowError);
-      }
-    }, 1000);
-    
-    // Clear interval after 10 seconds
-    setTimeout(() => {
-      clearInterval(checkForErrors);
-      window.removeEventListener('error', handleWindowError);
-    }, 10000);
 
-    document.head.appendChild(script);
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || event.reason || '';
+      const reasonStr = String(reason);
+      if (reasonStr.includes('RefererNotAllowedMapError') || 
+          reasonStr.includes('RefererNotAllowed') ||
+          reasonStr.includes('Google Maps')) {
+        setApiError('Google Maps API error detected. You can type your address manually.');
+        setAllowManualInput(true);
+        if (inputRef.current) {
+          inputRef.current.disabled = false;
+        }
+      }
+    };
+
+    window.addEventListener('error', handleWindowError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
-      // Cleanup will be handled in the callback or error handlers
+      window.removeEventListener('error', handleWindowError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
 
   // Initialize autocomplete when script is loaded
   useEffect(() => {
-    if (!isScriptLoaded || !inputRef.current || disabled) {
-      // If script failed to load, allow manual input
-      if (!isScriptLoaded && !disabled) {
-        setAllowManualInput(true);
-      }
+    if (disabled || !isScriptLoaded || !inputRef.current) {
       return;
     }
-    
-    // Wait a bit more to ensure Places library is fully initialized
-    const initTimer = setTimeout(() => {
+
+    const initTimer = setTimeout(async () => {
       if (!window.google?.maps?.places) {
-        console.error('Google Maps Places library not loaded');
         setApiError('Google Maps Places library failed to load. You can still type your address manually.');
         setAllowManualInput(true);
-        return;
-      }
-
-      // Check if Autocomplete is available (legacy API - still works for existing customers)
-      if (!window.google.maps.places.Autocomplete) {
-        console.error('Google Maps Places Autocomplete is not available. This may be because:');
-        console.error('1. Your API key was created after March 1, 2025 (new customers must use PlaceAutocompleteElement)');
-        console.error('2. Places API is not enabled in Google Cloud Console');
-        console.error('3. The script has not fully loaded yet');
-        setApiError('Autocomplete is not available. You can still type your address manually.');
-        setAllowManualInput(true);
+        if (inputRef.current) {
+          inputRef.current.disabled = false;
+        }
         return;
       }
 
       try {
         if (!inputRef.current) {
-          console.error('Input ref is null');
           return;
         }
 
-        // Use legacy Autocomplete API (works for existing customers)
+        // Try to use new API first (if available and supported)
+        if (useNewAPI && window.google.maps.places.PlaceAutocompleteElement) {
+          // PlaceAutocompleteElement is a web component - requires different handling
+          // For now, we'll use the legacy Autocomplete which works better with React
+          // TODO: Implement PlaceAutocompleteElement web component wrapper if needed
+          console.log('New API available, but using legacy Autocomplete for React compatibility');
+        }
+
+        // Use legacy Autocomplete API (works with both old and new API keys)
+        // This is the most compatible approach for React
+        if (!window.google.maps.places.Autocomplete) {
+          console.error('Google Maps Places Autocomplete is not available.');
+          setApiError('Autocomplete is not available. You can still type your address manually.');
+          setAllowManualInput(true);
+          if (inputRef.current) {
+            inputRef.current.disabled = false;
+          }
+          return;
+        }
+
         const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
           types: ['address'],
           fields: [
@@ -290,42 +407,80 @@ export function AddressAutocomplete({
             'place_id',
             'geometry',
           ],
-          componentRestrictions: undefined, // Allow all countries
+          componentRestrictions: undefined,
         });
 
         autocompleteRef.current = autocomplete;
 
         // Handle place selection
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
+        autocomplete.addListener('place_changed', async () => {
+          const placeResult = autocomplete.getPlace();
           
-          if (!place.address_components || !place.formatted_address) {
+          if (!placeResult.address_components || !placeResult.formatted_address) {
             return;
           }
 
           setIsLoading(true);
 
-          const components = parseAddressComponents(place);
+          try {
+            let components: AddressComponents;
 
-          // Update parent component
-          onChange(place.formatted_address, components);
-          onPlaceSelected?.(components);
+            // Try to use new Place API if available
+            if (useNewAPI && placeResult.place_id) {
+              try {
+                // Import places library to get Place class
+                const placesLibrary = await window.google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+                if (placesLibrary && 'Place' in placesLibrary) {
+                  const Place = placesLibrary.Place;
+                  // Use new Place class with fetchFields (modern API)
+                  const place = new Place({ id: placeResult.place_id });
+                  await place.fetchFields({
+                    fields: [
+                      'id',
+                      'formattedAddress',
+                      'addressComponents',
+                      'location',
+                    ],
+                  });
 
-          setIsLoading(false);
+                  components = parseAddressComponentsFromPlace(place);
+                } else {
+                  // Fallback to legacy parsing
+                  components = parseAddressComponentsFromPlaceResult(placeResult);
+                }
+              } catch (error) {
+                // Fallback to legacy parsing
+                console.warn('Failed to use new Place API, falling back to legacy:', error);
+                components = parseAddressComponentsFromPlaceResult(placeResult);
+              }
+            } else {
+              // Use legacy parsing
+              components = parseAddressComponentsFromPlaceResult(placeResult);
+            }
+
+            // Update parent component
+            onChange(components.formatted_address, components);
+            onPlaceSelected?.(components);
+          } catch (error) {
+            console.error('Error processing place:', error);
+            // Fallback to basic parsing
+            const components = parseAddressComponentsFromPlaceResult(placeResult);
+            onChange(components.formatted_address, components);
+            onPlaceSelected?.(components);
+          } finally {
+            setIsLoading(false);
+          }
         });
 
       } catch (error) {
         console.error('Error initializing Google Places Autocomplete:', error);
-        console.error('Error details:', {
-          hasGoogle: !!window.google,
-          hasMaps: !!window.google?.maps,
-          hasPlaces: !!window.google?.maps?.places,
-          hasAutocomplete: !!window.google?.maps?.places?.Autocomplete,
-        });
         setApiError('Failed to initialize address autocomplete. You can still type your address manually.');
         setAllowManualInput(true);
+        if (inputRef.current) {
+          inputRef.current.disabled = false;
+        }
       }
-    }, 200); // Small delay to ensure library is ready
+    }, 200);
 
     return () => {
       clearTimeout(initTimer);
@@ -337,12 +492,26 @@ export function AddressAutocomplete({
         }
       }
     };
-  }, [isScriptLoaded, disabled, onChange, onPlaceSelected]);
+  }, [isScriptLoaded, disabled, onChange, onPlaceSelected, useNewAPI]);
 
   // Handle manual input
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
   };
+  
+  // Ensure input is always enabled for manual typing
+  useEffect(() => {
+    const ensureInputEnabled = () => {
+      if (inputRef.current && !disabled) {
+        inputRef.current.disabled = false;
+      }
+    };
+    
+    ensureInputEnabled();
+    const interval = setInterval(ensureInputEnabled, 500);
+    
+    return () => clearInterval(interval);
+  }, [disabled, apiError, allowManualInput]);
 
   return (
     <div className={className}>
@@ -361,7 +530,7 @@ export function AddressAutocomplete({
           onChange={handleInputChange}
           placeholder={apiError ? 'Type your address manually...' : placeholder}
           required={required}
-          disabled={disabled || (!isScriptLoaded && !allowManualInput)}
+          disabled={disabled}
           className={error || apiError ? 'border-destructive' : ''}
           autoComplete="off"
         />
