@@ -316,7 +316,7 @@ export default function PricingPage() {
               Compare All Features
             </h2>
             <p className="text-muted-foreground">
-              See exactly what's included in each plan
+              See exactly what&apos;s included in each plan
             </p>
           </div>
 
