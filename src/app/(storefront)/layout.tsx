@@ -12,6 +12,7 @@ import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control'
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
+import AnalyticsProvider from '@/components/analytics/analytics-provider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ExclamationTriangleIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { redirect } from 'next/navigation';
@@ -51,30 +52,32 @@ export default async function StorefrontLayout({
 
   return (
     <ThemeProviderWrapper>
-      <div className="min-h-screen bg-background flex flex-col">
-        <StorefrontHeader />
-        {showExpirationNotice && (
-          <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950 m-4 mb-0">
-            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600" />
-            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-              <p className="font-medium">
-                Store Temporarily Unavailable
-              </p>
-              <p className="text-sm mt-1">
-                This store&apos;s subscription has expired. 
-                {accessRestriction.daysRemaining !== undefined && (
-                  <> Grace period ends in {accessRestriction.daysRemaining} day{accessRestriction.daysRemaining !== 1 ? 's' : ''}. </>
-                )}
-                Please check back soon or contact the store owner.
-              </p>
-            </AlertDescription>
-          </Alert>
-        )}
-        <main className="flex-1">
-          {children}
-        </main>
-        <StorefrontFooter />
-      </div>
+      <AnalyticsProvider>
+        <div className="min-h-screen bg-background flex flex-col">
+          <StorefrontHeader />
+          {showExpirationNotice && (
+            <Alert className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950 m-4 mb-0">
+              <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                <p className="font-medium">
+                  Store Temporarily Unavailable
+                </p>
+                <p className="text-sm mt-1">
+                  This store&apos;s subscription has expired. 
+                  {accessRestriction.daysRemaining !== undefined && (
+                    <> Grace period ends in {accessRestriction.daysRemaining} day{accessRestriction.daysRemaining !== 1 ? 's' : ''}. </>
+                  )}
+                  Please check back soon or contact the store owner.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+          <main className="flex-1">
+            {children}
+          </main>
+          <StorefrontFooter />
+        </div>
+      </AnalyticsProvider>
     </ThemeProviderWrapper>
   );
 }

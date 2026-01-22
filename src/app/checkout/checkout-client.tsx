@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { AddressAutocomplete } from '@/components/address/address-autocomplete';
+import { useAnalytics } from '@/lib/analytics/use-analytics';
 
 interface CartItem {
   product_id: string;
@@ -82,6 +83,7 @@ export default function CheckoutClient({
 }: Readonly<CheckoutClientProps>) {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
+  const { track } = useAnalytics();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -662,6 +664,12 @@ export default function CheckoutClient({
       }
       
       setCurrentStep('payment');
+      // Track checkout start
+      await track('checkout_start', {
+        eventCategory: 'checkout',
+        eventLabel: 'Checkout Started',
+        metadata: { step: 'payment' },
+      });
     } else if (currentStep === 'payment') {
       // Validate M-Pesa payment verification if payment timing is before_delivery
       if (paymentMethod === 'mpesa' && 
@@ -777,6 +785,18 @@ export default function CheckoutClient({
         notes: notes || null,
       };
 
+      // Track checkout attempt
+      await track('checkout_attempt', {
+        eventCategory: 'checkout',
+        eventLabel: 'Order Submission',
+        eventValue: cart.total,
+        metadata: {
+          itemCount: cart.items.length,
+          paymentMethod,
+          deliveryMethod,
+        },
+      });
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -788,6 +808,20 @@ export default function CheckoutClient({
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Track checkout completion
+        await track('checkout_complete', {
+          eventCategory: 'checkout',
+          eventLabel: 'Order Completed',
+          eventValue: cart.total,
+          orderId: data.order.id,
+          metadata: {
+            orderNumber: data.order.order_number,
+            itemCount: cart.items.length,
+            paymentMethod,
+            deliveryMethod,
+          },
+        });
+
         // Dispatch cart updated event to clear cart count in header
         window.dispatchEvent(new CustomEvent('cartUpdated'));
         
@@ -801,6 +835,15 @@ export default function CheckoutClient({
           : '';
         router.push(`/orders/${data.order.id}?order_number=${data.order.order_number}${emailParam}`);
       } else {
+        // Track checkout failure
+        await track('checkout_failed', {
+          eventCategory: 'checkout',
+          eventLabel: 'Order Failed',
+          metadata: {
+            error: data.error || 'Unknown error',
+            paymentMethod,
+          },
+        });
         toast.error(data.error || 'Failed to process order');
       }
     } catch (error: any) {

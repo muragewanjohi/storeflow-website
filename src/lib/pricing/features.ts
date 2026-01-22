@@ -16,7 +16,7 @@ export function getPlanFeatures(planName: string): string[] {
       'Custom Pages: 10',
       'Blog Posts: Unlimited',
       'Languages: 2',
-      'Advanced Reports',
+      'Basic Analytics',
       'Email Support'
     ];
   } else if (normalizedName.includes('standard') || normalizedName.includes('pro')) {
@@ -29,7 +29,7 @@ export function getPlanFeatures(planName: string): string[] {
       'Custom Pages: 50',
       'Blog Posts: 100',
       'Languages: 4',
-      'Advanced Reports',
+      'Advanced Analytics',
       'Abandoned Cart Recovery - Coming Soon',
       'Gift Cards - Coming Soon',
       'Priority Support',

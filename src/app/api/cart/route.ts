@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma/client';
 import { addToCartSchema, updateCartItemSchema } from '@/lib/orders/validation';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import { getOrCreateSessionId, getSessionId } from '@/lib/cart/session';
+import { trackAddToCart } from '@/lib/analytics/server-tracking';
 
 /**
  * GET /api/cart - Get cart items
@@ -267,6 +268,13 @@ export async function POST(request: NextRequest) {
           variant_id: variant_id || null,
           quantity,
         },
+      });
+    }
+
+    // Track add to cart event (fire and forget)
+    if (sessionId) {
+      trackAddToCart(tenant.id, sessionId, product_id, quantity).catch((error) => {
+        console.error('Error tracking add to cart:', error);
       });
     }
 

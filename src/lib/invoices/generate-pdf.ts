@@ -116,7 +116,7 @@ export async function generateInvoicePDF(
         .text(storeAddress, 50, 105)
         .text(`Email: ${tenant.contact_email || 'support@store.com'}`, 50, 118);
 
-      // Invoice/Receipt Details
+      // Invoice/Receipt Details - Fixed positioning to prevent overlap
       const invoiceNumber = order.invoice_number || order.order_number;
       const invoiceDate = order.created_at 
         ? new Date(order.created_at).toLocaleDateString('en-US', { 
@@ -126,13 +126,32 @@ export async function generateInvoicePDF(
           })
         : new Date().toLocaleDateString();
 
+      // Right-aligned invoice details - use full line for each item to prevent overlap
+      const rightAlignX = 500;
+      let detailY = 90;
+      
+      // Invoice/Receipt number - label and value on same line, properly spaced
+      const invoiceLabel = `${options.type === 'invoice' ? 'Invoice' : 'Receipt'} #:`;
       doc
         .fontSize(10)
         .font('Helvetica-Bold')
-        .text(`${options.type === 'invoice' ? 'Invoice' : 'Receipt'} #: ${invoiceNumber}`, 400, 90, { align: 'right' })
+        .text(invoiceLabel, rightAlignX - 150, detailY, { width: 80, align: 'right' })
         .font('Helvetica')
-        .text(`Date: ${invoiceDate}`, 400, 105, { align: 'right' })
-        .text(`Order #: ${order.order_number}`, 400, 118, { align: 'right' });
+        .text(invoiceNumber, rightAlignX, detailY, { align: 'right', width: 100 });
+      
+      detailY += 13;
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Date: ${invoiceDate}`, rightAlignX, detailY, { align: 'right', width: 150 });
+      
+      detailY += 13;
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('Order #:', rightAlignX - 150, detailY, { width: 80, align: 'right' })
+        .font('Helvetica')
+        .text(order.order_number, rightAlignX, detailY, { align: 'right', width: 100 });
 
       // Customer Information
       const customerName = order.name || 'Customer';
@@ -171,8 +190,8 @@ export async function generateInvoicePDF(
         doc.text(postalCountry, 50, addressY);
       }
 
-      // Items Table Header
-      let tableY = 280;
+      // Items Table Header - Calculate position dynamically based on address
+      let tableY = addressY + 20; // Reduced from fixed 280 to dynamic based on address
       doc
         .fontSize(10)
         .font('Helvetica-Bold')
@@ -188,7 +207,7 @@ export async function generateInvoicePDF(
         .stroke();
 
       // Order Items
-      tableY += 25;
+      tableY += 20; // Reduced from 25 to 20 for tighter spacing
       const items = order.order_products || [];
       
       items.forEach((item) => {
@@ -200,6 +219,9 @@ export async function generateInvoicePDF(
         const maxWidth = 180;
         const lines = doc.heightOfString(displayName, { width: maxWidth });
         
+        // Use consistent row height - only add extra space if text wraps to multiple lines
+        const rowHeight = lines > 1 ? Math.max(12, lines * 10) : 12;
+        
         doc
           .fontSize(9)
           .font('Helvetica')
@@ -208,48 +230,61 @@ export async function generateInvoicePDF(
           .text(formatCurrency(item.price, currency), 350, tableY, { align: 'right' })
           .text(formatCurrency(item.total, currency), 450, tableY, { align: 'right' });
 
-        tableY += Math.max(15, lines * 12);
+        tableY += rowHeight;
       });
 
-      // Totals
+      // Totals - Fixed spacing and positioning to prevent overlap
       const subtotal = Number(order.total_amount) - (Number(order.delivery_fee) || 0) - (Number(order.coupon_discounted) || 0);
       const deliveryFee = Number(order.delivery_fee) || 0;
       const discount = Number(order.coupon_discounted) || 0;
       const total = Number(order.total_amount);
 
-      tableY += 20;
+      // Reduced spacing before totals section
+      tableY += 15;
+      
+      // Use proper x positions to prevent overlap - labels on left, values on right
+      const labelX = 350;
+      const valueX = 500;
+      
       doc
         .fontSize(10)
         .font('Helvetica')
-        .text('Subtotal:', 350, tableY, { align: 'right' })
-        .text(formatCurrency(subtotal, currency), 450, tableY, { align: 'right' });
+        .text('Subtotal:', labelX, tableY, { align: 'right', width: 90 })
+        .text(formatCurrency(subtotal, currency), valueX, tableY, { align: 'right', width: 100 });
 
       if (deliveryFee > 0) {
-        tableY += 15;
+        tableY += 13; // Reduced from 15
         doc
-          .text('Delivery Fee:', 350, tableY, { align: 'right' })
-          .text(formatCurrency(deliveryFee, currency), 450, tableY, { align: 'right' });
+          .fontSize(10)
+          .font('Helvetica')
+          .text('Delivery Fee:', labelX, tableY, { align: 'right', width: 90 })
+          .text(formatCurrency(deliveryFee, currency), valueX, tableY, { align: 'right', width: 100 });
       }
 
       if (discount > 0) {
-        tableY += 15;
+        tableY += 13; // Reduced from 15
         doc
-          .text(`Discount${order.coupon ? ` (${order.coupon})` : ''}:`, 350, tableY, { align: 'right' })
-          .text(`-${formatCurrency(discount, currency)}`, 450, tableY, { align: 'right' });
+          .fontSize(10)
+          .font('Helvetica')
+          .text(`Discount${order.coupon ? ` (${order.coupon})` : ''}:`, labelX, tableY, { align: 'right', width: 90 })
+          .text(`-${formatCurrency(discount, currency)}`, valueX, tableY, { align: 'right', width: 100 });
       }
 
-      tableY += 20;
+      tableY += 15; // Reduced from 20
       doc
-        .moveTo(350, tableY - 5)
+        .moveTo(labelX, tableY - 5)
         .lineTo(550, tableY - 5)
-        .stroke()
+        .stroke();
+      
+      // Total label and value - properly spaced to prevent overlap
+      doc
         .fontSize(12)
         .font('Helvetica-Bold')
-        .text('Total:', 350, tableY, { align: 'right' })
-        .text(formatCurrency(total, currency), 450, tableY, { align: 'right' });
+        .text('Total:', labelX, tableY, { align: 'right', width: 90 })
+        .text(formatCurrency(total, currency), valueX, tableY, { align: 'right', width: 100 });
 
-      // Payment Information
-      tableY += 40;
+      // Payment Information - Reduced spacing
+      tableY += 25; // Reduced from 40 to 25
       doc
         .fontSize(10)
         .font('Helvetica-Bold')
