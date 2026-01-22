@@ -90,6 +90,10 @@ export async function POST(request: NextRequest) {
       '/api/admin/analytics/aggregate': analyticsAggregateGET,
       '/api/admin/cleanup': cleanupGET,
       '/api/admin/cleanup/hard-delete-tenants': hardDeleteTenantsGET,
+      '/api/admin/cleanup/pre-deletion-warnings': async (req) => {
+        const { GET } = await import('../cleanup/pre-deletion-warnings/route');
+        return GET(req);
+      },
       '/api/admin/sales/automate': salesAutomateGET,
     };
 

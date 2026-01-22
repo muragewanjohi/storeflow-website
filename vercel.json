@@ -30,6 +30,10 @@
     {
       "path": "/api/admin/sales/automate",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/admin/cleanup/pre-deletion-warnings",
+      "schedule": "0 10 * * *"
     }
   ]
 }

@@ -27,32 +27,16 @@ const createUserSchema = z.object({
 /**
  * GET /api/admin/users
  * 
- * List all users for the current tenant
+ * List all users for the current tenant (or all users if landlord)
  */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth();
     requireAnyRole(user, ['tenant_admin', 'landlord']);
 
-    const tenant = await requireTenant();
-    
-    // Verify user belongs to tenant (unless landlord)
-    if (user.role !== 'landlord' && user.tenant_id !== tenant.id) {
-      return NextResponse.json(
-        { 
-          error: 'Access denied',
-          message: 'You do not have permission to access this resource'
-        },
-        { status: 403 }
-      );
-    }
-
-    const supabase = await createClient();
     const adminClient = createAdminClient();
 
-    // Get all users for this tenant
-    // Note: In production, you'd want to store user-tenant relationships in a separate table
-    // For now, we'll use user_metadata.tenant_id
+    // Get all users from Supabase
     const { data: { users }, error } = await adminClient.auth.admin.listUsers();
 
     if (error) {
@@ -63,6 +47,57 @@ export async function GET(request: NextRequest) {
           message: 'An error occurred while fetching user list'
         },
         { status: 500 }
+      );
+    }
+
+    // If landlord, return all users with tenant info
+    if (user.role === 'landlord') {
+      // Get all tenants for mapping
+      const { prisma } = await import('@/lib/prisma/client');
+      const tenants = await prisma.tenants.findMany({
+        select: {
+          id: true,
+          name: true,
+          subdomain: true,
+        },
+      });
+      const tenantMap = new Map(tenants.map(t => [t.id, t]));
+
+      // Map all users with tenant information
+      const mappedUsers = users.map((u: any) => {
+        const tenantId = u.user_metadata?.tenant_id;
+        const tenant = tenantId ? tenantMap.get(tenantId) : null;
+        
+        return {
+          id: u.id,
+          email: u.email,
+          name: u.user_metadata?.name,
+          role: u.user_metadata?.role,
+          tenant_id: tenantId,
+          tenant_name: tenant?.name || null,
+          tenant_subdomain: tenant?.subdomain || null,
+          created_at: u.created_at,
+          last_sign_in_at: u.last_sign_in_at,
+        };
+      });
+
+      return NextResponse.json({
+        users: mappedUsers,
+        count: mappedUsers.length,
+      });
+    }
+
+    // For tenant_admin, filter by tenant
+    const tenant = await requireTenant();
+    
+    // Verify user belongs to tenant
+    if (user.tenant_id !== tenant.id) {
+      return NextResponse.json(
+        { 
+          error: 'Access denied',
+          message: 'You do not have permission to access this resource'
+        },
+        { status: 403 }
       );
     }
 

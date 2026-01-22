@@ -125,6 +125,7 @@ export async function sendSubscriptionExpiredEmail({
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+    const gracePeriodDays = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '2');
 
     const html = `
       <!DOCTYPE html>
@@ -160,7 +161,7 @@ export async function sendSubscriptionExpiredEmail({
 
           <div style="background-color: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
             <p style="margin: 0; color: #92400e;">
-              <strong>Important:</strong> Your account is currently in a grace period. You have 7 days to renew before your account is suspended.
+              <strong>Important:</strong> Your account is currently in a grace period. You have ${gracePeriodDays} day${gracePeriodDays !== 1 ? 's' : ''} to renew before your account is suspended.
             </p>
           </div>
 
@@ -185,6 +186,188 @@ export async function sendSubscriptionExpiredEmail({
     });
   } catch (error) {
     console.error('Error sending subscription expired email:', error);
+    throw error;
+  }
+}
+
+/**
+ * Send subscription suspended email (after grace period)
+ */
+export async function sendSubscriptionSuspendedEmail({
+  tenant,
+  plan,
+}: {
+  tenant: Tenant;
+  plan: { 
+    name: string; 
+    price: number; 
+    duration_months: number;
+    currency?: 'KES' | 'USD';
+    currencySymbol?: 'Ksh' | '$';
+  } | null;
+}) {
+  try {
+    const tenantEmail = getTenantContactEmail(tenant);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Account Suspended</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+            <h1 style="color: #dc2626; margin-top: 0;">Account Suspended</h1>
+            <p style="margin: 0;">Your subscription grace period has ended and your account has been suspended.</p>
+          </div>
+
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">What This Means</h2>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>Your storefront is no longer accessible to customers</li>
+              <li>Dashboard access is restricted to renewal pages only</li>
+              <li>All your data is preserved and safe</li>
+              <li>You can restore access immediately by renewing</li>
+            </ul>
+          </div>
+
+          <div style="background-color: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Your Data is Safe:</strong> All your products, orders, customers, and settings have been preserved. 
+              They will be immediately available when you renew your subscription.
+            </p>
+          </div>
+
+          ${plan ? `
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Subscription Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold; width: 120px;">Plan:</td>
+                <td style="padding: 8px 0;">${plan.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Price:</td>
+                <td style="padding: 8px 0;">${plan.currencySymbol || '$'}${plan.currencySymbol === 'Ksh' 
+                    ? Number(plan.price).toLocaleString('en-KE')
+                    : Number(plan.price).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+          ` : ''}
+
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+               style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              Restore Access Now
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
+            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 5px 0 0 0;">Need help? Contact our support team for assistance with renewal.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return sendPlatformEmail({
+      to: tenantEmail,
+      subject: 'Account Suspended - Restore Access Now',
+      html,
+    });
+  } catch (error) {
+    console.error('Error sending subscription suspended email:', error);
+    throw error;
+  }
+}
+
+/**
+ * Send pre-hard-deletion warning email
+ * Sent to tenants before their account is permanently deleted
+ */
+export async function sendPreDeletionWarningEmail({
+  tenant,
+  daysUntilDeletion,
+}: {
+  tenant: Tenant;
+  daysUntilDeletion: number;
+}) {
+  try {
+    const tenantEmail = getTenantContactEmail(tenant);
+    const retentionDays = parseInt(process.env.TENANT_RETENTION_DAYS || '90');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Account Deletion Warning</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+            <h1 style="color: #dc2626; margin-top: 0;">⚠️ Final Warning: Account Deletion</h1>
+            <p style="margin: 0; font-size: 16px;">
+              Your account will be permanently deleted in ${daysUntilDeletion} day${daysUntilDeletion !== 1 ? 's' : ''}.
+            </p>
+          </div>
+
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">What This Means</h2>
+            <p style="margin: 0 0 15px 0;">
+              Your account was deleted ${retentionDays - daysUntilDeletion} days ago and is currently in a ${retentionDays}-day retention period. 
+              After ${daysUntilDeletion} day${daysUntilDeletion !== 1 ? 's' : ''}, your account and all associated data will be permanently removed and cannot be recovered.
+            </p>
+            <ul style="margin: 0; padding-left: 20px;">
+              <li>All products, orders, and customer data will be permanently deleted</li>
+              <li>Your storefront and subdomain will be removed</li>
+              <li>All files and media will be deleted</li>
+              <li><strong>This action cannot be undone</strong></li>
+            </ul>
+          </div>
+
+          <div style="background-color: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Important:</strong> If you want to recover your account, you must contact support immediately. 
+              Once the ${retentionDays}-day retention period expires, all data will be permanently deleted and cannot be restored.
+            </p>
+          </div>
+
+          <div style="background-color: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>Data Export:</strong> If you need to backup your data, please contact our support team immediately. 
+              We can provide data exports for your records before permanent deletion.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="mailto:support@dukanest.com?subject=Account Recovery Request - ${tenant.name}" 
+               style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">
+              Contact Support Now
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
+            <p style="margin: 0;">This is an automated warning from StoreFlow Platform</p>
+            <p style="margin: 5px 0 0 0;">
+              Account: ${tenant.name} (${tenant.subdomain})<br/>
+              Deletion Date: ${daysUntilDeletion} day${daysUntilDeletion !== 1 ? 's' : ''} from now
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return sendPlatformEmail({
+      to: tenantEmail,
+      subject: `⚠️ Final Warning: Account Deletion in ${daysUntilDeletion} Day${daysUntilDeletion !== 1 ? 's' : ''}`,
+      html,
+    });
+  } catch (error) {
+    console.error('Error sending pre-deletion warning email:', error);
     throw error;
   }
 }

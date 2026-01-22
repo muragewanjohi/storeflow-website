@@ -65,11 +65,12 @@ export async function getTenant(): Promise<Tenant | null> {
         
         if (supabaseUrl && supabaseKey) {
           const supabase = createClient(supabaseUrl, supabaseKey);
+          // Include both 'active' and 'expired' status (expired tenants are accessible during grace period)
           const { data: tenant, error } = await supabase
             .from('tenants')
             .select('*')
             .eq('subdomain', tenantSubdomainCookie.toLowerCase())
-            .eq('status', 'active')
+            .in('status', ['active', 'expired'])
             .maybeSingle();
           
           if (tenant && !error) {

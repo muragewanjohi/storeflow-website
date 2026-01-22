@@ -112,16 +112,28 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Redirect suspended tenants (past grace period)
+    // Redirect suspended tenants (past grace period) - block storefront access
     if (accessRestriction.level === 'restricted' && tenant.status === 'suspended') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/tenant-suspended';
-      return NextResponse.redirect(url);
+      // Check if this is a storefront route (not dashboard)
+      const isStorefrontRoute = !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin');
+      
+      if (isStorefrontRoute) {
+        // Redirect storefront to suspension page
+        const url = request.nextUrl.clone();
+        url.pathname = '/tenant-suspended';
+        return NextResponse.redirect(url);
+      } else {
+        // For dashboard routes, allow access to renewal page
+        const url = request.nextUrl.clone();
+        url.pathname = '/tenant-suspended';
+        return NextResponse.redirect(url);
+      }
     }
 
-    // For expired tenants in grace period, allow access but mark as read-only
-    // Don't redirect - let them access dashboard in read-only mode
-    // The dashboard layout will enforce read-only restrictions
+    // For expired tenants in grace period:
+    // - Dashboard: allow access but mark as read-only
+    // - Storefront: allow access but show expiration notice (read-only, no checkout)
+    // Don't redirect - let them access but with restrictions
 
     // Clone the request headers and add tenant info
     const requestHeaders = new Headers(request.headers);

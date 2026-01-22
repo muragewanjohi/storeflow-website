@@ -93,6 +93,12 @@ const CRON_JOBS = [
     schedule: 'Weekly on Sunday at 3 AM UTC',
     description: 'Hard deletes tenants past retention period (90 days)',
   },
+  {
+    name: 'Pre-Deletion Warnings',
+    path: '/api/admin/cleanup/pre-deletion-warnings',
+    schedule: 'Daily at 10 AM UTC',
+    description: 'Sends warning emails to tenants before hard deletion (30, 7, and 1 day before)',
+  },
 ];
 
 export default function CronJobsClient() {

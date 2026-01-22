@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
-import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
+import { sendSubscriptionExpiredEmail, sendSubscriptionSuspendedEmail } from '@/lib/subscriptions/emails';
 import { getTenantSubscriptionPricing } from '@/lib/subscriptions/pricing';
 import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
@@ -149,6 +149,40 @@ export async function GET(request: NextRequest) {
               data: { status: 'suspended' },
             });
             results.suspended++;
+            
+            // Send suspension email notification (only once when status changes)
+            const { sendSubscriptionSuspendedEmail } = await import('@/lib/subscriptions/emails');
+            const subscriptionPricing = tenant.price_plans
+              ? getTenantSubscriptionPricing(
+                  tenant as any,
+                  {
+                    name: tenant.price_plans.name,
+                    price: tenant.price_plans.price,
+                  },
+                  (tenant.data as any)?.subscription?.currency === 'KES'
+                )
+              : null;
+
+            sendSubscriptionSuspendedEmail({
+              tenant: tenant as any,
+              plan: subscriptionPricing
+                ? {
+                    name: subscriptionPricing.planName,
+                    price: subscriptionPricing.price,
+                    currency: subscriptionPricing.currency,
+                    currencySymbol: subscriptionPricing.currencySymbol,
+                    duration_months: tenant.price_plans?.duration_months || 0,
+                  }
+                : tenant.price_plans
+                ? {
+                    name: tenant.price_plans.name,
+                    price: Number(tenant.price_plans.price),
+                    duration_months: tenant.price_plans.duration_months,
+                  }
+                : null,
+            }).catch((error) => {
+              console.error(`Error sending suspended email to tenant ${tenant.id}:`, error);
+            });
           }
         }
       } catch (error) {

@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
@@ -67,9 +67,19 @@ type Step = 'shipping' | 'payment' | 'review';
 
 interface CheckoutClientProps {
   isAuthenticated?: boolean;
+  canProcessOrders?: boolean;
+  accessRestriction?: {
+    level: string;
+    reason?: string;
+    daysRemaining?: number;
+  };
 }
 
-export default function CheckoutClient({ isAuthenticated = false }: Readonly<CheckoutClientProps>) {
+export default function CheckoutClient({ 
+  isAuthenticated = false,
+  canProcessOrders = true,
+  accessRestriction,
+}: Readonly<CheckoutClientProps>) {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
   const [cart, setCart] = useState<Cart | null>(null);
@@ -836,8 +846,30 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
+        {/* Store Unavailable Notice (Expired/Suspended) */}
+        {!canProcessOrders && accessRestriction && (
+          <Card className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-1 text-yellow-800 dark:text-yellow-200">
+                    Store Temporarily Unavailable
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {accessRestriction.reason || 'This store is currently unable to process orders. Please check back later or contact the store owner.'}
+                    {accessRestriction.daysRemaining !== undefined && accessRestriction.daysRemaining > 0 && (
+                      <> Grace period ends in {accessRestriction.daysRemaining} day{accessRestriction.daysRemaining !== 1 ? 's' : ''}.</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
         {/* Guest Checkout Notice */}
-        {!isAuthenticated && (
+        {!isAuthenticated && canProcessOrders && (
           <Card className="mb-6 border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
@@ -1710,18 +1742,19 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                 <Button 
                   onClick={handleNext}
                   disabled={
-                    currentStep === 'payment' &&
+                    !canProcessOrders ||
+                    (currentStep === 'payment' &&
                     paymentMethod === 'mpesa' &&
                     checkoutSettings?.payment_timing === 'before_delivery' &&
-                    !paymentTransactionId.trim()
+                    !paymentTransactionId.trim())
                   }
                 >
                   Next
                   <ArrowRightIcon className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleSubmit} disabled={submitting}>
-                  {submitting ? 'Processing...' : 'Place Order'}
+                <Button onClick={handleSubmit} disabled={submitting || !canProcessOrders}>
+                  {submitting ? 'Processing...' : !canProcessOrders ? 'Store Unavailable' : 'Place Order'}
                 </Button>
               )}
             </div>

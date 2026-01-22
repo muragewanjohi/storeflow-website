@@ -170,8 +170,6 @@ export async function DELETE(
     const user = await requireAuth();
     requireAnyRole(user, ['tenant_admin', 'landlord']);
 
-    const tenant = await requireTenant();
-    const supabase = await createClient();
     const adminClient = createAdminClient();
 
     const { id } = await params;
@@ -186,12 +184,17 @@ export async function DELETE(
       );
     }
 
-    // Verify user belongs to tenant
-    if (targetUser.user.user_metadata?.tenant_id !== tenant.id) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+    // If not landlord, verify user belongs to tenant
+    if (user.role !== 'landlord') {
+      const tenant = await requireTenant();
+      
+      // Verify user belongs to tenant
+      if (targetUser.user.user_metadata?.tenant_id !== tenant.id) {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     // Prevent deleting yourself
@@ -199,6 +202,14 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Cannot delete your own account' },
         { status: 400 }
+      );
+    }
+
+    // Prevent deleting other landlords (only landlords can delete landlords)
+    if (targetUser.user.user_metadata?.role === 'landlord' && user.role !== 'landlord') {
+      return NextResponse.json(
+        { error: 'Access denied. Only landlords can delete landlord accounts.' },
+        { status: 403 }
       );
     }
 

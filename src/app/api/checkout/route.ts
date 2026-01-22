@@ -17,6 +17,7 @@ import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock
 import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 import { getSessionId } from '@/lib/cart/session';
 import { getStaticOptions } from '@/lib/settings/static-options';
+import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -30,6 +31,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     const validatedData = checkoutSchema.parse(body);
+
+    // Check tenant access level - block checkout for expired/suspended tenants
+    const accessRestriction = getTenantAccessRestriction(tenant);
+    if (!accessRestriction.canProcessOrders) {
+      return NextResponse.json(
+        { 
+          error: 'Store temporarily unavailable',
+          message: accessRestriction.reason || 'This store is currently unable to process orders. Please try again later or contact the store owner.',
+        },
+        { status: 403 }
+      );
+    }
 
     // Prevent purchases on demo stores
     await requireNotDemoStore(tenant.id, 'Purchases');
