@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
     const tenant = await requireTenant();
     const body = await request.json();
 
-    const { city, state, address_line_1 } = body;
+    const { formatted_address, city, state, address_line_1, coordinates } = body;
 
-    if (!city && !state && !address_line_1) {
+    if (!formatted_address && !city && !state && !address_line_1) {
       return NextResponse.json(
         { error: 'Address information required' },
         { status: 400 }
@@ -75,24 +75,36 @@ export async function POST(request: NextRequest) {
     });
 
     // Try to match address to zone
-    // Check city first, then state, then address keywords
+    // Use formatted_address (from Google Places) as primary, then fall back to individual components
     let matchedZone = null;
 
-    // Normalize search terms
+    // Normalize search terms - prioritize formatted_address
     const searchTerms: string[] = [];
-    if (city) searchTerms.push(city.toLowerCase().trim());
-    if (state) searchTerms.push(state.toLowerCase().trim());
-    if (address_line_1) {
-      // Extract area names from address (e.g., "Westlands" from "123 Main St, Westlands")
-      const addressParts = address_line_1.toLowerCase().split(/[,\s]+/);
+    
+    // Use formatted address if available (most reliable from Google Places)
+    if (formatted_address) {
+      // Extract location names from formatted address
+      // Format: "123 Main St, Westlands, Nairobi, Kenya"
+      const addressParts = formatted_address.toLowerCase().split(',').map((part: string) => part.trim());
       searchTerms.push(...addressParts);
+    } else {
+      // Fall back to individual components
+      if (city) searchTerms.push(city.toLowerCase().trim());
+      if (state) searchTerms.push(state.toLowerCase().trim());
+      if (address_line_1) {
+        // Extract area names from address (e.g., "Westlands" from "123 Main St, Westlands")
+        const addressParts = address_line_1.toLowerCase().split(/[,\s]+/);
+        searchTerms.push(...addressParts);
+      }
     }
 
     // Match against zone locations
+    // Each zone has a locations array - match if any location matches any search term
     for (const zone of zones) {
       for (const location of zone.locations) {
         const locationLower = location.toLowerCase().trim();
         for (const term of searchTerms) {
+          // More flexible matching - check if location contains term or vice versa
           if (locationLower.includes(term) || term.includes(locationLower)) {
             matchedZone = zone;
             break;

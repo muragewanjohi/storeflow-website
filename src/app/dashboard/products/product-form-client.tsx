@@ -146,7 +146,8 @@ export default function ProductFormClient({
         })
         .catch(err => console.error('Error fetching category:', err));
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.category_id]); // Only run when category_id changes, fetchSubcategories is stable
 
 
   const [formData, setFormData] = useState({

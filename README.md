@@ -125,6 +125,7 @@ storeflow/
 - **[SECURITY.md](./docs/SECURITY.md)** - Row-Level Security (RLS) implementation guide
 - **[PRISMA_EXPLANATION.md](./docs/PRISMA_EXPLANATION.md)** - Prisma ORM guide
 - **[POSTMAN_COLLECTION_GUIDE.md](./docs/POSTMAN_COLLECTION_GUIDE.md)** - API testing with Postman
+- **[GOOGLE_MAPS_SETUP.md](./docs/GOOGLE_MAPS_SETUP.md)** - Google Maps API setup for address autocomplete
 
 **External Documentation:**
 All migration and planning docs are in the [`../docs/`](../docs/) folder.

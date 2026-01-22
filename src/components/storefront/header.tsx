@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -249,7 +250,7 @@ export default function StorefrontHeader({
         abortController.abort();
       }
     };
-  }, [isPreview]);
+  }, [isPreview, isAuthenticated]);
 
   // Ecommerce storefront navigation
   // Popular e-commerce stores (Amazon, Target, Best Buy, etc.) typically include "Deals" or "Sales" 
@@ -279,14 +280,18 @@ export default function StorefrontHeader({
                 className="flex items-center gap-1"
               >
                 {storeLogo && (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  <div className="relative h-10 w-auto sm:h-12 md:h-16 max-w-[120px] sm:max-w-[180px] md:max-w-[300px]">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 )}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
                   {storeName}
@@ -295,14 +300,18 @@ export default function StorefrontHeader({
             ) : (
               <Link href="/" className="flex items-center gap-1">
                 {storeLogo && (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  <div className="relative h-10 w-auto sm:h-12 md:h-16 max-w-[120px] sm:max-w-[180px] md:max-w-[300px]">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 )}
                 <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
                   {storeName}

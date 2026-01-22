@@ -22,6 +22,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/ou
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { AddressAutocomplete } from '@/components/address/address-autocomplete';
 
 interface CartItem {
   product_id: string;
@@ -50,6 +51,12 @@ interface ShippingAddress {
   state: string;
   postal_code: string;
   country: string;
+  formatted_address?: string;
+  place_id?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 type PaymentMethod = 'cash' | 'mpesa';
@@ -136,6 +143,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
+  
+  // Address autocomplete state
+  const [addressInputValue, setAddressInputValue] = useState<string>('');
 
   const fetchCart = useCallback(async () => {
     try {
@@ -206,18 +216,32 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
             setSelectedAddressId(defaultAddress.id);
             setUseNewAddress(false);
             
+            // Extract state and country (they might be stored in address field or returned as strings)
+            // Check if state/country is a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+            const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+            const stateValue = typeof defaultAddress.state === 'string' && defaultAddress.state && !isUuid(defaultAddress.state)
+              ? defaultAddress.state 
+              : '';
+            const countryValue = typeof defaultAddress.country === 'string' && defaultAddress.country && !isUuid(defaultAddress.country)
+              ? defaultAddress.country
+              : '';
+            
+            const addressValue = defaultAddress.address || '';
+            
             // Pre-fill with saved delivery address
             setShippingAddress({
               name: defaultAddress.name || '',
               email: defaultAddress.email || '',
               phone: defaultAddress.phone || '',
-              address_line_1: defaultAddress.address || '',
+              address_line_1: addressValue,
               address_line_2: null,
               city: defaultAddress.city || '',
-              state: defaultAddress.state || '',
+              state: stateValue,
               postal_code: defaultAddress.postal_code || '',
-              country: defaultAddress.country || '',
+              country: countryValue,
+              formatted_address: addressValue,
             });
+            setAddressInputValue(addressValue);
           } else {
             // No default, but addresses exist - use profile address and let user select
             fetchCustomerProfile();
@@ -244,12 +268,24 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     }
   }, [isAuthenticated, fetchCustomerProfile]);
   
-  // Handle address selection
+  // Handle address selection from saved addresses
   const handleAddressSelect = (addressId: string) => {
     if (addressId === 'new') {
       setUseNewAddress(true);
       setSelectedAddressId(null);
-      // Clear form or keep current values
+      // Clear form
+      setShippingAddress({
+        name: '',
+        email: '',
+        phone: '',
+        address_line_1: '',
+        address_line_2: null,
+        city: '',
+        state: '',
+        postal_code: '',
+        country: '',
+      });
+      setAddressInputValue('');
       return;
     }
     
@@ -258,18 +294,62 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       setSelectedAddressId(addressId);
       setUseNewAddress(false);
       
+      // Extract state and country (they might be stored in address field or returned as strings)
+      const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const stateValue = typeof selectedAddress.state === 'string' && selectedAddress.state && !isUuid(selectedAddress.state)
+        ? selectedAddress.state 
+        : '';
+      const countryValue = typeof selectedAddress.country === 'string' && selectedAddress.country && !isUuid(selectedAddress.country)
+        ? selectedAddress.country
+        : '';
+      
       // Fill form with selected address
+      const addressValue = selectedAddress.address || '';
       setShippingAddress({
         name: selectedAddress.name || '',
         email: selectedAddress.email || '',
         phone: selectedAddress.phone || '',
-        address_line_1: selectedAddress.address || '',
+        address_line_1: addressValue,
         address_line_2: null,
         city: selectedAddress.city || '',
-        state: selectedAddress.state || '',
+        state: stateValue,
         postal_code: selectedAddress.postal_code || '',
-        country: selectedAddress.country || '',
+        country: countryValue,
+        formatted_address: addressValue, // Use saved address as formatted
       });
+      setAddressInputValue(addressValue);
+    }
+  };
+
+  // Handle Google Places address selection
+  const handlePlaceSelected = (components: {
+    address_line_1: string;
+    address_line_2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+    formatted_address: string;
+    place_id?: string;
+    coordinates?: { lat: number; lng: number };
+  }) => {
+    setShippingAddress({
+      ...shippingAddress,
+      address_line_1: components.address_line_1,
+      address_line_2: components.address_line_2 || null,
+      city: components.city,
+      state: components.state,
+      postal_code: components.postal_code,
+      country: components.country,
+      formatted_address: components.formatted_address,
+      place_id: components.place_id,
+      coordinates: components.coordinates,
+    });
+    setAddressInputValue(components.formatted_address);
+    
+    // Auto-detect zone after address is selected
+    if (deliveryMethod === 'delivery' && deliveryZones.length > 0) {
+      setTimeout(() => detectZone(), 300);
     }
   };
 
@@ -346,7 +426,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
 
   // Auto-detect zone based on address
   const detectZone = useCallback(async () => {
-    if (deliveryMethod !== 'delivery' || !shippingAddress.city && !shippingAddress.state && !shippingAddress.address_line_1) {
+    if (deliveryMethod !== 'delivery' || !shippingAddress.formatted_address && !shippingAddress.city && !shippingAddress.state && !shippingAddress.address_line_1) {
       return;
     }
 
@@ -359,9 +439,11 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          formatted_address: shippingAddress.formatted_address,
           city: shippingAddress.city,
           state: shippingAddress.state,
           address_line_1: shippingAddress.address_line_1,
+          coordinates: shippingAddress.coordinates,
         }),
       });
 
@@ -385,7 +467,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       console.error('Error detecting zone:', error);
       setZoneDetectionStatus(null);
     }
-  }, [deliveryMethod, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1]);
+  }, [deliveryMethod, shippingAddress.formatted_address, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1, shippingAddress.coordinates]);
 
   // Handle zone selection
   const handleZoneSelect = (zoneId: string) => {
@@ -429,14 +511,14 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
   useEffect(() => {
     if (deliveryMethod === 'delivery' && deliveryZones.length > 0) {
       const timer = setTimeout(() => {
-        if (shippingAddress.city || shippingAddress.state || shippingAddress.address_line_1) {
+        if (shippingAddress.formatted_address || shippingAddress.city || shippingAddress.state || shippingAddress.address_line_1) {
           detectZone();
         }
       }, 500); // Debounce for 500ms
 
       return () => clearTimeout(timer);
     }
-  }, [deliveryMethod, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1, deliveryZones.length, detectZone]);
+  }, [deliveryMethod, shippingAddress.formatted_address, shippingAddress.city, shippingAddress.state, shippingAddress.address_line_1, deliveryZones.length, detectZone]);
 
   // Fetch customer data when authenticated
   useEffect(() => {
@@ -505,9 +587,58 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep === 'shipping') {
       if (!validateShipping()) return;
+      
+      // Save new address if requested (when clicking Next, not just on final submit)
+      if (isAuthenticated && useNewAddress && saveNewAddress) {
+        try {
+          const addressResponse = await fetch('/api/customers/profile/addresses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: shippingAddress.name,
+              email: shippingAddress.email,
+              phone: shippingAddress.phone,
+              address: shippingAddress.address_line_1,
+              city: shippingAddress.city,
+              state_id: null, // Will be looked up by API if state name is provided
+              country_id: null, // Will be looked up by API if country name is provided
+              state: shippingAddress.state || null, // Send state name for lookup
+              country: shippingAddress.country || null, // Send country name for lookup
+              postal_code: shippingAddress.postal_code,
+              is_default: savedAddresses.length === 0, // Set as default if it's the first address
+            }),
+          });
+          
+          if (addressResponse.ok) {
+            const data = await addressResponse.json();
+            if (data.success) {
+              toast.success('Address saved successfully');
+              // Refresh saved addresses
+              await fetchSavedAddresses();
+              // Update to use the newly saved address
+              if (data.address) {
+                setSelectedAddressId(data.address.id);
+                setUseNewAddress(false);
+              }
+            }
+          } else {
+            const errorData = await addressResponse.json();
+            console.error('Error saving address:', errorData);
+            // Don't block navigation, but show warning
+            toast.warning('Address could not be saved, but you can continue');
+          }
+        } catch (error) {
+          console.error('Error saving address:', error);
+          // Don't block navigation
+          toast.warning('Address could not be saved, but you can continue');
+        }
+      }
+      
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
       setCurrentStep('review');
@@ -544,8 +675,8 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     setSubmitting(true);
 
     try {
-      // Save new address if requested
-      if (isAuthenticated && useNewAddress && saveNewAddress) {
+      // Save new address if requested (only if not already saved in handleNext)
+      if (isAuthenticated && useNewAddress && saveNewAddress && !selectedAddressId) {
         try {
           const addressResponse = await fetch('/api/customers/profile/addresses', {
             method: 'POST',
@@ -558,9 +689,11 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
               phone: shippingAddress.phone,
               address: shippingAddress.address_line_1,
               city: shippingAddress.city,
-              state: shippingAddress.state,
+              state_id: null, // Will be looked up by API if state name is provided
+              country_id: null, // Will be looked up by API if country name is provided
+              state: shippingAddress.state || null, // Send state name for lookup
+              country: shippingAddress.country || null, // Send country name for lookup
               postal_code: shippingAddress.postal_code,
-              country: shippingAddress.country,
               is_default: savedAddresses.length === 0, // Set as default if it's the first address
             }),
           });
@@ -1012,69 +1145,95 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                       />
                     </div>
                     
+                    {/* Google Places Autocomplete Address Field */}
                     <div className="md:col-span-2">
-                      <Label htmlFor="address_line_1">Address Line 1 *</Label>
-                      <Input
-                        id="address_line_1"
-                        value={shippingAddress.address_line_1}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, address_line_1: e.target.value })}
-                        placeholder="123 Main Street"
+                      <AddressAutocomplete
+                        value={addressInputValue}
+                        onChange={(value, components) => {
+                          setAddressInputValue(value);
+                          if (components) {
+                            handlePlaceSelected(components);
+                          } else {
+                            // Manual input - update address_line_1 only
+                            setShippingAddress({ ...shippingAddress, address_line_1: value });
+                          }
+                        }}
+                        onPlaceSelected={handlePlaceSelected}
+                        label="Address"
+                        placeholder="Start typing your address..."
                         required
                       />
                     </div>
                     
+                    {/* Address Line 2 (Apartment, suite, etc.) - Optional */}
                     <div className="md:col-span-2">
-                      <Label htmlFor="address_line_2">Address Line 2</Label>
+                      <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
                       <Input
                         id="address_line_2"
                         value={shippingAddress.address_line_2 || ''}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, address_line_2: e.target.value })}
-                        placeholder="Apartment, suite, etc. (optional)"
+                        placeholder="Apartment, suite, etc."
                       />
                     </div>
                     
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        value={shippingAddress.city}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                        placeholder="New York"
-                        required
-                      />
+                    {/* Read-only address components (filled by Google Places) */}
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="city">City *</Label>
+                        <Input
+                          id="city"
+                          value={shippingAddress.city}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                          placeholder="City"
+                          required
+                          readOnly={!!shippingAddress.formatted_address}
+                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="state">State/Province *</Label>
+                        <Input
+                          id="state"
+                          value={shippingAddress.state}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                          placeholder="State/Province"
+                          required
+                          readOnly={!!shippingAddress.formatted_address}
+                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="postal_code">Postal Code *</Label>
+                        <Input
+                          id="postal_code"
+                          value={shippingAddress.postal_code}
+                          onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
+                          placeholder="Postal Code"
+                          required
+                          readOnly={!!shippingAddress.formatted_address}
+                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
+                        />
+                      </div>
                     </div>
                     
-                    <div>
-                      <Label htmlFor="state">State/Province *</Label>
-                      <Input
-                        id="state"
-                        value={shippingAddress.state}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
-                        placeholder="NY"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="postal_code">Postal Code *</Label>
-                      <Input
-                        id="postal_code"
-                        value={shippingAddress.postal_code}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
-                        placeholder="10001"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
+                    <div className="md:col-span-2">
                       <Label htmlFor="country">Country *</Label>
                       <Input
                         id="country"
                         value={shippingAddress.country}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
-                        placeholder="United States"
+                        placeholder="Country"
                         required
+                        readOnly={!!shippingAddress.formatted_address}
+                        className={shippingAddress.formatted_address ? 'bg-muted' : ''}
                       />
+                      {shippingAddress.formatted_address && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Address components are auto-filled. You can edit if needed.
+                        </p>
+                      )}
                     </div>
                   </div>
                   

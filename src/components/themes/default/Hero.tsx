@@ -127,21 +127,26 @@ export default function DefaultHero({
           {/* Image */}
           <div className="relative">
             {image ? (
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                <img
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl aspect-square">
+                <Image
                   src={image}
                   alt={title}
-                  className="w-full h-auto object-cover"
-                  loading="eager"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
                 />
               </div>
             ) : (
               <div className="relative aspect-square bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl overflow-hidden shadow-2xl">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=800&fit=crop"
                   alt="Premium Computers"
-                  className="w-full h-full object-cover"
-                  loading="eager"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
               </div>
