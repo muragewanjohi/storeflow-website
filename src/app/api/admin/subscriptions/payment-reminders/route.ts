@@ -32,49 +32,32 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    // Security: Check for Vercel Cron header OR valid token
-    // Vercel Cron automatically sends 'x-vercel-cron' header (case-insensitive check)
-    // Manual calls require CRON_SECRET_TOKEN via Authorization header or query parameter
-    const allHeaders = Object.fromEntries(
-      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
-    );
-    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
-    const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
+    // Security: Use shared auth utility
+    // Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+    // Manual triggers use CRON_SECRET_TOKEN via Authorization header or query parameter
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
     
     // Debug logging (only in production to help diagnose issues)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[Payment Reminders] Auth check:', {
-        hasVercelCronHeader: !!vercelCronHeader,
-        hasAuthHeader: !!authHeader,
-        hasQueryToken: !!queryToken,
-        hasExpectedToken: !!expectedToken,
-        allHeaderKeys: Object.keys(allHeaders).filter(k => k.includes('vercel') || k.includes('cron') || k.includes('authorization')),
-      });
+    if (process.env.NODE_ENV === 'production' && !authResult.authorized) {
+      console.log('[Payment Reminders] Auth check failed:', authResult.debug);
     }
     
-    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
-    // OR if token is provided and valid
-    // OR if no token is configured (development mode)
-    if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '').trim();
-      const providedToken = queryToken || headerToken;
+    if (!authResult.authorized) {
+      const debugInfo = authResult.debug 
+        ? `hasVercelCronHeader: ${authResult.debug.hasVercelCronHeader}, hasAuthHeader: ${authResult.debug.hasAuthHeader}, hasQueryToken: ${authResult.debug.hasQueryToken}, hasExpectedToken: ${authResult.debug.hasExpectedToken}, hasCronSecret: ${authResult.debug.hasCronSecret}`
+        : 'No debug info available';
       
-      if (!providedToken || providedToken !== expectedToken) {
-        const debugInfo = `hasVercelCronHeader: ${!!vercelCronHeader}, hasAuthHeader: ${!!authHeader}, hasQueryToken: ${!!queryToken}, hasExpectedToken: ${!!expectedToken}`;
-        await completeCronJobLog(logId, 'failed', {
-          error: `Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
-        });
-        return NextResponse.json(
-          { 
-            message: 'Unauthorized',
-            error: 'Invalid token. Ensure CRON_SECRET_TOKEN is set in Vercel environment variables and cron jobs are configured correctly.',
-          },
-          { status: 401 }
-        );
-      }
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}. Vercel cron jobs automatically send CRON_SECRET in Authorization header. Manual triggers require CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
+      });
+      return NextResponse.json(
+        { 
+          message: 'Unauthorized',
+          error: authResult.reason || 'Invalid token. Ensure CRON_SECRET (for Vercel) or CRON_SECRET_TOKEN (for manual) is set in Vercel environment variables.',
+        },
+        { status: 401 }
+      );
     }
 
     const now = new Date();

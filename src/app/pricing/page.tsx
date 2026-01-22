@@ -87,15 +87,15 @@ const featureCategories: FeatureCategory[] = [
       { name: 'Sales & Discounts', basic: true, pro: true, premium: true },
       { name: 'Abandoned Cart Recovery', basic: false, pro: 'Coming Soon', premium: true },
       { name: 'Gift Cards', basic: false, pro: 'Coming Soon', premium: true },
-      { name: 'Email Marketing', basic: true, pro: true, premium: true },
-      { name: 'SEO Tools', basic: true, pro: true, premium: true },
+      { name: 'Email Marketing', basic: false, pro: true, premium: true },
+      { name: 'SEO Tools', basic: false, pro: true, premium: true },
     ],
   },
   {
     category: 'Analytics & Reports',
     features: [
       { name: 'Basic Reports', basic: true, pro: true, premium: true },
-      { name: 'Advanced Reports', basic: true, pro: true, premium: true },
+      { name: 'Advanced Reports', basic: false, pro: true, premium: true },
       { name: 'Advanced Analytics', basic: false, pro: false, premium: true },
       { name: 'Sales Dashboard', basic: true, pro: true, premium: true },
       { name: 'Customer Analytics', basic: true, pro: true, premium: true },

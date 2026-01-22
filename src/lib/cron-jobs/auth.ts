@@ -2,6 +2,9 @@
  * Cron Job Authentication Utility
  * 
  * Handles authentication for cron jobs from both Vercel (automatic) and manual triggers
+ * 
+ * IMPORTANT: Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+ * We also support CRON_SECRET_TOKEN for backward compatibility and manual triggers
  */
 
 import { NextRequest } from 'next/server';
@@ -9,11 +12,11 @@ import { NextRequest } from 'next/server';
 /**
  * Verify if a request is authorized to run a cron job
  * 
- * Vercel cron jobs automatically send the 'x-vercel-cron' header
+ * Vercel cron jobs automatically send CRON_SECRET in Authorization header (Bearer token)
  * Manual triggers require CRON_SECRET_TOKEN via Authorization header or query parameter
  * 
  * @param request - The incoming request
- * @returns true if authorized, false otherwise
+ * @returns Authorization result with debug info
  */
 export function verifyCronJobAuth(request: NextRequest): {
   authorized: boolean;
@@ -23,6 +26,7 @@ export function verifyCronJobAuth(request: NextRequest): {
     hasAuthHeader: boolean;
     hasQueryToken: boolean;
     hasExpectedToken: boolean;
+    hasCronSecret: boolean;
     headerKeys?: string[];
   };
 } {
@@ -32,7 +36,7 @@ export function verifyCronJobAuth(request: NextRequest): {
   );
 
   // Check for Vercel cron header (case-insensitive)
-  // Vercel sends 'x-vercel-cron' header automatically for cron jobs
+  // Note: This header may not always be present, so we also check Authorization header
   const vercelCronHeader = 
     allHeaders['x-vercel-cron'] || 
     allHeaders['x-vercel-signature'] ||
@@ -42,13 +46,17 @@ export function verifyCronJobAuth(request: NextRequest): {
   const authHeader = request.headers.get('authorization');
   const { searchParams } = new URL(request.url);
   const queryToken = searchParams.get('token');
-  const expectedToken = process.env.CRON_SECRET_TOKEN;
+  
+  // Support both CRON_SECRET (Vercel standard) and CRON_SECRET_TOKEN (our custom)
+  const expectedToken = process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN;
+  const hasCronSecret = !!process.env.CRON_SECRET;
 
   const debug = {
     hasVercelCronHeader: !!vercelCronHeader,
     hasAuthHeader: !!authHeader,
     hasQueryToken: !!queryToken,
     hasExpectedToken: !!expectedToken,
+    hasCronSecret,
     headerKeys: Object.keys(allHeaders).filter(k => 
       k.includes('vercel') || k.includes('cron') || k.includes('authorization')
     ),
@@ -66,19 +74,20 @@ export function verifyCronJobAuth(request: NextRequest): {
     }
     return { 
       authorized: false, 
-      reason: 'CRON_SECRET_TOKEN not configured', 
+      reason: 'CRON_SECRET or CRON_SECRET_TOKEN not configured', 
       debug 
     };
   }
 
   // Check for token in Authorization header or query parameter
-  const headerToken = authHeader?.replace('Bearer ', '').trim();
+  // Vercel automatically sends CRON_SECRET as Bearer token in Authorization header
+  const headerToken = authHeader?.replace(/^Bearer\s+/i, '').trim();
   const providedToken = queryToken || headerToken;
 
   if (!providedToken) {
     return { 
       authorized: false, 
-      reason: 'No token provided. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN', 
+      reason: 'No token provided. Vercel cron jobs automatically send CRON_SECRET in Authorization header. Manual triggers require CRON_SECRET_TOKEN via Authorization header or query parameter.', 
       debug 
     };
   }

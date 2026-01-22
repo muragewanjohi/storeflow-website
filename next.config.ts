@@ -49,6 +49,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['@heroicons/react', 'lucide-react'],
   },
   
+  // Server external packages - prevents bundling issues with packages that need to be external
+  // Required for PDFKit to work in serverless environments (Vercel)
+  serverExternalPackages: ['pdfkit'],
+  
   // Headers for better caching and CDN optimization
   async headers() {
     return [

@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
 
     // Create a mock request with cron secret token
     // Use the actual job path URL, not the current request URL
-    const cronToken = process.env.CRON_SECRET_TOKEN;
+    // Support both CRON_SECRET (Vercel standard) and CRON_SECRET_TOKEN (manual triggers)
+    const cronToken = process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN;
     const jobUrl = new URL(jobPath, request.url);
     const mockRequest = new NextRequest(jobUrl.toString(), {
       method: 'GET',

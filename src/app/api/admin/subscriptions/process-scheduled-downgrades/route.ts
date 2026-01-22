@@ -26,39 +26,19 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    // Security: Check for Vercel Cron header OR valid token
-    const allHeaders = Object.fromEntries(
-      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
-    );
-    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
-    const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
-
-    // Allow if it's a Vercel Cron call OR if token is provided and valid
-    if (!vercelCronHeader) {
-      if (!expectedToken) {
-        // Development mode - allow without token
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[Process Scheduled Downgrades] Running in development mode without token');
-        } else {
-          await completeCronJobLog(logId, 'failed', { error: 'CRON_SECRET_TOKEN not configured' });
-          return NextResponse.json(
-            { error: 'Unauthorized - CRON_SECRET_TOKEN not configured' },
-            { status: 401 }
-          );
-        }
-      } else {
-        const providedToken = authHeader?.replace('Bearer ', '') || queryToken;
-        if (providedToken !== expectedToken) {
-          await completeCronJobLog(logId, 'failed', { error: 'Invalid token' });
-          return NextResponse.json(
-            { error: 'Unauthorized - Invalid token' },
-            { status: 401 }
-          );
-        }
-      }
+    // Security: Use shared auth utility
+    // Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
+    
+    if (!authResult.authorized) {
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}`,
+      });
+      return NextResponse.json(
+        { error: `Unauthorized - ${authResult.reason || 'Invalid token'}` },
+        { status: 401 }
+      );
     }
 
     const now = new Date();

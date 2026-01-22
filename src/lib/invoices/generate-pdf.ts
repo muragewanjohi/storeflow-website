@@ -4,6 +4,8 @@
  * Generates PDF invoices using pdfkit
  */
 
+// Use PDFKit with proper configuration for serverless environments
+// serverExternalPackages in next.config.ts ensures PDFKit works in Vercel
 import PDFDocument from 'pdfkit';
 import type { Tenant } from '@/lib/tenant-context';
 import type { Prisma } from '@prisma/client';
@@ -75,7 +77,12 @@ export async function generateInvoicePDF(
 
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      // Create PDF document
+      // serverExternalPackages in next.config.ts ensures PDFKit font files are available
+      const doc = new PDFDocument({ 
+        margin: 50, 
+        size: 'A4',
+      });
       const buffers: Buffer[] = [];
 
       doc.on('data', buffers.push.bind(buffers));
