@@ -64,7 +64,9 @@ export default async function TenantSettingsPage() {
       'payment_mpesa_paybill_number',
       'payment_mpesa_paybill_account',
       'payment_mpesa_pochi_phone',
-      'default_payment_method',
+      'payment_method',
+      'default_payment_method', // Keep for backward compatibility
+      'payment_timing',
       
       // Tax Settings
       'tax_enabled',
@@ -139,7 +141,9 @@ export default async function TenantSettingsPage() {
     payment_mpesa_paybill_number: settings.payment_mpesa_paybill_number || '',
     payment_mpesa_paybill_account: settings.payment_mpesa_paybill_account || '',
     payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || '',
-    default_payment_method: settings.default_payment_method || 'cash',
+    payment_method: settings.payment_method || settings.default_payment_method || 'cash',
+    default_payment_method: settings.default_payment_method || settings.payment_method || 'cash', // Keep for backward compatibility
+    payment_timing: settings.payment_timing || 'user_choice',
     
     // Tax Settings
     tax_enabled: settings.tax_enabled === 'true',

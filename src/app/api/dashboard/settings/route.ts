@@ -65,7 +65,9 @@ const settingsUpdateSchema = z.object({
   payment_mpesa_paybill_number: z.string().optional().nullable(),
   payment_mpesa_paybill_account: z.string().optional().nullable(),
   payment_mpesa_pochi_phone: z.string().optional().nullable(),
-  default_payment_method: z.enum(['cash', 'mpesa']).optional(),
+  payment_method: z.enum(['cash', 'mpesa']).optional(),
+  default_payment_method: z.enum(['cash', 'mpesa']).optional(), // Keep for backward compatibility
+  payment_timing: z.enum(['before_delivery', 'after_delivery', 'user_choice']).optional(),
   
   // Tax Settings
   tax_enabled: z.boolean().optional(),
@@ -356,8 +358,17 @@ export async function PUT(request: NextRequest) {
     if (validatedData.payment_mpesa_pochi_phone !== undefined) {
       optionsToSave.payment_mpesa_pochi_phone = validatedData.payment_mpesa_pochi_phone || null;
     }
-    if (validatedData.default_payment_method !== undefined) {
+    if (validatedData.payment_method !== undefined) {
+      optionsToSave.payment_method = validatedData.payment_method;
+      // Also update default_payment_method for backward compatibility
+      optionsToSave.default_payment_method = validatedData.payment_method;
+    } else if (validatedData.default_payment_method !== undefined) {
+      // Fallback for backward compatibility
       optionsToSave.default_payment_method = validatedData.default_payment_method;
+      optionsToSave.payment_method = validatedData.default_payment_method;
+    }
+    if (validatedData.payment_timing !== undefined) {
+      optionsToSave.payment_timing = validatedData.payment_timing;
     }
     
     // Validation: Ensure at least one payment method is enabled

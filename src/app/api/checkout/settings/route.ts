@@ -37,7 +37,9 @@ export async function GET(request: NextRequest) {
       'payment_mpesa_paybill_number',
       'payment_mpesa_paybill_account',
       'payment_mpesa_pochi_phone',
-      'default_payment_method',
+      'payment_method',
+      'default_payment_method', // Keep for backward compatibility
+      'payment_timing',
     ]);
 
     // Check if pickup can be enabled (requires physical address)
@@ -53,7 +55,8 @@ export async function GET(request: NextRequest) {
     // Payment methods
     const payment_cash_enabled = settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null;
     const payment_mpesa_enabled = settings.payment_mpesa_enabled === 'true';
-    const default_payment_method = settings.default_payment_method || 'cash';
+    const payment_method = settings.payment_method || settings.default_payment_method || 'cash';
+    const payment_timing = settings.payment_timing || 'user_choice';
 
     return NextResponse.json({
       success: true,
@@ -88,7 +91,9 @@ export async function GET(request: NextRequest) {
         payment_mpesa_paybill_number: settings.payment_mpesa_paybill_number || null,
         payment_mpesa_paybill_account: settings.payment_mpesa_paybill_account || null,
         payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || null,
-        default_payment_method,
+        payment_method,
+        default_payment_method: payment_method, // Keep for backward compatibility
+        payment_timing,
       },
     });
   } catch (error: any) {

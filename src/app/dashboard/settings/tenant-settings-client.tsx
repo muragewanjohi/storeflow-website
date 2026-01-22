@@ -106,7 +106,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     payment_mpesa_paybill_number: initialSettings.payment_mpesa_paybill_number || '',
     payment_mpesa_paybill_account: initialSettings.payment_mpesa_paybill_account || '',
     payment_mpesa_pochi_phone: initialSettings.payment_mpesa_pochi_phone || '',
-    default_payment_method: initialSettings.default_payment_method || 'cash',
+    payment_method: initialSettings.payment_method || initialSettings.default_payment_method || 'cash',
+    payment_timing: initialSettings.payment_timing || 'user_choice',
     
     // Tax Settings
     tax_enabled: initialSettings.tax_enabled ?? false,
@@ -173,13 +174,13 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       return;
     }
     
-    // Validate that default payment method is one of the enabled methods
-    if (formData.default_payment_method === 'cash' && !formData.payment_cash_enabled) {
-      setSettingsError('Default payment method must be one of the enabled payment methods');
+    // Validate that payment method is one of the enabled methods
+    if (formData.payment_method === 'cash' && !formData.payment_cash_enabled) {
+      setSettingsError('Payment method must be one of the enabled payment methods');
       return;
     }
-    if (formData.default_payment_method === 'mpesa' && !formData.payment_mpesa_enabled) {
-      setSettingsError('Default payment method must be one of the enabled payment methods');
+    if (formData.payment_method === 'mpesa' && !formData.payment_mpesa_enabled) {
+      setSettingsError('Payment method must be one of the enabled payment methods');
       return;
     }
     
@@ -223,7 +224,9 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         payment_mpesa_paybill_number: formData.payment_mpesa_paybill_number || null,
         payment_mpesa_paybill_account: formData.payment_mpesa_paybill_account || null,
         payment_mpesa_pochi_phone: formData.payment_mpesa_pochi_phone || null,
-        default_payment_method: formData.default_payment_method || 'cash',
+        payment_method: formData.payment_method || 'cash',
+        default_payment_method: formData.payment_method || 'cash', // Keep for backward compatibility
+        payment_timing: formData.payment_timing || 'user_choice',
         
         // Tax Settings
         tax_enabled: formData.tax_enabled,
@@ -886,6 +889,86 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         <TabsContent value="payment" className="space-y-6">
           <form onSubmit={handleSettingsSubmit}>
             <div className="space-y-6">
+              {/* Payment Method - Moved to first position */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Method</CardTitle>
+                  <CardDescription>
+                    The default payment method shown to customers during checkout
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Select Payment Method</Label>
+                    <Select
+                      value={formData.payment_method}
+                      onValueChange={(value) => setFormData({ ...formData, payment_method: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.payment_cash_enabled && (
+                          <SelectItem value="cash">Cash</SelectItem>
+                        )}
+                        {formData.payment_mpesa_enabled && (
+                          <SelectItem value="mpesa">M-Pesa</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {!formData.payment_cash_enabled && !formData.payment_mpesa_enabled && (
+                      <p className="text-sm text-destructive mt-2">
+                        Please enable at least one payment method
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Payment Timing</Label>
+                    <RadioGroup
+                      value={formData.payment_timing}
+                      onValueChange={(value) => setFormData({ ...formData, payment_timing: value })}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="before_delivery" id="timing_before" className="mt-1" />
+                          <Label htmlFor="timing_before" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Pay Before Delivery</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers must pay before the order is delivered
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="after_delivery" id="timing_after" className="mt-1" />
+                          <Label htmlFor="timing_after" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Pay After Delivery</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers pay when the order is delivered (Cash on Delivery)
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="user_choice" id="timing_choice" className="mt-1" />
+                          <Label htmlFor="timing_choice" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">User Can Pay Before or After</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers can choose to pay before or after delivery
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Cash Payment Method */}
               <Card>
                 <CardHeader>
@@ -893,7 +976,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     <div>
                       <CardTitle>Cash</CardTitle>
                       <CardDescription>
-                        Customers pay with cash (on delivery or before delivery)
+                        Cash
                       </CardDescription>
                     </div>
                     <Checkbox
@@ -910,7 +993,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                           ...formData, 
                           payment_cash_enabled: newValue,
                           // If disabling cash and mpesa is enabled, set default to mpesa
-                          default_payment_method: !newValue && formData.payment_mpesa_enabled ? 'mpesa' : formData.default_payment_method
+                          payment_method: !newValue && formData.payment_mpesa_enabled ? 'mpesa' : formData.payment_method
                         });
                         setError(null);
                       }}
@@ -943,7 +1026,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                           ...formData, 
                           payment_mpesa_enabled: newValue,
                           // If disabling mpesa and cash is enabled, set default to cash
-                          default_payment_method: !newValue && formData.payment_cash_enabled ? 'cash' : formData.default_payment_method
+                          payment_method: !newValue && formData.payment_cash_enabled ? 'cash' : formData.payment_method
                         });
                         setError(null);
                       }}
@@ -1064,39 +1147,6 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     </div>
                   </CardContent>
                 )}
-              </Card>
-
-              {/* Default Payment Method */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Default Payment Method</CardTitle>
-                  <CardDescription>
-                    The default payment method shown to customers during checkout
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Select
-                    value={formData.default_payment_method}
-                    onValueChange={(value) => setFormData({ ...formData, default_payment_method: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select default payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.payment_cash_enabled && (
-                        <SelectItem value="cash">Cash</SelectItem>
-                      )}
-                      {formData.payment_mpesa_enabled && (
-                        <SelectItem value="mpesa">M-Pesa</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {!formData.payment_cash_enabled && !formData.payment_mpesa_enabled && (
-                    <p className="text-sm text-destructive mt-2">
-                      Please enable at least one payment method
-                    </p>
-                  )}
-                </CardContent>
               </Card>
             </div>
 

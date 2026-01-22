@@ -128,7 +128,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
     payment_mpesa_paybill_number: string | null;
     payment_mpesa_paybill_account: string | null;
     payment_mpesa_pochi_phone: string | null;
-    default_payment_method: string;
+    payment_method: string;
+    default_payment_method: string; // Keep for backward compatibility
+    payment_timing: 'before_delivery' | 'after_delivery' | 'user_choice';
   } | null>(null);
   
   // Delivery zones state
@@ -363,7 +365,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
           setCheckoutSettings(data.settings);
           
           // Set default payment method
-          if (data.settings.default_payment_method) {
+          if (data.settings.payment_method) {
+            setPaymentMethod(data.settings.payment_method as PaymentMethod);
+          } else if (data.settings.default_payment_method) {
             setPaymentMethod(data.settings.default_payment_method as PaymentMethod);
           } else if (data.settings.payment_cash_enabled) {
             setPaymentMethod('cash');
@@ -401,7 +405,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
         payment_mpesa_paybill_number: null,
         payment_mpesa_paybill_account: null,
         payment_mpesa_pochi_phone: null,
+        payment_method: 'cash',
         default_payment_method: 'cash',
+        payment_timing: 'user_choice',
       });
     }
   }, []);
@@ -641,6 +647,14 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
       
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
+      // Validate M-Pesa payment verification if payment timing is before_delivery
+      if (paymentMethod === 'mpesa' && 
+          checkoutSettings?.payment_timing === 'before_delivery' && 
+          !paymentTransactionId.trim()) {
+        toast.error('Please provide your M-Pesa Transaction ID / Receipt Number before proceeding');
+        return;
+      }
+      
       setCurrentStep('review');
     }
   };
@@ -666,8 +680,11 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                      zoneDetectionStatus === 'matched' && 
                      selectedZoneId;
 
-    // Validate M-Pesa payment verification details (only required for in-zone orders)
-    if (paymentMethod === 'mpesa' && isInZone && !paymentTransactionId.trim()) {
+    // Validate M-Pesa payment verification details
+    // Required if: payment timing is before_delivery OR order is in-zone
+    if (paymentMethod === 'mpesa' && 
+        (checkoutSettings?.payment_timing === 'before_delivery' || isInZone) && 
+        !paymentTransactionId.trim()) {
       toast.error('Please provide your M-Pesa Transaction ID / Receipt Number');
       return;
     }
@@ -735,7 +752,7 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
             : null,
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
-        payment_verification: paymentMethod === 'mpesa' && isInZone ? {
+        payment_verification: paymentMethod === 'mpesa' && (checkoutSettings?.payment_timing === 'before_delivery' || isInZone) ? {
           transaction_id: paymentTransactionId.trim(),
           reference: paymentReference.trim() || null,
           notes: paymentVerificationNotes.trim() || null,
@@ -1176,65 +1193,102 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                       />
                     </div>
                     
-                    {/* Read-only address components (filled by Google Places) */}
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="city">City *</Label>
-                        <Input
-                          id="city"
-                          value={shippingAddress.city}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                          placeholder="City"
-                          required
-                          readOnly={!!shippingAddress.formatted_address}
-                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="state">State/Province *</Label>
-                        <Input
-                          id="state"
-                          value={shippingAddress.state}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
-                          placeholder="State/Province"
-                          required
-                          readOnly={!!shippingAddress.formatted_address}
-                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="postal_code">Postal Code *</Label>
-                        <Input
-                          id="postal_code"
-                          value={shippingAddress.postal_code}
-                          onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
-                          placeholder="Postal Code"
-                          required
-                          readOnly={!!shippingAddress.formatted_address}
-                          className={shippingAddress.formatted_address ? 'bg-muted' : ''}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <Label htmlFor="country">Country *</Label>
-                      <Input
-                        id="country"
-                        value={shippingAddress.country}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
-                        placeholder="Country"
-                        required
-                        readOnly={!!shippingAddress.formatted_address}
-                        className={shippingAddress.formatted_address ? 'bg-muted' : ''}
-                      />
-                      {shippingAddress.formatted_address && (
+                    {/* Address Summary (when filled by Google Places) - Following Shopify pattern */}
+                    {shippingAddress.formatted_address && (
+                      <div className="md:col-span-2">
+                        <div className="p-3 border rounded-lg bg-muted/50">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Selected Address:</p>
+                              <p className="text-sm">{shippingAddress.formatted_address}</p>
+                              {shippingAddress.city && shippingAddress.state && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}
+                                  {shippingAddress.country && `, ${shippingAddress.country}`}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-auto py-1"
+                              onClick={() => {
+                                // Clear formatted address to show individual fields for editing
+                                setShippingAddress({ ...shippingAddress, formatted_address: undefined });
+                                setAddressInputValue('');
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Address components are auto-filled. You can edit if needed.
+                          Address verified by Google Places. Fields below are auto-filled for delivery zone detection.
                         </p>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    
+                    {/* Individual address components - Hidden when Google Places fills them, shown for manual entry or editing */}
+                    {(!shippingAddress.formatted_address || !shippingAddress.city || !shippingAddress.state) && (
+                      <>
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="city">City *</Label>
+                            <Input
+                              id="city"
+                              value={shippingAddress.city}
+                              onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                              placeholder="City"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="state">State/Province *</Label>
+                            <Input
+                              id="state"
+                              value={shippingAddress.state}
+                              onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                              placeholder="State/Province"
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="postal_code">Postal Code *</Label>
+                            <Input
+                              id="postal_code"
+                              value={shippingAddress.postal_code}
+                              onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
+                              placeholder="Postal Code"
+                              required
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <Label htmlFor="country">Country *</Label>
+                          <Input
+                            id="country"
+                            value={shippingAddress.country}
+                            onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
+                            placeholder="Country"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Hidden fields for data storage (when Google Places fills them) */}
+                    {shippingAddress.formatted_address && shippingAddress.city && shippingAddress.state && (
+                      <>
+                        <input type="hidden" value={shippingAddress.city} readOnly />
+                        <input type="hidden" value={shippingAddress.state} readOnly />
+                        <input type="hidden" value={shippingAddress.postal_code || ''} readOnly />
+                        <input type="hidden" value={shippingAddress.country} readOnly />
+                      </>
+                    )}
                   </div>
                   
                   {/* Option to save new address (only for authenticated users) */}
@@ -1272,11 +1326,38 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                       </p>
                     </div>
                   ) : (
-                    <RadioGroup
-                      value={paymentMethod}
-                      onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-                    >
-                      <div className="space-y-3">
+                    <>
+                      {/* Payment Timing Information */}
+                      {checkoutSettings?.payment_timing && checkoutSettings.payment_timing !== 'user_choice' && (
+                        <div className={`p-4 border rounded-lg ${
+                          checkoutSettings.payment_timing === 'before_delivery' 
+                            ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
+                            : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'
+                        }`}>
+                          <p className={`text-sm font-medium ${
+                            checkoutSettings.payment_timing === 'before_delivery'
+                              ? 'text-blue-900 dark:text-blue-100'
+                              : 'text-amber-900 dark:text-amber-100'
+                          }`}>
+                            {checkoutSettings.payment_timing === 'before_delivery' && '⚠️ Payment Required Before Delivery'}
+                            {checkoutSettings.payment_timing === 'after_delivery' && '💳 Cash on Delivery Available'}
+                          </p>
+                          <p className={`text-sm mt-1 ${
+                            checkoutSettings.payment_timing === 'before_delivery'
+                              ? 'text-blue-700 dark:text-blue-300'
+                              : 'text-amber-700 dark:text-amber-300'
+                          }`}>
+                            {checkoutSettings.payment_timing === 'before_delivery' && 'You must complete payment before your order can be delivered.'}
+                            {checkoutSettings.payment_timing === 'after_delivery' && 'You can pay when your order is delivered.'}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <RadioGroup
+                        value={paymentMethod}
+                        onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+                      >
+                        <div className="space-y-3">
                         {/* Cash Payment Method */}
                         {checkoutSettings?.payment_cash_enabled && (
                           <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
@@ -1284,7 +1365,11 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                             <Label htmlFor="payment_cash" className="flex-1 cursor-pointer">
                               <div>
                                 <div className="font-semibold">Cash</div>
-                                <div className="text-sm text-muted-foreground">Pay with cash (on delivery or before delivery)</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {checkoutSettings.payment_timing === 'before_delivery' && 'Pay before delivery'}
+                                  {checkoutSettings.payment_timing === 'after_delivery' && 'Pay after delivery (Cash on Delivery)'}
+                                  {checkoutSettings.payment_timing === 'user_choice' && 'Cash payment'}
+                                </div>
                               </div>
                             </Label>
                           </div>
@@ -1312,12 +1397,20 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                                   )}
                                   {!checkoutSettings.payment_mpesa_option && 'Mobile money payment'}
                                 </div>
+                                {checkoutSettings.payment_timing && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {checkoutSettings.payment_timing === 'before_delivery' && 'Payment required before delivery'}
+                                    {checkoutSettings.payment_timing === 'after_delivery' && 'Payment can be made after delivery'}
+                                    {checkoutSettings.payment_timing === 'user_choice' && 'You can pay before or after delivery'}
+                                  </div>
+                                )}
                               </div>
                             </Label>
                           </div>
                         )}
                       </div>
                     </RadioGroup>
+                    </>
                   )}
 
                   <Separator />
@@ -1343,12 +1436,13 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                     />
                   </div>
 
-                  {/* Payment Verification Form (only for M-Pesa and in-zone orders) */}
+                  {/* Payment Verification Form (for M-Pesa when payment timing is before_delivery OR for in-zone orders) */}
                   {paymentMethod === 'mpesa' && 
-                   deliveryMethod === 'delivery' && 
-                   checkoutSettings?.shipping_method_type === 'delivery_zones' && 
-                   zoneDetectionStatus === 'matched' && 
-                   selectedZoneId && (
+                   (checkoutSettings?.payment_timing === 'before_delivery' ||
+                    (deliveryMethod === 'delivery' && 
+                     checkoutSettings?.shipping_method_type === 'delivery_zones' && 
+                     zoneDetectionStatus === 'matched' && 
+                     selectedZoneId)) && (
                     <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                       <CardHeader>
                         <CardTitle className="text-sm">Payment Verification</CardTitle>
@@ -1366,7 +1460,9 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                             required
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            After making payment, enter the transaction ID from your M-Pesa confirmation message.
+                            {checkoutSettings?.payment_timing === 'before_delivery' 
+                              ? 'Payment is required before delivery. Please make your M-Pesa payment and enter the transaction ID from your confirmation message.'
+                              : 'After making payment, enter the transaction ID from your M-Pesa confirmation message.'}
                           </p>
                         </div>
                         <div>
@@ -1570,6 +1666,13 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
                           )}
                         </div>
                       )}
+                      {checkoutSettings?.payment_timing && (
+                        <div className="text-xs mt-1">
+                          {checkoutSettings.payment_timing === 'before_delivery' && 'Payment required before delivery'}
+                          {checkoutSettings.payment_timing === 'after_delivery' && 'Payment after delivery (Cash on Delivery)'}
+                          {checkoutSettings.payment_timing === 'user_choice' && 'You can pay before or after delivery'}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1598,7 +1701,15 @@ export default function CheckoutClient({ isAuthenticated = false }: Readonly<Che
               </Button>
               
               {currentStep !== 'review' ? (
-                <Button onClick={handleNext}>
+                <Button 
+                  onClick={handleNext}
+                  disabled={
+                    currentStep === 'payment' &&
+                    paymentMethod === 'mpesa' &&
+                    checkoutSettings?.payment_timing === 'before_delivery' &&
+                    !paymentTransactionId.trim()
+                  }
+                >
                   Next
                   <ArrowRightIcon className="w-4 h-4 ml-2" />
                 </Button>
