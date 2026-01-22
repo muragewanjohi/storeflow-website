@@ -1,16 +1,17 @@
 'use client';
 
 /**
- * Pricing Page
+ * Detailed Pricing Page
  * 
- * Public page where users can view and select pricing plans
+ * Comprehensive pricing page with full feature comparison table
+ * Following best practices from Shopify, WooCommerce, and BigCommerce
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, ArrowRight, Loader2, Zap } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Loader2, Zap, X, Check } from 'lucide-react';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { getPlanFeatures } from '@/lib/pricing/features';
 
@@ -35,6 +36,93 @@ interface PricingResponse {
   };
 }
 
+// Comprehensive feature categories for comparison table
+interface FeatureCategory {
+  category: string;
+  features: {
+    name: string;
+    basic: string | boolean;
+    pro: string | boolean;
+    premium: string | boolean;
+  }[];
+}
+
+const featureCategories: FeatureCategory[] = [
+  {
+    category: 'Store Management',
+    features: [
+      { name: 'Staff Users', basic: '1', pro: '5', premium: '10' },
+      { name: 'Products', basic: '100', pro: '1,000', premium: 'Unlimited' },
+      { name: 'Orders per Month', basic: '500', pro: '5,000', premium: 'Unlimited' },
+      { name: 'Storage', basic: '5 GB', pro: '25 GB', premium: '200 GB' },
+      { name: 'Customers', basic: '1,000', pro: '10,000', premium: 'Unlimited' },
+    ],
+  },
+  {
+    category: 'Content & Pages',
+    features: [
+      { name: 'Custom Pages', basic: '10', pro: '50', premium: 'Unlimited' },
+      { name: 'Blog Posts', basic: 'Unlimited', pro: '100', premium: 'Unlimited' },
+      { name: 'Languages', basic: '2', pro: '4', premium: 'Unlimited' },
+      { name: 'Custom Themes', basic: true, pro: true, premium: true },
+      { name: 'Theme Customization', basic: true, pro: true, premium: true },
+    ],
+  },
+  {
+    category: 'E-commerce Features',
+    features: [
+      { name: 'Product Catalog', basic: true, pro: true, premium: true },
+      { name: 'Shopping Cart', basic: true, pro: true, premium: true },
+      { name: 'Checkout System', basic: true, pro: true, premium: true },
+      { name: 'Payment Methods', basic: 'Cash, M-Pesa', pro: 'Cash, M-Pesa, Stripe', premium: 'All Payment Methods' },
+      { name: 'Delivery Zones', basic: true, pro: true, premium: true },
+      { name: 'Tax Management', basic: true, pro: true, premium: true },
+      { name: 'Inventory Management', basic: true, pro: true, premium: true },
+      { name: 'Order Tracking', basic: true, pro: true, premium: true },
+    ],
+  },
+  {
+    category: 'Marketing & Sales',
+    features: [
+      { name: 'Sales & Discounts', basic: true, pro: true, premium: true },
+      { name: 'Abandoned Cart Recovery', basic: false, pro: 'Coming Soon', premium: true },
+      { name: 'Gift Cards', basic: false, pro: 'Coming Soon', premium: true },
+      { name: 'Email Marketing', basic: true, pro: true, premium: true },
+      { name: 'SEO Tools', basic: true, pro: true, premium: true },
+    ],
+  },
+  {
+    category: 'Analytics & Reports',
+    features: [
+      { name: 'Basic Reports', basic: true, pro: true, premium: true },
+      { name: 'Advanced Reports', basic: true, pro: true, premium: true },
+      { name: 'Advanced Analytics', basic: false, pro: false, premium: true },
+      { name: 'Sales Dashboard', basic: true, pro: true, premium: true },
+      { name: 'Customer Analytics', basic: true, pro: true, premium: true },
+    ],
+  },
+  {
+    category: 'Support & Services',
+    features: [
+      { name: 'Email Support', basic: true, pro: true, premium: true },
+      { name: 'Priority Support', basic: false, pro: true, premium: true },
+      { name: 'Chat Support', basic: false, pro: false, premium: true },
+      { name: 'Documentation', basic: true, pro: true, premium: true },
+      { name: 'Video Tutorials', basic: true, pro: true, premium: true },
+    ],
+  },
+  {
+    category: 'Advanced Features',
+    features: [
+      { name: 'API Access', basic: false, pro: false, premium: true },
+      { name: 'Custom Domain', basic: false, pro: 'Coming Soon', premium: 'Coming Soon' },
+      { name: 'Automatic Payment Verification', basic: false, pro: 'Coming Soon', premium: 'Coming Soon' },
+      { name: 'White Label Options', basic: false, pro: false, premium: 'Available' },
+      { name: 'Multi-store Management', basic: false, pro: false, premium: 'Available' },
+    ],
+  },
+];
+
 export default function PricingPage() {
   const router = useRouter();
   const [plans, setPlans] = useState<PricingPlan[]>([]);
@@ -46,15 +134,12 @@ export default function PricingPage() {
   useEffect(() => {
     async function fetchPlans() {
       try {
-        // First, detect location on client side
         let locationInfo = detectUserLocationClient();
         
-        // Try IP-based detection as fallback (only if browser detection didn't find Kenya)
         if (!locationInfo.isKenya) {
           try {
             locationInfo = await detectLocationByIP();
           } catch (ipError) {
-            // If IP detection fails, use browser detection result
             console.log('IP detection failed, using browser detection');
           }
         }
@@ -62,7 +147,6 @@ export default function PricingPage() {
         setIsKenya(locationInfo.isKenya);
         setCurrencySymbol(locationInfo.currencySymbol);
 
-        // Fetch plans with location header
         const response = await fetch('/api/pricing', {
           headers: {
             'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
@@ -75,10 +159,8 @@ export default function PricingPage() {
         }
         const data: PricingResponse = await response.json();
         
-        // API should already return correct prices based on location
         setPlans(data.plans || []);
         
-        // Use client-detected currency if API didn't provide it
         if (data.location?.currencySymbol) {
           setCurrencySymbol(data.location.currencySymbol);
         } else {
@@ -97,22 +179,25 @@ export default function PricingPage() {
     router.push(`/register?plan=${planId}`);
   };
 
-  // Use original hardcoded features instead of formatting from API
-  const getFeatures = (planName: string): string[] => {
-    return getPlanFeatures(planName);
+  const getPlanByName = (name: string): PricingPlan | undefined => {
+    return plans.find(p => p.name.toLowerCase().includes(name.toLowerCase()));
   };
+
+  const basicPlan = getPlanByName('basic');
+  const proPlan = getPlanByName('pro') || getPlanByName('standard');
+  const premiumPlan = getPlanByName('premium') || getPlanByName('enterprise');
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0025cc]" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <Button asChild>
@@ -126,147 +211,278 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold text-[#0025cc]">
               DukaNest
             </Link>
-            <Button asChild variant="outline">
-              <Link href="/">Back to Home</Link>
-            </Button>
+            <div className="flex items-center gap-4">
+              <Button asChild variant="ghost">
+                <Link href="/#pricing">View Summary</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/">Back to Home</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Pricing Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Section Header */}
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <p className="text-[#0025cc] font-medium mb-2">Pricing Plan</p>
-            <h1 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
-              Choose Your Perfect Business Plan
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Select the perfect plan for your business. All plans include a free trial.
-            </p>
-          </div>
+      {/* Hero Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-[#0025cc] font-medium mb-2">Pricing Plans</p>
+          <h1 className="text-4xl lg:text-6xl font-bold text-[#0c0528] mb-4">
+            Choose the Perfect Plan for Your Business
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+            Compare all features and find the plan that fits your needs. All plans include a 14-day free trial.
+          </p>
+        </div>
+      </section>
 
-          {plans.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No pricing plans available at the moment.</p>
-              <Button asChild>
-                <Link href="/">Go Back Home</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-              {plans.map((plan, index) => {
-                const features = getFeatures(plan.name);
-                const isPopular = index === Math.floor(plans.length / 2); // Middle plan is popular
-                
-                return (
-                  <div
-                    key={plan.id}
-                    className={`relative bg-white rounded-2xl p-8 transition-all duration-300 ${
+      {/* Pricing Cards - Quick Overview */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            {[basicPlan, proPlan, premiumPlan].map((plan, index) => {
+              if (!plan) return null;
+              const isPopular = index === 1;
+              
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative bg-white rounded-2xl p-8 transition-all duration-300 ${
+                    isPopular
+                      ? 'shadow-2xl transform scale-105 border-2 border-[#0025cc]'
+                      : 'shadow-lg hover:shadow-xl'
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
+                        <Zap className="w-4 h-4" />
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-center mb-6">
+                    <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
+                      {plan.name}
+                    </h3>
+                    <div className="flex items-baseline justify-center">
+                      <span className={`text-5xl font-bold ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
+                        {(plan.currencySymbol || currencySymbol) === 'Ksh' 
+                          ? `Ksh ${plan.price.toLocaleString('en-KE')}`
+                          : `${(plan.currencySymbol || currencySymbol)}${plan.price.toFixed(2)}`
+                        }
+                      </span>
+                      <span className={`ml-2 ${isPopular ? 'text-[#5B8AC4]/80' : 'text-[#8d8d8d]'}`}>
+                        /month
+                      </span>
+                    </div>
+                    {plan.trial_days && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {plan.trial_days}-Day Free Trial
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={() => handleSelectPlan(plan.id)}
+                    className={`w-full ${
                       isPopular
-                        ? 'shadow-2xl transform scale-105 border-2 border-[#0025cc]'
-                        : 'shadow-lg hover:shadow-xl hover:transform hover:scale-105'
+                        ? 'bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white hover:shadow-xl'
+                        : 'bg-gray-100 text-[#0025cc] hover:bg-[#0025cc] hover:text-white'
                     }`}
                   >
-                    {/* Popular Badge */}
-                    {isPopular && (
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-6 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2">
-                          <Zap className="w-4 h-4" />
-                          Most Popular
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Plan Name */}
-                    <div className="text-center mb-6">
-                      <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
-                        {plan.name}
-                      </h3>
-                    </div>
-
-                    {/* Price */}
-                    <div className="text-center mb-6">
-                      <div className="flex items-baseline justify-center">
-                        <span className={`text-5xl font-bold ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
-                          {(plan.currencySymbol || currencySymbol) === 'Ksh' 
-                            ? `Ksh ${plan.price.toLocaleString('en-KE')}`
-                            : `${(plan.currencySymbol || currencySymbol)}${plan.price.toFixed(2)}`
-                          }
-                        </span>
-                        <span className={`ml-2 ${isPopular ? 'text-[#5B8AC4]/80' : 'text-[#8d8d8d]'}`}>
-                          / {plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
-                        </span>
-                      </div>
-                      {plan.trial_days && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          {plan.trial_days}-Day Free Trial
-                        </p>
-                      )}
-                    </div>
-
-                    {/* What's Included */}
-                    <div className={`mb-6 ${isPopular ? 'text-[#0025cc]/90' : 'text-[#0c0528]'}`}>
-                      <p className="font-semibold text-lg mb-4">{`What's Included`}</p>
-                    </div>
-
-                    {/* Features List */}
-                    <div className="space-y-3 mb-8">
-                      {features.map((feature, featureIndex) => (
-                        <div key={featureIndex} className="flex items-start gap-3">
-                          <div className={`rounded-full p-1 mt-0.5 ${
-                            isPopular ? 'bg-[#0025cc]/20' : 'bg-[#0025cc]'
-                          }`}>
-                            <CheckCircle2 className={`w-3 h-3 ${isPopular ? 'text-[#0025cc]' : 'text-white'}`} />
-                          </div>
-                          <span className={`text-sm ${isPopular ? 'text-[#0025cc]/90' : 'text-[#8d8d8d]'}`}>
-                            {feature}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* CTA Button */}
-                    <button
-                      onClick={() => plan.name.toLowerCase() !== 'premium' && handleSelectPlan(plan.id)}
-                      disabled={plan.name.toLowerCase() === 'premium'}
-                      className={`w-full py-4 rounded-lg font-medium transition-all ${
-                        plan.name.toLowerCase() === 'premium'
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : isPopular
-                          ? 'bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white hover:shadow-xl transform hover:-translate-y-1'
-                          : 'bg-gray-100 text-[#0025cc] hover:bg-[#0025cc] hover:text-white'
-                      }`}
-                    >
-                      {plan.name.toLowerCase() === 'premium' ? 'Coming Soon' : 'Get Started'}
-                      {plan.name.toLowerCase() !== 'premium' && (
-                        <ArrowRight className="ml-2 h-4 w-4 inline" />
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="text-center mt-12">
-            <p className="text-muted-foreground mb-4">
-              All plans include free trial. No credit card required.
-            </p>
-            <Link href="/" className="text-[#0025cc] hover:underline text-sm font-medium">
-              ← Back to Home
-            </Link>
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      </section>
+
+      {/* Feature Comparison Table */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-white/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-[#0c0528] mb-4">
+              Compare All Features
+            </h2>
+            <p className="text-muted-foreground">
+              See exactly what's included in each plan
+            </p>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-gray-200">
+                  <th className="text-left p-4 font-semibold text-[#0c0528]">Feature</th>
+                  <th className="text-center p-4 font-semibold text-[#0c0528]">
+                    {basicPlan?.name || 'Basic'}
+                  </th>
+                  <th className="text-center p-4 font-semibold text-[#0c0528] bg-blue-50">
+                    {proPlan?.name || 'Pro'}
+                  </th>
+                  <th className="text-center p-4 font-semibold text-[#0c0528]">
+                    {premiumPlan?.name || 'Premium'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {featureCategories.map((category, catIndex) => (
+                  <React.Fragment key={catIndex}>
+                    <tr className="bg-gray-50">
+                      <td colSpan={4} className="p-4 font-bold text-[#0025cc] text-lg">
+                        {category.category}
+                      </td>
+                    </tr>
+                    {category.features.map((feature, featIndex) => (
+                      <tr key={featIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="p-4 text-[#0c0528]">{feature.name}</td>
+                        <td className="p-4 text-center">
+                          {typeof feature.basic === 'boolean' ? (
+                            feature.basic ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-sm text-muted-foreground">{feature.basic}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center bg-blue-50/30">
+                          {typeof feature.pro === 'boolean' ? (
+                            feature.pro ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-sm text-muted-foreground">{feature.pro}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          {typeof feature.premium === 'boolean' ? (
+                            feature.premium ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-sm text-muted-foreground">{feature.premium}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-8">
+            {featureCategories.map((category, catIndex) => (
+              <div key={catIndex} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-[#0025cc] text-white p-4 font-bold text-lg">
+                  {category.category}
+                </div>
+                <div className="divide-y">
+                  {category.features.map((feature, featIndex) => (
+                    <div key={featIndex} className="p-4">
+                      <div className="font-semibold text-[#0c0528] mb-3">{feature.name}</div>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="text-center">
+                          <div className="font-medium text-muted-foreground mb-1">Basic</div>
+                          {typeof feature.basic === 'boolean' ? (
+                            feature.basic ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">{feature.basic}</span>
+                          )}
+                        </div>
+                        <div className="text-center bg-blue-50/30 rounded p-2">
+                          <div className="font-medium text-muted-foreground mb-1">Pro</div>
+                          {typeof feature.pro === 'boolean' ? (
+                            feature.pro ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">{feature.pro}</span>
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium text-muted-foreground mb-1">Premium</div>
+                          {typeof feature.premium === 'boolean' ? (
+                            feature.premium ? (
+                              <Check className="w-5 h-5 text-green-600 mx-auto" />
+                            ) : (
+                              <X className="w-5 h-5 text-gray-300 mx-auto" />
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">{feature.premium}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl lg:text-4xl font-bold text-[#0c0528] mb-4">
+            Ready to Get Started?
+          </h2>
+          <p className="text-xl text-muted-foreground mb-8">
+            Start your 14-day free trial. No credit card required.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {basicPlan && (
+              <Button
+                onClick={() => handleSelectPlan(basicPlan.id)}
+                variant="outline"
+                size="lg"
+                className="bg-white"
+              >
+                Start with {basicPlan.name}
+              </Button>
+            )}
+            {proPlan && (
+              <Button
+                onClick={() => handleSelectPlan(proPlan.id)}
+                size="lg"
+                className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white"
+              >
+                Start with {proPlan.name}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-8">
+            All plans include a free trial. Cancel anytime.
+          </p>
         </div>
       </section>
     </div>
   );
 }
-

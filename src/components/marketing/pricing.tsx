@@ -1,8 +1,9 @@
 'use client';
 
-import { Check, Zap, Loader2 } from 'lucide-react';
+import { Check, Zap, Loader2, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { getPlanFeatures } from '@/lib/pricing/features';
 
@@ -118,13 +119,18 @@ export function Pricing() {
           <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
             Choose Your Perfect Business Plan
           </h2>
+          <p className="text-lg text-muted-foreground">
+            Start with a 14-day free trial. No credit card required.
+          </p>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {/* Pricing Cards - Condensed Version */}
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
           {plans.map((plan, index) => {
             const features = getFeatures(plan.name);
             const isPopular = index === Math.floor(plans.length / 2); // Middle plan is popular
+            // Show only first 5 features on landing page
+            const displayedFeatures = features.slice(0, 5);
             
             return (
               <div
@@ -177,9 +183,9 @@ export function Pricing() {
                   <p className="font-semibold text-lg mb-4">{`What's Included`}</p>
                 </div>
 
-                {/* Features List */}
-                <div className="space-y-3 mb-8">
-                  {features.map((feature, featureIndex) => (
+                {/* Features List - Limited to 5 */}
+                <div className="space-y-3 mb-6">
+                  {displayedFeatures.map((feature, featureIndex) => (
                     <div key={featureIndex} className="flex items-start gap-3">
                       <div className={`rounded-full p-1 mt-0.5 ${
                         isPopular ? 'bg-[#0025cc]/20' : 'bg-[#0025cc]'
@@ -191,6 +197,11 @@ export function Pricing() {
                       </span>
                     </div>
                   ))}
+                  {features.length > 5 && (
+                    <div className="text-sm text-muted-foreground italic pt-2">
+                      + {features.length - 5} more features
+                    </div>
+                  )}
                 </div>
 
                 {/* CTA Button */}
@@ -210,6 +221,17 @@ export function Pricing() {
               </div>
             );
           })}
+        </div>
+
+        {/* View More Button */}
+        <div className="text-center">
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#0025cc] font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all hover:bg-[#0025cc] hover:text-white border-2 border-[#0025cc]"
+          >
+            View Full Feature Comparison
+            <ArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </div>
     </section>
