@@ -22,6 +22,72 @@ export const revalidate = 60; // Revalidate every 60 seconds
 // Enable dynamic params for product slugs
 export const dynamicParams = true;
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const tenant = await requireTenant();
+  const { slug } = await params;
+
+  // Fetch minimal product data for metadata
+  const product = await prisma.products.findFirst({
+    where: {
+      slug,
+      tenant_id: tenant.id,
+      status: 'active',
+    },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      short_description: true,
+      price: true,
+      sale_price: true,
+      image: true,
+    },
+  });
+
+  if (!product) {
+    return {
+      title: 'Product Not Found',
+    };
+  }
+
+  // Check for active sales
+  const now = new Date();
+  const activeSale = await prisma.product_sales.findFirst({
+    where: {
+      product_id: product.id,
+      tenant_id: tenant.id,
+      sales: {
+        status: 'active',
+        OR: [
+          { start_date: null, end_date: null },
+          { start_date: { lte: now }, end_date: { gte: now } },
+        ],
+      },
+    },
+    select: {
+      sale_price: true,
+    },
+  });
+
+  const finalPrice = activeSale?.sale_price 
+    ? Number(activeSale.sale_price)
+    : (product.sale_price ? Number(product.sale_price) : Number(product.price));
+
+  return generateProductMetadata({
+    tenant,
+    productName: product.name,
+    productDescription: product.short_description || product.description || undefined,
+    productImage: product.image || undefined,
+    productUrl: `/products/${slug}`,
+    price: finalPrice,
+    currency: 'USD',
+  });
+}
+
 export default async function ProductDetailPage({
   params,
 }: {

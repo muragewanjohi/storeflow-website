@@ -274,3 +274,154 @@ export function getAvailableThemeSlugs(): string[] {
     'default',
   ];
 }
+
+/**
+ * Get color scheme based on business type
+ * Returns color scheme that will override theme defaults
+ */
+export function getBusinessTypeColorScheme(businessType: string): Partial<ThemeColors> | null {
+  if (!businessType) return null;
+
+  const type = businessType.toLowerCase();
+
+  // Grocery Store / Supermarket
+  if (type.includes('grocery') || type.includes('supermarket')) {
+    return {
+      primary: '#4CAF50',      // Fresh green
+      secondary: '#2E7D32',     // Dark green
+      accent: '#FF9800',        // Warm orange
+      buttonBackground: '#4CAF50',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Pharmacy / Health & Wellness
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    return {
+      primary: '#0066CC',        // Medical blue
+      secondary: '#003D7A',     // Dark blue
+      accent: '#00A859',        // Trust green
+      buttonBackground: '#0066CC',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Fashion / Clothing
+  if (type.includes('fashion') || type.includes('clothing')) {
+    return {
+      primary: '#212121',       // Modern black
+      secondary: '#757575',     // Elegant gray
+      accent: '#E91E63',        // Pink accent
+      buttonBackground: '#212121',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Electronics & Mobile Phones
+  if (type.includes('electronics') || type.includes('mobile') || type.includes('phones')) {
+    return {
+      primary: '#2196F3',       // Tech blue
+      secondary: '#424242',      // Dark gray
+      accent: '#FF5722',        // Vibrant orange
+      buttonBackground: '#2196F3',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Beauty & Personal Care
+  if (type.includes('beauty') || type.includes('personal care')) {
+    return {
+      primary: '#F8BBD0',        // Soft pink
+      secondary: '#CE93D8',     // Elegant purple
+      accent: '#E91E63',        // Pink accent
+      buttonBackground: '#E91E63',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Home & Kitchen
+  if (type.includes('home') || type.includes('kitchen')) {
+    return {
+      primary: '#8D6E63',       // Warm brown
+      secondary: '#FF7043',    // Cozy orange
+      accent: '#66BB6A',       // Fresh green
+      buttonBackground: '#8D6E63',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Baby & Kids Products
+  if (type.includes('baby') || type.includes('kids')) {
+    return {
+      primary: '#F48FB1',       // Soft pink
+      secondary: '#90CAF9',     // Soft blue
+      accent: '#FFF59D',        // Soft yellow
+      buttonBackground: '#F48FB1',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Food & Beverages / Restaurant
+  if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+    return {
+      primary: '#E53935',       // Appetizing red
+      secondary: '#FF6F00',     // Warm orange
+      accent: '#66BB6A',        // Fresh green
+      buttonBackground: '#E53935',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Convenience Store / Duka
+  if (type.includes('convenience') || type.includes('duka')) {
+    return {
+      primary: '#42A5F5',       // Friendly blue
+      secondary: '#66BB6A',    // Accessible green
+      accent: '#FFC107',        // Warm yellow
+      buttonBackground: '#42A5F5',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Furniture & Home Decor
+  if (type.includes('furniture') || type.includes('home decor')) {
+    return {
+      primary: '#6D4C41',       // Rich brown
+      secondary: '#616161',     // Elegant gray
+      accent: '#FFD700',        // Accent gold
+      buttonBackground: '#6D4C41',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Pets
+  if (type.includes('pet')) {
+    return {
+      primary: '#FF6B9D',       // Playful pink
+      secondary: '#4ECDC4',    // Friendly turquoise
+      accent: '#FFE66D',       // Energetic yellow
+      buttonBackground: '#FF6B9D',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Hardware
+  if (type.includes('hardware')) {
+    return {
+      primary: '#37474F',       // Industrial gray-blue
+      secondary: '#546E7A',    // Steel gray
+      accent: '#FF6F00',        // Orange accent
+      buttonBackground: '#37474F',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Default/Other - use neutral colors
+  return {
+    primary: '#0066CC',         // Standard blue
+    secondary: '#00A8E8',      // Light blue
+    accent: '#4A90E2',         // Medium blue
+    buttonBackground: '#0066CC',
+    buttonText: '#FFFFFF',
+  };
+}

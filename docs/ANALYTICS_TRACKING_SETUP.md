@@ -80,6 +80,7 @@ function MyComponent() {
 - Tracks UTM parameters (source, medium, campaign, term, content)
 - Categorizes referrers (Direct, Search, Social, Referral)
 - Shows revenue by traffic source
+- **Social Media Tracking**: Product share buttons automatically add UTM parameters (utm_source=platform, utm_medium=social, utm_campaign=product_share) for accurate social media traffic attribution
 
 ### 3. Product Performance
 - Uses actual page views from `analytics_page_views` table

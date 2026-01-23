@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import ProductReviewsSection from '@/components/storefront/product-reviews-section';
 import { RatingDisplay } from '@/components/storefront/rating-display';
+import ProductShareButtons from '@/components/storefront/product-share-buttons';
 
 interface ProductVariant {
   id: string;
@@ -289,6 +290,18 @@ export default function ProductDetailClient({
               {product.stock_quantity} in stock
             </div>
           )}
+
+          {/* Social Share Buttons */}
+          <div className="pt-2">
+            <ProductShareButtons
+              productName={product.name}
+              productUrl={`/products/${product.slug || product.id}`}
+              productImage={selectedImage || product.image}
+              productDescription={product.short_description || product.description || undefined}
+              productPrice={displayPrice}
+              currency={currency.code}
+            />
+          </div>
 
           {/* Description */}
           {product.short_description && (

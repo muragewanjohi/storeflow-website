@@ -103,6 +103,11 @@ export function generateProductMetadata({
   
   const description = productDescription || `Buy ${productName} at ${siteName}. ${price ? `Price: ${new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price)}` : ''}`;
 
+  // Ensure product image URL is absolute
+  const absoluteImageUrl = productImage 
+    ? (productImage.startsWith('http') ? productImage : `${baseUrl}${productImage}`)
+    : undefined;
+
   return {
     title: `${productName} | ${siteName}`,
     description,
@@ -111,24 +116,37 @@ export function generateProductMetadata({
       description,
       url: fullUrl,
       siteName,
-      type: 'website',
-      images: productImage ? [
+      type: 'website', // Open Graph doesn't support 'product' type, but structured data handles product info
+      images: absoluteImageUrl ? [
         {
-          url: productImage,
+          url: absoluteImageUrl,
           width: 1200,
           height: 630,
           alt: productName,
         },
       ] : undefined,
+      // Add product-specific Open Graph properties
+      ...(price && {
+        // Note: Open Graph doesn't have standard price fields, but we include in description
+        // Some platforms may parse structured data instead
+      }),
     },
     twitter: {
       card: 'summary_large_image',
       title: productName,
       description,
-      images: productImage ? [productImage] : undefined,
+      images: absoluteImageUrl ? [absoluteImageUrl] : undefined,
     },
     alternates: {
       canonical: fullUrl,
+    },
+    // Add other metadata for better social sharing
+    other: {
+      // Additional meta tags that some platforms recognize
+      ...(price && {
+        'product:price:amount': price.toString(),
+        'product:price:currency': currency,
+      }),
     },
   };
 }

@@ -18,7 +18,7 @@ import {
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
 } from '@/lib/themes/homepage-templates';
-import { getThemeDefaults } from '@/lib/themes/theme-defaults';
+import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoContent } from '@/lib/themes/demo-content';
 import { trackThemeInstallation } from '@/lib/themes/theme-installation-analytics';
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     const body = await request.json();
-    const { theme_id, include_demo_content, include_demo_attributes } = body;
+    const { theme_id, include_demo_content, include_demo_attributes, business_type } = body;
     
     console.log('[Theme Install] Installation request:', {
       theme_id,
@@ -154,13 +154,23 @@ export async function POST(request: NextRequest) {
       // Get theme defaults for this theme
       const themeDefaults = getThemeDefaults(theme.slug);
       
-      // Create tenant theme with defaults
+      // Get business type color scheme if provided
+      let finalColors = themeDefaults?.colors || {};
+      if (business_type) {
+        const businessColors = getBusinessTypeColorScheme(business_type);
+        if (businessColors) {
+          // Merge business type colors with theme defaults (business type takes precedence)
+          finalColors = { ...finalColors, ...businessColors };
+        }
+      }
+      
+      // Create tenant theme with defaults and business type colors
       tenantTheme = await prisma.tenant_themes.create({
         data: {
           tenant_id: tenant.id,
           theme_id: theme_id,
           is_active: true,
-          custom_colors: themeDefaults?.colors || {},
+          custom_colors: finalColors,
           custom_fonts: themeDefaults?.fonts || {},
         },
       });
@@ -454,25 +464,41 @@ export async function POST(request: NextRequest) {
     console.log('[Theme Install] =================================');
     
     // Create demo content if requested (only for new installs to avoid duplicates)
+    let demoPagesCreated = 0;
+    let demoSalesCreated = 0;
+    let demoBlogsCreated = 0;
+    let demoBlogCategoriesCreated = 0;
+    let demoFormsCreated = 0;
+
     if (isNewInstall && include_demo_content === true) {
       try {
-        console.log('[Theme Install] Creating demo content for theme:', theme.slug, {
+        console.log('[Theme Install] Creating demo content for business type:', business_type, {
           includeAttributes: include_demo_attributes === true,
         });
         const demoResult = await createDemoContent(
           prisma, 
           tenant.id, 
-          theme.slug,
+          business_type || '',
           include_demo_attributes === true
         );
         demoContentCreated = true;
         demoCategoriesCreated = demoResult.categoriesCreated;
         demoProductsCreated = demoResult.productsCreated;
         demoAttributesCreated = demoResult.attributesCreated;
+        demoPagesCreated = demoResult.pagesCreated;
+        demoSalesCreated = demoResult.salesCreated;
+        demoBlogsCreated = demoResult.blogsCreated;
+        demoBlogCategoriesCreated = demoResult.blogCategoriesCreated;
+        demoFormsCreated = demoResult.formsCreated;
         console.log('[Theme Install] Demo content created:', {
           categories: demoCategoriesCreated,
           products: demoProductsCreated,
           attributes: demoAttributesCreated,
+          pages: demoPagesCreated,
+          sales: demoSalesCreated,
+          blogs: demoBlogsCreated,
+          blogCategories: demoBlogCategoriesCreated,
+          forms: demoFormsCreated,
         });
       } catch (demoError: any) {
         // Log detailed error but don't fail theme installation
@@ -519,6 +545,11 @@ export async function POST(request: NextRequest) {
       demo_categories_created: demoCategoriesCreated,
       demo_products_created: demoProductsCreated,
       demo_attributes_created: demoAttributesCreated,
+      demo_pages_created: demoPagesCreated,
+      demo_sales_created: demoSalesCreated,
+      demo_blogs_created: demoBlogsCreated,
+      demo_blog_categories_created: demoBlogCategoriesCreated,
+      demo_forms_created: demoFormsCreated,
     };
     
     console.log('[Theme Install] ===== FINAL RESPONSE DATA =====');
