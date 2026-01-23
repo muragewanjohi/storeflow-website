@@ -27,6 +27,7 @@ const createTenantSchema = z.object({
   contactEmail: z.string().email('Invalid contact email address'),
   planId: z.string().uuid().optional(), // Optional plan selection
   isDemo: z.boolean().optional().default(false), // Demo store flag
+  businessType: z.string().optional(), // Business type for demo stores
 });
 
 /**
@@ -146,15 +147,20 @@ export async function POST(request: NextRequest) {
         data: {
           theme: 'light', // Default to light mode for new stores
           isDemo: validatedData.isDemo || false, // Mark as demo store
+          business_type: validatedData.isDemo && validatedData.businessType ? validatedData.businessType : undefined, // Store business type for demo stores
         },
       },
     });
 
-    // If this is a demo store, seed it with sample data
+    // If this is a demo store, seed it with full demo content (50 products, 10 categories, etc.)
     if (validatedData.isDemo) {
-      // Import and run demo data seeding (non-blocking)
-      import('@/lib/demo-store/seed-demo-data').then(({ seedDemoStoreData }) => {
-        seedDemoStoreData(tenant.id).catch((error) => {
+      // Import and run full demo store seeding (non-blocking)
+      // This creates: 50 products, 10 categories, 5 customers, 10 orders, 2 pages, 2 sales, 2 blogs, 2 blog categories, 1 form
+      // Plus complete homepage with 8 sections
+      import('@/lib/themes/demo-store-seed').then(({ seedExistingDemoStore }) => {
+        // Use selected business type or default to Grocery Store
+        const businessType = validatedData.businessType || 'Grocery Store / Supermarket';
+        seedExistingDemoStore(tenant.id, businessType).catch((error) => {
           console.error('Failed to seed demo store data:', error);
           // Don't fail tenant creation if seeding fails
         });

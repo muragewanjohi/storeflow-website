@@ -493,6 +493,154 @@ async function createStaffUser(
 }
 
 /**
+ * Seed an existing tenant with full demo content
+ * This is used when creating a demo store from the admin form
+ */
+export async function seedExistingDemoStore(
+  tenantId: string,
+  businessType: string = 'Grocery Store / Supermarket'
+): Promise<void> {
+  const startTime = Date.now();
+  console.log(`[Demo Store Seed] 🚀 Starting seed for existing tenant: ${tenantId}`);
+
+  try {
+    // Get tenant
+    const tenant = await prisma.tenants.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new Error(`Tenant ${tenantId} not found`);
+    }
+
+    console.log(`[Demo Store Seed] Seeding tenant: ${tenant.name} (${tenant.subdomain})`);
+
+    // Get Grocery theme
+    const theme = await prisma.themes.findFirst({
+      where: { slug: 'grocery' },
+    });
+
+    if (!theme) {
+      throw new Error('Grocery theme not found');
+    }
+
+    // Check if theme is already installed
+    const existingTheme = await prisma.tenant_themes.findFirst({
+      where: {
+        tenant_id: tenantId,
+        theme_id: theme.id,
+      },
+    });
+
+    if (!existingTheme) {
+      // Install theme with business type colors
+      const themeDefaults = getThemeDefaults(theme.slug);
+      const businessColors = getBusinessTypeColorScheme(businessType);
+      const finalColors = businessColors ? { ...themeDefaults?.colors, ...businessColors } : themeDefaults?.colors;
+
+      await prisma.tenant_themes.create({
+        data: {
+          tenant_id: tenantId,
+          theme_id: theme.id,
+          is_active: true,
+          custom_colors: finalColors || {},
+          custom_fonts: themeDefaults?.fonts || {},
+        },
+      });
+      console.log(`[Demo Store Seed] ✅ Installed theme: ${theme.slug}`);
+    } else {
+      console.log(`[Demo Store Seed] ⏭️  Theme already installed`);
+    }
+
+    // Create homepage with complete sections
+    try {
+      const pageTitle = `Home - ${tenant.name}`;
+      const pageSlug = generatePageSlug('home');
+
+      const existingHomepage = await prisma.pages.findFirst({
+        where: { 
+          tenant_id: tenantId, 
+          OR: [
+            { slug: pageSlug },
+            { slug: 'home' },
+          ]
+        },
+      });
+
+      if (!existingHomepage) {
+        // Use the complete grocery homepage template with all 8 sections
+        const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+
+        await prisma.pages.create({
+          data: {
+            tenant_id: tenantId,
+            title: pageTitle,
+            slug: pageSlug,
+            content: JSON.stringify(pageBuilderData),
+            status: 'published',
+            meta_title: `${tenant.name} - Home`,
+            meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+          },
+        });
+        console.log(`[Demo Store Seed] ✅ Created complete homepage with ${pageBuilderData.sections?.length || 0} sections`);
+      } else {
+        console.log(`[Demo Store Seed] ⏭️  Homepage already exists, skipping creation`);
+      }
+    } catch (error: any) {
+      if (error?.code === 'P2002' || error?.message?.includes('Unique constraint')) {
+        console.log(`[Demo Store Seed] ⏭️  Homepage already exists (unique constraint), skipping`);
+      } else {
+        console.error(`[Demo Store Seed] ⚠️  Error creating homepage:`, error.message);
+      }
+    }
+
+    // Create extended demo content (50 products, 10 categories)
+    const { categoryMap, productIds } = await createExtendedDemoContent(
+      tenantId,
+      businessType
+    );
+
+    console.log(`[Demo Store Seed] ✅ Created ${Object.keys(categoryMap).length} categories and ${productIds.length} products`);
+
+    // Create additional demo content (pages, sales, blogs, etc.)
+    const tenantName = tenant.name;
+    
+    // Create pages, sales, blogs, blog categories, and forms
+    const pagesCreated = await createDemoPages(prisma, tenantId, tenantName);
+    const salesCreated = await createDemoSales(prisma, tenantId);
+    const blogCategoriesMap = await createDemoBlogCategories(prisma, tenantId);
+    const blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap);
+    const formsCreated = await createDemoForm(prisma, tenantId);
+    
+    // Create attributes
+    const attributesCreated = await createDemoAttributes(prisma, tenantId, businessType);
+
+    console.log(`[Demo Store Seed] ✅ Created additional content:`, {
+      pages: pagesCreated,
+      sales: salesCreated,
+      blogs: blogsCreated,
+      blogCategories: Object.keys(blogCategoriesMap).length,
+      forms: formsCreated,
+      attributes: attributesCreated,
+    });
+
+    // Create customers
+    const customerIds = await createDemoCustomers(tenantId);
+    console.log(`[Demo Store Seed] ✅ Created ${customerIds.length} customers`);
+
+    // Create orders
+    await createDemoOrders(tenantId, customerIds, productIds);
+    console.log(`[Demo Store Seed] ✅ Created 10 orders`);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[Demo Store Seed] ✅ Completed seeding tenant ${tenantId} in ${duration}s`);
+  } catch (error: any) {
+    console.error(`[Demo Store Seed] ❌ Error seeding tenant ${tenantId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
  * Create a demo store for a business type
  */
 export async function createDemoStore(businessType: string): Promise<void> {
