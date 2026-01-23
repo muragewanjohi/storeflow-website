@@ -465,8 +465,11 @@ export async function createDemoStore(businessType: string): Promise<void> {
       subdomain,
       contact_email: 'demo@dukanest.com',
       status: 'active',
-      // Store demo flag in data JSON field
-      data: { is_demo: true },
+      // Store demo flag and business type in data JSON field
+      data: { 
+        is_demo: true,
+        business_type: businessType,
+      },
     },
   });
 
