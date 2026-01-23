@@ -441,10 +441,13 @@ async function createStaffUser(
  * Create a demo store for a business type
  */
 export async function createDemoStore(businessType: string): Promise<void> {
-  const subdomain = businessType.toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .substring(0, 63) + '-demo';
+  // Create subdomain: "demo" + business type (no hyphens, no special characters)
+  // Example: "Grocery Store / Supermarket" -> "demogrocerystoresupermarket"
+  const businessTypeSlug = businessType.toLowerCase()
+    .replace(/\s+/g, '') // Remove all spaces
+    .replace(/[^a-z0-9]/g, ''); // Remove all special characters, keep only alphanumeric
+  
+  const subdomain = `demo${businessTypeSlug}`.substring(0, 63); // Max 63 chars for subdomain
 
   console.log(`[Demo Store] Creating demo store for: ${businessType} (${subdomain})`);
 
