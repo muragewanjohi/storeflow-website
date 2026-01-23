@@ -94,6 +94,59 @@ async function createExtendedDemoContent(
     }
   }
 
+  // Helper function to get Unsplash image for product based on business type and category
+  const getProductImage = (businessType: string, categoryIndex: number, productIndex: number): string => {
+    const type = businessType.toLowerCase();
+    
+    // Get category-specific Unsplash images based on business type
+    const categoryImages: Record<string, string[]> = {
+      grocery: [
+        'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&h=400&fit=crop', // Fruits
+        'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop', // Vegetables
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=400&fit=crop', // Dairy
+        'https://images.unsplash.com/photo-1603048297172-c92544798d5a?w=400&h=400&fit=crop', // Meat
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop', // Bakery
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=400&fit=crop', // Beverages
+        'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=400&h=400&fit=crop', // Snacks
+        'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop', // Produce
+      ],
+      pharmacy: [
+        'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop', // Vitamins
+        'https://images.unsplash.com/photo-1550572017-edd951b55104?w=400&h=400&fit=crop', // OTC
+        'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=400&fit=crop', // Prescription
+        'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=400&h=400&fit=crop', // Personal Care
+        'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=400&fit=crop', // Baby Care
+      ],
+      fashion: [
+        'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop', // Clothing
+        'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=400&fit=crop', // Jeans
+        'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=400&fit=crop', // Jackets
+        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', // Shoes
+        'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop', // Bags
+      ],
+      electronics: [
+        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&h=400&fit=crop', // Phones
+        'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&h=400&fit=crop', // Laptops
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', // Headphones
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', // Watches
+        'https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400&h=400&fit=crop', // Accessories
+      ],
+    };
+    
+    // Determine which image set to use
+    let imageSet = categoryImages.grocery; // default
+    if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+      imageSet = categoryImages.pharmacy;
+    } else if (type.includes('fashion') || type.includes('clothing')) {
+      imageSet = categoryImages.fashion;
+    } else if (type.includes('electronic') || type.includes('mobile')) {
+      imageSet = categoryImages.electronics;
+    }
+    
+    // Use category-specific image or cycle through available images
+    return imageSet[categoryIndex % imageSet.length] || imageSet[0];
+  };
+
   // Extend products to 50 by creating variations
   const baseProducts = config.products;
   const extendedProducts = [...baseProducts];
@@ -114,7 +167,8 @@ async function createExtendedDemoContent(
       price: baseProduct.price * (1 + (Math.random() * 0.3 - 0.15)), // Vary price by ±15%
       sale_price: Math.random() > 0.7 ? baseProduct.price * 0.8 : undefined,
       category_index: categoryIndex,
-      image: baseProduct.image,
+      // Use Unsplash image based on business type and category
+      image: getProductImage(businessType, categoryIndex, productIndex),
       sku: undefined, // Will be generated
     });
     productIndex++;
@@ -525,24 +579,25 @@ export async function createDemoStore(businessType: string): Promise<void> {
 
   console.log(`[Demo Store] Installed theme: ${theme.slug}`);
 
-  // Create homepage
+  // Create homepage with complete sections
   try {
-    const templateData = getHomepageTemplateData(theme.slug);
-    const pageTitle = templateData?.title || `Home - ${tenant.name}`;
+    const pageTitle = `Home - ${tenant.name}`;
     const pageSlug = generatePageSlug('home');
 
+    // Check if homepage already exists (by slug or by checking for home page)
     const existingHomepage = await prisma.pages.findFirst({
-      where: { tenant_id: tenant.id, slug: pageSlug },
+      where: { 
+        tenant_id: tenant.id, 
+        OR: [
+          { slug: pageSlug },
+          { slug: 'home' },
+        ]
+      },
     });
 
     if (!existingHomepage) {
-      const layoutData = getHomepageLayout(theme.slug);
-      let pageBuilderData;
-      if (layoutData && layoutData.length > 0) {
-        pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
-      } else {
-        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
-      }
+      // Use the complete grocery homepage template with all sections
+      const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
 
       await prisma.pages.create({
         data: {
@@ -555,10 +610,18 @@ export async function createDemoStore(businessType: string): Promise<void> {
           meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
         },
       });
-      console.log(`[Demo Store] Created homepage`);
+      console.log(`[Demo Store] ✅ Created complete homepage with ${pageBuilderData.sections?.length || 0} sections`);
+    } else {
+      console.log(`[Demo Store] ⏭️  Homepage already exists, skipping creation`);
     }
   } catch (error: any) {
-    console.error(`[Demo Store] Error creating homepage:`, error.message);
+    // If unique constraint error, homepage might already exist - that's okay
+    if (error?.code === 'P2002' || error?.message?.includes('Unique constraint')) {
+      console.log(`[Demo Store] ⏭️  Homepage already exists (unique constraint), skipping`);
+    } else {
+      console.error(`[Demo Store] ⚠️  Error creating homepage:`, error.message);
+      // Don't throw - continue with other content creation
+    }
   }
 
   // Create extended demo content (50 products, 10 categories)
