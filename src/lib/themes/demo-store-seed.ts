@@ -578,8 +578,8 @@ export async function seedExistingDemoStore(
       });
 
       if (!existingHomepage) {
-        // Use the complete grocery homepage template with all 8 sections
-        const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+        // Use the complete grocery homepage template with all 8 sections, customized for business type
+        const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, businessType);
 
         await prisma.pages.create({
           data: {
@@ -824,8 +824,8 @@ export async function createDemoStore(businessType: string): Promise<void> {
     });
 
     if (!existingHomepage) {
-      // Use the complete grocery homepage template with all sections
-      const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+      // Use the complete grocery homepage template with all sections, customized for business type
+      const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, businessType);
 
       await prisma.pages.create({
         data: {
