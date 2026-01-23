@@ -1070,6 +1070,31 @@ export async function createDemoAttributes(
     );
   }
   
+  // Pharmacy / Health & Wellness - dosage/quantity attributes (exactly 2 attributes)
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    attributeConfigs.push(
+      {
+        name: 'Dosage',
+        type: 'text',
+        values: [
+          { value: '500mg' },
+          { value: '1000mg' },
+          { value: '250mg' },
+        ],
+      },
+      {
+        name: 'Quantity',
+        type: 'text',
+        values: [
+          { value: '10 tablets' },
+          { value: '20 tablets' },
+          { value: '30 tablets' },
+          { value: '50 tablets' },
+        ],
+      }
+    );
+  }
+  
   // Fashion / Clothing - size and color
   if (type.includes('fashion') || type.includes('clothing')) {
     attributeConfigs.push(
@@ -1094,6 +1119,31 @@ export async function createDemoAttributes(
           { value: 'Red', color_code: '#FF0000' },
           { value: 'Blue', color_code: '#0000FF' },
           { value: 'Green', color_code: '#008000' },
+        ],
+      }
+    );
+  }
+  
+  // Pharmacy / Health & Wellness - dosage/quantity attributes (exactly 2 attributes)
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    attributeConfigs.push(
+      {
+        name: 'Dosage',
+        type: 'text',
+        values: [
+          { value: '500mg' },
+          { value: '1000mg' },
+          { value: '250mg' },
+        ],
+      },
+      {
+        name: 'Quantity',
+        type: 'text',
+        values: [
+          { value: '10 tablets' },
+          { value: '20 tablets' },
+          { value: '30 tablets' },
+          { value: '50 tablets' },
         ],
       }
     );
@@ -1151,9 +1201,69 @@ export async function createDemoAttributes(
     );
   }
   
-  // Default attributes for any theme
-  if (attributeConfigs.length === 0) {
+  // Beauty & Personal Care
+  if (type.includes('beauty') || type.includes('personal care')) {
     attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'text',
+        values: [
+          { value: '50ml' },
+          { value: '100ml' },
+          { value: '200ml' },
+          { value: '500ml' },
+        ],
+      },
+      {
+        name: 'Type',
+        type: 'text',
+        values: [
+          { value: 'Normal' },
+          { value: 'Sensitive' },
+          { value: 'Oily' },
+          { value: 'Dry' },
+        ],
+      }
+    );
+  }
+  
+  // Home & Kitchen
+  if (type.includes('home') && type.includes('kitchen')) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'text',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      },
+      {
+        name: 'Material',
+        type: 'text',
+        values: [
+          { value: 'Stainless Steel' },
+          { value: 'Plastic' },
+          { value: 'Ceramic' },
+        ],
+      }
+    );
+  }
+  
+  // Baby & Kids Products
+  if (type.includes('baby') || type.includes('kids')) {
+    attributeConfigs.push(
+      {
+        name: 'Age Range',
+        type: 'text',
+        values: [
+          { value: '0-6 months' },
+          { value: '6-12 months' },
+          { value: '1-2 years' },
+          { value: '2-4 years' },
+        ],
+      },
       {
         name: 'Size',
         type: 'size',
@@ -1165,10 +1275,133 @@ export async function createDemoAttributes(
       }
     );
   }
+  
+  // Food & Beverages / Restaurant
+  if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+    attributeConfigs.push(
+      {
+        name: 'Serving Size',
+        type: 'text',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      },
+      {
+        name: 'Spice Level',
+        type: 'text',
+        values: [
+          { value: 'Mild' },
+          { value: 'Medium' },
+          { value: 'Hot' },
+        ],
+      }
+    );
+  }
+  
+  // Convenience Store / Duka
+  if (type.includes('convenience') || type.includes('duka')) {
+    attributeConfigs.push(
+      {
+        name: 'Pack Size',
+        type: 'text',
+        values: [
+          { value: 'Single' },
+          { value: 'Pack of 2' },
+          { value: 'Pack of 4' },
+        ],
+      },
+      {
+        name: 'Weight',
+        type: 'text',
+        values: [
+          { value: '100g' },
+          { value: '250g' },
+          { value: '500g' },
+        ],
+      }
+    );
+  }
+  
+  // Pets
+  if (type.includes('pets')) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'text',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      },
+      {
+        name: 'Age Range',
+        type: 'text',
+        values: [
+          { value: 'Puppy/Kitten' },
+          { value: 'Adult' },
+          { value: 'Senior' },
+        ],
+      }
+    );
+  }
+  
+  // Hardware
+  if (type.includes('hardware')) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'text',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      },
+      {
+        name: 'Material',
+        type: 'text',
+        values: [
+          { value: 'Steel' },
+          { value: 'Aluminum' },
+          { value: 'Plastic' },
+        ],
+      }
+    );
+  }
+  
+  // Default attributes for any theme (ensure we have at least 2)
+  if (attributeConfigs.length === 0) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'size',
+        values: [
+          { value: 'Small' },
+          { value: 'Medium' },
+          { value: 'Large' },
+        ],
+      },
+      {
+        name: 'Color',
+        type: 'color',
+        values: [
+          { value: 'Black', color_code: '#000000' },
+          { value: 'White', color_code: '#FFFFFF' },
+          { value: 'Red', color_code: '#FF0000' },
+        ],
+      }
+    );
+  }
 
-  console.log(`[Demo Content] Creating ${attributeConfigs.length} attributes for business type: ${businessType}`);
+  // Limit to exactly 2 attributes
+  const finalAttributeConfigs = attributeConfigs.slice(0, 2);
+  
+  console.log(`[Demo Content] Creating ${finalAttributeConfigs.length} attributes for business type: ${businessType}`);
 
-  for (const attrConfig of attributeConfigs) {
+  for (const attrConfig of finalAttributeConfigs) {
     try {
       // Generate slug using same method as API route
       const slug = attrConfig.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -1308,16 +1541,29 @@ export async function createDemoPages(
 
 /**
  * Create demo sales/promotions for a tenant
+ * Links products to sales via product_sales junction table
  */
 export async function createDemoSales(
   prisma: PrismaClient,
-  tenantId: string
+  tenantId: string,
+  productIds?: string[]
 ): Promise<number> {
   let salesCreated = 0;
   
   const now = new Date();
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  // Get products if not provided
+  let availableProductIds = productIds;
+  if (!availableProductIds || availableProductIds.length === 0) {
+    const products = await prisma.products.findMany({
+      where: { tenant_id: tenantId, status: 'active' },
+      select: { id: true },
+      take: 20, // Get up to 20 products to link to sales
+    });
+    availableProductIds = products.map(p => p.id);
+  }
 
   const demoSales = [
     {
@@ -1354,8 +1600,12 @@ export async function createDemoSales(
         },
       });
 
-      if (!existingSale) {
-        await prisma.sales.create({
+      let sale;
+      if (existingSale) {
+        sale = existingSale;
+        console.log(`[Demo Content] Sale already exists: ${saleData.name}`);
+      } else {
+        sale = await prisma.sales.create({
           data: {
             tenant_id: tenantId,
             name: saleData.name,
@@ -1371,6 +1621,58 @@ export async function createDemoSales(
         });
         salesCreated++;
         console.log(`[Demo Content] Created sale: ${saleData.name}`);
+      }
+
+      // Link products to this sale (if products are available)
+      if (availableProductIds && availableProductIds.length > 0) {
+        // Link 5-10 products to each sale
+        const numProducts = Math.min(10, availableProductIds.length);
+        const productsToLink = availableProductIds
+          .sort(() => Math.random() - 0.5)
+          .slice(0, numProducts);
+
+        let productsLinked = 0;
+        for (let i = 0; i < productsToLink.length; i++) {
+          const productId = productsToLink[i];
+          try {
+            // Check if product-sale link already exists
+            const existingLink = await prisma.product_sales.findFirst({
+              where: {
+                tenant_id: tenantId,
+                product_id: productId,
+                sale_id: sale.id,
+              },
+            });
+
+            if (!existingLink) {
+              // Get product to calculate discount
+              const product = await prisma.products.findUnique({
+                where: { id: productId },
+                select: { price: true },
+              });
+
+              if (product) {
+                const discountPercent = 10 + (i % 20); // 10-30% discount
+                const salePrice = Number(product.price) * (1 - discountPercent / 100);
+
+                await prisma.product_sales.create({
+                  data: {
+                    tenant_id: tenantId,
+                    product_id: productId,
+                    sale_id: sale.id,
+                    discount_percent: discountPercent,
+                    sale_price: Number(salePrice.toFixed(2)),
+                    order_index: i,
+                  },
+                });
+                productsLinked++;
+              }
+            }
+          } catch (linkError: any) {
+            console.error(`[Demo Content] Error linking product to sale:`, linkError.message);
+          }
+        }
+        console.log(`[Demo Content] Linked ${productsLinked} products to sale: ${saleData.name}`);
       }
     } catch (error: any) {
       console.error(`[Demo Content] Error creating sale ${saleData.name}:`, error.message);

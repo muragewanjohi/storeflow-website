@@ -20,6 +20,7 @@ import { getDemoContentConfig, createDemoPages, createDemoSales, createDemoBlogC
 import { generateOrderNumber } from '@/lib/orders/utils';
 import { getHomepageTemplateData, getHomepageLayout, convertLegacyLayoutToPageBuilder, createDefaultHomepageTemplate } from './homepage-templates';
 import { addTenantDomain } from '@/lib/vercel-domains';
+import { setStaticOption } from '@/lib/settings/static-options';
 
 // Business types for demo stores
 const BUSINESS_TYPES = [
@@ -221,11 +222,11 @@ async function createDemoCustomers(
   tenantId: string
 ): Promise<string[]> {
   const customerData = [
-    { name: 'John Mwangi', email: 'john.mwangi@example.com', mobile: '+254700000001' },
-    { name: 'Sarah Wanjiku', email: 'sarah.wanjiku@example.com', mobile: '+254700000002' },
-    { name: 'David Ochieng', email: 'david.ochieng@example.com', mobile: '+254700000003' },
-    { name: 'Grace Akinyi', email: 'grace.akinyi@example.com', mobile: '+254700000004' },
-    { name: 'Peter Kamau', email: 'peter.kamau@example.com', mobile: '+254700000005' },
+    { name: 'John Mwangi', email: 'john.mwangi@dukanest.com', mobile: '+254700000001' },
+    { name: 'Sarah Wanjiku', email: 'sarah.wanjiku@dukanest.com', mobile: '+254700000002' },
+    { name: 'David Ochieng', email: 'david.ochieng@dukanest.com', mobile: '+254700000003' },
+    { name: 'Grace Akinyi', email: 'grace.akinyi@dukanest.com', mobile: '+254700000004' },
+    { name: 'Peter Kamau', email: 'peter.kamau@dukanest.com', mobile: '+254700000005' },
   ];
 
   const customerIds: string[] = [];
@@ -552,6 +553,14 @@ export async function seedExistingDemoStore(
       console.log(`[Demo Store Seed] ⏭️  Theme already installed`);
     }
 
+    // Set store logo (use default logo from public folder)
+    try {
+      await setStaticOption(tenantId, 'store_logo', '/logo.png');
+      console.log(`[Demo Store Seed] ✅ Set store logo: /logo.png`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error setting store logo:`, error.message);
+    }
+
     // Create homepage with complete sections
     try {
       const pageTitle = `Home - ${tenant.name}`;
@@ -607,7 +616,8 @@ export async function seedExistingDemoStore(
     
     // Create pages, sales, blogs, blog categories, and forms
     const pagesCreated = await createDemoPages(prisma, tenantId, tenantName);
-    const salesCreated = await createDemoSales(prisma, tenantId);
+    // Pass productIds to link products to sales
+    const salesCreated = await createDemoSales(prisma, tenantId, productIds);
     const blogCategoriesMap = await createDemoBlogCategories(prisma, tenantId);
     const blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap);
     const formsCreated = await createDemoForm(prisma, tenantId);
