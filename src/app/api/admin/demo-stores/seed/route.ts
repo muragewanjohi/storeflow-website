@@ -21,12 +21,19 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth();
     requireRole(user, 'landlord');
 
-    console.log('[Demo Store Seed API] Starting seed process...');
+    console.log('[Demo Store Seed API] 🚀 Starting seed process...');
+    console.log('[Demo Store Seed API] This will create 12 demo stores. Process may take 10-30 minutes.');
 
     // Run seed in background (don't wait for completion)
-    seedAllDemoStores().catch((error) => {
-      console.error('[Demo Store Seed API] Seed process error:', error);
-    });
+    // Logs will be visible in Vercel logs
+    seedAllDemoStores()
+      .then(() => {
+        console.log('[Demo Store Seed API] ✅ Seed process completed successfully');
+      })
+      .catch((error) => {
+        console.error('[Demo Store Seed API] ❌ Seed process error:', error);
+        console.error('[Demo Store Seed API] Error stack:', error?.stack);
+      });
 
     return NextResponse.json(
       {

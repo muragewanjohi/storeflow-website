@@ -19,6 +19,7 @@ import { getThemeDefaults, getBusinessTypeColorScheme } from './theme-defaults';
 import { getDemoContentConfig, createDemoPages, createDemoSales, createDemoBlogCategories, createDemoBlogs, createDemoForm, createDemoAttributes } from './demo-content';
 import { generateOrderNumber } from '@/lib/orders/utils';
 import { getHomepageTemplateData, getHomepageLayout, convertLegacyLayoutToPageBuilder, createDefaultHomepageTemplate } from './homepage-templates';
+import { addTenantDomain } from '@/lib/vercel-domains';
 
 // Business types for demo stores
 const BUSINESS_TYPES = [
@@ -449,7 +450,8 @@ export async function createDemoStore(businessType: string): Promise<void> {
   
   const subdomain = `demo${businessTypeSlug}`.substring(0, 63); // Max 63 chars for subdomain
 
-  console.log(`[Demo Store] Creating demo store for: ${businessType} (${subdomain})`);
+  const startTime = Date.now();
+  console.log(`[Demo Store] 🚀 Starting creation for: ${businessType} (${subdomain})`);
 
   // Check if tenant already exists
   const existingTenant = await prisma.tenants.findFirst({
@@ -457,7 +459,7 @@ export async function createDemoStore(businessType: string): Promise<void> {
   });
 
   if (existingTenant) {
-    console.log(`[Demo Store] Tenant ${subdomain} already exists, skipping...`);
+    console.log(`[Demo Store] ⏭️  Tenant ${subdomain} already exists, skipping...`);
     return;
   }
 
@@ -476,7 +478,26 @@ export async function createDemoStore(businessType: string): Promise<void> {
     },
   });
 
-  console.log(`[Demo Store] Created tenant: ${tenant.id}`);
+  console.log(`[Demo Store] ✅ Created tenant: ${tenant.id} (${tenant.name})`);
+
+  // Add subdomain to Vercel (if configured)
+  const projectId = process.env.VERCEL_PROJECT_ID;
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+  const fullDomain = `${subdomain}.${baseDomain}`;
+  
+  if (projectId) {
+    try {
+      console.log(`[Demo Store] 🌐 Adding domain to Vercel: ${fullDomain}...`);
+      await addTenantDomain(fullDomain, projectId);
+      console.log(`[Demo Store] ✅ Successfully added domain ${fullDomain} to Vercel`);
+    } catch (error: any) {
+      // Log error but don't fail tenant creation
+      console.error(`[Demo Store] ⚠️  Failed to add domain ${fullDomain} to Vercel:`, error?.message || error);
+      console.error(`[Demo Store] ⚠️  Domain can be added manually later if needed`);
+    }
+  } else {
+    console.log(`[Demo Store] ⚠️  VERCEL_PROJECT_ID not set. Domain ${fullDomain} will not be added to Vercel automatically.`);
+  }
 
   // Get Grocery theme
   const theme = await prisma.themes.findFirst({
@@ -591,22 +612,59 @@ export async function createDemoStore(businessType: string): Promise<void> {
   await createStaffUser(tenant.id);
   console.log(`[Demo Store] Linked staff user: tester@dukanest.com (password: Avatar.12)`);
 
-  console.log(`[Demo Store] ✅ Completed: ${businessType}`);
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[Demo Store] ✅ Completed: ${businessType} in ${duration}s`);
 }
 
 /**
  * Seed all demo stores
  */
 export async function seedAllDemoStores(): Promise<void> {
-  console.log('[Demo Store Seed] Starting seed process...');
+  const startTime = Date.now();
+  console.log('[Demo Store Seed] 🚀 Starting seed process for all business types...');
+  console.log(`[Demo Store Seed] Total stores to create: ${BUSINESS_TYPES.length}`);
 
-  for (const businessType of BUSINESS_TYPES) {
+  const results = {
+    success: [] as string[],
+    failed: [] as { type: string; error: string }[],
+    skipped: [] as string[],
+  };
+
+  for (let i = 0; i < BUSINESS_TYPES.length; i++) {
+    const businessType = BUSINESS_TYPES[i];
+    const progress = `[${i + 1}/${BUSINESS_TYPES.length}]`;
+    
     try {
+      console.log(`[Demo Store Seed] ${progress} Processing: ${businessType}...`);
       await createDemoStore(businessType);
+      results.success.push(businessType);
+      console.log(`[Demo Store Seed] ${progress} ✅ Success: ${businessType}`);
     } catch (error: any) {
-      console.error(`[Demo Store Seed] Error creating ${businessType}:`, error.message);
+      const errorMessage = error?.message || String(error);
+      console.error(`[Demo Store Seed] ${progress} ❌ Error creating ${businessType}:`, errorMessage);
+      console.error(`[Demo Store Seed] ${progress} Stack:`, error?.stack);
+      results.failed.push({ type: businessType, error: errorMessage });
     }
   }
 
-  console.log('[Demo Store Seed] ✅ Seed process completed!');
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log('\n[Demo Store Seed] ============================================');
+  console.log(`[Demo Store Seed] ✅ Seed process completed in ${duration}s`);
+  console.log(`[Demo Store Seed] 📊 Results:`);
+  console.log(`[Demo Store Seed]   - Success: ${results.success.length}`);
+  console.log(`[Demo Store Seed]   - Failed: ${results.failed.length}`);
+  console.log(`[Demo Store Seed]   - Skipped: ${results.skipped.length}`);
+  
+  if (results.success.length > 0) {
+    console.log(`[Demo Store Seed] ✅ Successful stores:`, results.success.join(', '));
+  }
+  
+  if (results.failed.length > 0) {
+    console.log(`[Demo Store Seed] ❌ Failed stores:`);
+    results.failed.forEach(({ type, error }) => {
+      console.log(`[Demo Store Seed]   - ${type}: ${error}`);
+    });
+  }
+  
+  console.log('[Demo Store Seed] ============================================\n');
 }
