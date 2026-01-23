@@ -503,6 +503,7 @@ export async function seedExistingDemoStore(
 ): Promise<void> {
   const startTime = Date.now();
   console.log(`[Demo Store Seed] 🚀 Starting seed for existing tenant: ${tenantId}`);
+  console.log(`[Demo Store Seed] Business type: ${businessType}`);
 
   try {
     // Get tenant
@@ -604,26 +605,77 @@ export async function seedExistingDemoStore(
     }
 
     // Create extended demo content (50 products, 10 categories)
-    const { categoryMap, productIds } = await createExtendedDemoContent(
-      tenantId,
-      businessType
-    );
-
-    console.log(`[Demo Store Seed] ✅ Created ${Object.keys(categoryMap).length} categories and ${productIds.length} products`);
+    console.log(`[Demo Store Seed] 📦 Starting to create extended demo content (50 products, 10 categories)...`);
+    let categoryMap: Record<number, string> = {};
+    let productIds: string[] = [];
+    
+    try {
+      const result = await createExtendedDemoContent(tenantId, businessType);
+      categoryMap = result.categoryMap;
+      productIds = result.productIds;
+      console.log(`[Demo Store Seed] ✅ Created ${Object.keys(categoryMap).length} categories and ${productIds.length} products`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ❌ Error creating extended demo content:`, error.message);
+      console.error(`[Demo Store Seed] Error stack:`, error?.stack);
+      throw error; // Re-throw to stop execution if products/categories fail
+    }
 
     // Create additional demo content (pages, sales, blogs, etc.)
     const tenantName = tenant.name;
     
-    // Create pages, sales, blogs, blog categories, and forms
-    const pagesCreated = await createDemoPages(prisma, tenantId, tenantName);
-    // Pass productIds to link products to sales
-    const salesCreated = await createDemoSales(prisma, tenantId, productIds);
-    const blogCategoriesMap = await createDemoBlogCategories(prisma, tenantId);
-    const blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap);
-    const formsCreated = await createDemoForm(prisma, tenantId);
+    console.log(`[Demo Store Seed] 📄 Creating additional demo content (pages, sales, blogs, attributes, forms)...`);
     
-    // Create attributes
-    const attributesCreated = await createDemoAttributes(prisma, tenantId, businessType);
+    // Create pages, sales, blogs, blog categories, and forms
+    let pagesCreated = 0;
+    let salesCreated = 0;
+    let blogCategoriesMap: Record<string, string> = {};
+    let blogsCreated = 0;
+    let formsCreated = 0;
+    let attributesCreated = 0;
+    
+    try {
+      pagesCreated = await createDemoPages(prisma, tenantId, tenantName);
+      console.log(`[Demo Store Seed] ✅ Created ${pagesCreated} pages`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating pages:`, error.message);
+    }
+    
+    try {
+      // Pass productIds to link products to sales
+      salesCreated = await createDemoSales(prisma, tenantId, productIds);
+      console.log(`[Demo Store Seed] ✅ Created ${salesCreated} sales`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating sales:`, error.message);
+    }
+    
+    try {
+      blogCategoriesMap = await createDemoBlogCategories(prisma, tenantId);
+      console.log(`[Demo Store Seed] ✅ Created ${Object.keys(blogCategoriesMap).length} blog categories`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating blog categories:`, error.message);
+    }
+    
+    try {
+      blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap);
+      console.log(`[Demo Store Seed] ✅ Created ${blogsCreated} blogs`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating blogs:`, error.message);
+    }
+    
+    try {
+      formsCreated = await createDemoForm(prisma, tenantId);
+      console.log(`[Demo Store Seed] ✅ Created ${formsCreated} forms`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating forms:`, error.message);
+    }
+    
+    try {
+      // Create attributes
+      attributesCreated = await createDemoAttributes(prisma, tenantId, businessType);
+      console.log(`[Demo Store Seed] ✅ Created ${attributesCreated} attributes`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ⚠️  Error creating attributes:`, error.message);
+    }
 
     console.log(`[Demo Store Seed] ✅ Created additional content:`, {
       pages: pagesCreated,
@@ -635,12 +687,30 @@ export async function seedExistingDemoStore(
     });
 
     // Create customers
-    const customerIds = await createDemoCustomers(tenantId);
-    console.log(`[Demo Store Seed] ✅ Created ${customerIds.length} customers`);
+    console.log(`[Demo Store Seed] 👥 Creating 5 customers...`);
+    let customerIds: string[] = [];
+    try {
+      customerIds = await createDemoCustomers(tenantId);
+      console.log(`[Demo Store Seed] ✅ Created ${customerIds.length} customers`);
+    } catch (error: any) {
+      console.error(`[Demo Store Seed] ❌ Error creating customers:`, error.message);
+      console.error(`[Demo Store Seed] Error stack:`, error?.stack);
+      // Continue even if customers fail, but orders will fail
+    }
 
-    // Create orders
-    await createDemoOrders(tenantId, customerIds, productIds);
-    console.log(`[Demo Store Seed] ✅ Created 10 orders`);
+    // Create orders (only if we have customers and products)
+    if (customerIds.length > 0 && productIds.length > 0) {
+      console.log(`[Demo Store Seed] 🛒 Creating 10 orders...`);
+      try {
+        await createDemoOrders(tenantId, customerIds, productIds);
+        console.log(`[Demo Store Seed] ✅ Created 10 orders`);
+      } catch (error: any) {
+        console.error(`[Demo Store Seed] ❌ Error creating orders:`, error.message);
+        console.error(`[Demo Store Seed] Error stack:`, error?.stack);
+      }
+    } else {
+      console.warn(`[Demo Store Seed] ⚠️  Skipping order creation: customers=${customerIds.length}, products=${productIds.length}`);
+    }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[Demo Store Seed] ✅ Completed seeding tenant ${tenantId} in ${duration}s`);

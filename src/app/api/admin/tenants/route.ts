@@ -157,15 +157,23 @@ export async function POST(request: NextRequest) {
       // Import and run full demo store seeding (non-blocking)
       // This creates: 50 products, 10 categories, 5 customers, 10 orders, 2 pages, 2 sales, 2 blogs, 2 blog categories, 1 form
       // Plus complete homepage with 8 sections
+      const businessType = validatedData.businessType || 'Grocery Store / Supermarket';
+      console.log(`[Tenant Creation] 🚀 Starting demo store seeding for tenant ${tenant.id} with business type: ${businessType}`);
+      
       import('@/lib/themes/demo-store-seed').then(({ seedExistingDemoStore }) => {
-        // Use selected business type or default to Grocery Store
-        const businessType = validatedData.businessType || 'Grocery Store / Supermarket';
-        seedExistingDemoStore(tenant.id, businessType).catch((error) => {
-          console.error('Failed to seed demo store data:', error);
-          // Don't fail tenant creation if seeding fails
-        });
+        console.log(`[Tenant Creation] ✅ Successfully imported seedExistingDemoStore function`);
+        seedExistingDemoStore(tenant.id, businessType)
+          .then(() => {
+            console.log(`[Tenant Creation] ✅ Successfully completed seeding for tenant ${tenant.id}`);
+          })
+          .catch((error) => {
+            console.error(`[Tenant Creation] ❌ Failed to seed demo store data for tenant ${tenant.id}:`, error);
+            console.error(`[Tenant Creation] Error stack:`, error?.stack);
+            // Don't fail tenant creation if seeding fails, but log the error
+          });
       }).catch((error) => {
-        console.error('Failed to import demo data seeder:', error);
+        console.error(`[Tenant Creation] ❌ Failed to import demo data seeder:`, error);
+        console.error(`[Tenant Creation] Import error stack:`, error?.stack);
       });
     }
 

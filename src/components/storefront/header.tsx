@@ -280,15 +280,18 @@ export default function StorefrontHeader({
                 className="flex items-center gap-1"
               >
                 {storeLogo && (
-                  <div className="relative h-10 w-auto sm:h-12 md:h-16 max-w-[120px] sm:max-w-[180px] md:max-w-[300px]">
+                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
                     <Image 
                       src={storeLogo} 
                       alt={storeName}
                       fill
                       className="object-contain"
                       sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        // Hide the image on error, but keep the container for spacing
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
                       }}
                     />
                   </div>
@@ -300,15 +303,18 @@ export default function StorefrontHeader({
             ) : (
               <Link href="/" className="flex items-center gap-1">
                 {storeLogo && (
-                  <div className="relative h-10 w-auto sm:h-12 md:h-16 max-w-[120px] sm:max-w-[180px] md:max-w-[300px]">
+                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
                     <Image 
                       src={storeLogo} 
                       alt={storeName}
                       fill
                       className="object-contain"
                       sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        // Hide the image on error, but keep the container for spacing
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
                       }}
                     />
                   </div>

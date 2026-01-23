@@ -25,7 +25,10 @@ export default async function StorefrontHeaderServer() {
   // Use tenant name as store name (from tenants table)
   // Store logo comes from static_options, fallback to default logo
   const storeName = tenant.name || tenant.subdomain || 'DukaNest';
-  const storeLogo = settings.store_logo || defaultLogo;
+  // Ensure logo is a valid string (not null, undefined, or empty)
+  const storeLogo = (settings.store_logo && settings.store_logo.trim() !== '') 
+    ? settings.store_logo.trim() 
+    : defaultLogo;
 
   return <StorefrontHeader storeName={storeName} storeLogo={storeLogo} />;
 }
