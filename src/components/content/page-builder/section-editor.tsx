@@ -2967,7 +2967,7 @@ function FormSectionEditor({
             onCheckedChange={(checked) => onUpdate({ show_form_title: checked === true })}
           />
           <Label htmlFor="show-form-title" className="cursor-pointer">
-            Show form's own title
+            Show form&apos;s own title
           </Label>
         </div>
 
