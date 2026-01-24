@@ -112,7 +112,7 @@ export async function sendCustomerPasswordResetEmail({
   resetToken: string;
 }) {
   const storeUrl = getTenantStoreUrl(tenant);
-  const resetUrl = `${storeUrl}/reset-password?token=${resetToken}`;
+  const resetUrl = `${storeUrl}/customer-reset-password?token=${resetToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 
   const html = `

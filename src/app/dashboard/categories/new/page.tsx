@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import CategoryFormClient from '../category-form-client';
 
 export const dynamic = 'force-dynamic';
@@ -19,25 +20,30 @@ export default async function CreateCategoryPage() {
     redirect('/login');
   }
 
-  // Fetch parent categories
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let parentCategories: any[] = [];
+  // Fetch parent categories directly from database (more reliable than HTTP fetch)
+  const parentCategoriesRaw = await prisma.categories.findMany({
+    where: {
+      tenant_id: tenant.id,
+      parent_id: null, // Only top-level categories as potential parents
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
 
-  try {
-    const response = await fetch(`${baseUrl}/api/categories?include_children=false`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
-      },
-      cache: 'no-store',
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      parentCategories = data.categories || [];
-    }
-  } catch (error) {
-    console.error('Error fetching parent categories:', error);
-  }
+  // Map to ensure non-null slugs for the client component
+  const parentCategories = parentCategoriesRaw.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    slug: cat.slug || '',
+    status: cat.status,
+  }));
 
   return <CategoryFormClient parentCategories={parentCategories} />;
 }

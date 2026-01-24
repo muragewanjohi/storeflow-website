@@ -138,14 +138,26 @@ export async function POST(request: NextRequest) {
 
     if (existingTenantTheme) {
       // Update existing theme to active
+      // Also update colors if business type is provided (allows color refresh)
+      const updateData: any = {
+        is_active: true,
+        updated_at: new Date(),
+      };
+      
+      // If business type is provided, update colors with latest scheme
+      if (business_type) {
+        const themeDefaults = getThemeDefaults(theme.slug);
+        const businessColors = getBusinessTypeColorScheme(business_type);
+        if (businessColors) {
+          updateData.custom_colors = { ...(themeDefaults?.colors || {}), ...businessColors };
+        }
+      }
+      
       tenantTheme = await prisma.tenant_themes.update({
         where: {
           id: existingTenantTheme.id,
         },
-        data: {
-          is_active: true,
-          updated_at: new Date(),
-        },
+        data: updateData,
       });
     } else {
       // Create new tenant theme

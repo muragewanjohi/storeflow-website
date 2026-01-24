@@ -18,9 +18,15 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
       ? new Date(searchParams.get('startDate')!)
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const endDate = searchParams.get('endDate')
-      ? new Date(searchParams.get('endDate')!)
-      : new Date();
+    
+    // Set endDate to end of day (23:59:59.999) to include all orders from that day
+    let endDate: Date;
+    if (searchParams.get('endDate')) {
+      endDate = new Date(searchParams.get('endDate')!);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      endDate = new Date();
+    }
 
     // Fetch order products with product and category info
     const orderProducts = await prisma.order_products.findMany({

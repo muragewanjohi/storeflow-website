@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const customer = await getCurrentCustomer();
     const customerId = customer?.id || null;
 
-    // Insert event
+    // Insert event using proper parameterization
     await prisma.$executeRaw`
       INSERT INTO analytics_events (
         tenant_id,
@@ -53,14 +53,14 @@ export async function POST(request: NextRequest) {
       ) VALUES (
         ${tenant.id}::uuid,
         ${sessionId},
-        ${customerId ? `${customerId}::uuid` : 'NULL'},
+        ${customerId}::uuid,
         ${eventName},
         ${eventCategory || null},
         ${eventLabel || null},
-        ${eventValue ? parseFloat(String(eventValue)) : null},
-        ${productId ? `${productId}::uuid` : 'NULL'},
-        ${orderId ? `${orderId}::uuid` : 'NULL'},
-        ${metadata ? JSON.stringify(metadata) : '{}'},
+        ${eventValue ? parseFloat(String(eventValue)) : null}::decimal,
+        ${productId}::uuid,
+        ${orderId}::uuid,
+        ${metadata ? JSON.stringify(metadata) : '{}'}::jsonb,
         NOW()
       )
     `;

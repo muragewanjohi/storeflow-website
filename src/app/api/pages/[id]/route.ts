@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
@@ -138,6 +139,25 @@ export async function PUT(
       },
     });
 
+    // Revalidate the page cache to ensure changes appear immediately on storefront
+    try {
+      // Revalidate the specific page path
+      if (page.slug) {
+        revalidatePath(`/${page.slug}`);
+      }
+      // Also revalidate old slug if it changed
+      if (existingPage.slug && existingPage.slug !== page.slug) {
+        revalidatePath(`/${existingPage.slug}`);
+      }
+      // Revalidate homepage if slug is 'home' or empty
+      if (page.slug === 'home' || page.slug === '') {
+        revalidatePath('/');
+      }
+    } catch (revalidateError) {
+      // Non-critical - log but don't fail the request
+      console.warn('[Page Update] Failed to revalidate cache:', revalidateError);
+    }
+
     return NextResponse.json({ page });
   } catch (error) {
     console.error('Error updating page:', error);
@@ -192,6 +212,18 @@ export async function DELETE(
         { error: 'Page not found' },
         { status: 404 }
       );
+    }
+
+    // Revalidate the page cache before deleting
+    try {
+      if (page.slug) {
+        revalidatePath(`/${page.slug}`);
+      }
+      if (page.slug === 'home' || page.slug === '') {
+        revalidatePath('/');
+      }
+    } catch (revalidateError) {
+      console.warn('[Page Delete] Failed to revalidate cache:', revalidateError);
     }
 
     // Delete page

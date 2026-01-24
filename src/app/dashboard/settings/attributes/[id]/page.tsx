@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import AttributeFormClient from '../attribute-form-client';
 
 export default async function EditAttributePage({
@@ -23,27 +24,20 @@ export default async function EditAttributePage({
 
   const { id } = await params;
 
-  // Fetch attribute
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let attribute: any = null;
-
-  try {
-    const response = await fetch(`${baseUrl}/api/attributes/${id}`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+  // Fetch attribute directly from database (more reliable than HTTP fetch)
+  const attribute = await prisma.attributes.findFirst({
+    where: {
+      id,
+      tenant_id: tenant.id,
+    },
+    include: {
+      attribute_values: {
+        orderBy: {
+          value: 'asc',
+        },
       },
-      cache: 'no-store',
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      attribute = data.attribute;
-    } else if (response.status === 404) {
-      redirect('/dashboard/settings/attributes');
-    }
-  } catch (error) {
-    console.error('Error fetching attribute:', error);
-  }
+    },
+  });
 
   if (!attribute) {
     redirect('/dashboard/settings/attributes');

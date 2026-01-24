@@ -2,7 +2,7 @@
  * Real-Time Analytics API Route
  * 
  * Returns real-time metrics:
- * - Live visitors (estimated)
+ * - Live visitors (from actual session data)
  * - Recent orders
  * - Current sales
  * - Recent activity
@@ -21,8 +21,10 @@ export async function GET(request: NextRequest) {
     // Get recent orders (last 24 hours)
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const lastHour = new Date(Date.now() - 60 * 60 * 1000);
+    const last5Minutes = new Date(Date.now() - 5 * 60 * 1000);
+    const last15Minutes = new Date(Date.now() - 15 * 60 * 1000);
 
-    const [recentOrders, hourlyOrders, todayRevenue, todayOrders] = await Promise.all([
+    const [recentOrders, hourlyOrders, todayRevenue, todayOrders, liveVisitors, recentVisitors] = await Promise.all([
       // Recent orders (last 24 hours)
       prisma.orders.findMany({
         where: {
@@ -75,18 +77,30 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
+      // Live visitors (active sessions in last 5 minutes)
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT session_id) as count
+        FROM analytics_sessions
+        WHERE tenant_id = ${tenant.id}::uuid
+          AND last_activity_at >= ${last5Minutes}
+      `.catch(() => [{ count: BigInt(0) }]),
+      // Recent visitors (active sessions in last 15 minutes)
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT session_id) as count
+        FROM analytics_sessions
+        WHERE tenant_id = ${tenant.id}::uuid
+          AND last_activity_at >= ${last15Minutes}
+      `.catch(() => [{ count: BigInt(0) }]),
     ]);
 
-    // Estimate live visitors (in production, use actual session tracking)
-    // For now, estimate based on recent activity
-    const estimatedLiveVisitors = Math.max(
-      hourlyOrders * 5, // Assume 5 visitors per order
-      0
-    );
+    // Get actual live visitor count from session data
+    const actualLiveVisitors = Number(liveVisitors[0]?.count || 0);
+    const actualRecentVisitors = Number(recentVisitors[0]?.count || 0);
 
     const data = {
       live: {
-        estimatedVisitors: estimatedLiveVisitors,
+        estimatedVisitors: actualLiveVisitors,
+        recentVisitors: actualRecentVisitors,
         ordersLastHour: hourlyOrders,
         todayRevenue: Number(todayRevenue._sum.total_amount || 0),
         todayOrders: todayOrders,
@@ -100,7 +114,6 @@ export async function GET(request: NextRequest) {
         createdAt: order.created_at,
       })),
       timestamp: new Date().toISOString(),
-      note: 'Live visitor count is estimated. Implement session tracking for accurate real-time metrics.',
     };
 
     return NextResponse.json({ success: true, data });

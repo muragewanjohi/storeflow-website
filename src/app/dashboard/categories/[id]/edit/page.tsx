@@ -5,6 +5,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import CategoryFormClient from '../../category-form-client';
 
 export default async function EditCategoryPage({
@@ -23,47 +24,71 @@ export default async function EditCategoryPage({
 
   const { id } = await params;
 
-  // Fetch category and parent categories
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  let category: any = null;
-  let parentCategories: any[] = [];
-
-  try {
-    // Fetch category
-    const categoryResponse = await fetch(`${baseUrl}/api/categories/${id}`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+  // Fetch category directly from database (more reliable than HTTP fetch)
+  const category = await prisma.categories.findFirst({
+    where: {
+      id,
+      tenant_id: tenant.id,
+    },
+    include: {
+      other_categories: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          parent_id: true,
+          status: true,
+        },
       },
-      cache: 'no-store',
-    });
-
-    if (categoryResponse.ok) {
-      const data = await categoryResponse.json();
-      category = data.category;
-    } else if (categoryResponse.status === 404) {
-      redirect('/dashboard/categories');
-    }
-
-    // Fetch parent categories
-    const parentsResponse = await fetch(`${baseUrl}/api/categories?include_children=false`, {
-      headers: {
-        'Cookie': `tenant-subdomain=${tenant.subdomain}`,
+      categories: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
       },
-      cache: 'no-store',
-    });
-
-    if (parentsResponse.ok) {
-      const data = await parentsResponse.json();
-      parentCategories = data.categories || [];
-    }
-  } catch (error) {
-    console.error('Error fetching category:', error);
-  }
+    },
+  });
 
   if (!category) {
     redirect('/dashboard/categories');
   }
 
-  return <CategoryFormClient category={category} parentCategories={parentCategories} />;
+  // Fetch parent categories (excluding current category to prevent self-reference)
+  const parentCategoriesRaw = await prisma.categories.findMany({
+    where: {
+      tenant_id: tenant.id,
+      id: { not: id }, // Exclude current category
+      parent_id: null, // Only top-level categories as potential parents
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+
+  // Map to ensure non-null slugs for the client component
+  const mappedCategory = {
+    id: category.id,
+    name: category.name,
+    slug: category.slug || '',
+    parent_id: category.parent_id,
+    image: category.image,
+    status: category.status,
+  };
+
+  const parentCategories = parentCategoriesRaw.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    slug: cat.slug || '',
+    status: cat.status,
+  }));
+
+  return <CategoryFormClient category={mappedCategory} parentCategories={parentCategories} />;
 }
 

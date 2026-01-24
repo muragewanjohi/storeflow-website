@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useCurrency } from '@/lib/currency/currency-context';
+import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
 
 interface Sale {
   id: string;
@@ -307,12 +308,22 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
           </div>
         </div>
         {saleUrl && (
-          <Button variant="outline" asChild>
-            <Link href={saleUrl} target="_blank">
-              <EyeIcon className="mr-2 h-4 w-4" />
-              Preview Sale
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <AdminShareButtons
+              title={formData.name || 'Sale'}
+              url={`/sales/${sale?.slug || formData.slug}`}
+              image={formData.banner_image}
+              description={formData.description}
+              type="sale"
+              storeUrl={baseUrl}
+            />
+            <Button variant="outline" asChild>
+              <Link href={saleUrl} target="_blank">
+                <EyeIcon className="mr-2 h-4 w-4" />
+                Preview Sale
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

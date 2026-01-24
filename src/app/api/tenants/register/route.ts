@@ -287,6 +287,54 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to clear tenant cache:', cacheError);
     }
 
+    // Create a default homepage for the new tenant
+    // This ensures there's always a homepage even before theme installation
+    try {
+      const existingHomepage = await prisma.pages.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          slug: 'home',
+        },
+      });
+
+      if (!existingHomepage) {
+        await prisma.pages.create({
+          data: {
+            tenant_id: tenant.id,
+            title: 'Home',
+            slug: 'home',
+            content: JSON.stringify({
+              sections: [
+                {
+                  id: 'hero-1',
+                  type: 'hero',
+                  title: `Welcome to ${tenant.name}`,
+                  subtitle: 'Discover amazing products at great prices',
+                  ctaText: 'Shop Now',
+                  ctaLink: '/shop',
+                  layout: 'center',
+                },
+                {
+                  id: 'featured-1',
+                  type: 'featured-products',
+                  title: 'Featured Products',
+                  subtitle: 'Check out our top picks',
+                  limit: 8,
+                },
+              ],
+            }),
+            status: 'published',
+            meta_title: `${tenant.name} - Home`,
+            meta_description: `Welcome to ${tenant.name}. Discover amazing products and great deals.`,
+          },
+        });
+        console.log(`✅ Created default homepage for tenant ${tenant.subdomain}`);
+      }
+    } catch (homepageError) {
+      // Non-critical - homepage creation failure shouldn't block registration
+      console.warn('Failed to create default homepage:', homepageError);
+    }
+
     // Send welcome email (non-blocking - can be delayed)
     const { sendWelcomeEmail } = await import('@/lib/email/sendgrid');
     sendWelcomeEmail({

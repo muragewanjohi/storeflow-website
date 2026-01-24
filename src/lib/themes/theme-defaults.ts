@@ -295,13 +295,13 @@ export function getBusinessTypeColorScheme(businessType: string): Partial<ThemeC
     };
   }
 
-  // Pharmacy / Health & Wellness
+  // Pharmacy / Health & Wellness (inspired by Medi-Cure template)
   if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
     return {
-      primary: '#0066CC',        // Medical blue
-      secondary: '#003D7A',     // Dark blue
-      accent: '#00A859',        // Trust green
-      buttonBackground: '#0066CC',
+      primary: '#009688',        // Healthcare teal - trust and professionalism
+      secondary: '#4DB6AC',      // Light teal - softer, welcoming (from Medi-Cure)
+      accent: '#EF5350',         // Coral red - for CTAs and emphasis
+      buttonBackground: '#009688',
       buttonText: '#FFFFFF',
     };
   }

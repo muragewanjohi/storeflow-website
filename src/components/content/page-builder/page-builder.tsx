@@ -26,9 +26,11 @@ interface PageBuilderProps {
   pageSlug?: string; // Page slug for preview
   pageId?: string; // Page ID for preview
   pageStatus?: string; // Page status (draft, published, archived)
+  onSave?: () => void; // Callback to save the page
+  isSaving?: boolean; // Whether the page is currently being saved
 }
 
-export default function PageBuilder({ value, onChange, pageSlug, pageId, pageStatus }: Readonly<PageBuilderProps>) {
+export default function PageBuilder({ value, onChange, pageSlug, pageId, pageStatus, onSave, isSaving }: Readonly<PageBuilderProps>) {
   // Parse initial data
   const parseData = (): PageBuilderData => {
     if (!value || value.trim() === '') {
@@ -461,7 +463,7 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                       Configure the content and settings for this section below
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -472,9 +474,15 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                     >
                       Back to Sections
                     </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Back to edit page
-                    </p>
+                    {onSave && (
+                      <Button
+                        size="sm"
+                        onClick={onSave}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? 'Saving...' : 'Save Page'}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <SectionEditor

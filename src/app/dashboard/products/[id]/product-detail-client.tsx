@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCurrency } from '@/lib/currency/currency-context';
+import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
 
 interface Product {
   id: string;
@@ -115,12 +116,22 @@ export default function ProductDetailClient({
             <p className="text-muted-foreground mt-2">Product Details</p>
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/dashboard/products/${product.id}/edit`}>
-            <PencilIcon className="mr-2 h-4 w-4" />
-            Edit Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <AdminShareButtons
+            title={product.name}
+            url={`/products/${product.slug}`}
+            image={product.image}
+            description={product.short_description || product.description}
+            price={product.sale_price || product.price}
+            type="product"
+          />
+          <Button asChild>
+            <Link href={`/dashboard/products/${product.id}/edit`}>
+              <PencilIcon className="mr-2 h-4 w-4" />
+              Edit Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

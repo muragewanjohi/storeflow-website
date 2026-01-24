@@ -108,8 +108,8 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Extracted save logic so it can be called from PageBuilder save button too
+  const performSave = async () => {
     setIsSubmitting(true);
     setError(null);
 
@@ -240,6 +240,16 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
       setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} page`);
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave();
+  };
+
+  // Handler for PageBuilder save button
+  const handlePageBuilderSave = () => {
+    performSave();
   };
 
   return (
@@ -428,6 +438,8 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       pageSlug={(formData.slug || page?.slug) || undefined}
                       pageId={page?.id}
                       pageStatus={formData.status}
+                      onSave={handlePageBuilderSave}
+                      isSaving={isSubmitting}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.
