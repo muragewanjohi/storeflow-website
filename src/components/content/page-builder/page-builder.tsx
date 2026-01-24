@@ -233,9 +233,18 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
       ) : (
         // Edit Mode
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList>
-            <TabsTrigger value="sections">Sections</TabsTrigger>
-            <TabsTrigger value="editor" disabled={!selectedSection}>
+          <TabsList className="bg-muted/50 border border-border">
+            <TabsTrigger 
+              value="sections"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Sections
+            </TabsTrigger>
+            <TabsTrigger 
+              value="editor" 
+              disabled={!selectedSection}
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
               Edit Section {selectedSection && `(${getSectionTypeLabel(selectedSection.type)})`}
             </TabsTrigger>
           </TabsList>

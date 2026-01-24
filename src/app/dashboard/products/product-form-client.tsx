@@ -33,6 +33,7 @@ interface Product {
   status: 'active' | 'inactive' | 'draft' | 'archived';
   image?: string | null;
   category_id?: string | null;
+  estimated_delivery_days?: number | null;
 }
 
 interface Category {
@@ -161,6 +162,7 @@ export default function ProductFormClient({
     status: product?.status || ('draft' as 'active' | 'inactive' | 'draft' | 'archived'),
     category_id: product?.category_id || 'none',
     image: product?.image || '',
+    estimated_delivery_days: product?.estimated_delivery_days?.toString() || '',
   });
 
   // Initialize variants from props if editing, or empty array if creating
@@ -370,6 +372,10 @@ export default function ProductFormClient({
           : parseInt(formData.stock_quantity, 10) || 0, // Use product-level stock when no variants
         status: formData.status,
         category_id: categoryId,
+        // Estimated delivery days (null means use tenant default)
+        estimated_delivery_days: formData.estimated_delivery_days 
+          ? parseInt(formData.estimated_delivery_days, 10) 
+          : null,
       };
 
       if (parsedSalePrice !== null) {
@@ -1088,7 +1094,7 @@ export default function ProductFormClient({
             <Card>
               <CardHeader>
                 <CardTitle>Settings</CardTitle>
-                <CardDescription>Product status and category</CardDescription>
+                <CardDescription>Product status, category, and shipping</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -1109,6 +1115,22 @@ export default function ProductFormClient({
                       <SelectItem value="archived">Archived</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="estimated_delivery_days">Estimated Delivery (Days)</Label>
+                  <Input
+                    id="estimated_delivery_days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={formData.estimated_delivery_days}
+                    onChange={(e) => setFormData({ ...formData, estimated_delivery_days: e.target.value })}
+                    placeholder="Use store default"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Override store default delivery time. Leave empty to use store settings.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

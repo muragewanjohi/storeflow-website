@@ -96,6 +96,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     flat_rate_amount: initialSettings.flat_rate_amount || '',
     free_shipping_enabled: initialSettings.free_shipping_enabled ?? false,
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
+    default_estimated_delivery_days: initialSettings.default_estimated_delivery_days || '',
     
     // Payment Methods
     payment_cash_enabled: initialSettings.payment_cash_enabled ?? true,
@@ -214,6 +215,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           : null,
         free_shipping_enabled: formData.free_shipping_enabled,
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
+        default_estimated_delivery_days: formData.default_estimated_delivery_days ? parseInt(formData.default_estimated_delivery_days) : null,
         
         // Payment Methods
         payment_cash_enabled: formData.payment_cash_enabled,
@@ -864,6 +866,26 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     </p>
                   </div>
                 )}
+                
+                {/* Estimated Delivery Time */}
+                <div className="pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="default_estimated_delivery_days">Default Estimated Delivery Time (Days)</Label>
+                    <Input
+                      id="default_estimated_delivery_days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={formData.default_estimated_delivery_days}
+                      onChange={(e) => setFormData({ ...formData, default_estimated_delivery_days: e.target.value })}
+                      placeholder="e.g., 3-5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Default estimated delivery time shown to customers. Individual products can override this value.
+                      Leave empty to not display delivery estimates.
+                    </p>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>

@@ -12,7 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import ProductReviewsSection from '@/components/storefront/product-reviews-section';
@@ -58,6 +58,7 @@ interface Product {
   product_variants: ProductVariant[];
   averageRating?: number;
   totalReviews?: number;
+  estimated_delivery_days?: number | null;
 }
 
 interface RelatedProduct {
@@ -73,17 +74,22 @@ interface RelatedProduct {
 interface ProductDetailClientProps {
   product: Product;
   relatedProducts: RelatedProduct[];
+  defaultEstimatedDeliveryDays?: number | null;
 }
 
 export default function ProductDetailClient({
   product,
   relatedProducts,
+  defaultEstimatedDeliveryDays,
 }: Readonly<ProductDetailClientProps>) {
   const { formatCurrency, currency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(product.image);
   const [hasInteractedWithQuantity, setHasInteractedWithQuantity] = useState(false);
+  
+  // Get estimated delivery days (product-specific overrides tenant default)
+  const estimatedDeliveryDays = product.estimated_delivery_days ?? defaultEstimatedDeliveryDays;
 
   // Format currency with space between symbol and amount
   const formatCurrencyWithSpace = (amount: number): string => {
@@ -110,6 +116,11 @@ export default function ProductDetailClient({
   const basePrice = selectedVariantData?.price ?? product.price;
   const displayPrice = product.sale_price || basePrice;
   const hasDiscount = product.sale_price !== null && !selectedVariantData?.price;
+
+  // Get current stock quantity (variant stock if selected, otherwise product stock)
+  const currentStockQuantity = selectedVariantData 
+    ? selectedVariantData.stock_quantity 
+    : product.stock_quantity;
 
   const router = useRouter();
   const [addingToCart, setAddingToCart] = useState(false);
@@ -156,10 +167,7 @@ export default function ProductDetailClient({
   };
 
   const incrementQuantity = () => {
-    const maxQuantity = selectedVariant
-      ? product.product_variants.find((v) => v.id === selectedVariant)?.stock_quantity || product.stock_quantity
-      : product.stock_quantity;
-    if (maxQuantity !== null && quantity < maxQuantity) {
+    if (currentStockQuantity !== null && quantity < currentStockQuantity) {
       setQuantity(quantity + 1);
       setHasInteractedWithQuantity(true);
     }
@@ -172,7 +180,8 @@ export default function ProductDetailClient({
     }
   };
 
-  const isOutOfStock = product.stock_quantity !== null && product.stock_quantity === 0;
+  // Check if the current selection (variant or product) is out of stock
+  const isOutOfStock = currentStockQuantity !== null && currentStockQuantity <= 0;
 
   // Get gallery images
   const galleryImages = Array.isArray(product.gallery) ? product.gallery : [];
@@ -285,9 +294,23 @@ export default function ProductDetailClient({
           {/* Stock Status */}
           {isOutOfStock ? (
             <div className="text-destructive font-medium">Out of Stock</div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {product.stock_quantity} in stock
+          ) : currentStockQuantity !== null ? (
+            <div className="text-sm text-green-600">
+              {currentStockQuantity} in stock
+            </div>
+          ) : null}
+
+          {/* Estimated Delivery Time */}
+          {estimatedDeliveryDays && estimatedDeliveryDays > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+              <TruckIcon className="h-5 w-5 text-primary" />
+              <span>
+                Estimated delivery: <span className="font-medium text-foreground">
+                  {estimatedDeliveryDays === 1 
+                    ? '1 day' 
+                    : `${estimatedDeliveryDays} days`}
+                </span>
+              </span>
             </div>
           )}
 
@@ -334,6 +357,13 @@ export default function ProductDetailClient({
                         setSelectedVariant(variant.id);
                         if (variantImage) {
                           setSelectedImage(variantImage);
+                        }
+                        // Reset quantity to 1 when switching variants, or to max available if out of stock
+                        const variantStock = variant.stock_quantity ?? 0;
+                        if (variantStock > 0 && quantity > variantStock) {
+                          setQuantity(variantStock);
+                        } else if (variantStock <= 0) {
+                          setQuantity(1); // Reset to 1, button will be disabled anyway
                         }
                       }}
                       className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
@@ -433,7 +463,7 @@ export default function ProductDetailClient({
                   variant="ghost"
                   size="icon"
                   onClick={incrementQuantity}
-                  disabled={isOutOfStock || (product.stock_quantity !== null && quantity >= product.stock_quantity)}
+                  disabled={isOutOfStock || (currentStockQuantity !== null && quantity >= currentStockQuantity)}
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>

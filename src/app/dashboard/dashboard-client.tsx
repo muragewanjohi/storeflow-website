@@ -93,6 +93,15 @@ interface LowStockItem {
   price: number;
 }
 
+interface LowStockVariant {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string | null;
+  variantSku: string | null;
+  stockQuantity: number;
+}
+
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -473,10 +482,12 @@ export default function DashboardClient({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-base">Low Stock Alerts</CardTitle>
-              {(inventoryData?.lowStock?.products?.length || 0) > 0 && (
-                <Badge variant="destructive" className="text-xs">
-                  {inventoryData?.summary.lowStockCount || 0}
-                </Badge>
+              {(inventoryData?.summary?.lowStockCount || 0) > 0 && (
+                <Link href="/dashboard/inventory">
+                  <Badge variant="destructive" className="text-xs cursor-pointer hover:bg-destructive/80">
+                    {inventoryData?.summary.lowStockCount || 0} items
+                  </Badge>
+                </Link>
               )}
             </CardHeader>
             <CardContent>
@@ -486,24 +497,43 @@ export default function DashboardClient({
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
-              ) : inventoryData?.lowStock?.products && inventoryData.lowStock.products.length > 0 ? (
+              ) : (inventoryData?.lowStock?.products?.length || 0) > 0 || (inventoryData?.lowStock?.variants?.length || 0) > 0 ? (
                 <div className="space-y-3">
-                  {inventoryData.lowStock.products.slice(0, 4).map((item: LowStockItem) => (
-                    <div key={item.id} className="flex items-center justify-between p-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.name}</p>
-                        {item.sku && (
-                          <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
-                        )}
+                  {/* Low stock products */}
+                  {inventoryData?.lowStock?.products?.slice(0, 3).map((item: LowStockItem) => (
+                    <Link key={`product-${item.id}`} href="/dashboard/inventory">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/20 cursor-pointer transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.name}</p>
+                          {item.sku && (
+                            <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="ml-2 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
+                          {item.stock_quantity} left
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="ml-2 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
-                        {item.stock_quantity} left
-                      </Badge>
-                    </div>
+                    </Link>
                   ))}
-                  {(inventoryData?.lowStock?.products?.length || 0) > 4 && (
+                  {/* Low stock variants */}
+                  {inventoryData?.lowStock?.variants?.slice(0, 3 - (inventoryData?.lowStock?.products?.length || 0)).map((variant: LowStockVariant) => (
+                    <Link key={`variant-${variant.id}`} href="/dashboard/inventory">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/20 cursor-pointer transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{variant.productName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Variant: {variant.variantSku || 'N/A'}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="ml-2 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                          {variant.stockQuantity} left
+                        </Badge>
+                      </div>
+                    </Link>
+                  ))}
+                  {(inventoryData?.summary?.lowStockCount || 0) > 3 && (
                     <Button variant="ghost" size="sm" className="w-full" asChild>
-                      <Link href="/dashboard/inventory/alerts">
+                      <Link href="/dashboard/inventory">
                         View all {inventoryData?.summary.lowStockCount} items
                         <ArrowRightIcon className="h-4 w-4 ml-1" />
                       </Link>

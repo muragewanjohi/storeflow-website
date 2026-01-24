@@ -161,6 +161,8 @@ export async function PUT(
     if (validatedData.category_id !== undefined) updateData.category_id = validatedData.category_id;
     if (validatedData.brand_id !== undefined) updateData.brand_id = validatedData.brand_id;
     if (validatedData.metadata !== undefined) updateData.metadata = validatedData.metadata;
+    // Estimated delivery days (null means use tenant default)
+    if (validatedData.estimated_delivery_days !== undefined) updateData.estimated_delivery_days = validatedData.estimated_delivery_days;
 
     // Update product
     const product = await prisma.products.update({

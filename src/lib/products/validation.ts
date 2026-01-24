@@ -25,6 +25,9 @@ export const createProductSchema = z.object({
   category_id: z.string().uuid().optional().nullable(),
   brand_id: z.string().uuid().optional().nullable(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
+  // Estimated delivery time in days (null means use tenant default)
+  estimated_delivery_days: z.number().int().min(1).max(365).optional().nullable()
+    .or(z.string().transform((val) => val ? parseInt(val, 10) : null).optional().nullable()),
 }).strip(); // Strip unknown fields to prevent Prisma errors
 
 /**

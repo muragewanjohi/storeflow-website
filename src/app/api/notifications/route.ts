@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     const [
       pendingOrders,
       lowStockProducts,
+      lowStockVariants,
       newSupportTickets,
       landlordTickets,
       approvedDeliveryFees,
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
         take: 10,
       }),
 
-      // 2. Low stock products (simple products only, limit 5)
+      // 2. Low stock products
       prisma.products.findMany({
         where: {
           tenant_id: tenant.id,
@@ -72,10 +73,27 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           name: true,
+          sku: true,
           stock_quantity: true,
         },
         orderBy: { stock_quantity: 'asc' },
-        take: 5,
+        take: 10,
+      }),
+
+      // 2b. Low stock variants
+      prisma.product_variants.findMany({
+        where: {
+          tenant_id: tenant.id,
+          stock_quantity: { lte: 10, gt: 0 },
+        },
+        select: {
+          id: true,
+          sku: true,
+          stock_quantity: true,
+          product_id: true,
+        },
+        orderBy: { stock_quantity: 'asc' },
+        take: 10,
       }),
 
       // 3. New support tickets (open, last 7 days)
@@ -168,19 +186,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Process low stock
+    // Process low stock products
     for (const product of lowStockProducts) {
       notifications.push({
-        id: `low-stock-${product.id}`,
+        id: `low-stock-product-${product.id}`,
         type: 'low_stock',
         title: 'Low Stock Alert',
-        message: `${product.name} - ${product.stock_quantity} units remaining`,
-        link: `/dashboard/products/${product.id}`,
+        message: `${product.name}${product.sku ? ` (${product.sku})` : ''} - ${product.stock_quantity} units remaining`,
+        link: `/dashboard/inventory`,
         created_at: new Date(),
         read: false,
         metadata: {
           product_id: product.id,
           stock_quantity: product.stock_quantity,
+          item_type: 'product',
+        },
+      });
+    }
+
+    // Get product names for low stock variants
+    const variantProductIds = lowStockVariants.map((v: any) => v.product_id).filter(Boolean);
+    let variantProducts: Map<string, string> = new Map();
+    if (variantProductIds.length > 0) {
+      const products = await prisma.products.findMany({
+        where: { id: { in: variantProductIds } },
+        select: { id: true, name: true },
+      });
+      variantProducts = new Map(products.map((p: any) => [p.id, p.name]));
+    }
+
+    // Process low stock variants
+    for (const variant of lowStockVariants) {
+      const variantName = variant.sku || 'Variant';
+      const productName = variantProducts.get(variant.product_id) || 'Unknown Product';
+      notifications.push({
+        id: `low-stock-variant-${variant.id}`,
+        type: 'low_stock',
+        title: 'Low Stock Alert (Variant)',
+        message: `${productName} - ${variantName} - ${variant.stock_quantity} units remaining`,
+        link: `/dashboard/inventory`,
+        created_at: new Date(),
+        read: false,
+        metadata: {
+          variant_id: variant.id,
+          product_id: variant.product_id,
+          stock_quantity: variant.stock_quantity,
+          item_type: 'variant',
         },
       });
     }

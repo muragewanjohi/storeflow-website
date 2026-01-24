@@ -9,6 +9,7 @@
 import { notFound } from 'next/navigation';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
+import { getStaticOption } from '@/lib/settings/static-options';
 import ProductDetailClient from './product-detail-client';
 import { generateProductMetadata, generateProductStructuredData } from '@/lib/seo/storefront-metadata';
 import { loadThemeProductDetail } from '@/lib/themes/theme-loader';
@@ -121,6 +122,7 @@ export default async function ProductDetailPage({
       image: true,
       gallery: true,
       category_id: true,
+      estimated_delivery_days: true,
       product_variants: {
         where: {
           tenant_id: tenant.id,
@@ -206,21 +208,24 @@ export default async function ProductDetailPage({
     effectiveSalePrice = Number(product.sale_price);
   }
 
-  // Fetch rating stats for this product
-  const ratingStats = await prisma.product_reviews.aggregate({
-    where: {
-      product_id: product.id,
-      tenant_id: tenant.id,
-      status: 'approved',
-      rating: { not: null },
-    },
-    _avg: {
-      rating: true,
-    },
-    _count: {
-      rating: true,
-    },
-  });
+  // Fetch rating stats and default delivery time in parallel
+  const [ratingStats, defaultDeliveryDays] = await Promise.all([
+    prisma.product_reviews.aggregate({
+      where: {
+        product_id: product.id,
+        tenant_id: tenant.id,
+        status: 'approved',
+        rating: { not: null },
+      },
+      _avg: {
+        rating: true,
+      },
+      _count: {
+        rating: true,
+      },
+    }),
+    getStaticOption(tenant.id, 'default_estimated_delivery_days'),
+  ]);
 
   // Parallel fetch: Convert product data AND fetch related products simultaneously
   // This reduces total wait time - Amazon/Shopify technique
@@ -233,6 +238,7 @@ export default async function ProductDetailPage({
       // stock_quantity is already synced with variant totals in the database
       averageRating: ratingStats._avg.rating ? Number(ratingStats._avg.rating) : undefined,
       totalReviews: ratingStats._count.rating || 0,
+      estimated_delivery_days: product.estimated_delivery_days,
       product_variants: product.product_variants.map((variant: any) => ({
         ...variant,
         price: variant.price ? Number(variant.price) : null,
@@ -309,6 +315,7 @@ export default async function ProductDetailPage({
       <ProductDetailComponent
         product={productData}
         relatedProducts={relatedProductsData}
+        defaultEstimatedDeliveryDays={defaultDeliveryDays ? parseInt(defaultDeliveryDays, 10) : null}
       />
     </>
   );

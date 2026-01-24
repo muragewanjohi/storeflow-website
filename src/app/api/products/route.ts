@@ -845,13 +845,14 @@ export async function POST(request: NextRequest) {
       brand_id: validatedData.brand_id ? String(validatedData.brand_id) : null,
       created_by: String(user.id),
       metadata: validatedData.metadata && typeof validatedData.metadata === 'object' ? validatedData.metadata : {},
+      estimated_delivery_days: validatedData.estimated_delivery_days ? Number(validatedData.estimated_delivery_days) : null,
     };
     
     // Final safety check: ensure no unexpected keys exist
     const allowedProductFields = [
       'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
       'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-      'created_by', 'metadata'
+      'created_by', 'metadata', 'estimated_delivery_days'
     ];
     const productDataKeys = Object.keys(productData);
     const unexpectedProductFields = productDataKeys.filter(key => !allowedProductFields.includes(key));
@@ -897,6 +898,7 @@ export async function POST(request: NextRequest) {
         brand_id: string | null;
         created_by: string;
         metadata: any;
+        estimated_delivery_days: number | null;
       } = {
         tenant_id: productData.tenant_id,
         name: productData.name,
@@ -914,6 +916,7 @@ export async function POST(request: NextRequest) {
         brand_id: productData.brand_id,
         created_by: productData.created_by,
         metadata: productData.metadata,
+        estimated_delivery_days: productData.estimated_delivery_days,
       };
       
       // Verify finalProductData has no unexpected fields
@@ -921,7 +924,7 @@ export async function POST(request: NextRequest) {
       const allowedFinalFields = [
         'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-        'created_by', 'metadata'
+        'created_by', 'metadata', 'estimated_delivery_days'
       ];
       const unexpectedFinalFields = finalKeys.filter(key => !allowedFinalFields.includes(key));
       if (unexpectedFinalFields.length > 0) {
@@ -986,6 +989,7 @@ export async function POST(request: NextRequest) {
         brand_id: ultraCleanData.brand_id ? String(ultraCleanData.brand_id) : null,
         created_by: String(ultraCleanData.created_by),
         metadata: ultraCleanData.metadata && typeof ultraCleanData.metadata === 'object' ? ultraCleanData.metadata : {},
+        estimated_delivery_days: ultraCleanData.estimated_delivery_days ? Number(ultraCleanData.estimated_delivery_days) : null,
       };
       
       // Final verification - ensure no 'new' field exists

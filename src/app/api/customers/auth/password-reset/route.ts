@@ -54,23 +54,28 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send password reset email (async, don't wait)
-    (async () => {
-      try {
-        const { sendCustomerPasswordResetEmail } = await import('@/lib/customers/emails');
-        await sendCustomerPasswordResetEmail({
-          customer: {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-          },
-          tenant,
-          resetToken,
-        });
-      } catch (error) {
-        console.error('Error sending password reset email:', error);
+    // Send password reset email
+    try {
+      const { sendCustomerPasswordResetEmail } = await import('@/lib/customers/emails');
+      const emailResult = await sendCustomerPasswordResetEmail({
+        customer: {
+          id: customer.id,
+          name: customer.name || customer.username || 'Customer', // Handle null name
+          email: customer.email,
+        },
+        tenant,
+        resetToken,
+      });
+      
+      console.log('Password reset email result:', emailResult);
+      
+      if (!emailResult?.success) {
+        console.error('Failed to send password reset email:', emailResult?.error);
       }
-    })();
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      // Don't fail the request - token is stored, user can retry
+    }
 
     return NextResponse.json({
       success: true,

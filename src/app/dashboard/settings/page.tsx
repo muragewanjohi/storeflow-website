@@ -54,6 +54,7 @@ export default async function TenantSettingsPage() {
       'flat_rate_amount',
       'free_shipping_enabled',
       'free_shipping_threshold',
+      'default_estimated_delivery_days',
       
       // Payment Methods
       'payment_cash_enabled',
