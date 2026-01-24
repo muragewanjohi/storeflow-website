@@ -9,6 +9,7 @@
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
+import { getStaticOption } from '@/lib/settings/static-options';
 import { redirect } from 'next/navigation';
 import CheckoutClient from './checkout-client';
 import StorefrontHeader from '@/components/storefront/header-server';
@@ -35,6 +36,9 @@ export default async function CheckoutPage() {
   // Guest checkout will require email during checkout process
   // Use getCurrentCustomer to check customer authentication (not tenant admin auth)
   const customer = await getCurrentCustomer();
+  
+  // Fetch default estimated delivery days for the tenant
+  const defaultDeliveryDays = await getStaticOption(tenant.id, 'default_estimated_delivery_days');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -44,6 +48,7 @@ export default async function CheckoutPage() {
           isAuthenticated={!!customer}
           canProcessOrders={accessRestriction.canProcessOrders}
           accessRestriction={accessRestriction}
+          defaultEstimatedDeliveryDays={defaultDeliveryDays ? parseInt(defaultDeliveryDays, 10) : null}
         />
       </main>
       <StorefrontFooter />

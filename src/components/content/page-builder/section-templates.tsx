@@ -50,6 +50,8 @@ export function SectionRenderer({ section, isPreview = false }: Readonly<Section
       return <CTASectionComponent section={section} isPreview={isPreview} />;
     case 'product_tabs':
       return <ProductTabsSectionComponent section={section} isPreview={isPreview} />;
+    case 'form':
+      return <FormSectionComponent section={section} isPreview={isPreview} />;
     default:
       return null;
   }
@@ -1588,7 +1590,7 @@ function SplitLayoutSectionComponent({
                   dangerouslySetInnerHTML={{ __html: section.left_side.content }}
                 />
               )}
-              {section.left_side.cta_text && section.left_side.cta_link && (
+              {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && (
                 <Link href={section.left_side.cta_link}>
                   <Button
                     size="lg"
@@ -1601,6 +1603,13 @@ function SplitLayoutSectionComponent({
                     {section.left_side.cta_text}
                   </Button>
                 </Link>
+              )}
+              
+              {/* Form for left side */}
+              {section.left_side.type === 'form' && (
+                <div className="w-full">
+                  <SplitLayoutFormRenderer formId={section.left_side.form_id} isPreview={isPreview} />
+                </div>
               )}
             </div>
           </div>
@@ -1717,10 +1726,220 @@ function SplitLayoutSectionComponent({
                 />
               </div>
             )}
+
+            {section.right_side.type === 'form' && (
+              <SplitLayoutFormRenderer formId={section.right_side.form_id} isPreview={isPreview} />
+            )}
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Inline form renderer for split layouts
+ */
+function SplitLayoutFormRenderer({ formId, isPreview }: { formId?: string; isPreview: boolean }) {
+  const [form, setForm] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (!formId || isPreview) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchForm = async () => {
+      try {
+        const response = await fetch(`/api/forms/${formId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setForm(data.form);
+          const initialValues: Record<string, any> = {};
+          data.form?.fields?.forEach((field: any) => {
+            initialValues[field.id] = field.type === 'checkbox' ? false : '';
+          });
+          setFormValues(initialValues);
+        }
+      } catch (error) {
+        console.error('Error fetching form:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchForm();
+  }, [formId, isPreview]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/forms/${formId}/submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: formValues }),
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFieldChange = (fieldId: string, value: any) => {
+    setFormValues(prev => ({ ...prev, [fieldId]: value }));
+  };
+
+  if (isPreview) {
+    return (
+      <div className="p-8 border-2 border-dashed rounded-lg text-center text-muted-foreground">
+        {formId ? <>Form will be displayed here</> : <>Please select a form</>}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Loading form...</div>;
+  }
+
+  if (!form) {
+    return <div className="text-center py-8 text-muted-foreground">Form not found</div>;
+  }
+
+  if (submitted) {
+    return (
+      <div className="p-8 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+        <h3 className="text-xl font-semibold text-green-700 dark:text-green-400 mb-2">
+          {form.success_message || 'Thank you for your submission!'}
+        </h3>
+        <p className="text-green-600 dark:text-green-500">We&apos;ll get back to you soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {form.title && <h3 className="text-xl font-semibold mb-4">{form.title}</h3>}
+      {form.description && <p className="text-muted-foreground mb-6">{form.description}</p>}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {form.fields?.map((field: any) => (
+          <div key={field.id} className="space-y-2">
+            <label className="block text-sm font-medium">
+              {field.label}
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            
+            {field.type === 'text' && (
+              <input
+                type="text"
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            
+            {field.type === 'email' && (
+              <input
+                type="email"
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            
+            {field.type === 'phone' && (
+              <input
+                type="tel"
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            
+            {field.type === 'textarea' && (
+              <textarea
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                required={field.required}
+                rows={4}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            
+            {field.type === 'select' && (
+              <select
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">{field.placeholder || 'Select an option'}</option>
+                {field.options?.map((option: string, index: number) => (
+                  <option key={index} value={option}>{option}</option>
+                ))}
+              </select>
+            )}
+            
+            {field.type === 'checkbox' && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formValues[field.id] || false}
+                  onChange={(e) => handleFieldChange(field.id, e.target.checked)}
+                  required={field.required}
+                  className="rounded border-gray-300 focus:ring-primary"
+                />
+                <span className="text-sm">{field.placeholder}</span>
+              </label>
+            )}
+            
+            {field.type === 'number' && (
+              <input
+                type="number"
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                placeholder={field.placeholder}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+            
+            {field.type === 'date' && (
+              <input
+                type="date"
+                value={formValues[field.id] || ''}
+                onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                required={field.required}
+                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            )}
+          </div>
+        ))}
+        
+        <Button type="submit" disabled={submitting} className="w-full">
+          {submitting ? 'Submitting...' : (form.submit_button_text || 'Submit')}
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -1960,6 +2179,301 @@ function ProductTabsSectionComponent({
               <DefaultProductCard key={product.id} product={product} />
             ))
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FormSectionComponent({ 
+  section, 
+  isPreview 
+}: { 
+  section: Extract<PageSection, { type: 'form' }>; 
+  isPreview: boolean;
+}) {
+  const [form, setForm] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (!section.form_id || isPreview) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchForm = async () => {
+      try {
+        const response = await fetch(`/api/forms/${section.form_id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setForm(data.form);
+          // Initialize form values
+          const initialValues: Record<string, any> = {};
+          data.form?.fields?.forEach((field: any) => {
+            initialValues[field.id] = field.type === 'checkbox' ? false : '';
+          });
+          setFormValues(initialValues);
+        }
+      } catch (error) {
+        console.error('Error fetching form:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchForm();
+  }, [section.form_id, isPreview]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/forms/${section.form_id}/submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: formValues }),
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFieldChange = (fieldId: string, value: any) => {
+    setFormValues(prev => ({ ...prev, [fieldId]: value }));
+  };
+
+  // Get max width class
+  const maxWidthClass = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    full: 'max-w-full',
+  }[section.max_width || 'md'];
+
+  const sectionStyle = {
+    backgroundColor: section.background_color || 'transparent',
+  } as React.CSSProperties;
+
+  const titleStyle = {
+    color: section.title_color || 'inherit',
+  } as React.CSSProperties;
+
+  const subtitleStyle = {
+    color: section.subtitle_color || 'var(--muted-foreground)',
+  } as React.CSSProperties;
+
+  if (isPreview) {
+    return (
+      <section className="py-12" style={sectionStyle}>
+        <div className="container mx-auto px-4">
+          <div className={`mx-auto ${maxWidthClass}`}>
+            {section.title && (
+              <h2 className="text-3xl font-bold mb-2" style={titleStyle}>
+                {section.title}
+              </h2>
+            )}
+            {section.subtitle && (
+              <p className="text-muted-foreground mb-6" style={subtitleStyle}>
+                {section.subtitle}
+              </p>
+            )}
+            <div className="p-8 border-2 border-dashed rounded-lg text-center text-muted-foreground">
+              {section.form_id ? (
+                <>Form will be displayed here (ID: {section.form_id})</>
+              ) : (
+                <>Please select a form to display</>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <section className="py-12" style={sectionStyle}>
+        <div className="container mx-auto px-4">
+          <div className={`mx-auto ${maxWidthClass} text-center`}>
+            Loading form...
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!form) {
+    return (
+      <section className="py-12" style={sectionStyle}>
+        <div className="container mx-auto px-4">
+          <div className={`mx-auto ${maxWidthClass} text-center text-muted-foreground`}>
+            Form not found
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <section className="py-12" style={sectionStyle}>
+        <div className="container mx-auto px-4">
+          <div className={`mx-auto ${maxWidthClass} text-center`}>
+            <div className="p-8 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <h3 className="text-xl font-semibold text-green-700 dark:text-green-400 mb-2">
+                {form.success_message || 'Thank you for your submission!'}
+              </h3>
+              <p className="text-green-600 dark:text-green-500">
+                We&apos;ll get back to you soon.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="py-12" style={sectionStyle}>
+      <div className="container mx-auto px-4">
+        <div className={`mx-auto ${maxWidthClass}`}>
+          {section.title && (
+            <h2 className="text-3xl font-bold mb-2" style={titleStyle}>
+              {section.title}
+            </h2>
+          )}
+          {section.subtitle && (
+            <p className="text-muted-foreground mb-6" style={subtitleStyle}>
+              {section.subtitle}
+            </p>
+          )}
+          
+          {section.show_form_title !== false && form.title && (
+            <h3 className="text-xl font-semibold mb-4">{form.title}</h3>
+          )}
+          
+          {form.description && (
+            <p className="text-muted-foreground mb-6">{form.description}</p>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {form.fields?.map((field: any) => (
+              <div key={field.id} className="space-y-2">
+                <label className="block text-sm font-medium">
+                  {field.label}
+                  {field.required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                
+                {field.type === 'text' && (
+                  <input
+                    type="text"
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+                
+                {field.type === 'email' && (
+                  <input
+                    type="email"
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+                
+                {field.type === 'phone' && (
+                  <input
+                    type="tel"
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+                
+                {field.type === 'textarea' && (
+                  <textarea
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    rows={4}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+                
+                {field.type === 'select' && (
+                  <select
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">{field.placeholder || 'Select an option'}</option>
+                    {field.options?.map((option: string, index: number) => (
+                      <option key={index} value={option}>{option}</option>
+                    ))}
+                  </select>
+                )}
+                
+                {field.type === 'checkbox' && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formValues[field.id] || false}
+                      onChange={(e) => handleFieldChange(field.id, e.target.checked)}
+                      required={field.required}
+                      className="rounded border-gray-300 focus:ring-primary"
+                    />
+                    <span className="text-sm">{field.placeholder}</span>
+                  </label>
+                )}
+                
+                {field.type === 'number' && (
+                  <input
+                    type="number"
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+                
+                {field.type === 'date' && (
+                  <input
+                    type="date"
+                    value={formValues[field.id] || ''}
+                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                    required={field.required}
+                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+              </div>
+            ))}
+            
+            <Button type="submit" disabled={submitting} className="w-full">
+              {submitting ? 'Submitting...' : (form.submit_button_text || 'Submit')}
+            </Button>
+          </form>
         </div>
       </div>
     </section>

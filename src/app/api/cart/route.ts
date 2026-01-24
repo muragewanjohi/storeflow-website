@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
             image: true,
             sku: true,
             slug: true,
+            estimated_delivery_days: true,
           },
         },
       },
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
         image: product.image,
         sku: product.sku,
         slug: product.slug,
+        estimated_delivery_days: product.estimated_delivery_days,
       };
     }).filter(Boolean) as any[];
 

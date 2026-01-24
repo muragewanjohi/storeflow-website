@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExclamationTriangleIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
@@ -34,6 +34,7 @@ interface CartItem {
   image: string | null;
   sku: string | null;
   slug?: string | null;
+  estimated_delivery_days?: number | null;
 }
 
 interface Cart {
@@ -74,12 +75,14 @@ interface CheckoutClientProps {
     reason?: string;
     daysRemaining?: number;
   };
+  defaultEstimatedDeliveryDays?: number | null;
 }
 
 export default function CheckoutClient({ 
   isAuthenticated = false,
   canProcessOrders = true,
   accessRestriction,
+  defaultEstimatedDeliveryDays,
 }: Readonly<CheckoutClientProps>) {
   const router = useRouter();
   const { formatCurrency } = useCurrency();
@@ -163,6 +166,20 @@ export default function CheckoutClient({
   
   // Address autocomplete state
   const [addressInputValue, setAddressInputValue] = useState<string>('');
+
+  // Calculate maximum estimated delivery days across all cart items
+  // Uses product-specific delivery days if set, otherwise falls back to tenant default
+  const getMaxEstimatedDeliveryDays = useCallback((): number | null => {
+    if (!cart || cart.items.length === 0) return null;
+    
+    const deliveryDays = cart.items.map((item: CartItem) => 
+      item.estimated_delivery_days ?? defaultEstimatedDeliveryDays
+    ).filter((days): days is number => days !== null && days !== undefined && days > 0);
+    
+    if (deliveryDays.length === 0) return null;
+    
+    return Math.max(...deliveryDays);
+  }, [cart, defaultEstimatedDeliveryDays]);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -1724,6 +1741,24 @@ export default function CheckoutClient({
                     </div>
                   </div>
 
+                  {/* Estimated Delivery Time - Only show for delivery method */}
+                  {deliveryMethod === 'delivery' && getMaxEstimatedDeliveryDays() && (
+                    <>
+                      <Separator />
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        <TruckIcon className="h-5 w-5 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">Estimated Delivery Time</p>
+                          <p className="text-sm text-muted-foreground">
+                            {getMaxEstimatedDeliveryDays() === 1 
+                              ? 'Approximately 1 day after order confirmation' 
+                              : `Approximately ${getMaxEstimatedDeliveryDays()} days after order confirmation`}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   <Separator />
 
                   {/* Payment Method Summary */}
@@ -1812,30 +1847,51 @@ export default function CheckoutClient({
               <CardContent className="space-y-4">
                 {/* Cart Items */}
                 <div className="space-y-3">
-                  {cart.items.map((item: any) => (
-                    <div key={`${item.product_id}-${item.variant_id || 'base'}`} className="flex gap-3">
-                      {item.image && (
-                        <div className="relative w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                          <Image
-                            src={item.image}
-                            alt={item.name}
-                            fill
-                            className="object-cover"
-                          />
+                  {cart.items.map((item: any) => {
+                    const itemDeliveryDays = item.estimated_delivery_days ?? defaultEstimatedDeliveryDays;
+                    return (
+                      <div key={`${item.product_id}-${item.variant_id || 'base'}`} className="flex gap-3">
+                        {item.image && (
+                          <div className="relative w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Qty: {item.quantity} × {formatPrice(item.price)}
+                          </p>
+                          {deliveryMethod === 'delivery' && itemDeliveryDays && itemDeliveryDays > 0 && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <TruckIcon className="h-3 w-3" />
+                              {itemDeliveryDays === 1 ? '1 day' : `${itemDeliveryDays} days`}
+                            </p>
+                          )}
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Qty: {item.quantity} × {formatPrice(item.price)}
-                        </p>
+                        <div className="text-sm font-medium">
+                          {formatPrice(item.price * item.quantity)}
+                        </div>
                       </div>
-                      <div className="text-sm font-medium">
-                        {formatPrice(item.price * item.quantity)}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                {/* Estimated Delivery Summary */}
+                {deliveryMethod === 'delivery' && getMaxEstimatedDeliveryDays() && (
+                  <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md text-xs">
+                    <TruckIcon className="h-4 w-4 text-primary" />
+                    <span>
+                      Est. delivery: <span className="font-medium">
+                        {getMaxEstimatedDeliveryDays() === 1 ? '1 day' : `${getMaxEstimatedDeliveryDays()} days`}
+                      </span>
+                    </span>
+                  </div>
+                )}
 
                 <Separator />
 

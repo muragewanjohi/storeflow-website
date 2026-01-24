@@ -6,7 +6,7 @@
  * Day 28: Content Management - Simple Page Builder
  */
 
-export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs';
+export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form';
 
 export interface BaseSection {
   id: string;
@@ -192,7 +192,7 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Left Side Configuration
   left_side: {
-    type: 'banner' | 'image' | 'text';
+    type: 'banner' | 'image' | 'text' | 'form';
     title?: string;
     subtitle?: string;
     content?: string; // For text type or rich HTML
@@ -200,6 +200,7 @@ export interface SplitLayoutSection extends BaseSection {
     alt_text?: string;
     cta_text?: string;
     cta_link?: string;
+    form_id?: string; // For form type
     
     // Alignment & Positioning
     text_alignment?: 'left' | 'center' | 'right';
@@ -220,12 +221,13 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Right Side Configuration
   right_side: {
-    type: 'products' | 'features' | 'text' | 'image';
+    type: 'products' | 'features' | 'text' | 'image' | 'form';
     title?: string;
     subtitle?: string;
     content?: string; // For text type
     image?: string;
     alt_text?: string;
+    form_id?: string; // For form type
     
     // Product Options
     product_selection?: 'category' | 'featured' | 'specific' | 'new' | 'bestsellers';
@@ -297,6 +299,18 @@ export interface ProductTabsSection extends BaseSection {
   title_color?: string;
 }
 
+export interface FormSection extends BaseSection {
+  type: 'form';
+  form_id: string; // ID of the form to embed
+  title?: string;
+  subtitle?: string;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  show_form_title?: boolean; // Whether to show the form's own title
+  max_width?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; // Container width
+}
+
 export type PageSection =
   | HeroSection
   | FeaturesSection
@@ -309,7 +323,8 @@ export type PageSection =
   | SalesTabSection
   | SplitLayoutSection
   | CTASection
-  | ProductTabsSection;
+  | ProductTabsSection
+  | FormSection;
 
 export interface PageBuilderData {
   sections: PageSection[];

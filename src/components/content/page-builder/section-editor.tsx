@@ -113,6 +113,8 @@ export function SectionEditor({ section, onUpdate }: Readonly<SectionEditorProps
       return <CTASectionEditor section={section} onUpdate={onUpdate} />;
     case 'product_tabs':
       return <ProductTabsSectionEditor section={section} onUpdate={onUpdate} />;
+    case 'form':
+      return <FormSectionEditor section={section} onUpdate={onUpdate} />;
     default:
       return null;
   }
@@ -1788,6 +1790,16 @@ function SplitLayoutSectionEditor({
     onUpdate({ [colorKey]: undefined });
   };
 
+  // Fetch available forms for form type selection
+  const { data: formsData } = useQuery({
+    queryKey: ['forms-list-split'],
+    queryFn: async () => {
+      const response = await fetch('/api/forms');
+      if (!response.ok) return { forms: [] };
+      return await response.json();
+    },
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -1996,10 +2008,42 @@ function SplitLayoutSectionEditor({
                 <SelectItem value="banner">Banner (with overlay)</SelectItem>
                 <SelectItem value="image">Image Only</SelectItem>
                 <SelectItem value="text">Text Content</SelectItem>
+                <SelectItem value="form">Form</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
+          {/* Form selector for left side */}
+          {section.left_side.type === 'form' && (
+            <div className="space-y-2">
+              <Label>Select Form *</Label>
+              {formsData?.forms?.length > 0 ? (
+                <Select
+                  value={section.left_side.form_id || ''}
+                  onValueChange={(value) => onUpdate({
+                    left_side: { ...section.left_side, form_id: value }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formsData.forms.map((form: any) => (
+                      <SelectItem key={form.id} value={form.id}>
+                        {form.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  No forms found. <a href="/dashboard/forms/new" className="text-primary hover:underline">Create a form</a> first.
+                </div>
+              )}
+            </div>
+          )}
+          
+          {section.left_side.type !== 'form' && (
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -2010,6 +2054,7 @@ function SplitLayoutSectionEditor({
               placeholder="Banner title"
             />
           </div>
+          )}
           <ColorPicker
             label="Title Color"
             colorKey="title_color"
@@ -2255,10 +2300,43 @@ function SplitLayoutSectionEditor({
                 <SelectItem value="features">Features</SelectItem>
                 <SelectItem value="text">Text Content</SelectItem>
                 <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="form">Form</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
+          {/* Form selector for right side */}
+          {section.right_side.type === 'form' && (
+            <div className="space-y-2">
+              <Label>Select Form *</Label>
+              {formsData?.forms?.length > 0 ? (
+                <Select
+                  value={section.right_side.form_id || ''}
+                  onValueChange={(value) => onUpdate({
+                    right_side: { ...section.right_side, form_id: value }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formsData.forms.map((form: any) => (
+                      <SelectItem key={form.id} value={form.id}>
+                        {form.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  No forms found. <a href="/dashboard/forms/new" className="text-primary hover:underline">Create a form</a> first.
+                </div>
+              )}
+            </div>
+          )}
+          
+          {section.right_side.type !== 'form' && (
+          <>
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -2278,6 +2356,8 @@ function SplitLayoutSectionEditor({
             onColorChange={handleRightSideColorChange}
             onColorReset={handleRightSideColorReset}
           />
+          </>
+          )}
           
           {section.right_side.type === 'products' && (
             <>
@@ -2782,6 +2862,159 @@ function ProductTabsSectionEditor({
           colorKey="background_color"
           defaultValue="#FFFFFF"
           description="Background color for the product tabs section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function FormSectionEditor({
+  section,
+  onUpdate,
+}: {
+  section: Extract<PageSection, { type: 'form' }>;
+  onUpdate: (updates: Partial<PageSection>) => void;
+}) {
+  // Fetch available forms
+  const { data: formsData, isLoading: formsLoading } = useQuery({
+    queryKey: ['forms-list'],
+    queryFn: async () => {
+      const response = await fetch('/api/forms');
+      if (!response.ok) return { forms: [] };
+      return await response.json();
+    },
+  });
+
+  // Helper function to handle color changes
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  // Helper function to reset color
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Edit Form Section</CardTitle>
+        <CardDescription>
+          Embed one of your created forms into the page
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="form-select">Select Form *</Label>
+          {formsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading forms...</div>
+          ) : formsData?.forms?.length > 0 ? (
+            <Select
+              value={section.form_id || ''}
+              onValueChange={(value) => onUpdate({ form_id: value })}
+            >
+              <SelectTrigger id="form-select">
+                <SelectValue placeholder="Select a form" />
+              </SelectTrigger>
+              <SelectContent>
+                {formsData.forms.map((form: any) => (
+                  <SelectItem key={form.id} value={form.id}>
+                    {form.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              No forms found. <a href="/dashboard/forms/new" className="text-primary hover:underline">Create a form</a> first.
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Choose a form to embed in this section
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="form-title">Section Title (Optional)</Label>
+          <Input
+            id="form-title"
+            value={section.title || ''}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+            placeholder="Contact Us"
+          />
+          <p className="text-xs text-muted-foreground">
+            Add a title above the form
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="form-subtitle">Section Subtitle (Optional)</Label>
+          <Input
+            id="form-subtitle"
+            value={section.subtitle || ''}
+            onChange={(e) => onUpdate({ subtitle: e.target.value })}
+            placeholder="We'd love to hear from you"
+          />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="show-form-title"
+            checked={section.show_form_title !== false}
+            onCheckedChange={(checked) => onUpdate({ show_form_title: checked === true })}
+          />
+          <Label htmlFor="show-form-title" className="cursor-pointer">
+            Show form's own title
+          </Label>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="max-width">Container Width</Label>
+          <Select
+            value={section.max_width || 'md'}
+            onValueChange={(value: any) => onUpdate({ max_width: value })}
+          >
+            <SelectTrigger id="max-width">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">Small (max-w-sm)</SelectItem>
+              <SelectItem value="md">Medium (max-w-md)</SelectItem>
+              <SelectItem value="lg">Large (max-w-lg)</SelectItem>
+              <SelectItem value="xl">Extra Large (max-w-xl)</SelectItem>
+              <SelectItem value="full">Full Width</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the form section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
           section={section}
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}

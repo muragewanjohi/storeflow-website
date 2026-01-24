@@ -378,6 +378,16 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                     <span className="text-2xl">📑</span>
                     <span className="text-xs">Product Tabs</span>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('form')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📋</span>
+                    <span className="text-xs">Form</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -703,6 +713,17 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         columns: 4,
         default_tab: `tab-${Date.now()}-1`,
       };
+    case 'form':
+      return {
+        id,
+        type: 'form',
+        order,
+        form_id: '',
+        title: '',
+        subtitle: '',
+        show_form_title: true,
+        max_width: 'md',
+      };
   }
 }
 
@@ -720,6 +741,7 @@ function getSectionTypeLabel(type: SectionType): string {
     testimonials: 'Testimonials',
     text: 'Text',
     image: 'Image',
+    form: 'Form',
   };
   return labels[type];
 }
