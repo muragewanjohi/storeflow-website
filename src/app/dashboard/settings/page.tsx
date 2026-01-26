@@ -134,6 +134,12 @@ export default async function TenantSettingsPage() {
     free_shipping_enabled: settings.free_shipping_enabled === 'true',
     free_shipping_threshold: settings.free_shipping_threshold ? parseFloat(settings.free_shipping_threshold) : null,
     
+    // Pickup Options
+    pickup_enabled: settings.pickup_enabled === 'true',
+    pickup_location_name: settings.pickup_location_name || '',
+    pickup_instructions: settings.pickup_instructions || '',
+    pickup_hours: settings.pickup_hours || '',
+    
     // Payment Methods
     payment_cash_enabled: settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null,
     payment_mpesa_enabled: settings.payment_mpesa_enabled === 'true',

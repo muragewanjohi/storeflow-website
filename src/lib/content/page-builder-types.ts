@@ -6,7 +6,7 @@
  * Day 28: Content Management - Simple Page Builder
  */
 
-export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form' | 'blogs';
+export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form' | 'blogs' | 'location';
 
 export interface BaseSection {
   id: string;
@@ -334,6 +334,23 @@ export interface BlogsSection extends BaseSection {
   cta_link?: string; // Link to full blog listing
 }
 
+export interface LocationSection extends BaseSection {
+  type: 'location';
+  title?: string;
+  subtitle?: string;
+  address: string; // Full address for the location
+  latitude?: number; // Optional: precise latitude
+  longitude?: number; // Optional: precise longitude
+  map_type?: 'roadmap' | 'satellite' | 'hybrid' | 'terrain'; // Google Maps map type
+  zoom?: number; // Map zoom level (1-20, default 15)
+  height?: number; // Map height in pixels (default 400)
+  show_info_window?: boolean; // Show address in info window
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  full_width?: boolean; // Full width map
+}
+
 export type PageSection =
   | HeroSection
   | FeaturesSection
@@ -348,7 +365,8 @@ export type PageSection =
   | CTASection
   | ProductTabsSection
   | FormSection
-  | BlogsSection;
+  | BlogsSection
+  | LocationSection;
 
 export interface PageBuilderData {
   sections: PageSection[];

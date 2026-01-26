@@ -55,6 +55,9 @@ const settingsUpdateSchema = z.object({
   
   // Pickup Options
   pickup_enabled: z.boolean().optional(),
+  pickup_location_name: z.string().optional().nullable(),
+  pickup_instructions: z.string().optional().nullable(),
+  pickup_hours: z.string().optional().nullable(), // JSON string of weekly hours
   
   // Payment Methods
   payment_cash_enabled: z.boolean().optional(),
@@ -115,6 +118,12 @@ export async function GET(request: NextRequest) {
       
       // Pickup Options
       'pickup_enabled',
+      'pickup_location_name',
+      'pickup_instructions',
+      'pickup_hours',
+      'pickup_location_name',
+      'pickup_instructions',
+      'pickup_hours',
       
       // Payment Methods
       'payment_cash_enabled',
@@ -332,6 +341,15 @@ export async function PUT(request: NextRequest) {
       }
       
       optionsToSave.pickup_enabled = validatedData.pickup_enabled.toString();
+    }
+    if (validatedData.pickup_location_name !== undefined) {
+      optionsToSave.pickup_location_name = validatedData.pickup_location_name || null;
+    }
+    if (validatedData.pickup_instructions !== undefined) {
+      optionsToSave.pickup_instructions = validatedData.pickup_instructions || null;
+    }
+    if (validatedData.pickup_hours !== undefined) {
+      optionsToSave.pickup_hours = validatedData.pickup_hours || null;
     }
 
     // Payment Methods

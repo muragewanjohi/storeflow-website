@@ -117,6 +117,8 @@ export function SectionEditor({ section, onUpdate }: Readonly<SectionEditorProps
       return <FormSectionEditor section={section} onUpdate={onUpdate} />;
     case 'blogs':
       return <BlogsSectionEditor section={section} onUpdate={onUpdate} />;
+    case 'location':
+      return <LocationSectionEditor section={section} onUpdate={onUpdate} />;
     default:
       return null;
   }
@@ -2097,6 +2099,32 @@ function SplitLayoutSectionEditor({
             onColorReset={handleLeftSideColorReset}
           />
           
+          {/* Text Content Editor for text type */}
+          {section.left_side.type === 'text' && (
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <RichTextEditor
+                content={section.left_side.content || ''}
+                onChange={(html) => onUpdate({
+                  left_side: { ...section.left_side, content: html }
+                })}
+                placeholder="Enter your text content here. You can format text, add links, lists, and more."
+              />
+              <p className="text-xs text-muted-foreground">
+                Use the editor above to format your text content. This content will appear on the left side of the split layout.
+              </p>
+            </div>
+          )}
+          <ColorPicker
+            label="Content Color"
+            colorKey="content_color"
+            defaultValue="#666666"
+            description="Color for the text content"
+            section={section.left_side}
+            onColorChange={handleLeftSideColorChange}
+            onColorReset={handleLeftSideColorReset}
+          />
+          
           {section.left_side.type !== 'image' && (
             <>
               <div className="space-y-2">
@@ -2368,6 +2396,23 @@ function SplitLayoutSectionEditor({
             onColorChange={handleRightSideColorChange}
             onColorReset={handleRightSideColorReset}
           />
+          
+          {/* Text Content Editor for text type */}
+          {section.right_side.type === 'text' && (
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <RichTextEditor
+                content={section.right_side.content || ''}
+                onChange={(html) => onUpdate({
+                  right_side: { ...section.right_side, content: html }
+                })}
+                placeholder="Enter your text content here. You can format text, add links, lists, and more."
+              />
+              <p className="text-xs text-muted-foreground">
+                Use the editor above to format your text content. This content will appear on the right side of the split layout.
+              </p>
+            </div>
+          )}
           </>
           )}
           
@@ -3166,14 +3211,14 @@ function BlogsSectionEditor({
         <div className="space-y-2">
           <Label>Category (Optional)</Label>
           <Select
-            value={section.category_id || ''}
-            onValueChange={(value) => onUpdate({ category_id: value || undefined })}
+            value={section.category_id || '__all__'}
+            onValueChange={(value) => onUpdate({ category_id: value === '__all__' ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="__all__">All Categories</SelectItem>
               {categories.map((cat: any) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
@@ -3296,6 +3341,181 @@ function BlogsSectionEditor({
           colorKey="background_color"
           defaultValue="#FFFFFF"
           description="Background color for the blogs section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function LocationSectionEditor({
+  section,
+  onUpdate,
+}: {
+  section: Extract<PageSection, { type: 'location' }>;
+  onUpdate: (updates: Partial<PageSection>) => void;
+}) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Edit Location Section</CardTitle>
+        <CardDescription>
+          Add a map to display your store location
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Title</Label>
+          <Input
+            value={section.title || ''}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+            placeholder="Find Us"
+          />
+        </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <div className="space-y-2">
+          <Label>Subtitle</Label>
+          <Input
+            value={section.subtitle || ''}
+            onChange={(e) => onUpdate({ subtitle: e.target.value })}
+            placeholder="Visit our store location"
+          />
+        </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <div className="space-y-2">
+          <Label>Address *</Label>
+          <Textarea
+            value={section.address || ''}
+            onChange={(e) => onUpdate({ address: e.target.value })}
+            placeholder="123 Main Street, City, State, ZIP Code"
+            rows={3}
+          />
+          <p className="text-xs text-muted-foreground">
+            Enter the full address. The map will be generated automatically.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Latitude (Optional)</Label>
+            <Input
+              type="number"
+              step="any"
+              value={section.latitude || ''}
+              onChange={(e) => onUpdate({ latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+              placeholder="40.7128"
+            />
+            <p className="text-xs text-muted-foreground">
+              For precise location pinning
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Longitude (Optional)</Label>
+            <Input
+              type="number"
+              step="any"
+              value={section.longitude || ''}
+              onChange={(e) => onUpdate({ longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+              placeholder="-74.0060"
+            />
+            <p className="text-xs text-muted-foreground">
+              For precise location pinning
+            </p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Map Type</Label>
+          <Select
+            value={section.map_type || 'roadmap'}
+            onValueChange={(value: 'roadmap' | 'satellite' | 'hybrid' | 'terrain') =>
+              onUpdate({ map_type: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="roadmap">Roadmap</SelectItem>
+              <SelectItem value="satellite">Satellite</SelectItem>
+              <SelectItem value="hybrid">Hybrid</SelectItem>
+              <SelectItem value="terrain">Terrain</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Zoom Level ({section.zoom || 15})</Label>
+          <input
+            type="range"
+            min="1"
+            max="20"
+            value={section.zoom || 15}
+            onChange={(e) => onUpdate({ zoom: parseInt(e.target.value) })}
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            Adjust the zoom level (1 = world view, 20 = street level)
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Map Height (px)</Label>
+          <Input
+            type="number"
+            value={section.height || 400}
+            onChange={(e) => onUpdate({ height: parseInt(e.target.value) || 400 })}
+            min="200"
+            max="800"
+          />
+        </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="full-width"
+            checked={section.full_width || false}
+            onCheckedChange={(checked) => onUpdate({ full_width: checked as boolean })}
+          />
+          <Label htmlFor="full-width" className="cursor-pointer">
+            Full Width Map
+          </Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="show-info-window"
+            checked={section.show_info_window || false}
+            onCheckedChange={(checked) => onUpdate({ show_info_window: checked as boolean })}
+          />
+          <Label htmlFor="show-info-window" className="cursor-pointer">
+            Show &quot;Open in Google Maps&quot; Link
+          </Label>
+        </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the location section"
           section={section}
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}

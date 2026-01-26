@@ -54,6 +54,8 @@ export function SectionRenderer({ section, isPreview = false }: Readonly<Section
       return <FormSectionComponent section={section} isPreview={isPreview} />;
     case 'blogs':
       return <BlogsSectionComponent section={section} isPreview={isPreview} />;
+    case 'location':
+      return <LocationSectionComponent section={section} isPreview={isPreview} />;
     default:
       return null;
   }
@@ -2836,6 +2838,112 @@ function BlogCard({
         )}
       </div>
     </Link>
+  );
+}
+
+function LocationSectionComponent({ 
+  section, 
+  isPreview 
+}: { 
+  section: Extract<PageSection, { type: 'location' }>; 
+  isPreview: boolean;
+}) {
+  // Build Google Maps embed URL
+  // Using the standard Google Maps embed format (no API key required for basic usage)
+  const buildMapUrl = () => {
+    const address = encodeURIComponent(section.address || '');
+    const zoom = section.zoom || 15;
+    
+    // If we have precise coordinates, use them
+    if (section.latitude && section.longitude) {
+      return `https://www.google.com/maps?q=${section.latitude},${section.longitude}&hl=en&z=${zoom}&output=embed`;
+    }
+    
+    // Otherwise, use address search
+    return `https://www.google.com/maps?q=${address}&hl=en&z=${zoom}&output=embed`;
+  };
+
+  const mapHeight = section.height || 400;
+  const sectionStyle = {
+    '--location-bg': section.background_color || 'transparent',
+    '--location-title-color': section.title_color || 'var(--color-text, #000000)',
+    '--location-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
+  } as React.CSSProperties & Record<string, string | undefined>;
+
+  return (
+    <section
+      className="py-16"
+      style={{
+        ...sectionStyle,
+        backgroundColor: 'var(--location-bg)',
+      }}
+    >
+      <div className={`${section.full_width ? '' : 'container mx-auto px-4'}`} style={{ maxWidth: section.full_width ? '100%' : 'var(--container-max-width, 1200px)' }}>
+        {(section.title || section.subtitle) && (
+          <div className="mb-8 text-center">
+            {section.title && (
+              <h2 
+                className="text-3xl md:text-4xl font-bold mb-4"
+                style={{ color: 'var(--location-title-color)' }}
+              >
+                {section.title}
+              </h2>
+            )}
+            {section.subtitle && (
+              <p 
+                className="text-lg text-muted-foreground"
+                style={{ color: 'var(--location-subtitle-color)' }}
+              >
+                {section.subtitle}
+              </p>
+            )}
+          </div>
+        )}
+        
+        <div className="rounded-lg overflow-hidden shadow-lg">
+          {isPreview ? (
+            <div 
+              className="w-full bg-gray-200 flex items-center justify-center"
+              style={{ height: `${mapHeight}px` }}
+            >
+              <div className="text-center text-gray-500">
+                <p className="text-lg font-semibold mb-2">📍 Map Preview</p>
+                <p className="text-sm">{section.address || 'Enter an address to see the map'}</p>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              width="100%"
+              height={mapHeight}
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              src={buildMapUrl()}
+              title={section.title || 'Location Map'}
+            />
+          )}
+        </div>
+        
+        {section.address && (
+          <div className="mt-6 text-center">
+            <p className="text-muted-foreground">
+              <strong>Address:</strong> {section.address}
+            </p>
+            {section.show_info_window && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(section.address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-4 text-primary hover:underline"
+              >
+                Open in Google Maps →
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

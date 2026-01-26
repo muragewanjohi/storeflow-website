@@ -131,6 +131,9 @@ export default function CheckoutClient({
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('delivery');
   const [checkoutSettings, setCheckoutSettings] = useState<{
     pickup_enabled: boolean;
+    pickup_location_name?: string | null;
+    pickup_instructions?: string | null;
+    pickup_hours?: string | null;
     shipping_enabled: boolean;
     shipping_method_type: string | null;
     store_full_address: string | null;
@@ -1041,17 +1044,67 @@ export default function CheckoutClient({
                   
                   {/* Show pickup location info when pickup is selected */}
                   {deliveryMethod === 'pickup' && checkoutSettings?.store_full_address && (
-                    <div className="p-4 border rounded-lg bg-primary/5">
-                      <div className="space-y-2">
-                        <h3 className="font-semibold">Pickup Location</h3>
-                        <p className="text-sm text-muted-foreground">{checkoutSettings.store_full_address}</p>
-                        {checkoutSettings.store_phone && (
-                          <p className="text-sm text-muted-foreground">Phone: {checkoutSettings.store_phone}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          You&apos;ll receive a notification when your order is ready for pickup.
+                    <div className="p-4 border rounded-lg bg-primary/5 space-y-3">
+                      <div>
+                        <h3 className="font-semibold">
+                          {checkoutSettings.pickup_location_name || 'Pickup Location'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {checkoutSettings.store_full_address}
                         </p>
+                        {checkoutSettings.store_phone && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Phone: {checkoutSettings.store_phone}
+                          </p>
+                        )}
                       </div>
+                      
+                      {checkoutSettings.pickup_instructions && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-medium mb-1">Pickup Instructions:</p>
+                          <p className="text-xs text-muted-foreground whitespace-pre-line">
+                            {checkoutSettings.pickup_instructions}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {checkoutSettings.pickup_hours && (() => {
+                        try {
+                          const hours = JSON.parse(checkoutSettings.pickup_hours);
+                          const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                          const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          const today = new Date().getDay();
+                          const currentDay = daysOfWeek[today === 0 ? 6 : today - 1];
+                          
+                          return (
+                            <div className="pt-2 border-t">
+                              <p className="text-xs font-medium mb-2">Store Hours:</p>
+                              <div className="text-xs space-y-1">
+                                {daysOfWeek.map((day, idx) => {
+                                  const dayHours = hours[day];
+                                  const isToday = day === currentDay;
+                                  return (
+                                    <div key={day} className={`flex justify-between ${isToday ? 'font-semibold' : ''}`}>
+                                      <span>{dayLabels[idx]}:</span>
+                                      <span>
+                                        {dayHours?.closed 
+                                          ? 'Closed' 
+                                          : `${dayHours?.open || '09:00'} - ${dayHours?.close || '17:00'}`}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()}
+                      
+                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                        You&apos;ll receive a notification when your order is ready for pickup.
+                      </p>
                     </div>
                   )}
                   

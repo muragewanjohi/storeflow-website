@@ -398,6 +398,16 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                     <span className="text-2xl">📰</span>
                     <span className="text-xs">Blogs</span>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('location')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📍</span>
+                    <span className="text-xs">Location</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -755,6 +765,20 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         cta_text: 'View All Blogs',
         cta_link: '/blog',
       };
+    case 'location':
+      return {
+        id,
+        type: 'location',
+        order,
+        title: 'Find Us',
+        subtitle: 'Visit our store location',
+        address: '',
+        map_type: 'roadmap',
+        zoom: 15,
+        height: 400,
+        show_info_window: true,
+        full_width: false,
+      };
   }
 }
 
@@ -774,6 +798,7 @@ function getSectionTypeLabel(type: SectionType): string {
     image: 'Image',
     form: 'Form',
     blogs: 'Blogs',
+    location: 'Location',
   };
   return labels[type];
 }

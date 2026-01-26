@@ -38,6 +38,124 @@ import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
 import { VersionInfo } from '@/components/dashboard/version-info';
 
+// Store Hours Editor Component
+interface StoreHoursEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function StoreHoursEditor({ value, onChange }: StoreHoursEditorProps) {
+  const daysOfWeek = [
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+    { key: 'sunday', label: 'Sunday' },
+  ];
+
+  // Parse hours from JSON string
+  const parseHours = (): Record<string, { open: string; close: string; closed: boolean }> => {
+    if (!value) {
+      return {};
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  };
+
+  const hours = parseHours();
+
+  const updateDay = (day: string, updates: Partial<{ open: string; close: string; closed: boolean }>) => {
+    const newHours = {
+      ...hours,
+      [day]: {
+        ...hours[day],
+        ...updates,
+      },
+    };
+    onChange(JSON.stringify(newHours));
+  };
+
+  const setAllDays = (open: string, close: string, closed: boolean) => {
+    const newHours: Record<string, { open: string; close: string; closed: boolean }> = {};
+    daysOfWeek.forEach((day) => {
+      newHours[day.key] = { open, close, closed };
+    });
+    onChange(JSON.stringify(newHours));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Actions */}
+      <div className="flex gap-2 flex-wrap">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('09:00', '17:00', false)}
+        >
+          Set All: 9 AM - 5 PM
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('08:00', '18:00', false)}
+        >
+          Set All: 8 AM - 6 PM
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('', '', true)}
+        >
+          Close All
+        </Button>
+      </div>
+
+      {/* Day-by-day editor */}
+      <div className="space-y-3">
+        {daysOfWeek.map((day) => {
+          const dayHours = hours[day.key] || { open: '09:00', close: '17:00', closed: false };
+          return (
+            <div key={day.key} className="flex items-center gap-4 p-3 border rounded-lg">
+              <div className="w-24 font-medium">{day.label}</div>
+              <Checkbox
+                checked={!dayHours.closed}
+                onCheckedChange={(checked) => updateDay(day.key, { closed: !checked })}
+              />
+              {!dayHours.closed ? (
+                <>
+                  <Input
+                    type="time"
+                    value={dayHours.open || '09:00'}
+                    onChange={(e) => updateDay(day.key, { open: e.target.value })}
+                    className="w-32"
+                  />
+                  <span className="text-muted-foreground">to</span>
+                  <Input
+                    type="time"
+                    value={dayHours.close || '17:00'}
+                    onChange={(e) => updateDay(day.key, { close: e.target.value })}
+                    className="w-32"
+                  />
+                </>
+              ) : (
+                <span className="text-muted-foreground">Closed</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface TenantSettingsClientProps {
   tenant: Tenant;
   initialSettings: Record<string, any>;
@@ -97,6 +215,12 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     free_shipping_enabled: initialSettings.free_shipping_enabled ?? false,
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
     default_estimated_delivery_days: initialSettings.default_estimated_delivery_days || '',
+    
+    // Pickup Options
+    pickup_enabled: initialSettings.pickup_enabled ?? false,
+    pickup_location_name: initialSettings.pickup_location_name || '',
+    pickup_instructions: initialSettings.pickup_instructions || '',
+    pickup_hours: initialSettings.pickup_hours || '',
     
     // Payment Methods
     payment_cash_enabled: initialSettings.payment_cash_enabled ?? true,
@@ -216,6 +340,12 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         free_shipping_enabled: formData.free_shipping_enabled,
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
         default_estimated_delivery_days: formData.default_estimated_delivery_days ? parseInt(formData.default_estimated_delivery_days) : null,
+        
+        // Pickup Options
+        pickup_enabled: formData.pickup_enabled,
+        pickup_location_name: formData.pickup_location_name || null,
+        pickup_instructions: formData.pickup_instructions || null,
+        pickup_hours: formData.pickup_hours || null,
         
         // Payment Methods
         payment_cash_enabled: formData.payment_cash_enabled,
@@ -887,6 +1017,108 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                   </div>
                 </div>
               </>
+            )}
+          </CardContent>
+          <div className="px-6 pb-6 flex items-center gap-4">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
+          </div>
+        </form>
+      </Card>
+
+      {/* Pickup Options */}
+      <Card>
+        <form onSubmit={handleSettingsSubmit}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Pickup Options</CardTitle>
+                <CardDescription>
+                  Configure store pickup for brick-and-mortar stores. Customers can choose to pick up their orders at your store location.
+                </CardDescription>
+              </div>
+              <Checkbox
+                id="pickup_enabled"
+                checked={formData.pickup_enabled}
+                onCheckedChange={(checked) => {
+                  const newValue = checked === true;
+                  // Validate that store address exists
+                  if (newValue && !formData.store_address && !formData.store_city && !formData.store_country) {
+                    setSettingsError('Store pickup requires a physical address. Please add store address in the General tab first.');
+                    return;
+                  }
+                  setFormData({ ...formData, pickup_enabled: newValue });
+                  setSettingsError(null);
+                }}
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.pickup_enabled ? (
+              <>
+                {(!formData.store_address || !formData.store_city || !formData.store_country) && (
+                  <div className="p-4 border border-yellow-500/50 rounded-lg bg-yellow-500/10">
+                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                      ⚠️ Store pickup requires a physical address. Please add your store address in the <strong>General</strong> tab first.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="pickup_location_name">Pickup Location Name (Optional)</Label>
+                  <Input
+                    id="pickup_location_name"
+                    value={formData.pickup_location_name}
+                    onChange={(e) => setFormData({ ...formData, pickup_location_name: e.target.value })}
+                    placeholder="e.g., Main Store, Downtown Location"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A friendly name for your pickup location. If left empty, your store name will be used.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pickup_instructions">Pickup Instructions (Optional)</Label>
+                  <Textarea
+                    id="pickup_instructions"
+                    value={formData.pickup_instructions}
+                    onChange={(e) => setFormData({ ...formData, pickup_instructions: e.target.value })}
+                    rows={3}
+                    placeholder="e.g., Enter through the main entrance. Orders are ready at the customer service desk. Please bring a valid ID."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Instructions for customers on how to pick up their orders. This will be shown during checkout and in order confirmations.
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <Label>Store Hours</Label>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Set your store&apos;s opening and closing times for each day of the week. Customers will see these hours when selecting pickup.
+                    </p>
+                    <StoreHoursEditor
+                      value={formData.pickup_hours}
+                      onChange={(hours) => setFormData({ ...formData, pickup_hours: hours })}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Enable store pickup to allow customers to collect their orders at your physical location. This is ideal for brick-and-mortar stores.
+              </div>
             )}
           </CardContent>
           <div className="px-6 pb-6 flex items-center gap-4">
