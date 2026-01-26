@@ -404,6 +404,7 @@ export async function POST(request: NextRequest) {
         // Create homepage
         try {
           const pageSlug = generateSlug('home');
+          console.log(`[Registration] Checking for existing homepage with slug: ${pageSlug}`);
           const existingHomepage = await prisma.pages.findFirst({
             where: {
               tenant_id: tenant.id,
@@ -412,20 +413,24 @@ export async function POST(request: NextRequest) {
           });
 
           if (!existingHomepage) {
+            console.log(`[Registration] Homepage does not exist, creating now...`);
             const templateData = getHomepageTemplateData(theme.slug);
             const pageTitle = 'Home';
             const layoutData = getHomepageLayout(theme.slug);
             
             let pageBuilderData;
             if (layoutData && layoutData.length > 0) {
+              console.log(`[Registration] Using legacy layout data for homepage`);
               pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
             } else {
-              pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+              console.log(`[Registration] Using default homepage template with businessType: ${validatedData.businessType || 'none'}`);
+              pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, validatedData.businessType || undefined);
             }
 
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+            console.log(`[Registration] Homepage data prepared, creating in database...`);
 
-            await prisma.pages.create({
+            const createdHomepage = await prisma.pages.create({
               data: {
                 tenant_id: tenant.id,
                 title: pageTitle,
@@ -437,12 +442,22 @@ export async function POST(request: NextRequest) {
                 meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
               },
             });
-            console.log(`[Registration] ✅ Created homepage (slug: ${pageSlug})`);
+            console.log(`[Registration] ✅ Created homepage successfully:`, {
+              id: createdHomepage.id,
+              slug: createdHomepage.slug,
+              title: createdHomepage.title,
+              tenant_id: createdHomepage.tenant_id,
+            });
           } else {
-            console.log(`[Registration] ℹ️ Homepage already exists (slug: ${pageSlug})`);
+            console.log(`[Registration] ℹ️ Homepage already exists (slug: ${pageSlug}, id: ${existingHomepage.id})`);
           }
         } catch (homepageError: any) {
           console.error(`[Registration] ❌ Failed to create homepage:`, homepageError);
+          console.error(`[Registration] Homepage error details:`, {
+            message: homepageError.message,
+            stack: homepageError.stack,
+            code: homepageError.code,
+          });
           // Continue - pages are important but not critical for registration
         }
 
@@ -530,6 +545,7 @@ export async function POST(request: NextRequest) {
           for (const pageConfig of requiredPages) {
             try {
               const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+              console.log(`[Registration] Checking for existing page: ${pageConfig.title} (slug: ${pageSlug})`);
               const existingPage = await prisma.pages.findFirst({
                 where: {
                   tenant_id: tenant.id,
@@ -538,16 +554,18 @@ export async function POST(request: NextRequest) {
               });
 
               if (!existingPage) {
+                console.log(`[Registration] Page does not exist, creating: ${pageConfig.title}`);
                 // For contact page, pass the contact form ID and contact email
                 let pageBuilderData;
                 if (pageConfig.slug === 'contact') {
+                  console.log(`[Registration] Generating contact page template with form ID: ${contactFormId || 'none'}`);
                   pageBuilderData = pageConfig.templateGenerator(tenantName, contactFormId, tenant.contact_email || undefined);
                 } else {
                   pageBuilderData = pageConfig.templateGenerator(tenantName);
                 }
                 pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
 
-                await prisma.pages.create({
+                const createdPage = await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
                     title: pageConfig.title,
@@ -559,12 +577,22 @@ export async function POST(request: NextRequest) {
                     meta_description: pageConfig.metaDescription || null,
                   },
                 });
-                console.log(`[Registration] ✅ Created page: ${pageConfig.title} (slug: ${pageSlug})`);
+                console.log(`[Registration] ✅ Created page successfully:`, {
+                  id: createdPage.id,
+                  slug: createdPage.slug,
+                  title: createdPage.title,
+                  tenant_id: createdPage.tenant_id,
+                });
               } else {
-                console.log(`[Registration] ℹ️ Page already exists: ${pageConfig.title} (slug: ${pageSlug})`);
+                console.log(`[Registration] ℹ️ Page already exists: ${pageConfig.title} (slug: ${pageSlug}, id: ${existingPage.id})`);
               }
             } catch (pageError: any) {
               console.error(`[Registration] ❌ Failed to create page ${pageConfig.title}:`, pageError);
+              console.error(`[Registration] Page error details:`, {
+                message: pageError.message,
+                stack: pageError.stack,
+                code: pageError.code,
+              });
               // Continue with next page
             }
           }
@@ -608,6 +636,89 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Registration] ✅ Successfully installed theme ${theme.slug} for tenant ${tenant.subdomain}`);
+        
+        // Double-check that required pages exist (in case they weren't created during theme installation)
+        try {
+          console.log(`[Registration] Verifying required pages exist...`);
+          const tenantName = tenant.name || 'Store';
+          const requiredSlugs = ['home', 'about', 'contact'];
+          
+          for (const slug of requiredSlugs) {
+            const pageSlug = generateSlug(slug);
+            const existingPage = await prisma.pages.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: pageSlug,
+              },
+            });
+            
+            if (!existingPage) {
+              console.log(`[Registration] ⚠️ Required page missing: ${slug}, creating now...`);
+              
+              if (slug === 'home') {
+                // Create homepage
+                const homePageBuilderData = createDefaultHomepageTemplate(theme.slug, tenantName, validatedData.businessType || undefined);
+                const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
+                
+                await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: 'Home',
+                    slug: pageSlug,
+                    content: JSON.stringify(cleanedHomePageData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: `${tenantName} - Home`,
+                    meta_description: `Welcome to ${tenantName}. Shop our amazing products and discover great deals.`,
+                  },
+                });
+                console.log(`[Registration] ✅ Created missing homepage (slug: ${pageSlug})`);
+              } else {
+                // Create about or contact page
+                const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+                const pageConfig = additionalPageTemplates.find(p => p.slug === slug);
+                
+                if (pageConfig) {
+                  let pageBuilderData;
+                  if (slug === 'contact') {
+                    // Get or create contact form
+                    let contactFormId: string | undefined;
+                    const existingContactForm = await prisma.form_builders.findFirst({
+                      where: {
+                        tenant_id: tenant.id,
+                        slug: 'contact-form',
+                      },
+                    });
+                    if (existingContactForm) {
+                      contactFormId = existingContactForm.id;
+                    }
+                    pageBuilderData = pageConfig.templateGenerator(tenantName, contactFormId, tenant.contact_email || undefined);
+                  } else {
+                    pageBuilderData = pageConfig.templateGenerator(tenantName);
+                  }
+                  pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+                  
+                  await prisma.pages.create({
+                    data: {
+                      tenant_id: tenant.id,
+                      title: pageConfig.title,
+                      slug: pageSlug,
+                      content: JSON.stringify(pageBuilderData),
+                      status: 'published',
+                      banner_image: null,
+                      meta_title: pageConfig.metaTitle || null,
+                      meta_description: pageConfig.metaDescription || null,
+                    },
+                  });
+                  console.log(`[Registration] ✅ Created missing page: ${pageConfig.title} (slug: ${pageSlug})`);
+                }
+              }
+            }
+          }
+        } catch (verifyError: any) {
+          console.error(`[Registration] ❌ Error verifying/creating required pages:`, verifyError);
+          // Don't throw - registration should still succeed
+        }
       } catch (themeError: any) {
         console.error(`[Registration] ❌ Failed to install theme:`, themeError);
         console.error(`[Registration] Theme installation error details:`, {
@@ -686,9 +797,43 @@ export async function POST(request: NextRequest) {
           }
           
           const tenantName = tenant.name || 'Store';
+          
+          // Create homepage first
+          try {
+            const homePageSlug = generateSlug('home');
+            const existingHomepage = await prisma.pages.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: homePageSlug,
+              },
+            });
+
+            if (!existingHomepage) {
+              const homePageBuilderData = createDefaultHomepageTemplate('grocery', tenantName, validatedData.businessType || undefined);
+              const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
+
+              await prisma.pages.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: 'Home',
+                  slug: homePageSlug,
+                  content: JSON.stringify(cleanedHomePageData),
+                  status: 'published',
+                  banner_image: null,
+                  meta_title: `${tenantName} - Home`,
+                  meta_description: `Welcome to ${tenantName}. Shop our amazing products and discover great deals.`,
+                },
+              });
+              console.log(`[Registration] ✅ Created fallback homepage (slug: ${homePageSlug})`);
+            }
+          } catch (homeError: any) {
+            console.error(`[Registration] ❌ Failed to create fallback homepage:`, homeError);
+          }
+          
+          // Create about and contact pages
           const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
           const requiredPages = additionalPageTemplates.filter(
-            (page) => page.slug === 'home' || page.slug === 'about' || page.slug === 'contact'
+            (page) => page.slug === 'about' || page.slug === 'contact'
           );
 
           for (const pageConfig of requiredPages) {
@@ -901,6 +1046,174 @@ export async function POST(request: NextRequest) {
     });
 
     // Return success response
+    // Final verification: Ensure all required pages exist before returning success
+    try {
+      console.log(`[Registration] Performing final verification of required pages...`);
+      const tenantName = tenant.name || 'Store';
+      const requiredSlugs = ['home', 'about', 'contact'];
+      let pagesCreated = 0;
+      
+      // Get or create contact form for contact page
+      let finalContactFormId: string | undefined;
+      const existingContactForm = await prisma.form_builders.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          slug: 'contact-form',
+        },
+      });
+      if (existingContactForm) {
+        finalContactFormId = existingContactForm.id;
+      } else {
+        // Create contact form if it doesn't exist
+        try {
+          const contactForm = await prisma.form_builders.create({
+            data: {
+              tenant_id: tenant.id,
+              title: 'Contact Form',
+              slug: 'contact-form',
+              description: 'Get in touch with us using this form',
+              email: tenant.contact_email || null,
+              button_text: 'Send Message',
+              fields: [
+                {
+                  id: `field-${Date.now()}-1`,
+                  type: 'text',
+                  label: 'Name',
+                  name: 'name',
+                  required: true,
+                  placeholder: 'Your full name',
+                },
+                {
+                  id: `field-${Date.now()}-2`,
+                  type: 'email',
+                  label: 'Email',
+                  name: 'email',
+                  required: true,
+                  placeholder: 'your.email@example.com',
+                },
+                {
+                  id: `field-${Date.now()}-3`,
+                  type: 'text',
+                  label: 'Subject',
+                  name: 'subject',
+                  required: true,
+                  placeholder: 'What is this regarding?',
+                },
+                {
+                  id: `field-${Date.now()}-4`,
+                  type: 'textarea',
+                  label: 'Message',
+                  name: 'message',
+                  required: true,
+                  placeholder: 'Tell us how we can help you...',
+                },
+              ],
+              success_message: 'Thank you for your message! We will get back to you soon.',
+              status: 'active',
+            },
+          });
+          finalContactFormId = contactForm.id;
+          console.log(`[Registration] ✅ Created contact form in final verification (ID: ${finalContactFormId})`);
+        } catch (formError: any) {
+          console.error(`[Registration] ❌ Failed to create contact form in final verification:`, formError);
+        }
+      }
+      
+      for (const slug of requiredSlugs) {
+        try {
+          const pageSlug = generateSlug(slug);
+          const existingPage = await prisma.pages.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: pageSlug,
+            },
+          });
+          
+          if (!existingPage) {
+            console.log(`[Registration] ⚠️ Required page missing in final check: ${slug}, creating now...`);
+            
+            if (slug === 'home') {
+              // Create homepage with business-specific content
+              let themeSlug = 'grocery'; // Default to grocery theme
+              if (validatedData.themeId) {
+                try {
+                  const theme = await prisma.themes.findUnique({ 
+                    where: { id: validatedData.themeId }, 
+                    select: { slug: true } 
+                  });
+                  if (theme) {
+                    themeSlug = theme.slug;
+                  }
+                } catch (themeError) {
+                  console.error(`[Registration] Error fetching theme for homepage:`, themeError);
+                  // Use default 'grocery'
+                }
+              }
+              const homePageBuilderData = createDefaultHomepageTemplate(themeSlug, tenantName, validatedData.businessType || undefined);
+              const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
+              
+              await prisma.pages.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: 'Home',
+                  slug: pageSlug,
+                  content: JSON.stringify(cleanedHomePageData),
+                  status: 'published',
+                  banner_image: null,
+                  meta_title: `${tenantName} - Home`,
+                  meta_description: `Welcome to ${tenantName}. Shop our amazing products and discover great deals.`,
+                },
+              });
+              pagesCreated++;
+              console.log(`[Registration] ✅ Created missing homepage in final verification (slug: ${pageSlug})`);
+            } else {
+              // Create about or contact page
+              const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+              const pageConfig = additionalPageTemplates.find(p => p.slug === slug);
+              
+              if (pageConfig) {
+                let pageBuilderData;
+                if (slug === 'contact') {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName, finalContactFormId, tenant.contact_email || undefined);
+                } else {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName);
+                }
+                pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+                
+                await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageConfig.title,
+                    slug: pageSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: pageConfig.metaTitle || null,
+                    meta_description: pageConfig.metaDescription || null,
+                  },
+                });
+                pagesCreated++;
+                console.log(`[Registration] ✅ Created missing page in final verification: ${pageConfig.title} (slug: ${pageSlug})`);
+              }
+            }
+          } else {
+            console.log(`[Registration] ✅ Verified page exists: ${slug} (slug: ${pageSlug})`);
+          }
+        } catch (pageError: any) {
+          console.error(`[Registration] ❌ Failed to create/verify page ${slug} in final check:`, pageError);
+        }
+      }
+      
+      if (pagesCreated > 0) {
+        console.log(`[Registration] ✅ Created ${pagesCreated} missing page(s) in final verification`);
+      } else {
+        console.log(`[Registration] ✅ All required pages verified and exist`);
+      }
+    } catch (verifyError: any) {
+      console.error(`[Registration] ❌ Error in final page verification:`, verifyError);
+      // Don't fail registration - pages might still exist
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Tenant registered successfully',
