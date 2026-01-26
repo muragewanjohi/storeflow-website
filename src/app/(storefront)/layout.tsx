@@ -17,6 +17,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ExclamationTriangleIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { redirect } from 'next/navigation';
 
+// Force dynamic rendering since this layout uses headers() for tenant resolution
+export const dynamic = 'force-dynamic';
+
 export default async function StorefrontLayout({
   children,
 }: {

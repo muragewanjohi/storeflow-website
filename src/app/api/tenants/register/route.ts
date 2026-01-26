@@ -448,6 +448,17 @@ export async function POST(request: NextRequest) {
               title: createdHomepage.title,
               tenant_id: createdHomepage.tenant_id,
             });
+            
+            // Verify the page was actually saved by querying it back
+            const verifyHomepage = await prisma.pages.findUnique({
+              where: { id: createdHomepage.id },
+              select: { id: true, slug: true, tenant_id: true, title: true },
+            });
+            if (verifyHomepage) {
+              console.log(`[Registration] ✅ Verified homepage exists in database:`, verifyHomepage);
+            } else {
+              console.error(`[Registration] ❌ WARNING: Homepage was created but cannot be found in database!`);
+            }
           } else {
             console.log(`[Registration] ℹ️ Homepage already exists (slug: ${pageSlug}, id: ${existingHomepage.id})`);
           }
@@ -583,6 +594,17 @@ export async function POST(request: NextRequest) {
                   title: createdPage.title,
                   tenant_id: createdPage.tenant_id,
                 });
+                
+                // Verify the page was actually saved
+                const verifyPage = await prisma.pages.findUnique({
+                  where: { id: createdPage.id },
+                  select: { id: true, slug: true, tenant_id: true, title: true },
+                });
+                if (verifyPage) {
+                  console.log(`[Registration] ✅ Verified page exists in database:`, verifyPage);
+                } else {
+                  console.error(`[Registration] ❌ WARNING: Page was created but cannot be found in database!`);
+                }
               } else {
                 console.log(`[Registration] ℹ️ Page already exists: ${pageConfig.title} (slug: ${pageSlug}, id: ${existingPage.id})`);
               }
@@ -1208,6 +1230,49 @@ export async function POST(request: NextRequest) {
         console.log(`[Registration] ✅ Created ${pagesCreated} missing page(s) in final verification`);
       } else {
         console.log(`[Registration] ✅ All required pages verified and exist`);
+      }
+      
+      // Final database verification - query all pages for this tenant
+      try {
+        const allPagesForTenant = await prisma.pages.findMany({
+          where: {
+            tenant_id: tenant.id,
+          },
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            status: true,
+            created_at: true,
+          },
+          orderBy: {
+            created_at: 'asc',
+          },
+        });
+        
+        console.log(`[Registration] 📋 Final database check - Pages for tenant ${tenant.id} (${tenant.subdomain}):`, {
+          totalPages: allPagesForTenant.length,
+          pages: allPagesForTenant.map(p => ({
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            status: p.status,
+            created: p.created_at,
+          })),
+        });
+        
+        // Verify required pages exist
+        const foundSlugs = allPagesForTenant.map(p => p.slug?.toLowerCase()).filter(Boolean);
+        const missingRequired = requiredSlugs.filter(slug => !foundSlugs.includes(slug.toLowerCase()));
+        
+        if (missingRequired.length > 0) {
+          console.error(`[Registration] ⚠️ WARNING: Required pages still missing after all attempts:`, missingRequired);
+          console.error(`[Registration] Found slugs:`, foundSlugs);
+        } else {
+          console.log(`[Registration] ✅ All required pages confirmed in database`);
+        }
+      } catch (dbCheckError: any) {
+        console.error(`[Registration] ❌ Error in final database check:`, dbCheckError);
       }
     } catch (verifyError: any) {
       console.error(`[Registration] ❌ Error in final page verification:`, verifyError);

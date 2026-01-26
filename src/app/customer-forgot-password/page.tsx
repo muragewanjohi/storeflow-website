@@ -7,6 +7,9 @@
  * Accessible via tenant subdomain storefront
  */
 
+// Force dynamic rendering since this page uses tenant context from layout
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
