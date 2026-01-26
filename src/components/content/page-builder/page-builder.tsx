@@ -388,6 +388,16 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
                     <span className="text-2xl">📋</span>
                     <span className="text-xs">Form</span>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSection('blogs')}
+                    className="flex flex-col items-center gap-1 h-auto py-3"
+                  >
+                    <span className="text-2xl">📰</span>
+                    <span className="text-xs">Blogs</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -632,6 +642,7 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         limit: 8,
         show_countdown: true,
         show_badge: true,
+        show_sale_name: true,
         banner_style: 'contained',
         product_card_style: 'default',
         cta_text: 'Shop More',
@@ -724,6 +735,26 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         show_form_title: true,
         max_width: 'md',
       };
+    case 'blogs':
+      return {
+        id,
+        type: 'blogs',
+        order,
+        title: 'Latest Blog Posts',
+        subtitle: 'Stay updated with our latest news and articles',
+        layout: 'grid',
+        columns: 3,
+        limit: 6,
+        show_excerpt: true,
+        show_date: true,
+        show_author: false,
+        show_category: true,
+        show_read_more: true,
+        order_by: 'created_at',
+        order_direction: 'desc',
+        cta_text: 'View All Blogs',
+        cta_link: '/blog',
+      };
   }
 }
 
@@ -742,6 +773,7 @@ function getSectionTypeLabel(type: SectionType): string {
     text: 'Text',
     image: 'Image',
     form: 'Form',
+    blogs: 'Blogs',
   };
   return labels[type];
 }

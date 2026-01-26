@@ -72,7 +72,7 @@ function TenantRegisterForm() {
   const [businessType, setBusinessType] = useState<string>('');
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
-  const [includeDemoAttributes, setIncludeDemoAttributes] = useState(false);
+  const [includeDemoAttributes, setIncludeDemoAttributes] = useState(true); // Default to true to include Size, Color, etc.
 
   // Business types for Kenya/Africa market
   const businessTypes = [
@@ -439,7 +439,7 @@ function TenantRegisterForm() {
                     value={formData.subdomain}
                     onChange={(e) => handleSubdomainChange(e.target.value)}
                     placeholder="mystore"
-                    pattern="[a-z0-9-]+"
+                    pattern="[a-z0-9\-]+"
                     className="rounded-r-none"
                   />
                   <span className="px-4 py-2 bg-muted border border-l-0 rounded-r-md text-muted-foreground">
@@ -503,6 +503,7 @@ function TenantRegisterForm() {
                   onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
                   placeholder="••••••••"
                   minLength={8}
+                  autoComplete="new-password"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.

@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     try {
       // Determine page title and slug
       const templateData = getHomepageTemplateData(theme.slug);
-      const pageTitle = templateData?.title || `Home - ${theme.title}`;
+      const pageTitle = 'Home';
       const pageSlug = generateSlug('home'); // Use same slug generation as API route
 
       // Check if homepage already exists for this tenant (matching API route check)
@@ -313,6 +313,75 @@ export async function POST(request: NextRequest) {
       
       const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
       
+      // Get or create contact form for contact page
+      let contactFormId: string | undefined;
+      if (additionalPageTemplates?.some(t => t.slug === 'contact')) {
+        try {
+          const existingContactForm = await prisma.form_builders.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: 'contact-form',
+            },
+          });
+
+          if (!existingContactForm) {
+            const contactForm = await prisma.form_builders.create({
+              data: {
+                tenant_id: tenant.id,
+                title: 'Contact Form',
+                slug: 'contact-form',
+                description: 'Get in touch with us using this form',
+                email: tenant.contact_email || null,
+                button_text: 'Send Message',
+                fields: [
+                  {
+                    id: `field-${Date.now()}-1`,
+                    type: 'text',
+                    label: 'Name',
+                    name: 'name',
+                    required: true,
+                    placeholder: 'Your full name',
+                  },
+                  {
+                    id: `field-${Date.now()}-2`,
+                    type: 'email',
+                    label: 'Email',
+                    name: 'email',
+                    required: true,
+                    placeholder: 'your.email@example.com',
+                  },
+                  {
+                    id: `field-${Date.now()}-3`,
+                    type: 'text',
+                    label: 'Subject',
+                    name: 'subject',
+                    required: true,
+                    placeholder: 'What is this regarding?',
+                  },
+                  {
+                    id: `field-${Date.now()}-4`,
+                    type: 'textarea',
+                    label: 'Message',
+                    name: 'message',
+                    required: true,
+                    placeholder: 'Tell us how we can help you...',
+                  },
+                ],
+                success_message: 'Thank you for your message! We will get back to you soon.',
+                status: 'active',
+              },
+            });
+            contactFormId = contactForm.id;
+            console.log('[Theme Install] ✅ Created contact form (ID: ' + contactFormId + ')');
+          } else {
+            contactFormId = existingContactForm.id;
+            console.log('[Theme Install] ℹ️ Contact form already exists (ID: ' + contactFormId + ')');
+          }
+        } catch (formError: any) {
+          console.error('[Theme Install] ❌ Failed to create contact form:', formError);
+        }
+      }
+      
       console.log('[Theme Install] getAdditionalPageTemplates returned:', {
         templateCount: additionalPageTemplates?.length || 0,
         templates: additionalPageTemplates?.map(t => ({ slug: t.slug, title: t.title })) || [],
@@ -349,8 +418,14 @@ export async function POST(request: NextRequest) {
             });
 
             // Generate page builder content (use tenantName variable)
+            // For contact page, pass the contact form ID and contact email
             console.log('[Theme Install] Generating page builder content...');
-            let pageBuilderData = pageConfig.templateGenerator(tenantName);
+            let pageBuilderData;
+            if (pageConfig.slug === 'contact') {
+              pageBuilderData = pageConfig.templateGenerator(tenantName, contactFormId, tenant.contact_email || undefined);
+            } else {
+              pageBuilderData = pageConfig.templateGenerator(tenantName);
+            }
           
             // Clean any blob URLs from page builder content
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);

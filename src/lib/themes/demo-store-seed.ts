@@ -564,7 +564,7 @@ export async function seedExistingDemoStore(
 
     // Create homepage with complete sections
     try {
-      const pageTitle = `Home - ${tenant.name}`;
+      const pageTitle = 'Home';
       const pageSlug = generatePageSlug('home');
 
       const existingHomepage = await prisma.pages.findFirst({
@@ -809,7 +809,7 @@ export async function createDemoStore(businessType: string): Promise<void> {
 
   // Create homepage with complete sections
   try {
-    const pageTitle = `Home - ${tenant.name}`;
+    const pageTitle = 'Home';
     const pageSlug = generatePageSlug('home');
 
     // Check if homepage already exists (by slug or by checking for home page)

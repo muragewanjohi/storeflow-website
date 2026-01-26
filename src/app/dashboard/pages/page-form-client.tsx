@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Page {
   id: string;
@@ -92,6 +93,10 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     status: page?.status || ('draft' as 'draft' | 'published' | 'archived'),
     use_banner: detectUseBanner(page?.content || '', page?.banner_image || ''),
   });
+
+  // SEO sections collapsible state (initially closed)
+  const [seoSettingsOpen, setSeoSettingsOpen] = useState(false);
+  const [seoPreviewOpen, setSeoPreviewOpen] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -472,54 +477,94 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
           {/* SEO Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>SEO Settings</CardTitle>
-              <CardDescription>
-                Meta tags for search engine optimization
-              </CardDescription>
+              <button
+                type="button"
+                onClick={() => setSeoSettingsOpen(!seoSettingsOpen)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div>
+                  <CardTitle>SEO Settings</CardTitle>
+                  <CardDescription>
+                    Meta tags for search engine optimization
+                  </CardDescription>
+                </div>
+                {seoSettingsOpen ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="meta_title">Meta Title</Label>
-                <Input
-                  id="meta_title"
-                  value={formData.meta_title || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
-                  placeholder="SEO title (max 60 characters)"
-                  maxLength={60}
-                />
-              </div>
+            {seoSettingsOpen && (
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="meta_title">Meta Title</Label>
+                  <Input
+                    id="meta_title"
+                    value={formData.meta_title || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
+                    placeholder="SEO title (max 60 characters)"
+                    maxLength={60}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meta_description">Meta Description</Label>
-                <Textarea
-                  id="meta_description"
-                  value={formData.meta_description || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
-                  rows={3}
-                  placeholder="SEO description (max 160 characters)"
-                  maxLength={160}
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="meta_description">Meta Description</Label>
+                  <Textarea
+                    id="meta_description"
+                    value={formData.meta_description || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
+                    rows={3}
+                    placeholder="SEO description (max 160 characters)"
+                    maxLength={160}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meta_tags">Meta Tags</Label>
-                <Input
-                  id="meta_tags"
-                  value={formData.meta_tags || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_tags: e.target.value })}
-                  placeholder="Comma-separated tags"
-                />
-              </div>
-            </CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="meta_tags">Meta Tags</Label>
+                  <Input
+                    id="meta_tags"
+                    value={formData.meta_tags || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_tags: e.target.value })}
+                    placeholder="Comma-separated tags"
+                  />
+                </div>
+              </CardContent>
+            )}
           </Card>
 
           {/* SEO Preview */}
-          <SEOPreview
-            title={formData.meta_title || formData.title}
-            description={formData.meta_description}
-            slug={formData.slug}
-            baseUrl={baseUrl || 'https://example.com'}
-          />
+          <Card>
+            <CardHeader>
+              <button
+                type="button"
+                onClick={() => setSeoPreviewOpen(!seoPreviewOpen)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div>
+                  <CardTitle>SEO Preview</CardTitle>
+                  <CardDescription>
+                    How your page will appear in search engine results
+                  </CardDescription>
+                </div>
+                {seoPreviewOpen ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            </CardHeader>
+            {seoPreviewOpen && (
+              <CardContent>
+                <SEOPreview
+                  title={formData.meta_title || formData.title}
+                  description={formData.meta_description}
+                  slug={formData.slug}
+                  baseUrl={baseUrl || 'https://example.com'}
+                />
+              </CardContent>
+            )}
+          </Card>
 
           {/* Form Actions */}
           <Card>

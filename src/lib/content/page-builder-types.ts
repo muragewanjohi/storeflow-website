@@ -6,7 +6,7 @@
  * Day 28: Content Management - Simple Page Builder
  */
 
-export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form';
+export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form' | 'blogs';
 
 export interface BaseSection {
   id: string;
@@ -156,6 +156,7 @@ export interface SalesTabSection extends BaseSection {
   // Features
   show_countdown: boolean;
   show_badge: boolean;
+  show_sale_name?: boolean; // Show sale name on frontend
   badge_text?: string; // Override sale badge_text
   badge_color?: string; // Override sale badge_color
   
@@ -311,6 +312,28 @@ export interface FormSection extends BaseSection {
   max_width?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; // Container width
 }
 
+export interface BlogsSection extends BaseSection {
+  type: 'blogs';
+  title?: string;
+  subtitle?: string;
+  layout?: 'grid' | 'list' | 'carousel';
+  columns?: 2 | 3 | 4;
+  limit?: number; // Number of blog posts to display
+  category_id?: string; // Filter by category (optional)
+  show_excerpt?: boolean; // Show blog excerpt
+  show_date?: boolean; // Show publication date
+  show_author?: boolean; // Show author name
+  show_category?: boolean; // Show category badge
+  show_read_more?: boolean; // Show "Read More" link
+  order_by?: 'created_at' | 'updated_at' | 'title'; // Sort order
+  order_direction?: 'asc' | 'desc';
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  cta_text?: string; // "View All Blogs" button text
+  cta_link?: string; // Link to full blog listing
+}
+
 export type PageSection =
   | HeroSection
   | FeaturesSection
@@ -324,7 +347,8 @@ export type PageSection =
   | SplitLayoutSection
   | CTASection
   | ProductTabsSection
-  | FormSection;
+  | FormSection
+  | BlogsSection;
 
 export interface PageBuilderData {
   sections: PageSection[];

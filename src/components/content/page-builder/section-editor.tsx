@@ -115,6 +115,8 @@ export function SectionEditor({ section, onUpdate }: Readonly<SectionEditorProps
       return <ProductTabsSectionEditor section={section} onUpdate={onUpdate} />;
     case 'form':
       return <FormSectionEditor section={section} onUpdate={onUpdate} />;
+    case 'blogs':
+      return <BlogsSectionEditor section={section} onUpdate={onUpdate} />;
     default:
       return null;
   }
@@ -1618,6 +1620,16 @@ function SalesTabSectionEditor({
                 Show sale badges on products
               </Label>
             </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_sale_name"
+                checked={section.show_sale_name !== false}
+                onCheckedChange={(checked) => onUpdate({ show_sale_name: !!checked })}
+              />
+              <Label htmlFor="show_sale_name" className="font-normal cursor-pointer">
+                Show sale name
+              </Label>
+            </div>
             {section.show_badge && (
               <div className="grid grid-cols-2 gap-4 pl-6">
                 <div className="space-y-2">
@@ -3024,3 +3036,263 @@ function FormSectionEditor({
   );
 }
 
+function BlogsSectionEditor({
+  section,
+  onUpdate,
+}: {
+  section: Extract<PageSection, { type: 'blogs' }>;
+  onUpdate: (updates: Partial<PageSection>) => void;
+}) {
+  const handleColorChange = (colorKey: string, value: string) => {
+    onUpdate({ [colorKey]: value });
+  };
+
+  const handleColorReset = (colorKey: string) => {
+    onUpdate({ [colorKey]: undefined });
+  };
+
+  // Fetch blog categories for filtering
+  const { data: categoriesData } = useQuery({
+    queryKey: ['blog-categories'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard/blog-categories');
+      if (!response.ok) return { categories: [] };
+      return await response.json();
+    },
+  });
+
+  const categories = useMemo(() => categoriesData?.categories || [], [categoriesData?.categories]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Edit Blogs Section</CardTitle>
+        <CardDescription>
+          Configure how blog posts are displayed
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Title</Label>
+          <Input
+            value={section.title || ''}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+            placeholder="Latest Blog Posts"
+          />
+        </div>
+        <ColorPicker
+          label="Title Color"
+          colorKey="title_color"
+          defaultValue="#000000"
+          description="Color for the section title"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <div className="space-y-2">
+          <Label>Subtitle</Label>
+          <Input
+            value={section.subtitle || ''}
+            onChange={(e) => onUpdate({ subtitle: e.target.value })}
+            placeholder="Stay updated with our latest news"
+          />
+        </div>
+        <ColorPicker
+          label="Subtitle Color"
+          colorKey="subtitle_color"
+          defaultValue="#666666"
+          description="Color for the section subtitle"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+        <div className="space-y-2">
+          <Label>Layout</Label>
+          <Select
+            value={section.layout || 'grid'}
+            onValueChange={(value: 'grid' | 'list' | 'carousel') =>
+              onUpdate({ layout: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="grid">Grid</SelectItem>
+              <SelectItem value="list">List</SelectItem>
+              <SelectItem value="carousel">Carousel</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {section.layout === 'grid' && (
+          <div className="space-y-2">
+            <Label>Columns</Label>
+            <Select
+              value={String(section.columns || 3)}
+              onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2">2 Columns</SelectItem>
+                <SelectItem value="3">3 Columns</SelectItem>
+                <SelectItem value="4">4 Columns</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label>Number of Posts</Label>
+          <Input
+            type="number"
+            value={section.limit || 6}
+            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 6 })}
+            min={1}
+            max={20}
+          />
+          <p className="text-xs text-muted-foreground">
+            Number of blog posts to display
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Category (Optional)</Label>
+          <Select
+            value={section.category_id || ''}
+            onValueChange={(value) => onUpdate({ category_id: value || undefined })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Categories</SelectItem>
+              {categories.map((cat: any) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Filter posts by category
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label>Sort By</Label>
+          <Select
+            value={section.order_by || 'created_at'}
+            onValueChange={(value: 'created_at' | 'updated_at' | 'title') =>
+              onUpdate({ order_by: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at">Date Created</SelectItem>
+              <SelectItem value="updated_at">Last Updated</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Sort Direction</Label>
+          <Select
+            value={section.order_direction || 'desc'}
+            onValueChange={(value: 'asc' | 'desc') =>
+              onUpdate({ order_direction: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Newest First</SelectItem>
+              <SelectItem value="asc">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold">Display Options</h3>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_excerpt"
+                checked={section.show_excerpt !== false}
+                onCheckedChange={(checked) => onUpdate({ show_excerpt: !!checked })}
+              />
+              <Label htmlFor="show_excerpt" className="font-normal cursor-pointer">
+                Show excerpt
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_date"
+                checked={section.show_date !== false}
+                onCheckedChange={(checked) => onUpdate({ show_date: !!checked })}
+              />
+              <Label htmlFor="show_date" className="font-normal cursor-pointer">
+                Show publication date
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_author"
+                checked={section.show_author === true}
+                onCheckedChange={(checked) => onUpdate({ show_author: !!checked })}
+              />
+              <Label htmlFor="show_author" className="font-normal cursor-pointer">
+                Show author
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_category"
+                checked={section.show_category !== false}
+                onCheckedChange={(checked) => onUpdate({ show_category: !!checked })}
+              />
+              <Label htmlFor="show_category" className="font-normal cursor-pointer">
+                Show category badge
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show_read_more"
+                checked={section.show_read_more !== false}
+                onCheckedChange={(checked) => onUpdate({ show_read_more: !!checked })}
+              />
+              <Label htmlFor="show_read_more" className="font-normal cursor-pointer">
+                Show &quot;Read More&quot; link
+              </Label>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2 border-t pt-4">
+          <Label>CTA Button Text</Label>
+          <Input
+            value={section.cta_text || ''}
+            onChange={(e) => onUpdate({ cta_text: e.target.value })}
+            placeholder="View All Blogs"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>CTA Button Link</Label>
+          <Input
+            value={section.cta_link || ''}
+            onChange={(e) => onUpdate({ cta_link: e.target.value })}
+            placeholder="/blog"
+          />
+        </div>
+        <ColorPicker
+          label="Background Color"
+          colorKey="background_color"
+          defaultValue="#FFFFFF"
+          description="Background color for the blogs section"
+          section={section}
+          onColorChange={handleColorChange}
+          onColorReset={handleColorReset}
+        />
+      </CardContent>
+    </Card>
+  );
+}

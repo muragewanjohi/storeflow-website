@@ -1489,19 +1489,21 @@ export async function createDemoPages(
 ): Promise<number> {
   let pagesCreated = 0;
   
+  // Use correct slugs: 'about' and 'contact' (not 'about-us' or 'contact-us')
+  // These pages may already exist from theme installation, so we check before creating
   const demoPages = [
     {
       title: 'About Us',
-      slug: 'about-us',
+      slug: 'about',
       content: `<h1>About ${tenantName}</h1><p>Welcome to ${tenantName}! We are committed to providing you with the best products and services.</p><p>Our mission is to deliver quality and value to our customers every day.</p>`,
       meta_title: `About Us - ${tenantName}`,
       meta_description: `Learn more about ${tenantName} and our commitment to excellence.`,
     },
     {
-      title: 'Contact Us',
-      slug: 'contact-us',
+      title: 'Contact',
+      slug: 'contact',
       content: `<h1>Contact Us</h1><p>We'd love to hear from you! Get in touch with ${tenantName} today.</p><p><strong>Email:</strong> info@example.com</p><p><strong>Phone:</strong> +254 700 000 000</p><p><strong>Address:</strong> Nairobi, Kenya</p>`,
-      meta_title: `Contact Us - ${tenantName}`,
+      meta_title: `Contact ${tenantName} - Get in Touch`,
       meta_description: `Get in touch with ${tenantName}. We're here to help!`,
     },
   ];
@@ -1818,25 +1820,36 @@ export async function createDemoForm(
           button_text: 'Send Message',
           fields: [
             {
+              id: `field-${Date.now()}-1`,
               type: 'text',
               label: 'Name',
               name: 'name',
               required: true,
-              placeholder: 'Enter your name',
+              placeholder: 'Your full name',
             },
             {
+              id: `field-${Date.now()}-2`,
               type: 'email',
               label: 'Email',
               name: 'email',
               required: true,
-              placeholder: 'Enter your email',
+              placeholder: 'your.email@example.com',
             },
             {
+              id: `field-${Date.now()}-3`,
+              type: 'text',
+              label: 'Subject',
+              name: 'subject',
+              required: true,
+              placeholder: 'What is this regarding?',
+            },
+            {
+              id: `field-${Date.now()}-4`,
               type: 'textarea',
               label: 'Message',
               name: 'message',
               required: true,
-              placeholder: 'Enter your message',
+              placeholder: 'Tell us how we can help you...',
             },
           ],
           success_message: 'Thank you for your message! We will get back to you soon.',

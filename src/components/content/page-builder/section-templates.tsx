@@ -52,6 +52,8 @@ export function SectionRenderer({ section, isPreview = false }: Readonly<Section
       return <ProductTabsSectionComponent section={section} isPreview={isPreview} />;
     case 'form':
       return <FormSectionComponent section={section} isPreview={isPreview} />;
+    case 'blogs':
+      return <BlogsSectionComponent section={section} isPreview={isPreview} />;
     default:
       return null;
   }
@@ -1277,6 +1279,19 @@ function SalesTabSectionComponent({
                 {section.title}
               </h2>
             )}
+            {section.show_sale_name && sales.length > 0 && (
+              <div className="mb-2">
+                {displayMode === 'all_active' && sales.length > 1 ? (
+                  <p className="text-lg font-semibold text-primary">
+                    Active Sales: {sales.map(s => s.name).join(', ')}
+                  </p>
+                ) : sales.length > 0 ? (
+                  <p className="text-lg font-semibold text-primary">
+                    {sales[0].name}
+                  </p>
+                ) : null}
+              </div>
+            )}
             {section.subtitle && (
               <p className="text-muted-foreground">{section.subtitle}</p>
             )}
@@ -1761,7 +1776,10 @@ function SplitLayoutFormRenderer({ formId, isPreview }: { formId?: string; isPre
           setForm(data.form);
           const initialValues: Record<string, any> = {};
           data.form?.fields?.forEach((field: any) => {
-            initialValues[field.id] = field.type === 'checkbox' ? false : '';
+            // Use field.name as the key since it's unique and used for form submission
+            // Fallback to field.id if name is not available
+            const fieldKey = field.name || field.id || `field-${Date.now()}-${Math.random()}`;
+            initialValues[fieldKey] = field.type === 'checkbox' ? false : '';
           });
           setFormValues(initialValues);
         }
@@ -1834,106 +1852,120 @@ function SplitLayoutFormRenderer({ formId, isPreview }: { formId?: string; isPre
       {form.description && <p className="text-muted-foreground mb-6">{form.description}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {form.fields?.map((field: any) => (
-          <div key={field.id} className="space-y-2">
-            <label className="block text-sm font-medium">
-              {field.label}
-              {field.required && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            
-            {field.type === 'text' && (
-              <input
-                type="text"
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-            
-            {field.type === 'email' && (
-              <input
-                type="email"
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-            
-            {field.type === 'phone' && (
-              <input
-                type="tel"
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-            
-            {field.type === 'textarea' && (
-              <textarea
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                required={field.required}
-                rows={4}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-            
-            {field.type === 'select' && (
-              <select
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">{field.placeholder || 'Select an option'}</option>
-                {field.options?.map((option: string, index: number) => (
-                  <option key={index} value={option}>{option}</option>
-                ))}
-              </select>
-            )}
-            
-            {field.type === 'checkbox' && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formValues[field.id] || false}
-                  onChange={(e) => handleFieldChange(field.id, e.target.checked)}
-                  required={field.required}
-                  className="rounded border-gray-300 focus:ring-primary"
-                />
-                <span className="text-sm">{field.placeholder}</span>
+        {form.fields?.map((field: any, index: number) => {
+          // Use field.name as the key since it's unique and used for form submission
+          // Fallback to field.id or generate a unique key if neither is available
+          const fieldKey = field.name || field.id || `field-${index}`;
+          
+          return (
+            <div key={fieldKey} className="space-y-2">
+              <label className="block text-sm font-medium">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-1">*</span>}
               </label>
-            )}
-            
-            {field.type === 'number' && (
-              <input
-                type="number"
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-            
-            {field.type === 'date' && (
-              <input
-                type="date"
-                value={formValues[field.id] || ''}
-                onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                required={field.required}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            )}
-          </div>
-        ))}
+              
+              {field.type === 'text' && (
+                <input
+                  type="text"
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              
+              {field.type === 'email' && (
+                <input
+                  type="email"
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              
+              {field.type === 'tel' && (
+                <input
+                  type="tel"
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              
+              {field.type === 'textarea' && (
+                <textarea
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  rows={4}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              
+              {field.type === 'select' && (
+                <select
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">{field.placeholder || 'Select an option'}</option>
+                  {field.options?.map((option: string, optIndex: number) => (
+                    <option key={optIndex} value={option}>{option}</option>
+                  ))}
+                </select>
+              )}
+              
+              {field.type === 'checkbox' && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name={field.name}
+                    checked={formValues[fieldKey] || false}
+                    onChange={(e) => handleFieldChange(fieldKey, e.target.checked)}
+                    required={field.required}
+                    className="rounded border-gray-300 focus:ring-primary"
+                  />
+                  <span className="text-sm">{field.placeholder}</span>
+                </label>
+              )}
+              
+              {field.type === 'number' && (
+                <input
+                  type="number"
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  placeholder={field.placeholder}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              
+              {field.type === 'date' && (
+                <input
+                  type="date"
+                  name={field.name}
+                  value={formValues[fieldKey] || ''}
+                  onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
+                  required={field.required}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+            </div>
+          );
+        })}
         
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? 'Submitting...' : (form.submit_button_text || 'Submit')}
@@ -2477,6 +2509,333 @@ function FormSectionComponent({
         </div>
       </div>
     </section>
+  );
+}
+
+function BlogsSectionComponent({ 
+  section, 
+  isPreview 
+}: { 
+  section: Extract<PageSection, { type: 'blogs' }>; 
+  isPreview: boolean;
+}) {
+  const [blogs, setBlogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const layout = section.layout || 'grid';
+  const columns = section.columns || 3;
+  const limit = section.limit || 6;
+  const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4';
+
+  useEffect(() => {
+    if (isPreview) {
+      setIsLoading(false);
+      return;
+    }
+
+    async function fetchBlogs() {
+      try {
+        const params = new URLSearchParams({
+          limit: String(limit),
+          status: 'published',
+        });
+
+        if (section.category_id) {
+          params.append('category_id', section.category_id);
+        }
+
+        if (section.order_by) {
+          params.append('sort_by', section.order_by);
+        }
+
+        if (section.order_direction) {
+          params.append('sort_order', section.order_direction);
+        }
+
+        const response = await fetch(`/api/blogs?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch blogs');
+        }
+        const data = await response.json();
+        setBlogs(data.blogs || []);
+      } catch (err: any) {
+        console.error('Error fetching blogs:', err);
+        setError(err.message || 'Failed to load blogs');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchBlogs();
+  }, [isPreview, limit, section.category_id, section.order_by, section.order_direction]);
+
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <section 
+        className="py-16"
+        style={{ backgroundColor: section.background_color || '#ffffff' }}
+      >
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <p className="text-muted-foreground">Loading blogs...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error || blogs.length === 0) {
+    if (isPreview) {
+      return (
+        <section 
+          className="py-16"
+          style={{ backgroundColor: section.background_color || '#ffffff' }}
+        >
+          <div className="container mx-auto px-4">
+            <div className="text-center text-muted-foreground">
+              <p>No blog posts available. Create some blog posts to see them here.</p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <section 
+      className="py-16"
+      style={{ backgroundColor: section.background_color || '#ffffff' }}
+    >
+      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+        {/* Header */}
+        {(section.title || section.subtitle) && (
+          <div className="text-center mb-12">
+            {section.title && (
+              <h2 
+                className="text-3xl md:text-4xl font-bold mb-4"
+                style={{ color: section.title_color || 'var(--color-text, currentColor)' }}
+              >
+                {section.title}
+              </h2>
+            )}
+            {section.subtitle && (
+              <p 
+                className="text-lg text-muted-foreground"
+                style={{ color: section.subtitle_color || 'var(--color-muted-foreground)' }}
+              >
+                {section.subtitle}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Blog Posts */}
+        {layout === 'carousel' ? (
+          <div className="overflow-x-auto">
+            <div className={`flex gap-6 min-w-max ${gridCols}`}>
+              {blogs.map((blog) => (
+                <BlogCard
+                  key={blog.id}
+                  blog={blog}
+                  section={section}
+                  formatDate={formatDate}
+                  className="min-w-[300px]"
+                />
+              ))}
+            </div>
+          </div>
+        ) : layout === 'list' ? (
+          <div className="space-y-6">
+            {blogs.map((blog) => (
+              <BlogCard
+                key={blog.id}
+                blog={blog}
+                section={section}
+                formatDate={formatDate}
+                layout="list"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
+            {blogs.map((blog) => (
+              <BlogCard
+                key={blog.id}
+                blog={blog}
+                section={section}
+                formatDate={formatDate}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* CTA Button */}
+        {section.cta_text && section.cta_link && (
+          <div className="text-center mt-12">
+            <Link
+              href={section.cta_link}
+              className="inline-block bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all"
+            >
+              {section.cta_text}
+            </Link>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BlogCard({ 
+  blog, 
+  section, 
+  formatDate,
+  layout = 'grid',
+  className = ''
+}: { 
+  blog: any; 
+  section: Extract<PageSection, { type: 'blogs' }>; 
+  formatDate: (date: Date | string | null) => string;
+  layout?: 'grid' | 'list';
+  className?: string;
+}) {
+  const { Calendar, Tag, User } = LucideIcons;
+
+  if (layout === 'list') {
+    return (
+      <Link
+        href={blog.slug ? `/blog/${blog.slug}` : `/blog/${blog.id}`}
+        className="group flex gap-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
+      >
+        <div className="relative w-64 h-48 flex-shrink-0 bg-[#e7e9eb] overflow-hidden">
+          {blog.image ? (
+            <Image
+              src={blog.image}
+              alt={blog.title}
+              fill
+              className="object-cover group-hover:scale-110 transition-transform duration-500"
+              sizes="256px"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#0025cc] to-[#001a99] flex items-center justify-center">
+              <Tag className="w-12 h-12 text-white opacity-50" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 p-6">
+          <div className="flex items-center gap-4 mb-3 text-xs text-muted-foreground">
+            {section.show_date && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>{formatDate(blog.created_at)}</span>
+              </div>
+            )}
+            {section.show_category && blog.blog_categories && (
+              <div className="flex items-center gap-1">
+                <Tag className="w-3 h-3 text-[#0025cc]" />
+                <span>{blog.blog_categories.name}</span>
+              </div>
+            )}
+            {section.show_author && blog.author && (
+              <div className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                <span>{blog.author}</span>
+              </div>
+            )}
+          </div>
+          <h3 className="text-xl font-semibold text-[#0c0528] mb-2 line-clamp-2">
+            {blog.title}
+          </h3>
+          {section.show_excerpt && blog.excerpt && (
+            <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-3">
+              {blog.excerpt}
+            </p>
+          )}
+          {section.show_read_more && (
+            <span className="text-[#0025cc] text-sm font-medium hover:underline">
+              Read More →
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href={blog.slug ? `/blog/${blog.slug}` : `/blog/${blog.id}`}
+      className={`group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden ${className}`}
+    >
+      {/* Post Image */}
+      <div className="relative h-48 bg-[#e7e9eb] overflow-hidden">
+        {blog.image ? (
+          <Image
+            src={blog.image}
+            alt={blog.title}
+            fill
+            className="object-cover group-hover:scale-110 transition-transform duration-500"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#0025cc] to-[#001a99] flex items-center justify-center">
+            <Tag className="w-12 h-12 text-white opacity-50" />
+          </div>
+        )}
+      </div>
+
+      {/* Post Meta */}
+      {(section.show_date || section.show_category || section.show_author) && (
+        <div className="relative -mt-6 mx-4 mb-4">
+          <div className="bg-white rounded-full shadow-lg px-4 py-2 flex items-center gap-3 text-xs flex-wrap">
+            {section.show_date && (
+              <div className="flex items-center gap-1 text-[#8d8d8d]">
+                <Calendar className="w-3 h-3" />
+                <span>{formatDate(blog.created_at)}</span>
+              </div>
+            )}
+            {section.show_category && blog.blog_categories && (
+              <div className="flex items-center gap-1 text-[#0c0528]">
+                <Tag className="w-3 h-3 text-[#0025cc]" />
+                <span>{blog.blog_categories.name}</span>
+              </div>
+            )}
+            {section.show_author && blog.author && (
+              <div className="flex items-center gap-1 text-[#8d8d8d]">
+                <User className="w-3 h-3" />
+                <span>{blog.author}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Post Content */}
+      <div className="px-4 pb-6">
+        <h3 className="text-lg font-semibold text-[#0c0528] mb-2 line-clamp-2">
+          {blog.title}
+        </h3>
+        {section.show_excerpt && blog.excerpt && (
+          <p className="text-sm text-[#8d8d8d] mb-4 line-clamp-2">
+            {blog.excerpt}
+          </p>
+        )}
+        {section.show_read_more && (
+          <span className="text-[#0025cc] text-sm font-medium hover:underline">
+            Read More →
+          </span>
+        )}
+      </div>
+    </Link>
   );
 }
 

@@ -413,7 +413,7 @@ export async function POST(request: NextRequest) {
 
           if (!existingHomepage) {
             const templateData = getHomepageTemplateData(theme.slug);
-            const pageTitle = templateData?.title || `Home - ${theme.title}`;
+            const pageTitle = 'Home';
             const layoutData = getHomepageLayout(theme.slug);
             
             let pageBuilderData;
@@ -446,6 +446,75 @@ export async function POST(request: NextRequest) {
           // Continue - pages are important but not critical for registration
         }
 
+        // Create contact form (always created, not just with demo content)
+        let contactFormId: string | undefined;
+        try {
+          console.log(`[Registration] Creating contact form...`);
+          const existingContactForm = await prisma.form_builders.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: 'contact-form',
+            },
+          });
+
+          if (!existingContactForm) {
+            const contactForm = await prisma.form_builders.create({
+              data: {
+                tenant_id: tenant.id,
+                title: 'Contact Form',
+                slug: 'contact-form',
+                description: 'Get in touch with us using this form',
+                email: tenant.contact_email || null,
+                button_text: 'Send Message',
+                fields: [
+                  {
+                    id: `field-${Date.now()}-1`,
+                    type: 'text',
+                    label: 'Name',
+                    name: 'name',
+                    required: true,
+                    placeholder: 'Your full name',
+                  },
+                  {
+                    id: `field-${Date.now()}-2`,
+                    type: 'email',
+                    label: 'Email',
+                    name: 'email',
+                    required: true,
+                    placeholder: 'your.email@example.com',
+                  },
+                  {
+                    id: `field-${Date.now()}-3`,
+                    type: 'text',
+                    label: 'Subject',
+                    name: 'subject',
+                    required: true,
+                    placeholder: 'What is this regarding?',
+                  },
+                  {
+                    id: `field-${Date.now()}-4`,
+                    type: 'textarea',
+                    label: 'Message',
+                    name: 'message',
+                    required: true,
+                    placeholder: 'Tell us how we can help you...',
+                  },
+                ],
+                success_message: 'Thank you for your message! We will get back to you soon.',
+                status: 'active',
+              },
+            });
+            contactFormId = contactForm.id;
+            console.log(`[Registration] ✅ Created contact form (ID: ${contactFormId})`);
+          } else {
+            contactFormId = existingContactForm.id;
+            console.log(`[Registration] ℹ️ Contact form already exists (ID: ${contactFormId})`);
+          }
+        } catch (formError: any) {
+          console.error(`[Registration] ❌ Failed to create contact form:`, formError);
+          // Continue - form creation failure shouldn't block page creation
+        }
+
         // Always create /home, /about, and /contact pages (not /about-us or /contact-us)
         try {
           const tenantName = tenant.name || 'Store';
@@ -469,7 +538,13 @@ export async function POST(request: NextRequest) {
               });
 
               if (!existingPage) {
-                let pageBuilderData = pageConfig.templateGenerator(tenantName);
+                // For contact page, pass the contact form ID and contact email
+                let pageBuilderData;
+                if (pageConfig.slug === 'contact') {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName, contactFormId, tenant.contact_email || undefined);
+                } else {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName);
+                }
                 pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
 
                 await prisma.pages.create({
@@ -544,6 +619,72 @@ export async function POST(request: NextRequest) {
         // But try to create default pages anyway
         try {
           console.log(`[Registration] Attempting to create default pages after theme installation failure...`);
+          
+          // Create contact form for fallback pages
+          let fallbackContactFormId: string | undefined;
+          try {
+            const existingContactForm = await prisma.form_builders.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: 'contact-form',
+              },
+            });
+
+            if (!existingContactForm) {
+              const contactForm = await prisma.form_builders.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: 'Contact Form',
+                  slug: 'contact-form',
+                  description: 'Get in touch with us using this form',
+                  email: tenant.contact_email || null,
+                  button_text: 'Send Message',
+                  fields: [
+                    {
+                      id: `field-${Date.now()}-1`,
+                      type: 'text',
+                      label: 'Name',
+                      name: 'name',
+                      required: true,
+                      placeholder: 'Your full name',
+                    },
+                    {
+                      id: `field-${Date.now()}-2`,
+                      type: 'email',
+                      label: 'Email',
+                      name: 'email',
+                      required: true,
+                      placeholder: 'your.email@example.com',
+                    },
+                    {
+                      id: `field-${Date.now()}-3`,
+                      type: 'text',
+                      label: 'Subject',
+                      name: 'subject',
+                      required: true,
+                      placeholder: 'What is this regarding?',
+                    },
+                    {
+                      id: `field-${Date.now()}-4`,
+                      type: 'textarea',
+                      label: 'Message',
+                      name: 'message',
+                      required: true,
+                      placeholder: 'Tell us how we can help you...',
+                    },
+                  ],
+                  success_message: 'Thank you for your message! We will get back to you soon.',
+                  status: 'active',
+                },
+              });
+              fallbackContactFormId = contactForm.id;
+            } else {
+              fallbackContactFormId = existingContactForm.id;
+            }
+          } catch (formError) {
+            console.error(`[Registration] ❌ Failed to create fallback contact form:`, formError);
+          }
+          
           const tenantName = tenant.name || 'Store';
           const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
           const requiredPages = additionalPageTemplates.filter(
@@ -561,7 +702,13 @@ export async function POST(request: NextRequest) {
               });
 
               if (!existingPage) {
-                let pageBuilderData = pageConfig.templateGenerator(tenantName);
+                // For contact page, pass the contact form ID and contact email
+                let pageBuilderData;
+                if (pageConfig.slug === 'contact') {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName, fallbackContactFormId, tenant.contact_email || undefined);
+                } else {
+                  pageBuilderData = pageConfig.templateGenerator(tenantName);
+                }
                 pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
 
                 await prisma.pages.create({
@@ -628,6 +775,71 @@ export async function POST(request: NextRequest) {
             },
           });
 
+          // Create contact form for pages (even without theme)
+          let noThemeContactFormId: string | undefined;
+          try {
+            const existingContactForm = await prisma.form_builders.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: 'contact-form',
+              },
+            });
+
+            if (!existingContactForm) {
+              const contactForm = await prisma.form_builders.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: 'Contact Form',
+                  slug: 'contact-form',
+                  description: 'Get in touch with us using this form',
+                  email: tenant.contact_email || null,
+                  button_text: 'Send Message',
+                  fields: [
+                    {
+                      id: `field-${Date.now()}-1`,
+                      type: 'text',
+                      label: 'Name',
+                      name: 'name',
+                      required: true,
+                      placeholder: 'Your full name',
+                    },
+                    {
+                      id: `field-${Date.now()}-2`,
+                      type: 'email',
+                      label: 'Email',
+                      name: 'email',
+                      required: true,
+                      placeholder: 'your.email@example.com',
+                    },
+                    {
+                      id: `field-${Date.now()}-3`,
+                      type: 'text',
+                      label: 'Subject',
+                      name: 'subject',
+                      required: true,
+                      placeholder: 'What is this regarding?',
+                    },
+                    {
+                      id: `field-${Date.now()}-4`,
+                      type: 'textarea',
+                      label: 'Message',
+                      name: 'message',
+                      required: true,
+                      placeholder: 'Tell us how we can help you...',
+                    },
+                  ],
+                  success_message: 'Thank you for your message! We will get back to you soon.',
+                  status: 'active',
+                },
+              });
+              noThemeContactFormId = contactForm.id;
+            } else {
+              noThemeContactFormId = existingContactForm.id;
+            }
+          } catch (formError) {
+            console.error(`[Registration] ❌ Failed to create contact form:`, formError);
+          }
+
           // Always create /about and /contact pages even without theme
           const tenantName = tenant.name || 'Store';
           const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
@@ -645,7 +857,13 @@ export async function POST(request: NextRequest) {
             });
 
             if (!existingPage) {
-              let pageBuilderData = pageConfig.templateGenerator(tenantName);
+              // For contact page, pass the contact form ID and contact email
+              let pageBuilderData;
+              if (pageConfig.slug === 'contact') {
+                pageBuilderData = pageConfig.templateGenerator(tenantName, noThemeContactFormId, tenant.contact_email || undefined);
+              } else {
+                pageBuilderData = pageConfig.templateGenerator(tenantName);
+              }
               pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
 
               await prisma.pages.create({
