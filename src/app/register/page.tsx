@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
@@ -49,6 +50,11 @@ function TenantRegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
+  const [demoContentInfo, setDemoContentInfo] = useState<{
+    created: boolean;
+    products: number;
+    categories: number;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -58,6 +64,63 @@ function TenantRegisterForm() {
     adminName: '',
     contactEmail: '',
   });
+
+  const [themes, setThemes] = useState<any[]>([]);
+  const [isLoadingThemes, setIsLoadingThemes] = useState(true);
+  const [themesError, setThemesError] = useState<string | null>(null);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>('');
+  const [businessType, setBusinessType] = useState<string>('');
+  const [otherBusinessType, setOtherBusinessType] = useState<string>('');
+  const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
+  const [includeDemoAttributes, setIncludeDemoAttributes] = useState(false);
+
+  // Business types for Kenya/Africa market
+  const businessTypes = [
+    'Grocery Store / Supermarket',
+    'Pharmacy / Health & Wellness',
+    'Fashion / Clothing',
+    'Electronics & Mobile Phones',
+    'Beauty & Personal Care',
+    'Home & Kitchen',
+    'Baby & Kids Products',
+    'Food & Beverages / Restaurant',
+    'Convenience Store / Duka',
+    'Furniture & Home Decor',
+    'Pets',
+    'Hardware',
+    'Other',
+  ];
+
+  // Fetch all themes on component mount
+  useEffect(() => {
+    async function fetchThemes() {
+      try {
+        // For registration, we need a public endpoint or we'll fetch themes after tenant creation
+        // For now, we'll create a simple endpoint or use a default theme
+        // Let's fetch from a public endpoint if available, otherwise use default
+        const response = await fetch('/api/public/themes');
+        if (response.ok) {
+          const data = await response.json();
+          setThemes(data.themes || []);
+          // Set default theme if available (Grocery theme)
+          const defaultTheme = data.themes?.find((t: any) => 
+            t.slug?.toLowerCase() === 'grocery' || t.title?.toLowerCase() === 'grocery'
+          );
+          if (defaultTheme) {
+            setSelectedThemeId(defaultTheme.id);
+          }
+        } else {
+          setThemesError('Failed to load themes. Please refresh the page.');
+        }
+      } catch (err) {
+        console.error('Error fetching themes:', err);
+        setThemesError('Failed to load themes. Please refresh the page.');
+      } finally {
+        setIsLoadingThemes(false);
+      }
+    }
+    fetchThemes();
+  }, []);
 
   // Fetch all plans on component mount
   useEffect(() => {
@@ -153,6 +216,9 @@ function TenantRegisterForm() {
         }
       }
 
+      // Determine final business type (use "Other" text if "Other" is selected)
+      const finalBusinessType = businessType === 'Other' ? otherBusinessType : businessType;
+
       const response = await fetch('/api/tenants/register', {
         method: 'POST',
         headers: {
@@ -163,6 +229,10 @@ function TenantRegisterForm() {
         body: JSON.stringify({
           ...formData,
           planId: selectedPlanId || undefined,
+          themeId: selectedThemeId || undefined,
+          businessType: finalBusinessType || undefined,
+          includeDemoContent: includeDemoContent,
+          includeDemoAttributes: includeDemoAttributes,
         }),
       });
 
@@ -177,6 +247,13 @@ function TenantRegisterForm() {
       setSuccess(true);
       if (data.loginUrl) {
         setLoginUrl(data.loginUrl);
+      }
+      if (data.demoContentCreated) {
+        setDemoContentInfo({
+          created: true,
+          products: data.demoProductsCreated || 0,
+          categories: data.demoCategoriesCreated || 0,
+        });
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -193,9 +270,24 @@ function TenantRegisterForm() {
           </div>
           <div>
             <h2 className="text-3xl font-bold mb-2">Registration Successful!</h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-4">
               Your store has been created successfully. You can now log in to your admin dashboard.
             </p>
+            {demoContentInfo?.created && (
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 mb-4 text-left">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  📦 Demo Content Installed
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                  We&apos;ve added sample products and categories to help you learn the system. You can explore them in your dashboard and remove them anytime.
+                </p>
+                {demoContentInfo.products > 0 && demoContentInfo.categories > 0 && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {demoContentInfo.products} sample product{demoContentInfo.products !== 1 ? 's' : ''} and {demoContentInfo.categories} categor{demoContentInfo.categories !== 1 ? 'ies' : 'y'} added.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           {loginUrl && (
             <div className="space-y-4">
@@ -416,11 +508,121 @@ function TenantRegisterForm() {
                   Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.
                 </p>
               </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div>
+                  <Label htmlFor="theme-select">Theme *</Label>
+                  {isLoadingThemes ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading themes...
+                    </div>
+                  ) : themesError ? (
+                    <div className="rounded-md bg-red-50 p-3 mt-2">
+                      <p className="text-sm text-red-800">{themesError}</p>
+                    </div>
+                  ) : themes.length === 0 ? (
+                    <div className="rounded-md bg-yellow-50 p-3 mt-2">
+                      <p className="text-sm text-yellow-800">No themes available. Please contact support.</p>
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedThemeId}
+                      onValueChange={setSelectedThemeId}
+                      required
+                    >
+                      <SelectTrigger id="theme-select" className="w-full mt-2">
+                        <SelectValue placeholder="Select a theme" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {themes.map((theme) => (
+                          <SelectItem key={theme.id} value={theme.id}>
+                            {theme.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose a theme for your storefront. You can customize it later.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="business-type">Business Type *</Label>
+                  <Select value={businessType} onValueChange={setBusinessType} required>
+                    <SelectTrigger id="business-type" className="w-full mt-2">
+                      <SelectValue placeholder="Select your business type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {businessTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {businessType === 'Other' && (
+                    <div className="mt-2">
+                      <Input
+                        placeholder="Enter your business type"
+                        value={otherBusinessType}
+                        onChange={(e) => setOtherBusinessType(e.target.value)}
+                        required={businessType === 'Other'}
+                      />
+                    </div>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This helps us customize colors and settings for your business.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="demo-content"
+                      checked={includeDemoContent}
+                      onCheckedChange={(checked) => {
+                        setIncludeDemoContent(checked === true);
+                        if (!checked) {
+                          setIncludeDemoAttributes(false);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="demo-content"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Install with demo content (products & categories)
+                    </label>
+                  </div>
+                  {includeDemoContent && (
+                    <div className="flex items-center space-x-2 pl-6">
+                      <Checkbox
+                        id="demo-attributes"
+                        checked={includeDemoAttributes}
+                        onCheckedChange={(checked) => setIncludeDemoAttributes(checked === true)}
+                      />
+                      <label
+                        htmlFor="demo-attributes"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Include demo attributes (Size, Color, etc.)
+                      </label>
+                    </div>
+                  )}
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 mt-2">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Recommended:</strong> Demo content includes sample products, categories, and pages that will help you learn the system and see how everything works. You can easily remove it later from your dashboard.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingPlans}
+              disabled={isSubmitting || isLoadingPlans || isLoadingThemes || !selectedThemeId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
               className="w-full"
             >
               {isSubmitting ? (

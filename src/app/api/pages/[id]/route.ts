@@ -214,6 +214,20 @@ export async function DELETE(
       );
     }
 
+    // Protect required system pages from deletion
+    const PROTECTED_PAGE_SLUGS = ['home', 'about', 'contact'];
+    const pageSlugLower = page.slug?.toLowerCase() || '';
+    
+    if (PROTECTED_PAGE_SLUGS.includes(pageSlugLower)) {
+      return NextResponse.json(
+        { 
+          error: `Cannot delete "${page.title}". This is a required system page (home, about, or contact) and cannot be removed.`,
+          protected: true
+        },
+        { status: 403 }
+      );
+    }
+
     // Revalidate the page cache before deleting
     try {
       if (page.slug) {

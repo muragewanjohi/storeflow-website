@@ -15,6 +15,62 @@ import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { clearCachedTenant } from '@/lib/tenant-context/cache';
 import { z } from 'zod';
+import {
+  getHomepageTemplateData,
+  getHomepageLayout,
+  convertLegacyLayoutToPageBuilder,
+  createDefaultHomepageTemplate,
+} from '@/lib/themes/homepage-templates';
+import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
+import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
+import { createDemoContent } from '@/lib/themes/demo-content';
+import { generateSlug } from '@/lib/content/validation';
+
+/**
+ * Remove blob URLs from page builder content
+ */
+function cleanBlobUrlsFromPageBuilder(pageBuilderData: any): any {
+  if (!pageBuilderData || !pageBuilderData.sections) {
+    return pageBuilderData;
+  }
+
+  const cleanedSections = pageBuilderData.sections.map((section: any) => {
+    const cleaned = { ...section };
+
+    if (cleaned.type === 'hero' && cleaned.image && cleaned.image.startsWith('blob:')) {
+      delete cleaned.image;
+    }
+
+    if (cleaned.type === 'image' && cleaned.image && cleaned.image.startsWith('blob:')) {
+      delete cleaned.image;
+    }
+
+    if (cleaned.type === 'features' && cleaned.features) {
+      cleaned.features = cleaned.features.map((feature: any) => {
+        if (feature.image && feature.image.startsWith('blob:')) {
+          delete feature.image;
+        }
+        return feature;
+      });
+    }
+
+    if (cleaned.type === 'testimonials' && cleaned.testimonials) {
+      cleaned.testimonials = cleaned.testimonials.map((testimonial: any) => {
+        if (testimonial.image && testimonial.image.startsWith('blob:')) {
+          delete testimonial.image;
+        }
+        return testimonial;
+      });
+    }
+
+    return cleaned;
+  });
+
+  return {
+    ...pageBuilderData,
+    sections: cleanedSections,
+  };
+}
 
 const registerTenantSchema = z.object({
   name: z.string().min(1, 'Store name is required'),
@@ -27,6 +83,10 @@ const registerTenantSchema = z.object({
   adminName: z.string().min(1, 'Admin name is required'),
   contactEmail: z.string().email('Invalid contact email address'),
   planId: z.string().uuid().optional(),
+  themeId: z.string().uuid().optional(),
+  businessType: z.string().optional(),
+  includeDemoContent: z.boolean().optional(),
+  includeDemoAttributes: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -287,52 +347,222 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to clear tenant cache:', cacheError);
     }
 
-    // Create a default homepage for the new tenant
-    // This ensures there's always a homepage even before theme installation
-    try {
-      const existingHomepage = await prisma.pages.findFirst({
-        where: {
-          tenant_id: tenant.id,
-          slug: 'home',
-        },
-      });
+    // Track demo content creation for response
+    let demoContentCreated = false;
+    let demoProductsCreated = 0;
+    let demoCategoriesCreated = 0;
 
-      if (!existingHomepage) {
-        await prisma.pages.create({
-          data: {
+    // Install theme if provided
+    if (validatedData.themeId) {
+      try {
+        const theme = await prisma.themes.findUnique({
+          where: { id: validatedData.themeId },
+        });
+
+        if (theme) {
+          // Get theme defaults
+          const themeDefaults = getThemeDefaults(theme.slug);
+          
+          // Get business type color scheme if provided
+          let finalColors = themeDefaults?.colors || {};
+          if (validatedData.businessType) {
+            const businessColors = getBusinessTypeColorScheme(validatedData.businessType);
+            if (businessColors) {
+              finalColors = { ...finalColors, ...businessColors };
+            }
+          }
+
+          // Create tenant theme
+          await prisma.tenant_themes.create({
+            data: {
+              tenant_id: tenant.id,
+              theme_id: theme.id,
+              is_active: true,
+              custom_colors: finalColors,
+              custom_fonts: themeDefaults?.fonts || {},
+            },
+          });
+
+          // Create homepage
+          const pageSlug = generateSlug('home');
+          const existingHomepage = await prisma.pages.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: pageSlug,
+            },
+          });
+
+          if (!existingHomepage) {
+            const templateData = getHomepageTemplateData(theme.slug);
+            const pageTitle = templateData?.title || `Home - ${theme.title}`;
+            const layoutData = getHomepageLayout(theme.slug);
+            
+            let pageBuilderData;
+            if (layoutData && layoutData.length > 0) {
+              pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
+            } else {
+              pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+            }
+
+            pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
+            await prisma.pages.create({
+              data: {
+                tenant_id: tenant.id,
+                title: pageTitle,
+                slug: pageSlug,
+                content: JSON.stringify(pageBuilderData),
+                status: 'published',
+                banner_image: null,
+                meta_title: `${tenant.name} - Home`,
+                meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+              },
+            });
+          }
+
+          // Always create /home, /about, and /contact pages (not /about-us or /contact-us)
+          const tenantName = tenant.name || 'Store';
+          const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+          
+          // Filter to only include about and contact pages (home is already created above)
+          const requiredPages = additionalPageTemplates.filter(
+            (page) => page.slug === 'about' || page.slug === 'contact'
+          );
+
+          for (const pageConfig of requiredPages) {
+            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+            const existingPage = await prisma.pages.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: pageSlug,
+              },
+            });
+
+            if (!existingPage) {
+              let pageBuilderData = pageConfig.templateGenerator(tenantName);
+              pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
+              await prisma.pages.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: pageConfig.title,
+                  slug: pageSlug,
+                  content: JSON.stringify(pageBuilderData),
+                  status: 'published',
+                  banner_image: null,
+                  meta_title: pageConfig.metaTitle || null,
+                  meta_description: pageConfig.metaDescription || null,
+                },
+              });
+            }
+          }
+
+          // Create demo content if requested
+          if (validatedData.includeDemoContent) {
+            try {
+              const demoResult = await createDemoContent(
+                prisma,
+                tenant.id,
+                validatedData.businessType || 'Grocery Store / Supermarket',
+                validatedData.includeDemoAttributes || false
+              );
+              demoContentCreated = true;
+              demoProductsCreated = demoResult.productsCreated;
+              demoCategoriesCreated = demoResult.categoriesCreated;
+            } catch (demoError) {
+              console.warn('Failed to create demo content:', demoError);
+              // Non-critical - continue even if demo content fails
+            }
+          }
+
+          console.log(`✅ Installed theme ${theme.slug} for tenant ${tenant.subdomain}`);
+        }
+      } catch (themeError) {
+        console.warn('Failed to install theme:', themeError);
+        // Non-critical - theme installation failure shouldn't block registration
+      }
+    } else {
+      // Create a default homepage if no theme is selected
+      try {
+        const existingHomepage = await prisma.pages.findFirst({
+          where: {
             tenant_id: tenant.id,
-            title: 'Home',
             slug: 'home',
-            content: JSON.stringify({
-              sections: [
-                {
-                  id: 'hero-1',
-                  type: 'hero',
-                  title: `Welcome to ${tenant.name}`,
-                  subtitle: 'Discover amazing products at great prices',
-                  ctaText: 'Shop Now',
-                  ctaLink: '/shop',
-                  layout: 'center',
-                },
-                {
-                  id: 'featured-1',
-                  type: 'featured-products',
-                  title: 'Featured Products',
-                  subtitle: 'Check out our top picks',
-                  limit: 8,
-                },
-              ],
-            }),
-            status: 'published',
-            meta_title: `${tenant.name} - Home`,
-            meta_description: `Welcome to ${tenant.name}. Discover amazing products and great deals.`,
           },
         });
-        console.log(`✅ Created default homepage for tenant ${tenant.subdomain}`);
+
+        if (!existingHomepage) {
+          await prisma.pages.create({
+            data: {
+              tenant_id: tenant.id,
+              title: 'Home',
+              slug: 'home',
+              content: JSON.stringify({
+                sections: [
+                  {
+                    id: 'hero-1',
+                    type: 'hero',
+                    title: `Welcome to ${tenant.name}`,
+                    subtitle: 'Discover amazing products at great prices',
+                    ctaText: 'Shop Now',
+                    ctaLink: '/shop',
+                    layout: 'center',
+                  },
+                  {
+                    id: 'featured-1',
+                    type: 'featured-products',
+                    title: 'Featured Products',
+                    subtitle: 'Check out our top picks',
+                    limit: 8,
+                  },
+                ],
+              }),
+              status: 'published',
+              meta_title: `${tenant.name} - Home`,
+              meta_description: `Welcome to ${tenant.name}. Discover amazing products and great deals.`,
+            },
+          });
+
+          // Always create /about and /contact pages even without theme
+          const tenantName = tenant.name || 'Store';
+          const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+          const requiredPages = additionalPageTemplates.filter(
+            (page) => page.slug === 'about' || page.slug === 'contact'
+          );
+
+          for (const pageConfig of requiredPages) {
+            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+            const existingPage = await prisma.pages.findFirst({
+              where: {
+                tenant_id: tenant.id,
+                slug: pageSlug,
+              },
+            });
+
+            if (!existingPage) {
+              let pageBuilderData = pageConfig.templateGenerator(tenantName);
+              pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
+              await prisma.pages.create({
+                data: {
+                  tenant_id: tenant.id,
+                  title: pageConfig.title,
+                  slug: pageSlug,
+                  content: JSON.stringify(pageBuilderData),
+                  status: 'published',
+                  banner_image: null,
+                  meta_title: pageConfig.metaTitle || null,
+                  meta_description: pageConfig.metaDescription || null,
+                },
+              });
+            }
+          }
+
+          console.log(`✅ Created default homepage and pages for tenant ${tenant.subdomain}`);
+        }
+      } catch (homepageError) {
+        console.warn('Failed to create default homepage:', homepageError);
       }
-    } catch (homepageError) {
-      // Non-critical - homepage creation failure shouldn't block registration
-      console.warn('Failed to create default homepage:', homepageError);
     }
 
     // Send welcome email (non-blocking - can be delayed)
@@ -357,6 +587,9 @@ export async function POST(request: NextRequest) {
         subdomain: tenant.subdomain,
       },
       loginUrl,
+      demoContentCreated,
+      demoProductsCreated,
+      demoCategoriesCreated,
     }, { status: 201 });
   } catch (error: any) {
     console.error('Tenant registration error:', error);

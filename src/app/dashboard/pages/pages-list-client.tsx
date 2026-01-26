@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,6 +120,13 @@ export default function PagesListClient({
   const [pageToDelete, setPageToDelete] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Protected pages that cannot be deleted
+  const PROTECTED_PAGE_SLUGS = ['home', 'about', 'contact'];
+  
+  const isPageProtected = (page: Page): boolean => {
+    return PROTECTED_PAGE_SLUGS.includes(page.slug.toLowerCase());
+  };
+
   const handleSearch = () => {
     const params = new URLSearchParams(searchParams.toString());
     
@@ -144,6 +151,11 @@ export default function PagesListClient({
   };
 
   const handleDelete = async (page: Page) => {
+    // Prevent deletion of protected pages
+    if (isPageProtected(page)) {
+      setError(`Cannot delete "${page.title}". This is a required system page and cannot be removed.`);
+      return;
+    }
     setPageToDelete(page);
     setShowDeleteDialog(true);
   };
@@ -161,6 +173,10 @@ export default function PagesListClient({
 
       if (!response.ok) {
         const errorData = await response.json();
+        // If it's a protected page error, show a clear message
+        if (response.status === 403 && errorData.protected) {
+          throw new Error(errorData.error || 'This is a required system page and cannot be deleted.');
+        }
         throw new Error(errorData.error || 'Failed to delete page');
       }
 
@@ -311,7 +327,12 @@ export default function PagesListClient({
                       {displayPages.map((page: any) => (
                         <TableRow key={page.id}>
                           <TableCell className="font-medium">
-                            {page.title}
+                            <div className="flex items-center gap-2">
+                              {page.title}
+                              {isPageProtected(page) && (
+                                <LockClosedIcon className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             /{page.slug}
@@ -337,9 +358,11 @@ export default function PagesListClient({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDelete(page)}
-                                disabled={deletingId === page.id}
+                                disabled={deletingId === page.id || isPageProtected(page)}
+                                className={isPageProtected(page) ? 'opacity-50 cursor-not-allowed' : ''}
+                                title={isPageProtected(page) ? 'This is a required system page and cannot be deleted' : 'Delete page'}
                               >
-                                <TrashIcon className="h-4 w-4 text-destructive" />
+                                <TrashIcon className={`h-4 w-4 ${isPageProtected(page) ? 'text-muted-foreground' : 'text-destructive'}`} />
                               </Button>
                             </div>
                           </TableCell>
@@ -397,17 +420,27 @@ export default function PagesListClient({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Page</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{pageToDelete?.title}&quot;? This action cannot be undone.
+              {pageToDelete && isPageProtected(pageToDelete) ? (
+                <>
+                  Cannot delete &quot;{pageToDelete.title}&quot;. This is a required system page (home, about, or contact) and must remain in your store.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to delete &quot;{pageToDelete?.title}&quot;? This action cannot be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deletingId ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
+            {pageToDelete && !isPageProtected(pageToDelete) && (
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletingId ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
