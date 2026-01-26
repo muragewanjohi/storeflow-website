@@ -3055,9 +3055,17 @@ function BlogsSectionEditor({
   const { data: categoriesData } = useQuery({
     queryKey: ['blog-categories'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard/blog-categories');
-      if (!response.ok) return { categories: [] };
-      return await response.json();
+      try {
+        const response = await fetch('/api/blogs/categories');
+        if (!response.ok) {
+          console.error('[BlogsSectionEditor] Failed to fetch blog categories:', response.status, response.statusText);
+          return { categories: [] };
+        }
+        return await response.json();
+      } catch (error) {
+        console.error('[BlogsSectionEditor] Error fetching blog categories:', error);
+        return { categories: [] };
+      }
     },
   });
 

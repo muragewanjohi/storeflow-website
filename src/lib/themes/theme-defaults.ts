@@ -300,7 +300,7 @@ export function getBusinessTypeColorScheme(businessType: string): Partial<ThemeC
     return {
       primary: '#009688',        // Healthcare teal - trust and professionalism
       secondary: '#4DB6AC',      // Light teal - softer, welcoming (from Medi-Cure)
-      accent: '#EF5350',         // Coral red - for CTAs and emphasis
+      accent: '#FF9800',         // Orange - for CTAs and emphasis
       buttonBackground: '#009688',
       buttonText: '#FFFFFF',
     };

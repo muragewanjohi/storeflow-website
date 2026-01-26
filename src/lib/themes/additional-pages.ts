@@ -83,17 +83,9 @@ export function createContactPageTemplate(tenantName: string, contactFormId?: st
   return {
     sections: [
       {
-        id: 'contact-hero-1',
-        type: 'hero',
-        order: 1,
-        title: `Contact ${tenantName}`,
-        subtitle: 'Get in Touch',
-        description: 'Have a question or need help? We\'re here to assist you. Fill out the form below and we\'ll get back to you within 24 hours.',
-      },
-      {
         id: 'contact-split-1',
         type: 'split_layout',
-        order: 2,
+        order: 1,
         layout_ratio: '50-50',
         mobile_behavior: 'stack',
         reverse_desktop: false,

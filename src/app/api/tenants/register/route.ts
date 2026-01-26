@@ -403,8 +403,10 @@ export async function POST(request: NextRequest) {
 
         // Create homepage
         try {
-          const pageSlug = generateSlug('home');
-          console.log(`[Registration] Checking for existing homepage with slug: ${pageSlug}`);
+          // Use tenant-specific slug to avoid global unique constraint issues
+          // The slug should be 'home' but we'll use upsert to handle conflicts
+          const pageSlug = 'home';
+          console.log(`[Registration] Checking for existing homepage with slug: ${pageSlug} for tenant: ${tenant.id}`);
           const existingHomepage = await prisma.pages.findFirst({
             where: {
               tenant_id: tenant.id,
@@ -430,18 +432,74 @@ export async function POST(request: NextRequest) {
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
             console.log(`[Registration] Homepage data prepared, creating in database...`);
 
-            const createdHomepage = await prisma.pages.create({
-              data: {
-                tenant_id: tenant.id,
-                title: pageTitle,
-                slug: pageSlug,
-                content: JSON.stringify(pageBuilderData),
-                status: 'published',
-                banner_image: null,
-                meta_title: `${tenant.name} - Home`,
-                meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
-              },
-            });
+            // Try to create the page, but handle unique constraint errors
+            // Since slug has a global unique constraint, we need to check if it exists globally first
+            let createdHomepage;
+            try {
+              // Check if slug exists globally (for any tenant)
+              const globalPageCheck = await prisma.pages.findFirst({
+                where: {
+                  slug: pageSlug,
+                },
+                select: {
+                  id: true,
+                  tenant_id: true,
+                },
+              });
+
+              if (globalPageCheck) {
+                // Slug exists for another tenant - we need to use a tenant-specific slug
+                const tenantSpecificSlug = `${pageSlug}-${tenant.subdomain}`;
+                console.log(`[Registration] ⚠️ Slug '${pageSlug}' exists for another tenant, using tenant-specific slug: ${tenantSpecificSlug}`);
+                
+                createdHomepage = await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageTitle,
+                    slug: tenantSpecificSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: `${tenant.name} - Home`,
+                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+                  },
+                });
+              } else {
+                // Slug doesn't exist globally, safe to create
+                createdHomepage = await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageTitle,
+                    slug: pageSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: `${tenant.name} - Home`,
+                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+                  },
+                });
+              }
+            } catch (createError: any) {
+              // If creation fails due to unique constraint, try with tenant-specific slug
+              if (createError.code === 'P2002' && createError.meta?.target?.includes('slug')) {
+                console.log(`[Registration] ⚠️ Unique constraint error on slug, retrying with tenant-specific slug...`);
+                const tenantSpecificSlug = `${pageSlug}-${tenant.subdomain}`;
+                createdHomepage = await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageTitle,
+                    slug: tenantSpecificSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: `${tenant.name} - Home`,
+                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+                  },
+                });
+              } else {
+                throw createError;
+              }
+            }
             console.log(`[Registration] ✅ Created homepage successfully:`, {
               id: createdHomepage.id,
               slug: createdHomepage.slug,
@@ -576,18 +634,49 @@ export async function POST(request: NextRequest) {
                 }
                 pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
 
-                const createdPage = await prisma.pages.create({
-                  data: {
-                    tenant_id: tenant.id,
-                    title: pageConfig.title,
-                    slug: pageSlug,
-                    content: JSON.stringify(pageBuilderData),
-                    status: 'published',
-                    banner_image: null,
-                    meta_title: pageConfig.metaTitle || null,
-                    meta_description: pageConfig.metaDescription || null,
-                  },
-                });
+                // Handle global unique constraint on slug
+                let createdPage;
+                try {
+                  // Check if slug exists globally (for any tenant)
+                  const globalPageCheck = await prisma.pages.findFirst({
+                    where: {
+                      slug: pageSlug,
+                    },
+                    select: {
+                      id: true,
+                      tenant_id: true,
+                    },
+                  });
+
+                  if (globalPageCheck && globalPageCheck.tenant_id !== tenant.id) {
+                    // Slug exists for another tenant - this is a schema issue
+                    // Log error but don't create page with wrong slug
+                    console.error(`[Registration] ❌ CRITICAL: Slug '${pageSlug}' already exists for tenant ${globalPageCheck.tenant_id}. Database schema needs @@unique([tenant_id, slug]) constraint.`);
+                    throw new Error(`Slug '${pageSlug}' is already in use by another tenant. This indicates a database schema issue - the slug constraint should be per-tenant, not global.`);
+                  }
+
+                  // Create the page
+                  createdPage = await prisma.pages.create({
+                    data: {
+                      tenant_id: tenant.id,
+                      title: pageConfig.title,
+                      slug: pageSlug,
+                      content: JSON.stringify(pageBuilderData),
+                      status: 'published',
+                      banner_image: null,
+                      meta_title: pageConfig.metaTitle || null,
+                      meta_description: pageConfig.metaDescription || null,
+                    },
+                  });
+                } catch (createError: any) {
+                  // If creation fails due to unique constraint, log detailed error
+                  if (createError.code === 'P2002' && createError.meta?.target?.includes('slug')) {
+                    console.error(`[Registration] ❌ CRITICAL: Unique constraint violation on slug '${pageSlug}'. This indicates the database schema has a global unique constraint on slug instead of per-tenant.`);
+                    console.error(`[Registration] Schema should have: @@unique([tenant_id, slug]) instead of: slug @unique`);
+                    throw new Error(`Cannot create page with slug '${pageSlug}' - it already exists for another tenant. Database schema needs to be fixed to allow per-tenant unique slugs.`);
+                  }
+                  throw createError;
+                }
                 console.log(`[Registration] ✅ Created page successfully:`, {
                   id: createdPage.id,
                   slug: createdPage.slug,
@@ -1174,20 +1263,45 @@ export async function POST(request: NextRequest) {
               const homePageBuilderData = createDefaultHomepageTemplate(themeSlug, tenantName, validatedData.businessType || undefined);
               const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
               
-              await prisma.pages.create({
-                data: {
-                  tenant_id: tenant.id,
-                  title: 'Home',
-                  slug: pageSlug,
-                  content: JSON.stringify(cleanedHomePageData),
-                  status: 'published',
-                  banner_image: null,
-                  meta_title: `${tenantName} - Home`,
-                  meta_description: `Welcome to ${tenantName}. Shop our amazing products and discover great deals.`,
-                },
-              });
-              pagesCreated++;
-              console.log(`[Registration] ✅ Created missing homepage in final verification (slug: ${pageSlug})`);
+              // Handle global unique constraint on slug
+              try {
+                // Check if slug exists globally (for any tenant)
+                const globalPageCheck = await prisma.pages.findFirst({
+                  where: {
+                    slug: pageSlug,
+                  },
+                  select: {
+                    id: true,
+                    tenant_id: true,
+                  },
+                });
+
+                if (globalPageCheck && globalPageCheck.tenant_id !== tenant.id) {
+                  console.error(`[Registration] ❌ CRITICAL: Slug '${pageSlug}' already exists for tenant ${globalPageCheck.tenant_id}. Database schema needs @@unique([tenant_id, slug]) constraint.`);
+                  throw new Error(`Slug '${pageSlug}' is already in use by another tenant. Database schema issue.`);
+                }
+
+                await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: 'Home',
+                    slug: pageSlug,
+                    content: JSON.stringify(cleanedHomePageData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: `${tenantName} - Home`,
+                    meta_description: `Welcome to ${tenantName}. Shop our amazing products and discover great deals.`,
+                  },
+                });
+                pagesCreated++;
+                console.log(`[Registration] ✅ Created missing homepage in final verification (slug: ${pageSlug})`);
+              } catch (createError: any) {
+                if (createError.code === 'P2002' && createError.meta?.target?.includes('slug')) {
+                  console.error(`[Registration] ❌ CRITICAL: Unique constraint violation on slug '${pageSlug}'. Database schema has global unique constraint instead of per-tenant.`);
+                  console.error(`[Registration] Schema should have: @@unique([tenant_id, slug]) instead of: slug @unique`);
+                }
+                throw createError;
+              }
             } else {
               // Create about or contact page
               const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
@@ -1202,20 +1316,45 @@ export async function POST(request: NextRequest) {
                 }
                 pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
                 
-                await prisma.pages.create({
-                  data: {
-                    tenant_id: tenant.id,
-                    title: pageConfig.title,
-                    slug: pageSlug,
-                    content: JSON.stringify(pageBuilderData),
-                    status: 'published',
-                    banner_image: null,
-                    meta_title: pageConfig.metaTitle || null,
-                    meta_description: pageConfig.metaDescription || null,
-                  },
-                });
-                pagesCreated++;
-                console.log(`[Registration] ✅ Created missing page in final verification: ${pageConfig.title} (slug: ${pageSlug})`);
+                // Handle global unique constraint on slug
+                try {
+                  // Check if slug exists globally (for any tenant)
+                  const globalPageCheck = await prisma.pages.findFirst({
+                    where: {
+                      slug: pageSlug,
+                    },
+                    select: {
+                      id: true,
+                      tenant_id: true,
+                    },
+                  });
+
+                  if (globalPageCheck && globalPageCheck.tenant_id !== tenant.id) {
+                    console.error(`[Registration] ❌ CRITICAL: Slug '${pageSlug}' already exists for tenant ${globalPageCheck.tenant_id}. Database schema needs @@unique([tenant_id, slug]) constraint.`);
+                    throw new Error(`Slug '${pageSlug}' is already in use by another tenant. Database schema issue.`);
+                  }
+
+                  await prisma.pages.create({
+                    data: {
+                      tenant_id: tenant.id,
+                      title: pageConfig.title,
+                      slug: pageSlug,
+                      content: JSON.stringify(pageBuilderData),
+                      status: 'published',
+                      banner_image: null,
+                      meta_title: pageConfig.metaTitle || null,
+                      meta_description: pageConfig.metaDescription || null,
+                    },
+                  });
+                  pagesCreated++;
+                  console.log(`[Registration] ✅ Created missing page in final verification: ${pageConfig.title} (slug: ${pageSlug})`);
+                } catch (createError: any) {
+                  if (createError.code === 'P2002' && createError.meta?.target?.includes('slug')) {
+                    console.error(`[Registration] ❌ CRITICAL: Unique constraint violation on slug '${pageSlug}'. Database schema has global unique constraint instead of per-tenant.`);
+                    console.error(`[Registration] Schema should have: @@unique([tenant_id, slug]) instead of: slug @unique`);
+                  }
+                  throw createError;
+                }
               }
             }
           } else {
