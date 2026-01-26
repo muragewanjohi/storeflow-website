@@ -355,24 +355,37 @@ export async function POST(request: NextRequest) {
     // Install theme if provided
     if (validatedData.themeId) {
       try {
+        console.log(`[Registration] Starting theme installation for tenant ${tenant.subdomain}`, {
+          themeId: validatedData.themeId,
+          businessType: validatedData.businessType,
+          includeDemoContent: validatedData.includeDemoContent,
+        });
+
         const theme = await prisma.themes.findUnique({
           where: { id: validatedData.themeId },
         });
 
-        if (theme) {
-          // Get theme defaults
-          const themeDefaults = getThemeDefaults(theme.slug);
-          
-          // Get business type color scheme if provided
-          let finalColors = themeDefaults?.colors || {};
-          if (validatedData.businessType) {
-            const businessColors = getBusinessTypeColorScheme(validatedData.businessType);
-            if (businessColors) {
-              finalColors = { ...finalColors, ...businessColors };
-            }
-          }
+        if (!theme) {
+          console.error(`[Registration] Theme not found: ${validatedData.themeId}`);
+          throw new Error(`Theme not found: ${validatedData.themeId}`);
+        }
 
-          // Create tenant theme
+        console.log(`[Registration] Found theme: ${theme.slug} (${theme.title})`);
+
+        // Get theme defaults
+        const themeDefaults = getThemeDefaults(theme.slug);
+        
+        // Get business type color scheme if provided
+        let finalColors = themeDefaults?.colors || {};
+        if (validatedData.businessType) {
+          const businessColors = getBusinessTypeColorScheme(validatedData.businessType);
+          if (businessColors) {
+            finalColors = { ...finalColors, ...businessColors };
+          }
+        }
+
+        // Create tenant theme
+        try {
           await prisma.tenant_themes.create({
             data: {
               tenant_id: tenant.id,
@@ -382,8 +395,14 @@ export async function POST(request: NextRequest) {
               custom_fonts: themeDefaults?.fonts || {},
             },
           });
+          console.log(`[Registration] ✅ Created tenant theme for ${theme.slug}`);
+        } catch (themeCreateError: any) {
+          console.error(`[Registration] ❌ Failed to create tenant theme:`, themeCreateError);
+          throw themeCreateError;
+        }
 
-          // Create homepage
+        // Create homepage
+        try {
           const pageSlug = generateSlug('home');
           const existingHomepage = await prisma.pages.findFirst({
             where: {
@@ -418,9 +437,17 @@ export async function POST(request: NextRequest) {
                 meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
               },
             });
+            console.log(`[Registration] ✅ Created homepage (slug: ${pageSlug})`);
+          } else {
+            console.log(`[Registration] ℹ️ Homepage already exists (slug: ${pageSlug})`);
           }
+        } catch (homepageError: any) {
+          console.error(`[Registration] ❌ Failed to create homepage:`, homepageError);
+          // Continue - pages are important but not critical for registration
+        }
 
-          // Always create /home, /about, and /contact pages (not /about-us or /contact-us)
+        // Always create /home, /about, and /contact pages (not /about-us or /contact-us)
+        try {
           const tenantName = tenant.name || 'Store';
           const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
           
@@ -429,57 +456,135 @@ export async function POST(request: NextRequest) {
             (page) => page.slug === 'about' || page.slug === 'contact'
           );
 
+          console.log(`[Registration] Creating ${requiredPages.length} additional pages (about, contact)`);
+
           for (const pageConfig of requiredPages) {
-            const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
-            const existingPage = await prisma.pages.findFirst({
-              where: {
-                tenant_id: tenant.id,
-                slug: pageSlug,
-              },
-            });
-
-            if (!existingPage) {
-              let pageBuilderData = pageConfig.templateGenerator(tenantName);
-              pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
-
-              await prisma.pages.create({
-                data: {
+            try {
+              const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+              const existingPage = await prisma.pages.findFirst({
+                where: {
                   tenant_id: tenant.id,
-                  title: pageConfig.title,
                   slug: pageSlug,
-                  content: JSON.stringify(pageBuilderData),
-                  status: 'published',
-                  banner_image: null,
-                  meta_title: pageConfig.metaTitle || null,
-                  meta_description: pageConfig.metaDescription || null,
                 },
               });
+
+              if (!existingPage) {
+                let pageBuilderData = pageConfig.templateGenerator(tenantName);
+                pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
+                await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageConfig.title,
+                    slug: pageSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: pageConfig.metaTitle || null,
+                    meta_description: pageConfig.metaDescription || null,
+                  },
+                });
+                console.log(`[Registration] ✅ Created page: ${pageConfig.title} (slug: ${pageSlug})`);
+              } else {
+                console.log(`[Registration] ℹ️ Page already exists: ${pageConfig.title} (slug: ${pageSlug})`);
+              }
+            } catch (pageError: any) {
+              console.error(`[Registration] ❌ Failed to create page ${pageConfig.title}:`, pageError);
+              // Continue with next page
             }
           }
-
-          // Create demo content if requested
-          if (validatedData.includeDemoContent) {
-            try {
-              const demoResult = await createDemoContent(
-                prisma,
-                tenant.id,
-                validatedData.businessType || 'Grocery Store / Supermarket',
-                validatedData.includeDemoAttributes || false
-              );
-              demoContentCreated = true;
-              demoProductsCreated = demoResult.productsCreated;
-              demoCategoriesCreated = demoResult.categoriesCreated;
-            } catch (demoError) {
-              console.warn('Failed to create demo content:', demoError);
-              // Non-critical - continue even if demo content fails
-            }
-          }
-
-          console.log(`✅ Installed theme ${theme.slug} for tenant ${tenant.subdomain}`);
+        } catch (pagesError: any) {
+          console.error(`[Registration] ❌ Failed to create additional pages:`, pagesError);
+          // Continue - pages are important but not critical for registration
         }
-      } catch (themeError) {
-        console.warn('Failed to install theme:', themeError);
+
+        // Create demo content if requested
+        if (validatedData.includeDemoContent) {
+          try {
+            console.log(`[Registration] Creating demo content...`, {
+              businessType: validatedData.businessType || 'Grocery Store / Supermarket',
+              includeAttributes: validatedData.includeDemoAttributes || false,
+            });
+            const demoResult = await createDemoContent(
+              prisma,
+              tenant.id,
+              validatedData.businessType || 'Grocery Store / Supermarket',
+              validatedData.includeDemoAttributes || false
+            );
+            demoContentCreated = true;
+            demoProductsCreated = demoResult.productsCreated;
+            demoCategoriesCreated = demoResult.categoriesCreated;
+            console.log(`[Registration] ✅ Demo content created:`, {
+              products: demoProductsCreated,
+              categories: demoCategoriesCreated,
+              attributes: demoResult.attributesCreated,
+              pages: demoResult.pagesCreated,
+            });
+          } catch (demoError: any) {
+            console.error(`[Registration] ❌ Failed to create demo content:`, demoError);
+            console.error(`[Registration] Demo content error details:`, {
+              message: demoError.message,
+              stack: demoError.stack,
+            });
+            // Non-critical - continue even if demo content fails
+          }
+        } else {
+          console.log(`[Registration] Demo content not requested (includeDemoContent: false)`);
+        }
+
+        console.log(`[Registration] ✅ Successfully installed theme ${theme.slug} for tenant ${tenant.subdomain}`);
+      } catch (themeError: any) {
+        console.error(`[Registration] ❌ Failed to install theme:`, themeError);
+        console.error(`[Registration] Theme installation error details:`, {
+          message: themeError.message,
+          stack: themeError.stack,
+          themeId: validatedData.themeId,
+        });
         // Non-critical - theme installation failure shouldn't block registration
+        // But try to create default pages anyway
+        try {
+          console.log(`[Registration] Attempting to create default pages after theme installation failure...`);
+          const tenantName = tenant.name || 'Store';
+          const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
+          const requiredPages = additionalPageTemplates.filter(
+            (page) => page.slug === 'home' || page.slug === 'about' || page.slug === 'contact'
+          );
+
+          for (const pageConfig of requiredPages) {
+            try {
+              const pageSlug = generateSlug(pageConfig.slug || pageConfig.title);
+              const existingPage = await prisma.pages.findFirst({
+                where: {
+                  tenant_id: tenant.id,
+                  slug: pageSlug,
+                },
+              });
+
+              if (!existingPage) {
+                let pageBuilderData = pageConfig.templateGenerator(tenantName);
+                pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
+
+                await prisma.pages.create({
+                  data: {
+                    tenant_id: tenant.id,
+                    title: pageConfig.title,
+                    slug: pageSlug,
+                    content: JSON.stringify(pageBuilderData),
+                    status: 'published',
+                    banner_image: null,
+                    meta_title: pageConfig.metaTitle || null,
+                    meta_description: pageConfig.metaDescription || null,
+                  },
+                });
+                console.log(`[Registration] ✅ Created fallback page: ${pageConfig.title} (slug: ${pageSlug})`);
+              }
+            } catch (pageError: any) {
+              console.error(`[Registration] ❌ Failed to create fallback page ${pageConfig.title}:`, pageError);
+            }
+          }
+        } catch (fallbackError: any) {
+          console.error(`[Registration] ❌ Failed to create fallback pages:`, fallbackError);
+        }
       }
     } else {
       // Create a default homepage if no theme is selected

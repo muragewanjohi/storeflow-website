@@ -102,9 +102,9 @@ function TenantRegisterForm() {
         if (response.ok) {
           const data = await response.json();
           setThemes(data.themes || []);
-          // Set default theme if available (Grocery theme)
+          // Set default theme if available (Multipurpose theme, previously Grocery)
           const defaultTheme = data.themes?.find((t: any) => 
-            t.slug?.toLowerCase() === 'grocery' || t.title?.toLowerCase() === 'grocery'
+            t.slug?.toLowerCase() === 'grocery' || t.title?.toLowerCase().includes('multipurpose')
           );
           if (defaultTheme) {
             setSelectedThemeId(defaultTheme.id);

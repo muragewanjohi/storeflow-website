@@ -278,10 +278,19 @@ export default function ThemesListClient() {
 
   const themes = themesData || [];
 
-  // Helper function to check if a theme is the Grocery theme
-  const isGroceryTheme = (theme: Theme) => {
+  // Helper function to check if a theme is the Multipurpose theme (previously Grocery)
+  const isMultipurposeTheme = (theme: Theme) => {
     return theme.slug?.toLowerCase() === 'grocery' || 
-           theme.title?.toLowerCase() === 'grocery';
+           theme.title?.toLowerCase().includes('grocery') ||
+           theme.title?.toLowerCase().includes('multipurpose');
+  };
+  
+  // Helper function to get display name for theme
+  const getThemeDisplayName = (theme: Theme): string => {
+    if (isMultipurposeTheme(theme)) {
+      return theme.title?.replace(/Grocery/gi, 'Multipurpose') || 'Multipurpose Theme';
+    }
+    return theme.title || 'Unknown Theme';
   };
 
   return (
@@ -303,7 +312,7 @@ export default function ThemesListClient() {
                   Active Theme
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  {currentThemeData.theme.title} - {currentThemeData.theme.description || 'No description'}
+                  {getThemeDisplayName(currentThemeData.theme)} - {currentThemeData.theme.description || 'No description'}
                 </CardDescription>
               </div>
               <Link href="/dashboard/themes/customize">
@@ -319,7 +328,8 @@ export default function ThemesListClient() {
           const isActive = activeThemeId === theme.id;
           const isInstalled = installedThemes[theme.id] !== undefined;
           const isInstalling = installThemeMutation.isPending && installThemeMutation.variables?.themeId === theme.id;
-          const isAvailable = isGroceryTheme(theme);
+          const isAvailable = isMultipurposeTheme(theme);
+          const displayName = getThemeDisplayName(theme);
           
           // Determine button text and icon
           let buttonText = 'Install';
@@ -359,7 +369,7 @@ export default function ThemesListClient() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <CardTitle className="flex items-center gap-2">
-                      {theme.title}
+                      {displayName}
                       {theme.is_premium && (
                         <Sparkles className="h-4 w-4 text-yellow-500" />
                       )}
