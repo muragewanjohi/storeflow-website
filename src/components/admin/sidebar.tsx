@@ -20,6 +20,7 @@ import {
   CreditCardIcon,
   ClockIcon,
   DocumentTextIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
   { name: 'Tenants', href: '/admin/tenants', icon: BuildingOfficeIcon },
   { name: 'Price Plans', href: '/admin/price-plans', icon: CreditCardIcon },
+  { name: 'Payments', href: '/admin/payments', icon: BanknotesIcon },
   { name: 'Blogs', href: '/admin/blogs', icon: DocumentTextIcon },
   { name: 'Blog Categories', href: '/admin/blogs/categories', icon: DocumentTextIcon },
   { name: 'Support Tickets', href: '/admin/support/tickets', icon: ChatBubbleLeftRightIcon },
