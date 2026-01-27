@@ -65,26 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create payment log entry
-    const paymentLog = await prisma.payment_logs.create({
-      data: {
-        tenant_id: defaultTenant.id,
-        user_id: user.id,
-        gateway: 'mpesa_buy_goods',
-        amount: roundedAmount,
-        currency: 'KES',
-        status: 'pending',
-        metadata: {
-          phone_number,
-          account_reference: accountReference,
-          is_test_payment: true,
-          initiated_by: user.email,
-        },
-      },
-    });
-
-    // Get M-Pesa service
+    // Get M-Pesa service first to validate configuration
     const mpesaService = getMpesaService();
+    
+    // Log environment being used (for debugging)
+    const environment = process.env.MPESA_ENVIRONMENT || 'sandbox';
+    console.log(`[Test Mpesa Payment] Using environment: ${environment}`);
+    console.log(`[Test Mpesa Payment] Base URL: ${environment === 'production' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke'}`);
 
     // Get callback URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
@@ -93,27 +80,56 @@ export async function POST(request: NextRequest) {
                    'https://yourdomain.com';
     const callbackUrl = `${baseUrl}/api/mpesa/subscription/callback`;
 
-    // Initiate STK Push
-    const stkResponse = await mpesaService.initiateStkPush({
-      phoneNumber: phone_number,
-      amount: roundedAmount,
-      accountReference,
-      transactionDesc: `Test Payment: ${accountReference}`,
-      callbackUrl,
-    });
+    // Initiate STK Push FIRST (before creating payment log)
+    // This way, if STK push fails, we don't create orphaned records
+    let stkResponse;
+    try {
+      stkResponse = await mpesaService.initiateStkPush({
+        phoneNumber: phone_number,
+        amount: roundedAmount,
+        accountReference,
+        transactionDesc: `Test Payment: ${accountReference}`,
+        callbackUrl,
+      });
+      
+      console.log('[Test Mpesa Payment] STK Push initiated successfully:', {
+        checkoutRequestID: stkResponse.checkoutRequestID,
+        merchantRequestID: stkResponse.merchantRequestID,
+        responseCode: stkResponse.responseCode,
+        customerMessage: stkResponse.customerMessage,
+      });
+    } catch (stkError) {
+      console.error('[Test Mpesa Payment] STK Push failed:', stkError);
+      // Re-throw to be handled by outer catch block
+      throw new Error(
+        stkError instanceof Error 
+          ? `Failed to initiate STK Push: ${stkError.message}` 
+          : 'Failed to initiate STK Push. Please check your M-Pesa configuration and phone number.'
+      );
+    }
 
-    // Update payment log with M-Pesa request IDs
-    await prisma.payment_logs.update({
-      where: { id: paymentLog.id },
+    // Only create payment log AFTER successful STK push initiation
+    const paymentLog = await prisma.payment_logs.create({
       data: {
+        tenant_id: defaultTenant.id,
+        user_id: user.id,
+        gateway: 'mpesa_buy_goods',
+        amount: roundedAmount,
+        currency: 'KES',
+        status: 'pending',
         payment_id: stkResponse.checkoutRequestID,
         metadata: {
-          ...(paymentLog.metadata as any),
+          phone_number,
+          account_reference: accountReference,
+          is_test_payment: true,
+          initiated_by: user.email,
           merchant_request_id: stkResponse.merchantRequestID,
           checkout_request_id: stkResponse.checkoutRequestID,
           response_code: stkResponse.responseCode,
           response_description: stkResponse.responseDescription,
           customer_message: stkResponse.customerMessage,
+          environment: environment,
+          callback_url: callbackUrl,
         },
       },
     });

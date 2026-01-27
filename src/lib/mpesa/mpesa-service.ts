@@ -52,6 +52,10 @@ export class MpesaService {
     this.baseUrl = config.environment === 'production'
       ? 'https://api.safaricom.co.ke'
       : 'https://sandbox.safaricom.co.ke';
+    
+    // Log environment on initialization (for debugging)
+    console.log(`[MpesaService] Initialized with environment: ${config.environment}`);
+    console.log(`[MpesaService] Using base URL: ${this.baseUrl}`);
   }
 
   /**
@@ -190,6 +194,9 @@ export class MpesaService {
     };
 
     try {
+      console.log(`[MpesaService] Initiating STK Push to: ${this.baseUrl}/mpesa/stkpush/v1/processrequest`);
+      console.log(`[MpesaService] Phone: ${phoneNumber}, Amount: ${amount}, ShortCode: ${this.config.shortCode}`);
+      
       const response = await fetch(
         `${this.baseUrl}/mpesa/stkpush/v1/processrequest`,
         {
@@ -204,14 +211,21 @@ export class MpesaService {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[MpesaService] STK Push HTTP error: ${response.status}`, errorText);
         throw new Error(`STK Push request failed: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`[MpesaService] STK Push response:`, {
+        ResponseCode: data.ResponseCode,
+        ResponseDescription: data.ResponseDescription,
+        CustomerMessage: data.CustomerMessage,
+      });
 
       // M-Pesa returns ResponseCode: "0" for success
       if (data.ResponseCode !== '0') {
-        throw new Error(data.ResponseDescription || 'STK Push request failed');
+        console.error(`[MpesaService] STK Push failed with code: ${data.ResponseCode}`, data.ResponseDescription);
+        throw new Error(data.ResponseDescription || `STK Push request failed (Code: ${data.ResponseCode})`);
       }
 
       return {

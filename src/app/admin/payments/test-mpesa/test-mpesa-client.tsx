@@ -6,24 +6,46 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowPathIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowPathIcon, ArrowLeftIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Link from 'next/link';
+
+interface MpesaEnv {
+  environment: string;
+  baseUrl: string;
+  isProduction: boolean;
+  shortCode: string;
+}
 
 export default function TestMpesaClient() {
   const router = useRouter();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mpesaEnv, setMpesaEnv] = useState<MpesaEnv | null>(null);
+
+  useEffect(() => {
+    // Fetch Mpesa environment info
+    fetch('/api/admin/payments/mpesa-env')
+      .then(res => res.json())
+      .then(data => setMpesaEnv(data))
+      .catch(err => console.error('Error fetching Mpesa env:', err));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (isSubmitting) {
+      return;
+    }
     
     if (!phoneNumber.trim()) {
       toast.error('Please enter a phone number');
@@ -92,6 +114,22 @@ export default function TestMpesaClient() {
         </div>
       </CardHeader>
       <CardContent>
+        {mpesaEnv && (
+          <Alert className={`mb-6 ${mpesaEnv.isProduction ? 'border-orange-500 bg-orange-50 dark:bg-orange-950' : 'border-blue-500 bg-blue-50 dark:bg-blue-950'}`}>
+            <InformationCircleIcon className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Environment:</strong> {mpesaEnv.environment.toUpperCase()}
+              <br />
+              <strong>API URL:</strong> {mpesaEnv.baseUrl}
+              <br />
+              {mpesaEnv.isProduction && (
+                <span className="text-orange-700 dark:text-orange-300 font-semibold">
+                  ⚠️ Using LIVE/PRODUCTION environment - Real money will be charged!
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="phoneNumber">Phone Number</Label>
