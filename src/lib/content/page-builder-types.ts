@@ -19,8 +19,9 @@ export interface HeroSection extends BaseSection {
   title: string;
   subtitle?: string;
   description?: string;
-  image?: string;
-  image_as_background?: boolean; // If true, use image as background instead of separate image
+  image?: string; // Normal image (displayed as separate element)
+  banner_image?: string; // Banner image (used as background)
+  image_crop?: boolean; // If false, don't crop the normal image. Defaults to true
   text_alignment?: 'left' | 'center' | 'right'; // Alignment for title and subtitle
   cta_text?: string;
   cta_link?: string;
@@ -230,6 +231,8 @@ export interface SplitLayoutSection extends BaseSection {
     content?: string; // For text type
     image?: string;
     alt_text?: string;
+    cta_text?: string;
+    cta_link?: string;
     form_id?: string; // For form type
     
     // Product Options

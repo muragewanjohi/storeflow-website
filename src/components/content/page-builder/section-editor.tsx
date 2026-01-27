@@ -203,35 +203,47 @@ function HeroSectionEditor({
         />
         
         <div className="space-y-2">
-          <Label>Hero Image</Label>
+          <Label>Banner Image (Background)</Label>
           <ImageUploadField
-            label="hero image"
-            value={section.image || ''}
-            onChange={(url) => onUpdate({ image: url || undefined })}
+            label="banner image"
+            value={section.banner_image || ''}
+            onChange={(url) => onUpdate({ banner_image: url || undefined })}
+            enableCrop={true}
+            aspectRatio={16 / 9}
+            recommendedDimensions="1920x1080px (16:9 ratio). This image will be used as the background of the hero section."
           />
           <p className="text-xs text-muted-foreground">
-            Recommended size: 1920x1080px or larger for best quality
+            The banner image will be displayed as the background of the hero section. It will be cropped to fit the section dimensions.
           </p>
         </div>
         
-        {section.image && (
-          <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg border">
-            <Checkbox
-              id="image-as-background"
-              checked={section.image_as_background === true}
-              onCheckedChange={(checked) => onUpdate({ image_as_background: checked === true })}
-            />
-            <Label htmlFor="image-as-background" className="cursor-pointer flex-1">
-              <div>
-                <div className="font-medium">Use image as background</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  When enabled, the image will be used as the full background of the hero section. 
-                  The image will not appear as a separate element. If a background color is set, it will be used as a semi-transparent overlay for text readability.
+        <div className="space-y-2">
+          <Label>Normal Image</Label>
+          <ImageUploadField
+            label="normal image"
+            value={section.image || ''}
+            onChange={(url) => onUpdate({ image: url || undefined })}
+            enableCrop={section.image_crop !== false}
+            recommendedDimensions="800x600px or larger. Any aspect ratio. This image will be displayed as a separate element alongside the text."
+          />
+          {section.image && (
+            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border">
+              <Checkbox
+                id="image-crop"
+                checked={section.image_crop !== false}
+                onCheckedChange={(checked) => onUpdate({ image_crop: checked === true })}
+              />
+              <Label htmlFor="image-crop" className="cursor-pointer flex-1">
+                <div>
+                  <div className="font-medium text-sm">Crop image</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    When unchecked, the full image will be displayed without cropping.
+                  </div>
                 </div>
-              </div>
-            </Label>
-          </div>
-        )}
+              </Label>
+            </div>
+          )}
+        </div>
         
         <div className="space-y-2">
           <Label>Text Alignment</Label>
@@ -447,6 +459,8 @@ function FeaturesSectionEditor({
                     label="feature image"
                     value={feature.image || ''}
                     onChange={(url) => updateFeature(feature.id, { image: url || undefined })}
+                    enableCrop={false}
+                    recommendedDimensions="400x400px (1:1 square) or larger. Image will be displayed in full without cropping."
                   />
                 </div>
                 <Button
@@ -740,6 +754,8 @@ function TestimonialsSectionEditor({
                     label="testimonial image"
                     value={testimonial.image || ''}
                     onChange={(url) => updateTestimonial(testimonial.id, { image: url || undefined })}
+                    enableCrop={false}
+                    recommendedDimensions="200x200px (1:1 square) or larger. Image will be displayed in full without cropping."
                   />
                 </div>
                 <Button
@@ -839,6 +855,8 @@ function ImageSectionEditor({
             label="image"
             value={section.image}
             onChange={(url) => onUpdate({ image: url || '' })}
+            enableCrop={false}
+            recommendedDimensions="1200x800px or larger. Any aspect ratio. Image will be displayed in full without cropping."
           />
         </div>
         <div className="space-y-2">
@@ -1289,6 +1307,9 @@ function BannersSectionEditor({
                     label="banner image"
                     value={banner.image || ''}
                     onChange={(url) => updateBanner(banner.id, { image: url || '' })}
+                    enableCrop={true}
+                    aspectRatio={16 / 9}
+                    recommendedDimensions="1920x1080px (16:9 ratio). Image will be cropped to fit banner aspect ratio."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -2167,7 +2188,8 @@ function SplitLayoutSectionEditor({
             onColorReset={handleLeftSideColorReset}
           />
           
-          {section.left_side.type !== 'image' && (
+          {/* Image upload for banner and image types */}
+          {(section.left_side.type === 'banner' || section.left_side.type === 'image') && (
             <>
               <div className="space-y-2">
                 <Label>Image {section.left_side.type === 'banner' ? '(Background)' : ''}</Label>
@@ -2177,41 +2199,50 @@ function SplitLayoutSectionEditor({
                   onChange={(url) => onUpdate({
                     left_side: { ...section.left_side, image: url || '' }
                   })}
+                  enableCrop={section.left_side.type === 'banner'}
+                  aspectRatio={section.left_side.type === 'banner' ? 16 / 9 : undefined}
+                  recommendedDimensions={section.left_side.type === 'banner' 
+                    ? "1920x1080px (16:9 ratio) for banner backgrounds. Image will be cropped to fit."
+                    : "800x600px or larger. Any aspect ratio. Image will be displayed in full without cropping."}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Image Position</Label>
-                <Select
-                  value={section.left_side.image_position || 'cover'}
-                  onValueChange={(value) => onUpdate({
-                    left_side: { ...section.left_side, image_position: value as any }
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cover">Cover</SelectItem>
-                    <SelectItem value="contain">Contain</SelectItem>
-                    <SelectItem value="top">Top</SelectItem>
-                    <SelectItem value="center">Center</SelectItem>
-                    <SelectItem value="bottom">Bottom</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Overlay Opacity ({section.left_side.overlay_opacity || 0}%)</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={section.left_side.overlay_opacity || 0}
-                  onChange={(e) => onUpdate({
-                    left_side: { ...section.left_side, overlay_opacity: parseInt(e.target.value) }
-                  })}
-                  className="w-full"
-                />
-              </div>
+              {section.left_side.type === 'banner' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Image Position</Label>
+                    <Select
+                      value={section.left_side.image_position || 'cover'}
+                      onValueChange={(value) => onUpdate({
+                        left_side: { ...section.left_side, image_position: value as any }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cover">Cover</SelectItem>
+                        <SelectItem value="contain">Contain</SelectItem>
+                        <SelectItem value="top">Top</SelectItem>
+                        <SelectItem value="center">Center</SelectItem>
+                        <SelectItem value="bottom">Bottom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Overlay Opacity ({section.left_side.overlay_opacity || 0}%)</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={section.left_side.overlay_opacity || 0}
+                      onChange={(e) => onUpdate({
+                        left_side: { ...section.left_side, overlay_opacity: parseInt(e.target.value) }
+                      })}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
           
@@ -2454,6 +2485,62 @@ function SplitLayoutSectionEditor({
                 Use the editor above to format your text content. This content will appear on the right side of the split layout.
               </p>
             </div>
+          )}
+          
+          {/* Image upload for image type */}
+          {section.right_side.type === 'image' && (
+            <>
+              <div className="space-y-2">
+                <Label>Image</Label>
+                <ImageUploadField
+                  label="right side image"
+                  value={section.right_side.image || ''}
+                  onChange={(url) => onUpdate({
+                    right_side: { ...section.right_side, image: url || '' }
+                  })}
+                  enableCrop={false}
+                  recommendedDimensions="800x600px or larger. Any aspect ratio. Image will be displayed in full without cropping."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Alt Text</Label>
+                <Input
+                  value={section.right_side.alt_text || ''}
+                  onChange={(e) => onUpdate({
+                    right_side: { ...section.right_side, alt_text: e.target.value }
+                  })}
+                  placeholder="Image alt text"
+                />
+              </div>
+            </>
+          )}
+          
+          {/* CTA for image type */}
+          {section.right_side.type === 'image' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>CTA Text</Label>
+                  <Input
+                    value={section.right_side.cta_text || ''}
+                    onChange={(e) => onUpdate({
+                      right_side: { ...section.right_side, cta_text: e.target.value }
+                    })}
+                    placeholder="Order Now"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CTA Link</Label>
+                  <Input
+                    value={section.right_side.cta_link || ''}
+                    onChange={(e) => onUpdate({
+                      right_side: { ...section.right_side, cta_link: e.target.value }
+                    })}
+                    placeholder="/products"
+                  />
+                </div>
+              </div>
+            </>
           )}
           </>
           )}

@@ -22,6 +22,8 @@ interface ImageUploadFieldProps {
   aspectRatio?: number; // Defaults to 16/9
   maxSizeMB?: number; // Defaults to 5
   helpText?: string;
+  enableCrop?: boolean; // If false, skip cropping and use image as-is. Defaults to true
+  recommendedDimensions?: string; // Recommended dimensions text (e.g., "1920x1080px")
 }
 
 export default function ImageUploadField({
@@ -32,6 +34,8 @@ export default function ImageUploadField({
   aspectRatio = 16 / 9,
   maxSizeMB = 5,
   helpText,
+  enableCrop = true,
+  recommendedDimensions,
 }: Readonly<ImageUploadFieldProps>) {
   const [imagePreview, setImagePreview] = useState<string | null>(value);
   const [isUploading, setIsUploading] = useState(false);
@@ -83,9 +87,15 @@ export default function ImageUploadField({
       }
 
       const { url } = await response.json();
-      // Show crop dialog instead of directly setting the image
-      setImageToCrop(url);
-      setShowCropDialog(true);
+      // Show crop dialog if enabled, otherwise use image directly
+      if (enableCrop) {
+        setImageToCrop(url);
+        setShowCropDialog(true);
+      } else {
+        // Use image directly without cropping
+        onChange(url);
+        setImagePreview(url);
+      }
     } catch (error) {
       console.error('Error uploading image:', error);
       alert(error instanceof Error ? error.message : 'Failed to upload image');
@@ -179,6 +189,11 @@ export default function ImageUploadField({
       )}
       {helpText && (
         <p className="text-xs text-muted-foreground">{helpText}</p>
+      )}
+      {recommendedDimensions && (
+        <p className="text-xs text-muted-foreground font-medium">
+          Recommended: {recommendedDimensions}
+        </p>
       )}
 
       {/* Image Cropper Dialog */}

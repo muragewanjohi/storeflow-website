@@ -68,8 +68,10 @@ function HeroSectionComponent({
   section: Extract<PageSection, { type: 'hero' }>; 
   isPreview: boolean;
 }) {
-  const useImageAsBackground = section.image_as_background === true && section.image;
+  const hasBannerImage = section.banner_image && !section.banner_image.startsWith('blob:');
+  const hasNormalImage = section.image && !section.image.startsWith('blob:');
   const textAlignment = section.text_alignment || 'center';
+  const shouldCropImage = section.image_crop !== false;
   
   // Get alignment classes - always vertically center, but horizontally align based on selection
   const getAlignmentClasses = (align: 'left' | 'center' | 'right') => {
@@ -99,12 +101,12 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Background style - prioritize image if image_as_background is true
+  // Background style - use banner_image if available
   const backgroundStyle: React.CSSProperties = {};
   
-  if (useImageAsBackground && section.image && !section.image.startsWith('blob:')) {
-    // Use image as background - ensure proper URL formatting
-    const imageUrl = section.image.trim();
+  if (hasBannerImage) {
+    // Use banner image as background - ensure proper URL formatting
+    const imageUrl = section.banner_image!.trim();
     backgroundStyle.backgroundImage = `url("${imageUrl}")`;
     backgroundStyle.backgroundSize = 'cover';
     backgroundStyle.backgroundPosition = 'center';
@@ -117,14 +119,14 @@ function HeroSectionComponent({
 
   return (
     <section
-      className={`relative ${useImageAsBackground ? 'min-h-[600px] md:min-h-[700px]' : 'py-16 md:py-24'}`}
+      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px]' : 'py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         ...backgroundStyle,
       }}
     >
-      {/* Overlay for background image to ensure text readability - only show if background color is set */}
-      {useImageAsBackground && section.background_color && (
+      {/* Overlay for banner image to ensure text readability - only show if background color is set */}
+      {hasBannerImage && section.background_color && (
         <div 
           className="absolute inset-0 z-0"
           style={{
@@ -134,7 +136,7 @@ function HeroSectionComponent({
       )}
       
       <div className="container mx-auto px-4 relative z-10" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
-        {useImageAsBackground ? (
+        {hasBannerImage ? (
           // Full-width background image layout
           <div className={`flex ${alignmentClasses} min-h-[600px] md:min-h-[700px]`}>
             <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
@@ -241,9 +243,9 @@ function HeroSectionComponent({
                 </div>
               )}
             </div>
-            {section.image && (
-              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] rounded-lg overflow-hidden shadow-lg">
-                {section.image.startsWith('blob:') ? (
+            {hasNormalImage && (
+              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] rounded-lg overflow-hidden shadow-lg bg-muted/20">
+                {section.image!.startsWith('blob:') ? (
                   <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
                     <div className="text-center">
                       <p className="text-sm font-medium">Image not available</p>
@@ -253,10 +255,10 @@ function HeroSectionComponent({
                 ) : (
                   <div className="relative w-full h-full">
                     <Image
-                      src={section.image}
+                      src={section.image!}
                       alt={section.title || 'Hero image'}
                       fill
-                      className="object-cover"
+                      className={shouldCropImage ? 'object-cover' : 'object-contain'}
                       sizes="(max-width: 1024px) 100vw, 50vw"
                       priority
                       onError={(e) => {
@@ -347,7 +349,7 @@ function FeaturesSectionComponent({
                       src={feature.image}
                       alt={feature.title}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
@@ -610,7 +612,7 @@ function TestimonialsSectionComponent({
                         src={testimonial.image}
                         alt={testimonial.name}
                         fill
-                        className="object-cover"
+                        className="object-contain"
                         sizes="48px"
                       />
                     </div>
@@ -1405,11 +1407,11 @@ function SalesTabSectionComponent({
             )}
           </div>
           {section.cta_position === 'top_right' && section.cta_text && section.cta_link && (
-            <a href={section.cta_link}>
+            <Link href={section.cta_link}>
               <Button variant="outline">
                 {section.cta_text}
               </Button>
-            </a>
+            </Link>
           )}
         </div>
 
@@ -1472,11 +1474,11 @@ function SalesTabSectionComponent({
         {/* Bottom CTA */}
         {section.cta_position === 'bottom_center' && section.cta_text && section.cta_link && (
           <div className="mt-8 text-center">
-            <a href={section.cta_link}>
+            <Link href={section.cta_link}>
               <Button variant="outline" size="lg">
                 {section.cta_text}
               </Button>
-            </a>
+            </Link>
           </div>
         )}
       </div>
@@ -1656,9 +1658,9 @@ function SplitLayoutSectionComponent({
               minHeight: mobileBehavior === 'scroll' ? '400px' : '500px',
             }}
           >
-            {/* Background Image (if any) */}
-            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type !== 'text' && (
-              <div className="absolute inset-0">
+            {/* Background Image (for banner type only) */}
+            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type === 'banner' && (
+              <div className="absolute inset-0 z-0">
                 <Image
                   src={section.left_side.image}
                   alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
@@ -1667,7 +1669,7 @@ function SplitLayoutSectionComponent({
                   sizes="(max-width: 1024px) 100vw, 50vw"
                 />
                 {/* Overlay */}
-                {section.left_side.overlay_opacity !== undefined && (
+                {section.left_side.overlay_opacity !== undefined && section.left_side.overlay_opacity > 0 && (
                   <div 
                     className="absolute inset-0 bg-black"
                     style={{ opacity: section.left_side.overlay_opacity / 100 }}
@@ -1676,65 +1678,82 @@ function SplitLayoutSectionComponent({
               </div>
             )}
             
-            {/* Content Overlay */}
-            <div 
-              className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
-              style={{ padding: contentPadding, zIndex: 10 }}
-            >
-              {section.left_side.title && (
-                <h2 
-                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
-                  style={{ 
-                    fontFamily: 'var(--font-heading)',
-                    color: 'var(--split-layout-left-title-color)',
-                  }}
-                >
-                  {section.left_side.title}
-                </h2>
-              )}
-              {section.left_side.subtitle && (
-                <p 
-                  className="text-lg md:text-xl mb-4"
-                  style={{ 
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--split-layout-left-subtitle-color)',
-                  }}
-                >
-                  {section.left_side.subtitle}
-                </p>
-              )}
-              {section.left_side.content && (
-                <div 
-                  className="prose max-w-none mb-6"
-                  style={{ 
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--split-layout-left-content-color)',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: section.left_side.content }}
-                />
-              )}
-              {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && (
-                <Link href={section.left_side.cta_link}>
-                  <Button
-                    size="lg"
-                    style={{
-                      backgroundColor: 'var(--split-layout-left-cta-bg-color)',
-                      color: 'var(--split-layout-left-cta-text-color)',
-                    }}
-                    className={section.left_side.text_alignment === 'left' ? '' : section.left_side.text_alignment === 'right' ? 'ml-auto' : 'mx-auto'}
-                  >
-                    {section.left_side.cta_text}
-                  </Button>
-                </Link>
-              )}
-              
-              {/* Form for left side */}
-              {section.left_side.type === 'form' && (
-                <div className="w-full">
-                  <SplitLayoutFormRenderer formId={section.left_side.form_id} isPreview={isPreview} />
+            {/* Regular Image (for image type only) */}
+            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type === 'image' && (
+              <div className="relative w-full h-full min-h-[400px] flex items-center justify-center p-8">
+                <div className="relative w-full h-full max-w-2xl">
+                  <Image
+                    src={section.left_side.image}
+                    alt={section.left_side.alt_text || 'Image'}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            
+            {/* Content Overlay - Show for banner, text, and form types */}
+            {section.left_side.type !== 'image' && (
+              <div 
+                className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
+                style={{ padding: contentPadding, zIndex: 10 }}
+              >
+                {section.left_side.title && (
+                  <h2 
+                    className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
+                    style={{ 
+                      fontFamily: 'var(--font-heading)',
+                      color: 'var(--split-layout-left-title-color)',
+                    }}
+                  >
+                    {section.left_side.title}
+                  </h2>
+                )}
+                {section.left_side.subtitle && (
+                  <p 
+                    className="text-lg md:text-xl mb-4"
+                    style={{ 
+                      fontFamily: 'var(--font-body)',
+                      color: 'var(--split-layout-left-subtitle-color)',
+                    }}
+                  >
+                    {section.left_side.subtitle}
+                  </p>
+                )}
+                {section.left_side.content && (
+                  <div 
+                    className="prose max-w-none mb-6"
+                    style={{ 
+                      fontFamily: 'var(--font-body)',
+                      color: 'var(--split-layout-left-content-color)',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: section.left_side.content }}
+                  />
+                )}
+                {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && (
+                  <Link href={section.left_side.cta_link}>
+                    <Button
+                      size="lg"
+                      style={{
+                        backgroundColor: 'var(--split-layout-left-cta-bg-color)',
+                        color: 'var(--split-layout-left-cta-text-color)',
+                      }}
+                      className={section.left_side.text_alignment === 'left' ? '' : section.left_side.text_alignment === 'right' ? 'ml-auto' : 'mx-auto'}
+                    >
+                      {section.left_side.cta_text}
+                    </Button>
+                  </Link>
+                )}
+                
+                {/* Form for left side */}
+                {section.left_side.type === 'form' && (
+                  <div className="w-full">
+                    <SplitLayoutFormRenderer formId={section.left_side.form_id} isPreview={isPreview} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Side */}
@@ -1838,16 +1857,29 @@ function SplitLayoutSectionComponent({
               />
             )}
 
-            {section.right_side.type === 'image' && section.right_side.image && !section.right_side.image.startsWith('blob:') && (
-              <div className="relative aspect-video rounded-lg overflow-hidden">
-                <Image
-                  src={section.right_side.image}
-                  alt={section.right_side.alt_text || 'Image'}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
-              </div>
+            {section.right_side.type === 'image' && (
+              <>
+                {section.right_side.image && !section.right_side.image.startsWith('blob:') && (
+                  <div className="relative aspect-video rounded-lg overflow-hidden bg-muted/20 mb-6">
+                    <Image
+                      src={section.right_side.image}
+                      alt={section.right_side.alt_text || 'Image'}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                    />
+                  </div>
+                )}
+                {section.right_side.cta_text && section.right_side.cta_link && (
+                  <div className={`flex ${section.right_side.text_alignment === 'center' ? 'justify-center' : section.right_side.text_alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
+                    <Link href={section.right_side.cta_link}>
+                      <Button size="lg">
+                        {section.right_side.cta_text}
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
 
             {section.right_side.type === 'form' && (
