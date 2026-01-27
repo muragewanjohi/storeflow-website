@@ -20,6 +20,7 @@ export interface HeroSection extends BaseSection {
   subtitle?: string;
   description?: string;
   image?: string;
+  image_as_background?: boolean; // If true, use image as background instead of separate image
   cta_text?: string;
   cta_link?: string;
   background_color?: string;

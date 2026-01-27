@@ -68,9 +68,13 @@ function HeroSectionComponent({
   section: Extract<PageSection, { type: 'hero' }>; 
   isPreview: boolean;
 }) {
+  const useImageAsBackground = section.image_as_background === true && section.image;
+  
   // Set CSS variables on section for better performance (section-specific naming)
   const sectionStyle = {
-    '--hero-bg': section.background_color || 'var(--color-background, transparent)',
+    '--hero-bg': useImageAsBackground 
+      ? 'transparent' 
+      : (section.background_color || 'var(--color-background, transparent)'),
     '--hero-text': 'var(--color-text, currentColor)',
     '--hero-title-color': section.title_color || 'var(--color-primary, currentColor)',
     '--hero-subtitle-color': section.subtitle_color || 'var(--color-text, #666666)',
@@ -83,99 +87,175 @@ function HeroSectionComponent({
 
   return (
     <section
-      className="relative py-16 md:py-24"
+      className={`relative ${useImageAsBackground ? 'min-h-[600px] md:min-h-[700px]' : 'py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         backgroundColor: 'var(--hero-bg)',
+        backgroundImage: useImageAsBackground && !section.image?.startsWith('blob:') 
+          ? `url(${section.image})` 
+          : undefined,
+        backgroundSize: useImageAsBackground ? 'cover' : undefined,
+        backgroundPosition: useImageAsBackground ? 'center' : undefined,
+        backgroundRepeat: useImageAsBackground ? 'no-repeat' : undefined,
       }}
     >
-      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-          <div>
-            {section.title && (
-              <h1 
-                className="text-4xl md:text-5xl font-bold mb-4"
-                style={{ 
-                  fontFamily: 'var(--font-heading)',
-                  color: 'var(--hero-title-color)',
-                }}
-              >
-                {section.title}
-              </h1>
-            )}
-            {section.subtitle && (
-              <h2 
-                className="text-2xl md:text-3xl mb-4"
-                style={{ 
-                  fontFamily: 'var(--font-heading)',
-                  color: 'var(--hero-subtitle-color)',
-                }}
-              >
-                {section.subtitle}
-              </h2>
-            )}
-            {section.description && (
-              <p 
-                className="text-lg mb-6" 
-                style={{ 
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--hero-description-color)',
-                }}
-              >
-                {section.description}
-              </p>
-            )}
-            {section.cta_text && section.cta_link && (
-              <Button 
-                asChild
-                style={{ 
-                  backgroundColor: 'var(--hero-cta-bg-color)',
-                  color: 'var(--hero-cta-text-color)',
-                }}
-              >
-                <a href={section.cta_link}>{section.cta_text}</a>
-              </Button>
-            )}
-          </div>
-          {section.image && (
-            <div className="relative aspect-video rounded-lg overflow-hidden">
-              {section.image.startsWith('blob:') ? (
-                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Image not available</p>
-                    <p className="text-xs mt-1">Please re-upload this image</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative w-full h-full">
-                  <Image
-                    src={section.image}
-                    alt={section.title || 'Hero image'}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    onError={(e) => {
-                      // Fallback if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent) {
-                        parent.innerHTML = `
-                          <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-                            <div class="text-center">
-                              <p class="text-sm font-medium">Image not available</p>
-                              <p class="text-xs mt-1">Please check the image URL</p>
-                            </div>
-                          </div>
-                        `;
-                      }
-                    }}
-                  />
-                </div>
+      {/* Overlay for background image to ensure text readability */}
+      {useImageAsBackground && (
+        <div 
+          className="absolute inset-0 bg-black/40 z-0"
+          style={{
+            backgroundColor: section.background_color 
+              ? `${section.background_color}CC` // Add transparency if background color is set
+              : 'rgba(0, 0, 0, 0.4)', // Default dark overlay
+          }}
+        />
+      )}
+      
+      <div className="container mx-auto px-4 relative z-10" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+        {useImageAsBackground ? (
+          // Full-width background image layout - content centered
+          <div className="flex items-center justify-center min-h-[600px] md:min-h-[700px]">
+            <div className="max-w-4xl text-center">
+              {section.title && (
+                <h1 
+                  className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
+                  style={{ 
+                    fontFamily: 'var(--font-heading)',
+                    color: 'var(--hero-title-color)',
+                  }}
+                >
+                  {section.title}
+                </h1>
+              )}
+              {section.subtitle && (
+                <h2 
+                  className="text-2xl md:text-3xl lg:text-4xl mb-6 font-semibold"
+                  style={{ 
+                    fontFamily: 'var(--font-heading)',
+                    color: 'var(--hero-subtitle-color)',
+                  }}
+                >
+                  {section.subtitle}
+                </h2>
+              )}
+              {section.description && (
+                <p 
+                  className="text-lg md:text-xl lg:text-2xl mb-8 max-w-2xl mx-auto" 
+                  style={{ 
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--hero-description-color)',
+                  }}
+                >
+                  {section.description}
+                </p>
+              )}
+              {section.cta_text && section.cta_link && (
+                <Button 
+                  asChild
+                  size="lg"
+                  className="text-lg px-8 py-6"
+                  style={{ 
+                    backgroundColor: 'var(--hero-cta-bg-color)',
+                    color: 'var(--hero-cta-text-color)',
+                  }}
+                >
+                  <a href={section.cta_link}>{section.cta_text}</a>
+                </Button>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          // Two-column layout with image on the right
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div>
+              {section.title && (
+                <h1 
+                  className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight"
+                  style={{ 
+                    fontFamily: 'var(--font-heading)',
+                    color: 'var(--hero-title-color)',
+                  }}
+                >
+                  {section.title}
+                </h1>
+              )}
+              {section.subtitle && (
+                <h2 
+                  className="text-2xl md:text-3xl lg:text-4xl mb-6 font-semibold"
+                  style={{ 
+                    fontFamily: 'var(--font-heading)',
+                    color: 'var(--hero-subtitle-color)',
+                  }}
+                >
+                  {section.subtitle}
+                </h2>
+              )}
+              {section.description && (
+                <p 
+                  className="text-lg md:text-xl mb-8" 
+                  style={{ 
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--hero-description-color)',
+                  }}
+                >
+                  {section.description}
+                </p>
+              )}
+              {section.cta_text && section.cta_link && (
+                <Button 
+                  asChild
+                  size="lg"
+                  className="text-base md:text-lg px-6 md:px-8 py-5 md:py-6"
+                  style={{ 
+                    backgroundColor: 'var(--hero-cta-bg-color)',
+                    color: 'var(--hero-cta-text-color)',
+                  }}
+                >
+                  <a href={section.cta_link}>{section.cta_text}</a>
+                </Button>
+              )}
+            </div>
+            {section.image && (
+              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] rounded-lg overflow-hidden shadow-lg">
+                {section.image.startsWith('blob:') ? (
+                  <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                    <div className="text-center">
+                      <p className="text-sm font-medium">Image not available</p>
+                      <p className="text-xs mt-1">Please re-upload this image</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={section.image}
+                      alt={section.title || 'Hero image'}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      priority
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                              <div class="text-center">
+                                <p class="text-sm font-medium">Image not available</p>
+                                <p class="text-xs mt-1">Please check the image URL</p>
+                              </div>
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -209,7 +209,29 @@ function HeroSectionEditor({
             value={section.image || ''}
             onChange={(url) => onUpdate({ image: url || undefined })}
           />
+          <p className="text-xs text-muted-foreground">
+            Recommended size: 1920x1080px or larger for best quality
+          </p>
         </div>
+        
+        {section.image && (
+          <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg border">
+            <Checkbox
+              id="image-as-background"
+              checked={section.image_as_background === true}
+              onCheckedChange={(checked) => onUpdate({ image_as_background: checked === true })}
+            />
+            <Label htmlFor="image-as-background" className="cursor-pointer flex-1">
+              <div>
+                <div className="font-medium">Use image as background</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  When enabled, the image will be used as the full background of the hero section. 
+                  The image will not appear as a separate element. Text will be centered with an overlay for readability.
+                </div>
+              </div>
+            </Label>
+          </div>
+        )}
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

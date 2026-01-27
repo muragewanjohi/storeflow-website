@@ -130,12 +130,11 @@ export async function POST(request: NextRequest) {
     // Get M-Pesa service
     const mpesaService = getMpesaService();
 
-    // Get callback URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                   request.headers.get('origin') || 
-                   'https://yourdomain.com';
-    const callbackUrl = `${baseUrl}/api/mpesa/subscription/callback`;
+    // Get callback URL (use configured URL or fallback to dukanest.com)
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || 
+                       (process.env.NEXT_PUBLIC_APP_URL 
+                         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/mpesa/subscription/callback`
+                         : 'https://dukanest.com/api/mpesa/subscription/callback');
 
     // Initiate STK Push
     const stkResponse = await mpesaService.initiateStkPush({

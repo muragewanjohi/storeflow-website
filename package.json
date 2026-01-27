@@ -39,7 +39,8 @@
     "deploy:smoke-tests": "tsx scripts/smoke-tests.ts",
     "deploy:verify-ssl": "tsx scripts/verify-ssl-certificates.ts",
     "test:subscriptions": "tsx scripts/test-subscription-reminders.ts",
-    "test:email": "tsx scripts/test-email-sending.ts"
+    "test:email": "tsx scripts/test-email-sending.ts",
+    "test:mpesa": "node scripts/test-mpesa-stk-push.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

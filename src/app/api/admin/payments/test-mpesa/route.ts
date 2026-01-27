@@ -73,12 +73,11 @@ export async function POST(request: NextRequest) {
     console.log(`[Test Mpesa Payment] Using environment: ${environment}`);
     console.log(`[Test Mpesa Payment] Base URL: ${environment === 'production' ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke'}`);
 
-    // Get callback URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                   request.headers.get('origin') || 
-                   'https://yourdomain.com';
-    const callbackUrl = `${baseUrl}/api/mpesa/subscription/callback`;
+    // Get callback URL (use configured URL or fallback to dukanest.com)
+    const callbackUrl = process.env.MPESA_CALLBACK_URL || 
+                       (process.env.NEXT_PUBLIC_APP_URL 
+                         ? `${process.env.NEXT_PUBLIC_APP_URL}/api/mpesa/subscription/callback`
+                         : 'https://dukanest.com/api/mpesa/subscription/callback');
 
     // Initiate STK Push FIRST (before creating payment log)
     // This way, if STK push fails, we don't create orphaned records
