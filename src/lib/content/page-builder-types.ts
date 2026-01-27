@@ -22,6 +22,7 @@ export interface HeroSection extends BaseSection {
   image?: string; // Normal image (displayed as separate element)
   banner_image?: string; // Banner image (used as background)
   image_crop?: boolean; // If false, don't crop the normal image. Defaults to true
+  image_position?: 'left' | 'center' | 'right'; // Position of normal image when both banner and normal image are present
   text_alignment?: 'left' | 'center' | 'right'; // Alignment for title and subtitle
   cta_text?: string;
   cta_link?: string;
@@ -196,7 +197,7 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Left Side Configuration
   left_side: {
-    type: 'banner' | 'image' | 'text' | 'form';
+    type: 'banner' | 'image' | 'text' | 'form' | 'products';
     title?: string;
     subtitle?: string;
     content?: string; // For text type or rich HTML
@@ -205,6 +206,13 @@ export interface SplitLayoutSection extends BaseSection {
     cta_text?: string;
     cta_link?: string;
     form_id?: string; // For form type
+    
+    // Product Options (if type is 'products')
+    product_selection?: 'category' | 'featured' | 'specific' | 'new' | 'bestsellers';
+    product_ids?: string[];
+    category_id?: string;
+    limit?: number;
+    columns?: 1 | 2 | 3;
     
     // Alignment & Positioning
     text_alignment?: 'left' | 'center' | 'right';

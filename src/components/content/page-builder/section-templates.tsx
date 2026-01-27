@@ -101,95 +101,297 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Background style - use banner_image if available
-  const backgroundStyle: React.CSSProperties = {};
-  
-  if (hasBannerImage) {
-    // Use banner image as background - ensure proper URL formatting
-    const imageUrl = section.banner_image!.trim();
-    backgroundStyle.backgroundImage = `url("${imageUrl}")`;
-    backgroundStyle.backgroundSize = 'cover';
-    backgroundStyle.backgroundPosition = 'center';
-    backgroundStyle.backgroundRepeat = 'no-repeat';
-    backgroundStyle.backgroundColor = section.background_color || 'transparent'; // Use background color as fallback if image fails
-  } else {
-    // Use background color only
-    backgroundStyle.backgroundColor = section.background_color || 'var(--color-background, transparent)';
-  }
+  // Background style - use background color only (banner image is handled separately)
+  const backgroundStyle: React.CSSProperties = {
+    backgroundColor: hasBannerImage ? 'transparent' : (section.background_color || 'var(--color-background, transparent)'),
+  };
 
   return (
     <section
-      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px]' : 'py-16 md:py-24'}`}
+      className={`relative ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px] py-0' : 'py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         ...backgroundStyle,
+        // Ensure section is properly contained and doesn't extend beyond boundaries
+        position: 'relative',
+        isolation: 'isolate', // Create new stacking context
       }}
     >
-      {/* Overlay for banner image to ensure text readability - only show if background color is set */}
-      {hasBannerImage && section.background_color && (
+      {/* Background image container - properly contained within section */}
+      {hasBannerImage && (
         <div 
           className="absolute inset-0 z-0"
           style={{
-            backgroundColor: `${section.background_color}80`, // 50% opacity overlay
+            backgroundImage: `url("${section.banner_image!.trim()}")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundAttachment: 'scroll', // Use scroll instead of fixed to prevent extending beyond container
           }}
         />
       )}
       
-      <div className="container mx-auto px-4 relative z-10" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+      {/* No overlay - banner image colors should display vibrantly without color modification */}
+      
+      <div className="container mx-auto px-4 relative z-[2]" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
         {hasBannerImage ? (
-          // Full-width background image layout
-          <div className={`flex ${alignmentClasses} min-h-[600px] md:min-h-[700px]`}>
-            <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
-              {section.title && (
-                <h1 
-                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
-                  style={{ 
-                    fontFamily: 'var(--font-heading)',
-                    color: 'var(--hero-title-color)',
-                  }}
-                >
-                  {section.title}
-                </h1>
-              )}
-              {section.subtitle && (
-                <h2 
-                  className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
-                  style={{ 
-                    fontFamily: 'var(--font-heading)',
-                    color: 'var(--hero-subtitle-color)',
-                  }}
-                >
-                  {section.subtitle}
-                </h2>
-              )}
-              {section.description && (
-                <p 
-                  className={`text-base md:text-lg mb-6 ${textAlignment === 'center' ? 'mx-auto max-w-2xl' : ''}`}
-                  style={{ 
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--hero-description-color)',
-                  }}
-                >
-                  {section.description}
-                </p>
-              )}
-              {section.cta_text && section.cta_link && (
-                <div className={textAlignment === 'center' ? 'flex justify-center' : textAlignment === 'right' ? 'flex justify-end' : ''}>
-                  <Button 
-                    asChild
-                    size="lg"
-                    className="text-base px-6 py-3"
-                    style={{ 
-                      backgroundColor: 'var(--hero-cta-bg-color)',
-                      color: 'var(--hero-cta-text-color)',
-                    }}
-                  >
-                    <a href={section.cta_link}>{section.cta_text}</a>
-                  </Button>
+          // Full-width background image layout - can include normal image
+          (() => {
+            const imagePosition = section.image_position || 'right';
+            const showNormalImage = hasNormalImage;
+            
+            // If normal image is present, use grid layout based on position
+            if (showNormalImage) {
+              const isImageLeft = imagePosition === 'left';
+              const isImageRight = imagePosition === 'right';
+              const isImageCenter = imagePosition === 'center';
+              
+              if (isImageCenter) {
+                // Center image layout - image in center, text above/below
+                return (
+                  <div className={`flex flex-col items-center justify-center min-h-[600px] md:min-h-[700px] ${alignmentClasses}`}>
+                    <div className={`w-full max-w-4xl ${textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}`}>
+                      {section.title && (
+                        <h1 
+                          className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                          style={{ 
+                            fontFamily: 'var(--font-heading)',
+                            color: 'var(--hero-title-color)',
+                          }}
+                        >
+                          {section.title}
+                        </h1>
+                      )}
+                      {section.subtitle && (
+                        <h2 
+                          className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                          style={{ 
+                            fontFamily: 'var(--font-heading)',
+                            color: 'var(--hero-subtitle-color)',
+                          }}
+                        >
+                          {section.subtitle}
+                        </h2>
+                      )}
+                      {section.description && (
+                        <p 
+                          className={`text-base md:text-lg mb-6 ${textAlignment === 'center' ? 'mx-auto max-w-2xl' : ''}`}
+                          style={{ 
+                            fontFamily: 'var(--font-body)',
+                            color: 'var(--hero-description-color)',
+                          }}
+                        >
+                          {section.description}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Center image */}
+                    <div className="relative w-full max-w-2xl h-[300px] md:h-[400px] my-8">
+                      {section.image!.startsWith('blob:') ? (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <div className="text-center">
+                            <p className="text-sm font-medium">Image not available</p>
+                            <p className="text-xs mt-1">Please re-upload this image</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={section.image!}
+                            alt={section.title || 'Hero image'}
+                            fill
+                            className={shouldCropImage ? 'object-cover' : 'object-contain'}
+                            sizes="(max-width: 1024px) 100vw, 50vw"
+                            priority
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {section.cta_text && section.cta_link && (
+                      <div className={textAlignment === 'center' ? 'flex justify-center' : textAlignment === 'right' ? 'flex justify-end' : ''}>
+                        <Button 
+                          asChild
+                          size="lg"
+                          className="text-base px-6 py-3"
+                          style={{ 
+                            backgroundColor: 'var(--hero-cta-bg-color)',
+                            color: 'var(--hero-cta-text-color)',
+                          }}
+                        >
+                          <a href={section.cta_link}>{section.cta_text}</a>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              } else {
+                // Left or right image layout - side by side
+                return (
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[600px] md:min-h-[700px] ${isImageLeft ? 'lg:grid-flow-col-dense' : ''}`}>
+                    {/* Image column */}
+                    {isImageLeft && (
+                      <div className="relative w-full h-[300px] md:h-[400px] lg:h-[500px] order-1">
+                        {section.image!.startsWith('blob:') ? (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <div className="text-center">
+                              <p className="text-sm font-medium">Image not available</p>
+                              <p className="text-xs mt-1">Please re-upload this image</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={section.image!}
+                              alt={section.title || 'Hero image'}
+                              fill
+                              className={shouldCropImage ? 'object-cover' : 'object-contain'}
+                              sizes="(max-width: 1024px) 100vw, 50vw"
+                              priority
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Text column */}
+                    <div className={`${isImageLeft ? 'order-2' : 'order-1'} ${textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}`}>
+                      {section.title && (
+                        <h1 
+                          className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                          style={{ 
+                            fontFamily: 'var(--font-heading)',
+                            color: 'var(--hero-title-color)',
+                          }}
+                        >
+                          {section.title}
+                        </h1>
+                      )}
+                      {section.subtitle && (
+                        <h2 
+                          className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                          style={{ 
+                            fontFamily: 'var(--font-heading)',
+                            color: 'var(--hero-subtitle-color)',
+                          }}
+                        >
+                          {section.subtitle}
+                        </h2>
+                      )}
+                      {section.description && (
+                        <p 
+                          className="text-base md:text-lg mb-6"
+                          style={{ 
+                            fontFamily: 'var(--font-body)',
+                            color: 'var(--hero-description-color)',
+                          }}
+                        >
+                          {section.description}
+                        </p>
+                      )}
+                      {section.cta_text && section.cta_link && (
+                        <div className={textAlignment === 'center' ? 'flex justify-center' : textAlignment === 'right' ? 'flex justify-end' : ''}>
+                          <Button 
+                            asChild
+                            size="lg"
+                            className="text-base px-6 py-3"
+                            style={{ 
+                              backgroundColor: 'var(--hero-cta-bg-color)',
+                              color: 'var(--hero-cta-text-color)',
+                            }}
+                          >
+                            <a href={section.cta_link}>{section.cta_text}</a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Image column - right */}
+                    {isImageRight && (
+                      <div className="relative w-full h-[300px] md:h-[400px] lg:h-[500px] order-2">
+                        {section.image!.startsWith('blob:') ? (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <div className="text-center">
+                              <p className="text-sm font-medium">Image not available</p>
+                              <p className="text-xs mt-1">Please re-upload this image</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={section.image!}
+                              alt={section.title || 'Hero image'}
+                              fill
+                              className={shouldCropImage ? 'object-cover' : 'object-contain'}
+                              sizes="(max-width: 1024px) 100vw, 50vw"
+                              priority
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            } else {
+              // No normal image - just text content
+              return (
+                <div className={`flex ${alignmentClasses} min-h-[600px] md:min-h-[700px]`}>
+                  <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
+                    {section.title && (
+                      <h1 
+                        className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                        style={{ 
+                          fontFamily: 'var(--font-heading)',
+                          color: 'var(--hero-title-color)',
+                        }}
+                      >
+                        {section.title}
+                      </h1>
+                    )}
+                    {section.subtitle && (
+                      <h2 
+                        className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                        style={{ 
+                          fontFamily: 'var(--font-heading)',
+                          color: 'var(--hero-subtitle-color)',
+                        }}
+                      >
+                        {section.subtitle}
+                      </h2>
+                    )}
+                    {section.description && (
+                      <p 
+                        className={`text-base md:text-lg mb-6 ${textAlignment === 'center' ? 'mx-auto max-w-2xl' : ''}`}
+                        style={{ 
+                          fontFamily: 'var(--font-body)',
+                          color: 'var(--hero-description-color)',
+                        }}
+                      >
+                        {section.description}
+                      </p>
+                    )}
+                    {section.cta_text && section.cta_link && (
+                      <div className={textAlignment === 'center' ? 'flex justify-center' : textAlignment === 'right' ? 'flex justify-end' : ''}>
+                        <Button 
+                          asChild
+                          size="lg"
+                          className="text-base px-6 py-3"
+                          style={{ 
+                            backgroundColor: 'var(--hero-cta-bg-color)',
+                            color: 'var(--hero-cta-text-color)',
+                          }}
+                        >
+                          <a href={section.cta_link}>{section.cta_text}</a>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              );
+            }
+          })()
         ) : (
           // Two-column layout with image on the right
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -244,9 +446,9 @@ function HeroSectionComponent({
               )}
             </div>
             {hasNormalImage && (
-              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] rounded-lg overflow-hidden shadow-lg bg-muted/20">
+              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px]">
                 {section.image!.startsWith('blob:') ? (
-                  <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                     <div className="text-center">
                       <p className="text-sm font-medium">Image not available</p>
                       <p className="text-xs mt-1">Please re-upload this image</p>
@@ -268,7 +470,7 @@ function HeroSectionComponent({
                         const parent = target.parentElement;
                         if (parent) {
                           parent.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                            <div class="w-full h-full flex items-center justify-center text-muted-foreground">
                               <div class="text-center">
                                 <p class="text-sm font-medium">Image not available</p>
                                 <p class="text-xs mt-1">Please check the image URL</p>
@@ -1509,19 +1711,61 @@ function SplitLayoutSectionComponent({
   const headingFont = 'var(--font-heading, inherit)';
   const bodyFont = 'var(--font-body, inherit)';
   
+  const [leftProducts, setLeftProducts] = useState<Product[]>([]);
   const [rightProducts, setRightProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingLeft, setIsLoadingLeft] = useState(true);
+  const [isLoadingRight, setIsLoadingRight] = useState(true);
 
-  // Fetch products for right side if needed
+  // Fetch products for left side if needed
   useEffect(() => {
-    if (isPreview || section.right_side.type !== 'products') {
-      setIsLoading(false);
+    if (isPreview || section.left_side.type !== 'products') {
+      setIsLoadingLeft(false);
       return;
     }
 
     const fetchProducts = async () => {
       try {
-        setIsLoading(true);
+        setIsLoadingLeft(true);
+        const params = new URLSearchParams();
+        params.append('status', 'active');
+        params.append('limit', String(section.left_side.limit || 4));
+        
+        if (section.left_side.category_id) {
+          params.append('category_id', section.left_side.category_id);
+        }
+        
+        const response = await fetch(`/api/products?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          setLeftProducts((data.products || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            price: typeof p.price === 'number' ? p.price : Number(p.price),
+            image: p.image,
+            stock_quantity: p.stock_quantity,
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching left products:', err);
+      } finally {
+        setIsLoadingLeft(false);
+      }
+    };
+
+    fetchProducts();
+  }, [section.left_side, isPreview]);
+
+  // Fetch products for right side if needed
+  useEffect(() => {
+    if (isPreview || section.right_side.type !== 'products') {
+      setIsLoadingRight(false);
+      return;
+    }
+
+    const fetchProducts = async () => {
+      try {
+        setIsLoadingRight(true);
         const params = new URLSearchParams();
         params.append('status', 'active');
         params.append('limit', String(section.right_side.limit || 4));
@@ -1543,9 +1787,9 @@ function SplitLayoutSectionComponent({
           })));
         }
       } catch (err) {
-        console.error('Error fetching products:', err);
+        console.error('Error fetching right products:', err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingRight(false);
       }
     };
 
@@ -1693,8 +1937,68 @@ function SplitLayoutSectionComponent({
               </div>
             )}
             
+            {/* Products for left side */}
+            {section.left_side.type === 'products' && (
+              <div 
+                className="relative h-full"
+                style={{ padding: contentPadding, zIndex: 10 }}
+              >
+                {section.left_side.title && (
+                  <h2 
+                    className={`text-2xl md:text-3xl font-bold mb-6 ${getTextAlignClass(section.left_side.text_alignment).split(' ')[0]}`}
+                    style={{ 
+                      fontFamily: 'var(--font-heading)',
+                      color: 'var(--split-layout-left-title-color)',
+                    }}
+                  >
+                    {section.left_side.title}
+                  </h2>
+                )}
+                {section.left_side.subtitle && (
+                  <p 
+                    className={`text-lg mb-6 ${getTextAlignClass(section.left_side.text_alignment).split(' ')[0]}`}
+                    style={{ 
+                      fontFamily: 'var(--font-body)',
+                      color: 'var(--split-layout-left-subtitle-color)',
+                    }}
+                  >
+                    {section.left_side.subtitle}
+                  </p>
+                )}
+                <div className={`grid gap-4 ${section.left_side.columns === 1 ? 'grid-cols-1' : section.left_side.columns === 3 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                  {isPreview ? (
+                    <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
+                      Products will be displayed here
+                    </div>
+                  ) : isLoadingLeft ? (
+                    <div className="col-span-full text-center text-muted-foreground py-12">
+                      Loading products...
+                    </div>
+                  ) : leftProducts.length === 0 ? (
+                    <div className="col-span-full text-center text-muted-foreground py-12">
+                      No products found
+                    </div>
+                  ) : (
+                    leftProducts.map((product) => (
+                      <DefaultProductCard 
+                        key={product.id} 
+                        product={{
+                          id: product.id,
+                          name: product.name,
+                          slug: product.slug,
+                          price: product.price,
+                          image: product.image,
+                          stock_quantity: product.stock_quantity,
+                        }} 
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Content Overlay - Show for banner, text, and form types */}
-            {section.left_side.type !== 'image' && (
+            {section.left_side.type !== 'image' && section.left_side.type !== 'products' && (
               <div 
                 className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
                 style={{ padding: contentPadding, zIndex: 10 }}
@@ -1795,7 +2099,7 @@ function SplitLayoutSectionComponent({
                   <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
                     Products will be displayed here
                   </div>
-                ) : isLoading ? (
+                ) : isLoadingRight ? (
                   <div className="col-span-full text-center text-muted-foreground py-12">
                     Loading products...
                   </div>
@@ -1805,25 +2109,17 @@ function SplitLayoutSectionComponent({
                   </div>
                 ) : (
                   rightProducts.map((product) => (
-                    <div key={product.id} className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
-                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
-                        <Image
-                          src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop'}
-                          alt={product.name}
-                          fill
-                          className="object-cover"
-                          sizes="80px"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm mb-1 line-clamp-2">{product.name}</h3>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold" style={{ color: 'var(--color-primary, currentColor)' }}>
-                            ${product.price.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    <DefaultProductCard 
+                      key={product.id} 
+                      product={{
+                        id: product.id,
+                        name: product.name,
+                        slug: product.slug,
+                        price: product.price,
+                        image: product.image,
+                        stock_quantity: product.stock_quantity,
+                      }} 
+                    />
                   ))
                 )}
               </div>

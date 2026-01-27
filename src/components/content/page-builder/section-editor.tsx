@@ -202,19 +202,59 @@ function HeroSectionEditor({
           onColorReset={handleColorReset}
         />
         
-        <div className="space-y-2">
-          <Label>Banner Image (Background)</Label>
-          <ImageUploadField
-            label="banner image"
-            value={section.banner_image || ''}
-            onChange={(url) => onUpdate({ banner_image: url || undefined })}
-            enableCrop={true}
-            aspectRatio={16 / 9}
-            recommendedDimensions="1920x1080px (16:9 ratio). This image will be used as the background of the hero section."
-          />
-          <p className="text-xs text-muted-foreground">
-            The banner image will be displayed as the background of the hero section. It will be cropped to fit the section dimensions.
-          </p>
+        <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+          <div className="space-y-2">
+            <Label>Background Type</Label>
+            <Select
+              value={section.banner_image ? 'image' : section.background_color ? 'color' : 'none'}
+              onValueChange={(value) => {
+                if (value === 'image') {
+                  // Clear background color when selecting image
+                  onUpdate({ background_color: undefined });
+                } else if (value === 'color') {
+                  // Clear banner image when selecting color
+                  onUpdate({ banner_image: undefined });
+                } else {
+                  // Clear both
+                  onUpdate({ banner_image: undefined, background_color: undefined });
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="image">Background Image</SelectItem>
+                <SelectItem value="color">Background Color</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose either a background image or background color, not both.
+            </p>
+          </div>
+          
+          {section.banner_image && (
+            <div className="space-y-2">
+              <Label>Banner Image (Background)</Label>
+              <ImageUploadField
+                label="banner image"
+                value={section.banner_image || ''}
+                onChange={(url) => {
+                  onUpdate({ 
+                    banner_image: url || undefined,
+                    background_color: undefined // Clear background color when setting image
+                  });
+                }}
+                enableCrop={true}
+                aspectRatio={16 / 9}
+                recommendedDimensions="1920x1080px (16:9 ratio). This image will be used as the background of the hero section."
+              />
+              <p className="text-xs text-muted-foreground">
+                The banner image will be displayed as the background of the hero section. It will be cropped to fit the section dimensions.
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="space-y-2">
@@ -227,21 +267,44 @@ function HeroSectionEditor({
             recommendedDimensions="800x600px or larger. Any aspect ratio. This image will be displayed as a separate element alongside the text."
           />
           {section.image && (
-            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border">
-              <Checkbox
-                id="image-crop"
-                checked={section.image_crop !== false}
-                onCheckedChange={(checked) => onUpdate({ image_crop: checked === true })}
-              />
-              <Label htmlFor="image-crop" className="cursor-pointer flex-1">
-                <div>
-                  <div className="font-medium text-sm">Crop image</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    When unchecked, the full image will be displayed without cropping.
+            <>
+              <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border">
+                <Checkbox
+                  id="image-crop"
+                  checked={section.image_crop !== false}
+                  onCheckedChange={(checked) => onUpdate({ image_crop: checked === true })}
+                />
+                <Label htmlFor="image-crop" className="cursor-pointer flex-1">
+                  <div>
+                    <div className="font-medium text-sm">Crop image</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      When unchecked, the full image will be displayed without cropping.
+                    </div>
                   </div>
+                </Label>
+              </div>
+              {section.banner_image && (
+                <div className="space-y-2">
+                  <Label>Image Position</Label>
+                  <Select
+                    value={section.image_position || 'right'}
+                    onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ image_position: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="center">Center</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Position of the normal image when both banner and normal images are selected. Image will be vertically centered.
+                  </p>
                 </div>
-              </Label>
-            </div>
+              )}
+            </>
           )}
         </div>
         
@@ -302,15 +365,23 @@ function HeroSectionEditor({
           onColorReset={handleColorReset}
         />
         
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the hero section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        {!section.banner_image && (
+          <ColorPicker
+            label="Background Color"
+            colorKey="background_color"
+            defaultValue="#FFFFFF"
+            description="Background color for the hero section (only available when no banner image is set)"
+            section={section}
+            onColorChange={(colorKey, value) => {
+              // Clear banner image when setting background color
+              onUpdate({ 
+                background_color: value,
+                banner_image: undefined
+              });
+            }}
+            onColorReset={handleColorReset}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -2086,6 +2157,7 @@ function SplitLayoutSectionEditor({
                 <SelectItem value="image">Image Only</SelectItem>
                 <SelectItem value="text">Text Content</SelectItem>
                 <SelectItem value="form">Form</SelectItem>
+                <SelectItem value="products">Products</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -2119,8 +2191,54 @@ function SplitLayoutSectionEditor({
               )}
             </div>
           )}
+
+          {/* Product configuration for left side */}
+          {section.left_side.type === 'products' && (
+            <>
+              <div className="space-y-2">
+                <Label>Product Limit</Label>
+                <Input
+                  type="number"
+                  value={section.left_side.limit || 4}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, limit: parseInt(e.target.value) || 4 }
+                  })}
+                  min={1}
+                  max={12}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.left_side.columns || 2)}
+                  onValueChange={(value) => onUpdate({
+                    left_side: { ...section.left_side, columns: parseInt(value) as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Column</SelectItem>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Category ID (Optional)</Label>
+                <Input
+                  value={section.left_side.category_id || ''}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, category_id: e.target.value || undefined }
+                  })}
+                  placeholder="Filter by category"
+                />
+              </div>
+            </>
+          )}
           
-          {section.left_side.type !== 'form' && (
+          {section.left_side.type !== 'form' && section.left_side.type !== 'products' && (
           <div className="space-y-2">
             <Label>Title</Label>
             <Input

@@ -269,24 +269,24 @@ export default function StorefrontHeader({
       <nav className="container mx-auto px-2 sm:px-4 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          {/* Best practice: Very tight spacing (4px) between logo and brand name for unified brand identity */}
-          <div className="flex items-center gap-1" suppressHydrationWarning>
+          {/* Best practice: Logo height should be 60-80% of header height (64px), spacing 12-16px for optimal visual balance */}
+          <div className="flex items-center gap-3 md:gap-4" suppressHydrationWarning>
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   onNavigate('/');
                 }}
-                className="flex items-center gap-1"
+                className="flex items-center gap-3 md:gap-4"
               >
                 {storeLogo && (
-                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
+                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-20 flex-shrink-0">
                     <Image 
                       src={storeLogo} 
                       alt={storeName}
                       fill
                       className="object-contain"
-                      sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
                       unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                       onError={(e) => {
                         // Hide the image on error, but keep the container for spacing
@@ -296,20 +296,20 @@ export default function StorefrontHeader({
                     />
                   </div>
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
+                <span className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors whitespace-nowrap">
                   {storeName}
                 </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center gap-1">
+              <Link href="/" className="flex items-center gap-3 md:gap-4">
                 {storeLogo && (
-                  <div className="relative h-10 w-[120px] sm:h-12 sm:w-[180px] md:h-16 md:w-[300px] flex-shrink-0">
+                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-20 flex-shrink-0">
                     <Image 
                       src={storeLogo} 
                       alt={storeName}
                       fill
                       className="object-contain"
-                      sizes="(max-width: 640px) 120px, (max-width: 768px) 180px, 300px"
+                      sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
                       unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
                       onError={(e) => {
                         // Hide the image on error, but keep the container for spacing
@@ -319,7 +319,7 @@ export default function StorefrontHeader({
                     />
                   </div>
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
+                <span className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors whitespace-nowrap">
                   {storeName}
                 </span>
               </Link>
