@@ -108,7 +108,7 @@ function HeroSectionComponent({
 
   return (
     <section
-      className={`relative ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px] py-0' : 'py-16 md:py-24'}`}
+      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px] py-2 md:py-4' : 'py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         ...backgroundStyle,
@@ -117,7 +117,7 @@ function HeroSectionComponent({
         isolation: 'isolate', // Create new stacking context
       }}
     >
-      {/* Background image container - properly contained within section */}
+      {/* Background image container - properly contained within section, clipped by overflow-hidden */}
       {hasBannerImage && (
         <div 
           className="absolute inset-0 z-0"

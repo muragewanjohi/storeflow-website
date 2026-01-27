@@ -131,6 +131,17 @@ function HeroSectionEditor({
   section: Extract<PageSection, { type: 'hero' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
+  // Track selected background type to show fields even when values are not set yet
+  const [selectedBackgroundType, setSelectedBackgroundType] = useState<'none' | 'image' | 'color'>(() => {
+    return section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
+  });
+
+  // Update selected type when section values change externally
+  useEffect(() => {
+    const currentType = section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
+    setSelectedBackgroundType(currentType);
+  }, [section.banner_image, section.background_color]);
+
   // Helper function to handle color changes
   const handleColorChange = (colorKey: string, value: string) => {
     onUpdate({ [colorKey]: value });
@@ -206,8 +217,9 @@ function HeroSectionEditor({
           <div className="space-y-2">
             <Label>Background Type</Label>
             <Select
-              value={section.banner_image ? 'image' : section.background_color ? 'color' : 'none'}
-              onValueChange={(value) => {
+              value={selectedBackgroundType}
+              onValueChange={(value: 'none' | 'image' | 'color') => {
+                setSelectedBackgroundType(value);
                 if (value === 'image') {
                   // Clear background color when selecting image
                   onUpdate({ background_color: undefined });
@@ -234,7 +246,8 @@ function HeroSectionEditor({
             </p>
           </div>
           
-          {section.banner_image && (
+          {/* Show ImageUploadField when 'image' is selected */}
+          {selectedBackgroundType === 'image' && (
             <div className="space-y-2">
               <Label>Banner Image (Background)</Label>
               <ImageUploadField
@@ -365,7 +378,8 @@ function HeroSectionEditor({
           onColorReset={handleColorReset}
         />
         
-        {!section.banner_image && (
+        {/* Show ColorPicker when 'color' is selected */}
+        {selectedBackgroundType === 'color' && (
           <ColorPicker
             label="Background Color"
             colorKey="background_color"
