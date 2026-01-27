@@ -417,7 +417,7 @@ export async function POST(request: NextRequest) {
           if (!existingHomepage) {
             console.log(`[Registration] Homepage does not exist, creating now...`);
             const templateData = getHomepageTemplateData(theme.slug);
-            const pageTitle = 'Home';
+            const pageTitle = ''; // Empty title to allow full customization via page builder
             const layoutData = getHomepageLayout(theme.slug);
             
             let pageBuilderData;
@@ -774,7 +774,7 @@ export async function POST(request: NextRequest) {
                 await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
-                    title: 'Home',
+                    title: '', // Empty title to allow full customization via page builder
                     slug: pageSlug,
                     content: JSON.stringify(cleanedHomePageData),
                     status: 'published',
@@ -1284,7 +1284,7 @@ export async function POST(request: NextRequest) {
                 await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
-                    title: 'Home',
+                    title: '', // Empty title to allow full customization via page builder
                     slug: pageSlug,
                     content: JSON.stringify(cleanedHomePageData),
                     status: 'published',

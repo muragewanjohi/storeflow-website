@@ -219,21 +219,21 @@ export function getAdditionalPageTemplates(tenantName: string): PageTemplateConf
   return [
     {
       slug: 'about',
-      title: 'About Us',
+      title: '', // Empty title to allow full customization via page builder
       metaTitle: `About ${tenantName} - Our Story`,
       metaDescription: `Learn more about ${tenantName}, our mission, values, and commitment to providing exceptional products and service.`,
       templateGenerator: createAboutPageTemplate,
     },
     {
       slug: 'contact',
-      title: 'Contact',
+      title: '', // Empty title to allow full customization via page builder
       metaTitle: `Contact ${tenantName} - Get in Touch`,
       metaDescription: `Contact ${tenantName} for questions, support, or inquiries. We're here to help!`,
       templateGenerator: createContactPageTemplate,
     },
     {
       slug: 'shop',
-      title: 'Shop',
+      title: '', // Empty title to allow full customization via page builder
       metaTitle: `Shop at ${tenantName} - Browse Our Collection`,
       metaDescription: `Browse our wide selection of products at ${tenantName}. Find quality items at great prices.`,
       templateGenerator: createShopPageTemplate,

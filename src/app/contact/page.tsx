@@ -142,7 +142,8 @@ export default async function ContactPage() {
                   
                   {/* Page Builder Content */}
                   <div className="container mx-auto px-4 py-8 md:py-12">
-                    {!customPage.banner_image && !hasHeroSectionFirst && (
+                    {/* Don't show page title if page has page builder sections - sections handle their own titles */}
+                    {!customPage.banner_image && !hasHeroSectionFirst && (!pageData || !pageData.sections || pageData.sections.length === 0) && (
                       <div className="mb-8">
                         <h1 className="text-4xl md:text-5xl font-bold mb-4">{customPage.title}</h1>
                       </div>

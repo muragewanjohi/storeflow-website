@@ -15,6 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -158,6 +160,12 @@ export default function TenantSubscriptionClient({
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedPlanName, setSelectedPlanName] = useState<string | null>(null);
+  
+  // M-Pesa payment state
+  const [showMpesaPayment, setShowMpesaPayment] = useState(false);
+  const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState('');
+  const [mpesaLoading, setMpesaLoading] = useState(false);
+  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
 
   // Handle tab navigation from URL query params
   useEffect(() => {
@@ -240,6 +248,108 @@ export default function TenantSubscriptionClient({
       setSelectedPlanId(null);
       setSelectedPlanName(null);
     }
+  };
+
+  // M-Pesa payment handler
+  const handleMpesaPayment = async (planId: string) => {
+    if (!mpesaPhoneNumber) {
+      setUpgradeError('Please enter your M-Pesa phone number');
+      return;
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^(?:254|0)[0-9]{9}$/;
+    if (!phoneRegex.test(mpesaPhoneNumber)) {
+      setUpgradeError('Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX');
+      return;
+    }
+
+    setMpesaLoading(true);
+    setUpgradeError(null);
+    setUpgradeSuccess(null);
+
+    try {
+      const response = await fetch('/api/mpesa/subscription/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          phone_number: mpesaPhoneNumber,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate payment');
+      }
+
+      const data = await response.json();
+      setCheckoutRequestId(data.checkout_request_id);
+      setUpgradeSuccess(
+        `Payment request sent! Please check your phone (${mpesaPhoneNumber}) and enter your M-Pesa PIN to complete the payment.`
+      );
+      
+      // Poll for payment status
+      pollPaymentStatus(data.checkout_request_id);
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'Payment initiation failed');
+      setMpesaLoading(false);
+    }
+  };
+
+  // Poll payment status
+  const pollPaymentStatus = async (checkoutRequestId: string) => {
+    const maxAttempts = 60; // 5 minutes (5 second intervals)
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setMpesaLoading(false);
+        setUpgradeError('Payment timeout. Please check your M-Pesa and try again, or contact support.');
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/mpesa/subscription/status?checkout_request_id=${checkoutRequestId}`
+        );
+        
+        if (!response.ok) {
+          attempts++;
+          setTimeout(poll, 5000);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.status === 'completed') {
+          setMpesaLoading(false);
+          setShowMpesaPayment(false);
+          setMpesaPhoneNumber('');
+          setUpgradeSuccess('Payment successful! Your subscription has been activated.');
+          setTimeout(() => window.location.reload(), 2000);
+        } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'timeout') {
+          setMpesaLoading(false);
+          const statusMessage = data.status === 'cancelled' 
+            ? 'Payment was cancelled. Please try again.'
+            : data.status === 'timeout'
+            ? 'Payment timed out. Please try again.'
+            : 'Payment failed. Please try again or contact support.';
+          setUpgradeError(statusMessage);
+        } else {
+          // Still pending, poll again
+          attempts++;
+          setTimeout(poll, 5000); // Poll every 5 seconds
+        }
+      } catch (error) {
+        attempts++;
+        setTimeout(poll, 5000);
+      }
+    };
+
+    poll();
   };
 
   return (
@@ -696,14 +806,22 @@ export default function TenantSubscriptionClient({
                                   setSelectedPlanName(plan.name);
                                   setShowDowngradeDialog(true);
                                 } else {
-                                  handleUpgrade(plan.id, false);
+                                  // For upgrades/new subscriptions, show payment option
+                                  if (Number(plan.price) > 0) {
+                                    setSelectedPlanId(plan.id);
+                                    setSelectedPlanName(plan.name);
+                                    setShowMpesaPayment(true);
+                                  } else {
+                                    // Free plan, activate directly
+                                    handleUpgrade(plan.id, false);
+                                  }
                                 }
                               }}
-                              disabled={isUpgrading}
+                              disabled={isUpgrading || mpesaLoading}
                               className="w-full"
                               variant={isUpgrade ? 'default' : 'outline'}
                             >
-                              {isUpgrading ? (
+                              {isUpgrading || mpesaLoading ? (
                                 'Processing...'
                               ) : isUpgrade ? (
                                 <>
@@ -843,6 +961,78 @@ export default function TenantSubscriptionClient({
               }}
             >
               Confirm Downgrade
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* M-Pesa Payment Dialog */}
+      <AlertDialog open={showMpesaPayment} onOpenChange={setShowMpesaPayment}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pay with M-Pesa</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                You&apos;re about to subscribe to <strong>{selectedPlanName}</strong>.
+              </p>
+              {selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                  <p className="text-2xl font-bold">
+                    KES {Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="mpesa-phone">
+                  M-Pesa Phone Number *
+                </Label>
+                <Input
+                  id="mpesa-phone"
+                  type="tel"
+                  value={mpesaPhoneNumber}
+                  onChange={(e) => setMpesaPhoneNumber(e.target.value)}
+                  placeholder="254712345678 or 0712345678"
+                  disabled={mpesaLoading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter your M-Pesa registered phone number. You&apos;ll receive an STK Push prompt to complete the payment.
+                </p>
+              </div>
+              {checkoutRequestId && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    ⏳ Waiting for payment confirmation... Please check your phone and enter your M-Pesa PIN.
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              disabled={mpesaLoading}
+              onClick={() => {
+                setMpesaPhoneNumber('');
+                setCheckoutRequestId(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedPlanId) {
+                  handleMpesaPayment(selectedPlanId);
+                }
+              }}
+              disabled={mpesaLoading || !mpesaPhoneNumber || !!checkoutRequestId}
+            >
+              {mpesaLoading ? (
+                'Processing...'
+              ) : checkoutRequestId ? (
+                'Waiting for Payment...'
+              ) : (
+                'Pay with M-Pesa'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -564,7 +564,7 @@ export async function seedExistingDemoStore(
 
     // Create homepage with complete sections
     try {
-      const pageTitle = 'Home';
+      const pageTitle = ''; // Empty title to allow full customization via page builder
       const pageSlug = generatePageSlug('home');
 
       const existingHomepage = await prisma.pages.findFirst({

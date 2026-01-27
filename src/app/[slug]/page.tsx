@@ -142,8 +142,9 @@ export default async function DynamicPage({ params }: PageProps) {
 
         {/* Page Content */}
         <div className={`${isPageBuilder && hasHeroSectionFirst ? '' : 'container mx-auto px-4'} py-8 md:py-12`}>
-          {/* If no banner image AND no hero section first, show title here */}
-          {!page.banner_image && !hasHeroSectionFirst && (
+          {/* If no banner image AND no hero section first AND no page builder sections, show title here */}
+          {/* Pages with page builder sections should handle their own titles within sections */}
+          {!page.banner_image && !hasHeroSectionFirst && (!isPageBuilder || !pageData || !pageData.sections || pageData.sections.length === 0) && (
             <div className="mb-8 container mx-auto px-4">
               <h1 className="text-4xl md:text-5xl font-bold mb-4">{page.title}</h1>
             </div>

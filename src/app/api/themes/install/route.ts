@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     try {
       // Determine page title and slug
       const templateData = getHomepageTemplateData(theme.slug);
-      const pageTitle = 'Home';
+      const pageTitle = ''; // Empty title to allow full customization via page builder
       const pageSlug = generateSlug('home'); // Use same slug generation as API route
 
       // Check if homepage already exists for this tenant (matching API route check)
