@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -135,12 +135,36 @@ function HeroSectionEditor({
   const [selectedBackgroundType, setSelectedBackgroundType] = useState<'none' | 'image' | 'color'>(() => {
     return section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
   });
+  
+  // Track if user is actively selecting a type to prevent useEffect from overriding
+  const isSelectingRef = useRef(false);
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update selected type when section values change externally
+  // Update selected type when section values change externally (but not when user is actively selecting)
   useEffect(() => {
+    // Don't override if user is actively making a selection
+    if (isSelectingRef.current) {
+      return;
+    }
+    
     const currentType = section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
-    setSelectedBackgroundType(currentType);
+    setSelectedBackgroundType((prev) => {
+      // Only update if it's different to avoid unnecessary re-renders
+      if (currentType !== prev) {
+        return currentType;
+      }
+      return prev;
+    });
   }, [section.banner_image, section.background_color]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Helper function to handle color changes
   const handleColorChange = (colorKey: string, value: string) => {
@@ -219,7 +243,18 @@ function HeroSectionEditor({
             <Select
               value={selectedBackgroundType}
               onValueChange={(value: 'none' | 'image' | 'color') => {
+                // Clear any existing timeout
+                if (selectionTimeoutRef.current) {
+                  clearTimeout(selectionTimeoutRef.current);
+                }
+                
+                // Set flag to prevent useEffect from overriding
+                isSelectingRef.current = true;
+                
+                // Update local state immediately
                 setSelectedBackgroundType(value);
+                
+                // Update section values
                 if (value === 'image') {
                   // Clear background color when selecting image
                   onUpdate({ background_color: undefined });
@@ -230,6 +265,11 @@ function HeroSectionEditor({
                   // Clear both
                   onUpdate({ banner_image: undefined, background_color: undefined });
                 }
+                
+                // Reset flag after a delay to allow state to settle
+                selectionTimeoutRef.current = setTimeout(() => {
+                  isSelectingRef.current = false;
+                }, 300);
               }}
             >
               <SelectTrigger>
