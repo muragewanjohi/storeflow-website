@@ -226,7 +226,7 @@ function HeroSectionEditor({
                 <div className="font-medium">Use image as background</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   When enabled, the image will be used as the full background of the hero section. 
-                  The image will not appear as a separate element. Background color will be used as an overlay for readability.
+                  The image will not appear as a separate element. If a background color is set, it will be used as a semi-transparent overlay for text readability.
                 </div>
               </div>
             </Label>

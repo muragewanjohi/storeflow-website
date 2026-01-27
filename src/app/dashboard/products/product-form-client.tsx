@@ -19,6 +19,7 @@ import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/
 import { PhotoIcon } from '@heroicons/react/24/solid';
 import { generateVariantName } from '@/lib/products/variant-helpers';
 import ProductSalesSection from './product-sales-section';
+import RichTextEditor from '@/components/content/rich-text-editor';
 
 interface Product {
   id: string;
@@ -606,24 +607,25 @@ export default function ProductFormClient({
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Full Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => {
-                      setFormData({ ...formData, description: e.target.value });
+                  <RichTextEditor
+                    content={formData.description}
+                    onChange={(content) => {
+                      setFormData({ ...formData, description: content });
                       // Clear warnings when user starts typing
-                      if (e.target.value.trim() && warnings.length > 0) {
+                      if (content.trim() && warnings.length > 0) {
                         setWarnings([]);
                       }
                     }}
-                    placeholder="Detailed product description"
-                    rows={8}
+                    placeholder="Detailed product description. Use the toolbar to format text, add images, links, and more."
                   />
                   {!formData.description.trim() && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
                       ⚠️ Leaving the description empty may negatively affect SEO and customer understanding of your product.
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    Use the toolbar to format text, add images, links, and more
+                  </p>
                 </div>
               </CardContent>
             </Card>

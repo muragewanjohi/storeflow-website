@@ -71,13 +71,14 @@ function HeroSectionComponent({
   const useImageAsBackground = section.image_as_background === true && section.image;
   const textAlignment = section.text_alignment || 'center';
   
-  // Get alignment classes
+  // Get alignment classes - always vertically center, but horizontally align based on selection
   const getAlignmentClasses = (align: 'left' | 'center' | 'right') => {
+    // Always use items-center for vertical centering
     switch (align) {
       case 'left':
-        return 'text-left items-start';
+        return 'text-left items-center';
       case 'right':
-        return 'text-right items-end';
+        return 'text-right items-center';
       case 'center':
       default:
         return 'text-center items-center';
@@ -102,12 +103,13 @@ function HeroSectionComponent({
   const backgroundStyle: React.CSSProperties = {};
   
   if (useImageAsBackground && section.image && !section.image.startsWith('blob:')) {
-    // Use image as background
-    backgroundStyle.backgroundImage = `url(${section.image})`;
+    // Use image as background - ensure proper URL formatting
+    const imageUrl = section.image.trim();
+    backgroundStyle.backgroundImage = `url("${imageUrl}")`;
     backgroundStyle.backgroundSize = 'cover';
     backgroundStyle.backgroundPosition = 'center';
     backgroundStyle.backgroundRepeat = 'no-repeat';
-    backgroundStyle.backgroundColor = 'transparent'; // Don't use background color when image is set
+    backgroundStyle.backgroundColor = section.background_color || 'transparent'; // Use background color as fallback if image fails
   } else {
     // Use background color only
     backgroundStyle.backgroundColor = section.background_color || 'var(--color-background, transparent)';
@@ -121,14 +123,12 @@ function HeroSectionComponent({
         ...backgroundStyle,
       }}
     >
-      {/* Overlay for background image to ensure text readability */}
-      {useImageAsBackground && (
+      {/* Overlay for background image to ensure text readability - only show if background color is set */}
+      {useImageAsBackground && section.background_color && (
         <div 
           className="absolute inset-0 z-0"
           style={{
-            backgroundColor: section.background_color 
-              ? `${section.background_color}CC` // Add transparency if background color is set (for overlay)
-              : 'rgba(0, 0, 0, 0.4)', // Default dark overlay
+            backgroundColor: `${section.background_color}80`, // 50% opacity overlay
           }}
         />
       )}
@@ -140,7 +140,7 @@ function HeroSectionComponent({
             <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
               {section.title && (
                 <h1 
-                  className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight"
+                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-title-color)',
@@ -151,7 +151,7 @@ function HeroSectionComponent({
               )}
               {section.subtitle && (
                 <h2 
-                  className="text-2xl md:text-3xl lg:text-4xl mb-6 font-semibold"
+                  className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-subtitle-color)',
@@ -162,7 +162,7 @@ function HeroSectionComponent({
               )}
               {section.description && (
                 <p 
-                  className={`text-lg md:text-xl lg:text-2xl mb-8 ${textAlignment === 'center' ? 'mx-auto max-w-2xl' : ''}`}
+                  className={`text-base md:text-lg mb-6 ${textAlignment === 'center' ? 'mx-auto max-w-2xl' : ''}`}
                   style={{ 
                     fontFamily: 'var(--font-body)',
                     color: 'var(--hero-description-color)',
@@ -176,7 +176,7 @@ function HeroSectionComponent({
                   <Button 
                     asChild
                     size="lg"
-                    className="text-lg px-8 py-6"
+                    className="text-base px-6 py-3"
                     style={{ 
                       backgroundColor: 'var(--hero-cta-bg-color)',
                       color: 'var(--hero-cta-text-color)',
@@ -194,7 +194,7 @@ function HeroSectionComponent({
             <div className={textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}>
               {section.title && (
                 <h1 
-                  className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight"
+                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-title-color)',
@@ -205,7 +205,7 @@ function HeroSectionComponent({
               )}
               {section.subtitle && (
                 <h2 
-                  className="text-2xl md:text-3xl lg:text-4xl mb-6 font-semibold"
+                  className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-subtitle-color)',
@@ -216,7 +216,7 @@ function HeroSectionComponent({
               )}
               {section.description && (
                 <p 
-                  className="text-lg md:text-xl mb-8" 
+                  className="text-base md:text-lg mb-6" 
                   style={{ 
                     fontFamily: 'var(--font-body)',
                     color: 'var(--hero-description-color)',
@@ -230,7 +230,7 @@ function HeroSectionComponent({
                   <Button 
                     asChild
                     size="lg"
-                    className="text-base md:text-lg px-6 md:px-8 py-5 md:py-6"
+                    className="text-base px-6 py-3"
                     style={{ 
                       backgroundColor: 'var(--hero-cta-bg-color)',
                       color: 'var(--hero-cta-text-color)',
