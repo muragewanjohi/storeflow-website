@@ -226,12 +226,32 @@ function HeroSectionEditor({
                 <div className="font-medium">Use image as background</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   When enabled, the image will be used as the full background of the hero section. 
-                  The image will not appear as a separate element. Text will be centered with an overlay for readability.
+                  The image will not appear as a separate element. Background color will be used as an overlay for readability.
                 </div>
               </div>
             </Label>
           </div>
         )}
+        
+        <div className="space-y-2">
+          <Label>Text Alignment</Label>
+          <Select
+            value={section.text_alignment || 'center'}
+            onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ text_alignment: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Left</SelectItem>
+              <SelectItem value="center">Center</SelectItem>
+              <SelectItem value="right">Right</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Alignment for title and subtitle text
+          </p>
+        </div>
         
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

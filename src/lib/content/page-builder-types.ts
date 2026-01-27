@@ -21,6 +21,7 @@ export interface HeroSection extends BaseSection {
   description?: string;
   image?: string;
   image_as_background?: boolean; // If true, use image as background instead of separate image
+  text_alignment?: 'left' | 'center' | 'right'; // Alignment for title and subtitle
   cta_text?: string;
   cta_link?: string;
   background_color?: string;
