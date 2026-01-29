@@ -8,6 +8,7 @@
 
 'use client';
 
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
@@ -37,6 +38,15 @@ interface AllSalesClientProps {
 }
 
 export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>) {
+  const router = useRouter();
+
+  const handleSaleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    // Allow middle-click and modifier keys (open in new tab) to use default link behavior
+    if (e.ctrlKey || e.metaKey || e.button !== 0) return;
+    e.preventDefault();
+    router.push(href);
+  };
+
   if (sales.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -144,7 +154,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
 
-              {/* CTA Button - native Link navigation so Next.js handles client-side transition and page load */}
+              {/* CTA Button and link - explicit router.push on click so navigation always fires */}
               {sale.slug ? (
                 <div className="mt-auto space-y-2">
                   <Button
@@ -156,6 +166,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                       href={`/sales/${sale.slug}`}
                       className="inline-flex items-center justify-center gap-2 group/btn"
                       scroll={true}
+                      onClick={(e) => handleSaleNavigation(e, `/sales/${sale.slug}`)}
                     >
                       Shop Now
                       <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
@@ -166,6 +177,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                       href={`/sales/${sale.slug}`}
                       className="text-sm text-primary underline hover:no-underline"
                       scroll={true}
+                      onClick={(e) => handleSaleNavigation(e, `/sales/${sale.slug}`)}
                     >
                       Open sale page →
                     </Link>
