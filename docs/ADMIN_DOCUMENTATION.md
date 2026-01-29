@@ -728,7 +728,7 @@ Use filters to find specific orders:
 
 ## Related Documentation
 
-- [User Guides](./USER_GUIDES.md)
+- [Tenant Guide](./TENANT_GUIDE.md) - Share with tenants: lists all tenant features and storefront behaviour
 - [API Documentation](./API_DOCUMENTATION.md)
 - [Deployment Guide](./DEPLOYMENT_GUIDE.md)
 - [Troubleshooting Guide](./TROUBLESHOOTING_GUIDE.md)

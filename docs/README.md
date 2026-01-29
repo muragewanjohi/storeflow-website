@@ -20,6 +20,8 @@
 
 ### 👥 **Administration**
 - **[ADMIN_DOCUMENTATION.md](./ADMIN_DOCUMENTATION.md)** - Admin panel usage and management
+- **[TENANT_GUIDE.md](./TENANT_GUIDE.md)** - Tenant-facing guide: dashboard features and storefront (share with store owners)
+- **[CANVA_BRANDING_GUIDE.md](./CANVA_BRANDING_GUIDE.md)** - Brand details for Canva (name, colors, fonts, logo, tagline)
 
 ---
 
