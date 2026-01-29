@@ -6,7 +6,7 @@
  * Phase 4: Storefront - Sales Implementation
  */
 
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
@@ -97,6 +97,20 @@ export default async function SalePage({
   });
 
   if (!sale) {
+    // Common typo: URL has slug ending in "s" (e.g. /sales/summer-sales) but DB slug is summer-sale
+    if (slug.endsWith('s') && slug.length > 1) {
+      const slugWithoutTrailingS = slug.slice(0, -1);
+      const saleByAltSlug = await prisma.sales.findFirst({
+        where: {
+          slug: slugWithoutTrailingS,
+          tenant_id: tenant.id,
+          status: 'active',
+        },
+      });
+      if (saleByAltSlug) {
+        redirect(`/sales/${saleByAltSlug.slug}`);
+      }
+    }
     notFound();
   }
 

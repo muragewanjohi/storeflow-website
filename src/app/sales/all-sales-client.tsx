@@ -10,6 +10,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,8 @@ interface AllSalesClientProps {
 }
 
 export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>) {
+  const router = useRouter();
+
   if (sales.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -144,10 +147,21 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
 
-              {/* CTA Button - use Button asChild so Link receives click and navigates */}
+              {/* CTA Button - Link for href/SEO + onClick for reliable client-side navigation (same pattern as checkout, cart) */}
               {sale.slug ? (
-                <Button asChild className="w-full mt-auto" size="lg">
-                  <Link href={`/sales/${sale.slug}`} className="inline-flex items-center justify-center gap-2 group/btn">
+                <Button
+                  asChild
+                  className="w-full mt-auto"
+                  size="lg"
+                >
+                  <Link
+                    href={`/sales/${sale.slug}`}
+                    className="inline-flex items-center justify-center gap-2 group/btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push(`/sales/${sale.slug}`);
+                    }}
+                  >
                     Shop Now
                     <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
                   </Link>

@@ -458,8 +458,8 @@ export default function SalesListClient({
                               <div>
                                 <div className="font-semibold">{sale.name}</div>
                                 {sale.slug && (
-                                  <div className="text-xs text-muted-foreground">
-                                    /{sale.slug}
+                                  <div className="text-xs text-muted-foreground" title={`Storefront URL: /sales/${sale.slug} (path is /sales/, slug is ${sale.slug})`}>
+                                    <span className="font-medium">Storefront:</span> /sales/{sale.slug}
                                   </div>
                                 )}
                               </div>

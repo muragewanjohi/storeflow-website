@@ -218,6 +218,9 @@ export default function ProductDetailClient({
                 fill
                 className="object-cover"
                 priority
+                quality={90}
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                unoptimized={selectedImage.startsWith('data:') || selectedImage.startsWith('blob:')}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -244,6 +247,9 @@ export default function ProductDetailClient({
                     alt={`${product.name} - Image ${index + 1}`}
                     fill
                     className="object-cover"
+                    quality={90}
+                    sizes="120px"
+                    unoptimized={img.startsWith('data:') || img.startsWith('blob:')}
                   />
                 </button>
               ))}
@@ -251,10 +257,10 @@ export default function ProductDetailClient({
           )}
         </div>
 
-        {/* Product Info */}
+        {/* Product Info - typography scaled to align with header/nav (design best practice) */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+            <h1 className="text-xl font-bold mb-1.5 md:text-2xl">{product.name}</h1>
             {product.sku && (
               <p className="text-sm text-muted-foreground mb-2">SKU: {product.sku}</p>
             )}
@@ -271,15 +277,15 @@ export default function ProductDetailClient({
             )}
           </div>
 
-          {/* Price */}
-          <div className="flex items-center gap-3">
-            <span className="text-3xl font-bold">{formatPrice(displayPrice)}</span>
+          {/* Price - prominent but proportional to page hierarchy */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xl font-bold md:text-2xl">{formatPrice(displayPrice)}</span>
             {hasDiscount && (
               <>
-                <span className="text-xl text-muted-foreground line-through">
+                <span className="text-base text-muted-foreground line-through">
                   {formatPrice(product.price)}
                 </span>
-                <span className="bg-destructive text-destructive-foreground px-2 py-1 rounded text-sm font-medium">
+                <span className="bg-destructive text-destructive-foreground px-2 py-0.5 rounded text-xs font-medium">
                   {Math.round(((product.price - product.sale_price!) / product.price) * 100)}% OFF
                 </span>
               </>
@@ -329,8 +335,8 @@ export default function ProductDetailClient({
           {/* Description */}
           {product.short_description && (
             <div>
-              <h2 className="font-semibold mb-2">Description</h2>
-              <p className="text-muted-foreground whitespace-pre-line">
+              <h2 className="text-base font-semibold mb-2">Description</h2>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">
                 {product.short_description}
               </p>
             </div>
@@ -339,7 +345,7 @@ export default function ProductDetailClient({
           {/* Variants */}
           {product.product_variants.length > 0 && (
             <div>
-              <h2 className="font-semibold mb-4">Variants</h2>
+              <h2 className="text-base font-semibold mb-4">Variants</h2>
               <div className="space-y-3">
                 {product.product_variants.map((variant: any) => {
                   const variantImage = variant.image || 
@@ -381,6 +387,9 @@ export default function ProductDetailClient({
                               alt={variantDetails || `Variant ${variant.id.slice(0, 8)}`}
                               fill
                               className="object-cover"
+                              quality={90}
+                              sizes="80px"
+                              unoptimized={variantImage.startsWith('data:') || variantImage.startsWith('blob:')}
                             />
                           </div>
                         )}
@@ -422,7 +431,7 @@ export default function ProductDetailClient({
                               )}
                             </div>
                             {variant.price && (
-                              <span className="font-bold text-lg ml-2">
+                              <span className="font-semibold text-base ml-2">
                                 {formatPrice(variant.price)}
                               </span>
                             )}
@@ -448,7 +457,7 @@ export default function ProductDetailClient({
           {/* Quantity Selector */}
           <div className="space-y-3">
             <div className="flex items-center gap-4">
-              <label className="font-semibold">Quantity:</label>
+              <label className="text-sm font-semibold">Quantity:</label>
               <div className="flex items-center gap-2 border rounded-md">
                 <Button
                   variant="ghost"
@@ -495,9 +504,9 @@ export default function ProductDetailClient({
           {/* Full Description */}
           {product.description && (
             <div className="pt-6 border-t">
-              <h2 className="font-semibold mb-2">Full Description</h2>
+              <h2 className="text-base font-semibold mb-2">Full Description</h2>
               <div
-                className="text-muted-foreground prose prose-sm max-w-none"
+                className="text-muted-foreground prose prose-sm max-w-none text-sm"
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
             </div>
@@ -513,7 +522,7 @@ export default function ProductDetailClient({
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6">Related Products</h2>
+          <h2 className="text-lg font-bold mb-4 md:text-xl">Related Products</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((relatedProduct) => (
               <Link key={relatedProduct.id} href={`/products/${relatedProduct.slug}`}>
@@ -526,6 +535,9 @@ export default function ProductDetailClient({
                           alt={relatedProduct.name}
                           fill
                           className="object-cover"
+                          quality={90}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          unoptimized={relatedProduct.image.startsWith('data:') || relatedProduct.image.startsWith('blob:')}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -534,9 +546,9 @@ export default function ProductDetailClient({
                       )}
                     </div>
                     <div className="p-4">
-                      <h3 className="font-semibold mb-2 line-clamp-2">{relatedProduct.name}</h3>
+                      <h3 className="text-sm font-semibold mb-2 line-clamp-2">{relatedProduct.name}</h3>
                       <div className="flex items-center gap-2">
-                        <p className="text-lg font-bold">
+                        <p className="text-base font-semibold">
                           {formatPrice(relatedProduct.sale_price || relatedProduct.price)}
                         </p>
                         {relatedProduct.sale_price && (

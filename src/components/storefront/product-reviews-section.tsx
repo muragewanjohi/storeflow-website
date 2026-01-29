@@ -191,25 +191,25 @@ export default function ProductReviewsSection({
     <div className={className}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl mb-4">Customer Reviews</CardTitle>
+          <CardTitle className="text-lg font-bold mb-4 md:text-xl">Customer Reviews</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-muted-foreground text-sm">
               Loading reviews...
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column: Rating Summary (Amazon-style) */}
+              {/* Left Column: Rating Summary - typography aligned with page hierarchy */}
               <div className="lg:col-span-1">
                 <div className="space-y-4">
                   {/* Overall Rating */}
                   <div>
                     <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-4xl font-bold">
+                      <span className="text-2xl font-bold md:text-3xl">
                         {averageRating > 0 ? averageRating.toFixed(1) : '0.0'}
                       </span>
-                      <span className="text-xl text-muted-foreground">out of 5</span>
+                      <span className="text-sm text-muted-foreground">out of 5</span>
                     </div>
                     <div className="mb-2">
                       <RatingDisplay
