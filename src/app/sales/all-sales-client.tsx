@@ -10,7 +10,6 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,8 +37,6 @@ interface AllSalesClientProps {
 }
 
 export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>) {
-  const router = useRouter();
-
   if (sales.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -82,8 +79,8 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
               
-              {/* Gradient Overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              {/* Gradient Overlay - pointer-events-none so it never blocks clicks on card/content below */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" aria-hidden="true" />
               
               {/* Badges */}
               <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
@@ -147,25 +144,33 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
 
-              {/* CTA Button - Link for href/SEO + onClick for reliable client-side navigation (same pattern as checkout, cart) */}
+              {/* CTA Button - native Link navigation so Next.js handles client-side transition and page load */}
               {sale.slug ? (
-                <Button
-                  asChild
-                  className="w-full mt-auto"
-                  size="lg"
-                >
-                  <Link
-                    href={`/sales/${sale.slug}`}
-                    className="inline-flex items-center justify-center gap-2 group/btn"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      router.push(`/sales/${sale.slug}`);
-                    }}
+                <div className="mt-auto space-y-2">
+                  <Button
+                    asChild
+                    className="w-full"
+                    size="lg"
                   >
-                    Shop Now
-                    <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
-                  </Link>
-                </Button>
+                    <Link
+                      href={`/sales/${sale.slug}`}
+                      className="inline-flex items-center justify-center gap-2 group/btn"
+                      scroll={true}
+                    >
+                      Shop Now
+                      <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                    </Link>
+                  </Button>
+                  <p className="text-center">
+                    <Link
+                      href={`/sales/${sale.slug}`}
+                      className="text-sm text-primary underline hover:no-underline"
+                      scroll={true}
+                    >
+                      Open sale page →
+                    </Link>
+                  </p>
+                </div>
               ) : (
                 <div className="mt-auto">
                   <Button 
