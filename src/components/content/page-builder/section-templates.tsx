@@ -61,6 +61,20 @@ export function SectionRenderer({ section, isPreview = false }: Readonly<Section
   }
 }
 
+// Hero title/subtitle font size presets (responsive clamp)
+const HERO_TITLE_FONT_SIZES: Record<string, string> = {
+  sm: 'clamp(1.5rem, 3vw, 2.25rem)',
+  md: 'clamp(1.875rem, 4vw, 3rem)',
+  lg: 'clamp(2.25rem, 5vw, 3.75rem)',
+  xl: 'clamp(2.75rem, 6vw, 4.5rem)',
+};
+const HERO_SUBTITLE_FONT_SIZES: Record<string, string> = {
+  sm: 'clamp(0.9rem, 2vw, 1.125rem)',
+  md: 'clamp(1.125rem, 2.5vw, 1.5rem)',
+  lg: 'clamp(1.375rem, 3vw, 1.875rem)',
+  xl: 'clamp(1.625rem, 4vw, 2.25rem)',
+};
+
 function HeroSectionComponent({ 
   section, 
   isPreview 
@@ -72,6 +86,8 @@ function HeroSectionComponent({
   const hasNormalImage = section.image && !section.image.startsWith('blob:');
   const textAlignment = section.text_alignment || 'center';
   const shouldCropImage = section.image_crop !== false;
+  const titleFontSize = HERO_TITLE_FONT_SIZES[section.title_font_size || 'md'] ?? HERO_TITLE_FONT_SIZES.md;
+  const subtitleFontSize = HERO_SUBTITLE_FONT_SIZES[section.subtitle_font_size || 'md'] ?? HERO_SUBTITLE_FONT_SIZES.md;
   
   // Get alignment classes - always vertically center, but horizontally align based on selection
   const getAlignmentClasses = (align: 'left' | 'center' | 'right') => {
@@ -108,7 +124,7 @@ function HeroSectionComponent({
 
   return (
     <section
-      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[600px] md:min-h-[700px] py-2 md:py-4' : 'py-16 md:py-24'}`}
+      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         ...backgroundStyle,
@@ -120,13 +136,13 @@ function HeroSectionComponent({
       {/* Background image container - properly contained within section, clipped by overflow-hidden */}
       {hasBannerImage && (
         <div 
-          className="absolute inset-0 z-0"
+          className="absolute inset-0 z-0 bg-center bg-no-repeat bg-cover md:bg-cover"
           style={{
             backgroundImage: `url("${section.banner_image!.trim()}")`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'scroll', // Use scroll instead of fixed to prevent extending beyond container
+            backgroundAttachment: 'scroll',
           }}
         />
       )}
@@ -149,14 +165,15 @@ function HeroSectionComponent({
               if (isImageCenter) {
                 // Center image layout - image in center, text above/below
                 return (
-                  <div className={`flex flex-col items-center justify-center min-h-[600px] md:min-h-[700px] ${alignmentClasses}`}>
+                  <div className={`flex flex-col items-center justify-center min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] ${alignmentClasses}`}>
                     <div className={`w-full max-w-4xl ${textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}`}>
                       {section.title && (
                         <h1 
-                          className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                          className="font-bold mb-4 leading-tight"
                           style={{ 
                             fontFamily: 'var(--font-heading)',
                             color: 'var(--hero-title-color)',
+                            fontSize: titleFontSize,
                           }}
                         >
                           {section.title}
@@ -164,10 +181,11 @@ function HeroSectionComponent({
                       )}
                       {section.subtitle && (
                         <h2 
-                          className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                          className="mb-4 font-semibold"
                           style={{ 
                             fontFamily: 'var(--font-heading)',
                             color: 'var(--hero-subtitle-color)',
+                            fontSize: subtitleFontSize,
                           }}
                         >
                           {section.subtitle}
@@ -186,8 +204,8 @@ function HeroSectionComponent({
                       )}
                     </div>
                     
-                    {/* Center image */}
-                    <div className="relative w-full max-w-2xl h-[300px] md:h-[400px] my-8">
+                    {/* Center image - no border, transparent-friendly */}
+                    <div className="relative w-full max-w-2xl h-[240px] sm:h-[300px] md:h-[400px] my-6 md:my-8 overflow-hidden rounded-lg">
                       {section.image!.startsWith('blob:') ? (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           <div className="text-center">
@@ -196,7 +214,7 @@ function HeroSectionComponent({
                           </div>
                         </div>
                       ) : (
-                        <div className="relative w-full h-full">
+                        <div className="relative w-full h-full bg-transparent">
                           <Image
                             src={section.image!}
                             alt={section.title || 'Hero image'}
@@ -204,6 +222,8 @@ function HeroSectionComponent({
                             className={shouldCropImage ? 'object-cover' : 'object-contain'}
                             sizes="(max-width: 1024px) 100vw, 50vw"
                             priority
+                            quality={90}
+                            unoptimized={section.image!.startsWith('data:')}
                           />
                         </div>
                       )}
@@ -229,10 +249,10 @@ function HeroSectionComponent({
               } else {
                 // Left or right image layout - side by side
                 return (
-                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[600px] md:min-h-[700px] ${isImageLeft ? 'lg:grid-flow-col-dense' : ''}`}>
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] ${isImageLeft ? 'lg:grid-flow-col-dense' : ''}`}>
                     {/* Image column */}
                     {isImageLeft && (
-                      <div className="relative w-full h-[300px] md:h-[400px] lg:h-[500px] order-1">
+                      <div className="relative w-full h-[240px] sm:h-[300px] md:h-[400px] lg:h-[500px] order-1 overflow-hidden rounded-lg">
                         {section.image!.startsWith('blob:') ? (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
@@ -241,7 +261,7 @@ function HeroSectionComponent({
                             </div>
                           </div>
                         ) : (
-                          <div className="relative w-full h-full">
+                          <div className="relative w-full h-full bg-transparent">
                             <Image
                               src={section.image!}
                               alt={section.title || 'Hero image'}
@@ -249,6 +269,8 @@ function HeroSectionComponent({
                               className={shouldCropImage ? 'object-cover' : 'object-contain'}
                               sizes="(max-width: 1024px) 100vw, 50vw"
                               priority
+                              quality={90}
+                              unoptimized={section.image!.startsWith('data:')}
                             />
                           </div>
                         )}
@@ -259,10 +281,11 @@ function HeroSectionComponent({
                     <div className={`${isImageLeft ? 'order-2' : 'order-1'} ${textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}`}>
                       {section.title && (
                         <h1 
-                          className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                          className="font-bold mb-4 leading-tight"
                           style={{ 
                             fontFamily: 'var(--font-heading)',
                             color: 'var(--hero-title-color)',
+                            fontSize: titleFontSize,
                           }}
                         >
                           {section.title}
@@ -270,10 +293,11 @@ function HeroSectionComponent({
                       )}
                       {section.subtitle && (
                         <h2 
-                          className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                          className="mb-4 font-semibold"
                           style={{ 
                             fontFamily: 'var(--font-heading)',
                             color: 'var(--hero-subtitle-color)',
+                            fontSize: subtitleFontSize,
                           }}
                         >
                           {section.subtitle}
@@ -309,7 +333,7 @@ function HeroSectionComponent({
                     
                     {/* Image column - right */}
                     {isImageRight && (
-                      <div className="relative w-full h-[300px] md:h-[400px] lg:h-[500px] order-2">
+                      <div className="relative w-full h-[240px] sm:h-[300px] md:h-[400px] lg:h-[500px] order-2 overflow-hidden rounded-lg">
                         {section.image!.startsWith('blob:') ? (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
@@ -318,7 +342,7 @@ function HeroSectionComponent({
                             </div>
                           </div>
                         ) : (
-                          <div className="relative w-full h-full">
+                          <div className="relative w-full h-full bg-transparent">
                             <Image
                               src={section.image!}
                               alt={section.title || 'Hero image'}
@@ -326,6 +350,8 @@ function HeroSectionComponent({
                               className={shouldCropImage ? 'object-cover' : 'object-contain'}
                               sizes="(max-width: 1024px) 100vw, 50vw"
                               priority
+                              quality={90}
+                              unoptimized={section.image!.startsWith('data:')}
                             />
                           </div>
                         )}
@@ -337,14 +363,15 @@ function HeroSectionComponent({
             } else {
               // No normal image - just text content
               return (
-                <div className={`flex ${alignmentClasses} min-h-[600px] md:min-h-[700px]`}>
+                <div className={`flex ${alignmentClasses} min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px]`}>
                   <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
                     {section.title && (
                       <h1 
-                        className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                        className="font-bold mb-4 leading-tight"
                         style={{ 
                           fontFamily: 'var(--font-heading)',
                           color: 'var(--hero-title-color)',
+                          fontSize: titleFontSize,
                         }}
                       >
                         {section.title}
@@ -352,10 +379,11 @@ function HeroSectionComponent({
                     )}
                     {section.subtitle && (
                       <h2 
-                        className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                        className="mb-4 font-semibold"
                         style={{ 
                           fontFamily: 'var(--font-heading)',
                           color: 'var(--hero-subtitle-color)',
+                          fontSize: subtitleFontSize,
                         }}
                       >
                         {section.subtitle}
@@ -394,14 +422,15 @@ function HeroSectionComponent({
           })()
         ) : (
           // Two-column layout with image on the right
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
             <div className={textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}>
               {section.title && (
                 <h1 
-                  className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight"
+                  className="font-bold mb-4 leading-tight"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-title-color)',
+                    fontSize: titleFontSize,
                   }}
                 >
                   {section.title}
@@ -409,10 +438,11 @@ function HeroSectionComponent({
               )}
               {section.subtitle && (
                 <h2 
-                  className="text-xl md:text-2xl lg:text-3xl mb-4 font-semibold"
+                  className="mb-4 font-semibold"
                   style={{ 
                     fontFamily: 'var(--font-heading)',
                     color: 'var(--hero-subtitle-color)',
+                    fontSize: subtitleFontSize,
                   }}
                 >
                   {section.subtitle}
@@ -446,7 +476,7 @@ function HeroSectionComponent({
               )}
             </div>
             {hasNormalImage && (
-              <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px]">
+              <div className="relative w-full h-[280px] sm:h-[360px] md:h-[450px] lg:h-[550px] overflow-hidden rounded-lg">
                 {section.image!.startsWith('blob:') ? (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                     <div className="text-center">
@@ -455,7 +485,7 @@ function HeroSectionComponent({
                     </div>
                   </div>
                 ) : (
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-full bg-transparent">
                     <Image
                       src={section.image!}
                       alt={section.title || 'Hero image'}
@@ -463,8 +493,9 @@ function HeroSectionComponent({
                       className={shouldCropImage ? 'object-cover' : 'object-contain'}
                       sizes="(max-width: 1024px) 100vw, 50vw"
                       priority
+                      quality={90}
+                      unoptimized={section.image!.startsWith('data:')}
                       onError={(e) => {
-                        // Fallback if image fails to load
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
                         const parent = target.parentElement;

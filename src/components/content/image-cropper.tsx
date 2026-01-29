@@ -26,8 +26,10 @@ interface ImageCropperProps {
   aspect?: number;
   onCropComplete: (croppedImageUrl: string) => void;
   onCancel: () => void;
+  onUseFullImage?: () => void; // If provided, show "Use full image" to skip cropping
   open: boolean;
   uploadEndpoint?: string; // Optional: if provided, will upload the cropped image
+  imageType?: string; // e.g. 'image/png' to preserve transparency when outputting
 }
 
 interface Area {
@@ -42,8 +44,10 @@ export default function ImageCropper({
   aspect = 16 / 9, // Default banner aspect ratio
   onCropComplete,
   onCancel,
+  onUseFullImage,
   open,
   uploadEndpoint,
+  imageType,
 }: ImageCropperProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -95,7 +99,7 @@ export default function ImageCropper({
     imageSrc: string,
     pixelCrop: Area
   ): Promise<File> => {
-    const image = await createImage(imageSrc);
+    const imageEl = await createImage(imageSrc);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -107,9 +111,15 @@ export default function ImageCropper({
     canvas.width = pixelCrop.width;
     canvas.height = pixelCrop.height;
 
+    // Preserve transparency for PNG/WebP so transparent areas don't become black
+    const preserveAlpha = imageType === 'image/png' || imageType === 'image/webp' || imageType === 'image/gif';
+    if (preserveAlpha) {
+      ctx.clearRect(0, 0, pixelCrop.width, pixelCrop.height);
+    }
+
     // Draw the cropped image
     ctx.drawImage(
-      image,
+      imageEl,
       pixelCrop.x,
       pixelCrop.y,
       pixelCrop.width,
@@ -120,7 +130,9 @@ export default function ImageCropper({
       pixelCrop.height
     );
 
-    // Convert canvas to blob, then to File
+    const mimeType = preserveAlpha ? 'image/png' : 'image/jpeg';
+    const extension = preserveAlpha ? 'png' : 'jpg';
+
     return new Promise((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
@@ -128,12 +140,11 @@ export default function ImageCropper({
             reject(new Error('Canvas is empty'));
             return;
           }
-          // Convert blob to File
-          const file = new File([blob], 'cropped-image.jpg', { type: 'image/jpeg' });
+          const file = new File([blob], `cropped-image.${extension}`, { type: mimeType });
           resolve(file);
         },
-        'image/jpeg',
-        0.95
+        mimeType,
+        preserveAlpha ? undefined : 0.95
       );
     });
   };
@@ -179,12 +190,20 @@ export default function ImageCropper({
     <Dialog open={open} onOpenChange={onCancel}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Crop Banner Image</DialogTitle>
+          <DialogTitle>Crop Image</DialogTitle>
           <DialogDescription>
-            Drag the image to adjust position, use zoom to crop, then click Apply
+            Drag the image to adjust position, use zoom to crop, then click Apply. Transparent areas will be preserved for PNG/WebP images.
           </DialogDescription>
         </DialogHeader>
-        <div className="relative w-full h-[400px] bg-black rounded-md overflow-hidden">
+        <div
+          className="relative w-full h-[400px] rounded-md overflow-hidden bg-muted"
+          style={{
+            backgroundImage: 'linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)',
+            backgroundSize: '16px 16px',
+            backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+            backgroundColor: '#f3f4f6',
+          }}
+        >
           <Cropper
             image={image}
             crop={crop}
@@ -210,7 +229,18 @@ export default function ImageCropper({
             />
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-wrap gap-2">
+          {onUseFullImage && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onUseFullImage}
+              disabled={isUploading}
+              className="mr-auto"
+            >
+              Use full image (no crop)
+            </Button>
+          )}
           <Button variant="outline" onClick={onCancel} disabled={isUploading}>
             <XMarkIcon className="mr-2 h-4 w-4" />
             Cancel

@@ -13,7 +13,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import {
-  getHomepageTemplateData,
   getHomepageLayout,
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
@@ -207,10 +206,9 @@ export async function POST(request: NextRequest) {
     // Always try to create pages if they don't exist (for both new installs and switches)
     // Create homepage
     try {
-      // Determine page title and slug
-      const templateData = getHomepageTemplateData(theme.slug);
-      const pageTitle = ''; // Empty title to allow full customization via page builder
-      const pageSlug = generateSlug('home'); // Use same slug generation as API route
+      // Homepage always uses slug 'home' and title 'Home' for display in dashboard/navigation
+      const pageTitle = 'Home';
+      const pageSlug = generateSlug('home'); // 'home'
 
       // Check if homepage already exists for this tenant (matching API route check)
       const existingHomepage = await prisma.pages.findFirst({

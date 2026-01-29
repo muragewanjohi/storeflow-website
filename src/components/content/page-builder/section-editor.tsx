@@ -190,6 +190,23 @@ function HeroSectionEditor({
             placeholder="Hero title"
           />
         </div>
+        <div className="space-y-2">
+          <Label>Title Font Size</Label>
+          <Select
+            value={(section as Extract<PageSection, { type: 'hero' }>).title_font_size || 'md'}
+            onValueChange={(value) => onUpdate({ title_font_size: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">Small</SelectItem>
+              <SelectItem value="md">Medium (default)</SelectItem>
+              <SelectItem value="lg">Large</SelectItem>
+              <SelectItem value="xl">Extra large</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <ColorPicker
           label="Title Color"
           colorKey="title_color"
@@ -207,6 +224,23 @@ function HeroSectionEditor({
             onChange={(e) => onUpdate({ subtitle: e.target.value })}
             placeholder="Hero subtitle"
           />
+        </div>
+        <div className="space-y-2">
+          <Label>Subtitle Font Size</Label>
+          <Select
+            value={(section as Extract<PageSection, { type: 'hero' }>).subtitle_font_size || 'md'}
+            onValueChange={(value) => onUpdate({ subtitle_font_size: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sm">Small</SelectItem>
+              <SelectItem value="md">Medium (default)</SelectItem>
+              <SelectItem value="lg">Large</SelectItem>
+              <SelectItem value="xl">Extra large</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <ColorPicker
           label="Subtitle Color"
@@ -317,6 +351,8 @@ function HeroSectionEditor({
             value={section.image || ''}
             onChange={(url) => onUpdate({ image: url || undefined })}
             enableCrop={section.image_crop !== false}
+            aspectRatio={4 / 3}
+            allowSkipCrop={true}
             recommendedDimensions="800x600px or larger. Any aspect ratio. This image will be displayed as a separate element alongside the text."
           />
           {section.image && (
@@ -360,6 +396,24 @@ function HeroSectionEditor({
             </>
           )}
         </div>
+
+        {/* Background Color – next to Normal Image so colour picker relates to image/background */}
+        {selectedBackgroundType === 'color' && (
+          <ColorPicker
+            label="Background Color"
+            colorKey="background_color"
+            defaultValue="#FFFFFF"
+            description="Background color for the hero section (only when no banner image is set)"
+            section={section}
+            onColorChange={(colorKey, value) => {
+              onUpdate({
+                background_color: value,
+                banner_image: undefined,
+              });
+            }}
+            onColorReset={handleColorReset}
+          />
+        )}
         
         <div className="space-y-2">
           <Label>Text Alignment</Label>
@@ -417,25 +471,6 @@ function HeroSectionEditor({
           onColorChange={handleColorChange}
           onColorReset={handleColorReset}
         />
-        
-        {/* Show ColorPicker when 'color' is selected */}
-        {selectedBackgroundType === 'color' && (
-          <ColorPicker
-            label="Background Color"
-            colorKey="background_color"
-            defaultValue="#FFFFFF"
-            description="Background color for the hero section (only available when no banner image is set)"
-            section={section}
-            onColorChange={(colorKey, value) => {
-              // Clear banner image when setting background color
-              onUpdate({ 
-                background_color: value,
-                banner_image: undefined
-              });
-            }}
-            onColorReset={handleColorReset}
-          />
-        )}
       </CardContent>
     </Card>
   );

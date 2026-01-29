@@ -16,7 +16,6 @@ import { addTenantDomain } from '@/lib/vercel-domains';
 import { clearCachedTenant } from '@/lib/tenant-context/cache';
 import { z } from 'zod';
 import {
-  getHomepageTemplateData,
   getHomepageLayout,
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
@@ -403,8 +402,7 @@ export async function POST(request: NextRequest) {
 
         // Create homepage
         try {
-          // Use tenant-specific slug to avoid global unique constraint issues
-          // The slug should be 'home' but we'll use upsert to handle conflicts
+          // Slug is unique per tenant (tenant_id + slug), so we always use 'home' for the homepage
           const pageSlug = 'home';
           console.log(`[Registration] Checking for existing homepage with slug: ${pageSlug} for tenant: ${tenant.id}`);
           const existingHomepage = await prisma.pages.findFirst({
@@ -416,10 +414,9 @@ export async function POST(request: NextRequest) {
 
           if (!existingHomepage) {
             console.log(`[Registration] Homepage does not exist, creating now...`);
-            const templateData = getHomepageTemplateData(theme.slug);
-            const pageTitle = ''; // Empty title to allow full customization via page builder
             const layoutData = getHomepageLayout(theme.slug);
-            
+            const pageTitle = 'Home';
+
             let pageBuilderData;
             if (layoutData && layoutData.length > 0) {
               console.log(`[Registration] Using legacy layout data for homepage`);
@@ -432,74 +429,18 @@ export async function POST(request: NextRequest) {
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
             console.log(`[Registration] Homepage data prepared, creating in database...`);
 
-            // Try to create the page, but handle unique constraint errors
-            // Since slug has a global unique constraint, we need to check if it exists globally first
-            let createdHomepage;
-            try {
-              // Check if slug exists globally (for any tenant)
-              const globalPageCheck = await prisma.pages.findFirst({
-                where: {
-                  slug: pageSlug,
-                },
-                select: {
-                  id: true,
-                  tenant_id: true,
-                },
-              });
-
-              if (globalPageCheck) {
-                // Slug exists for another tenant - we need to use a tenant-specific slug
-                const tenantSpecificSlug = `${pageSlug}-${tenant.subdomain}`;
-                console.log(`[Registration] ⚠️ Slug '${pageSlug}' exists for another tenant, using tenant-specific slug: ${tenantSpecificSlug}`);
-                
-                createdHomepage = await prisma.pages.create({
-                  data: {
-                    tenant_id: tenant.id,
-                    title: pageTitle,
-                    slug: tenantSpecificSlug,
-                    content: JSON.stringify(pageBuilderData),
-                    status: 'published',
-                    banner_image: null,
-                    meta_title: `${tenant.name} - Home`,
-                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
-                  },
-                });
-              } else {
-                // Slug doesn't exist globally, safe to create
-                createdHomepage = await prisma.pages.create({
-                  data: {
-                    tenant_id: tenant.id,
-                    title: pageTitle,
-                    slug: pageSlug,
-                    content: JSON.stringify(pageBuilderData),
-                    status: 'published',
-                    banner_image: null,
-                    meta_title: `${tenant.name} - Home`,
-                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
-                  },
-                });
-              }
-            } catch (createError: any) {
-              // If creation fails due to unique constraint, try with tenant-specific slug
-              if (createError.code === 'P2002' && createError.meta?.target?.includes('slug')) {
-                console.log(`[Registration] ⚠️ Unique constraint error on slug, retrying with tenant-specific slug...`);
-                const tenantSpecificSlug = `${pageSlug}-${tenant.subdomain}`;
-                createdHomepage = await prisma.pages.create({
-                  data: {
-                    tenant_id: tenant.id,
-                    title: pageTitle,
-                    slug: tenantSpecificSlug,
-                    content: JSON.stringify(pageBuilderData),
-                    status: 'published',
-                    banner_image: null,
-                    meta_title: `${tenant.name} - Home`,
-                    meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
-                  },
-                });
-              } else {
-                throw createError;
-              }
-            }
+            const createdHomepage = await prisma.pages.create({
+              data: {
+                tenant_id: tenant.id,
+                title: pageTitle,
+                slug: pageSlug,
+                content: JSON.stringify(pageBuilderData),
+                status: 'published',
+                banner_image: null,
+                meta_title: `${tenant.name} - Home`,
+                meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+              },
+            });
             console.log(`[Registration] ✅ Created homepage successfully:`, {
               id: createdHomepage.id,
               slug: createdHomepage.slug,
@@ -774,7 +715,7 @@ export async function POST(request: NextRequest) {
                 await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
-                    title: '', // Empty title to allow full customization via page builder
+                    title: 'Home',
                     slug: pageSlug,
                     content: JSON.stringify(cleanedHomePageData),
                     status: 'published',
@@ -1284,7 +1225,7 @@ export async function POST(request: NextRequest) {
                 await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
-                    title: '', // Empty title to allow full customization via page builder
+                    title: 'Home',
                     slug: pageSlug,
                     content: JSON.stringify(cleanedHomePageData),
                     status: 'published',

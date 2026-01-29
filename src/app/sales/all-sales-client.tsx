@@ -144,15 +144,14 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
 
-              {/* CTA Button */}
+              {/* CTA Button - use Button asChild so Link receives click and navigates */}
               {sale.slug ? (
-                <Link 
-                  href={`/sales/${sale.slug}`}
-                  className="w-full mt-auto inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 group/button"
-                >
-                  Shop Now
-                  <ArrowRightIcon className="h-4 w-4 group-hover/button:translate-x-1 transition-transform" />
-                </Link>
+                <Button asChild className="w-full mt-auto" size="lg">
+                  <Link href={`/sales/${sale.slug}`} className="inline-flex items-center justify-center gap-2 group/btn">
+                    Shop Now
+                    <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
               ) : (
                 <div className="mt-auto">
                   <Button 

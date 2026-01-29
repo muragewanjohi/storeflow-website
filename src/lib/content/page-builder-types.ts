@@ -19,6 +19,8 @@ export interface HeroSection extends BaseSection {
   title: string;
   subtitle?: string;
   description?: string;
+  title_font_size?: string; // CSS value or preset: 'sm' | 'md' | 'lg' | 'xl'
+  subtitle_font_size?: string; // CSS value or preset: 'sm' | 'md' | 'lg' | 'xl'
   image?: string; // Normal image (displayed as separate element)
   banner_image?: string; // Banner image (used as background)
   image_crop?: boolean; // If false, don't crop the normal image. Defaults to true
