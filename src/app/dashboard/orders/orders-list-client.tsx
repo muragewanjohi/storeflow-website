@@ -241,7 +241,7 @@ export default function OrdersListClient({
     if (!status) return 'secondary';
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'secondary';
+        return 'outline'; // use outline so pendingBadgeClass can apply amber without conflict
       case 'processing':
         return 'default';
       case 'shipped':
@@ -261,7 +261,7 @@ export default function OrdersListClient({
     if (!status) return 'secondary';
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'secondary';
+        return 'outline'; // use outline so pendingBadgeClass can apply amber without conflict
       case 'paid':
         return 'default';
       case 'failed':
@@ -272,6 +272,10 @@ export default function OrdersListClient({
         return 'secondary';
     }
   };
+
+  // Readable pending badge: light amber background, dark text (avoids dark-on-dark from secondary variant)
+  const pendingBadgeClass =
+    'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-100';
 
   return (
     <div>
@@ -518,7 +522,14 @@ export default function OrdersListClient({
                         <TableCell>{formatCurrency(order.total_amount)}</TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            <Badge variant={getStatusBadgeVariant(order.status)}>
+                            <Badge
+                              variant={getStatusBadgeVariant(order.status)}
+                              className={
+                                order.status?.toLowerCase() === 'pending'
+                                  ? pendingBadgeClass
+                                  : undefined
+                              }
+                            >
                               {formatOrderStatus(order.status || 'pending')}
                             </Badge>
                             {order.status?.toLowerCase() === 'shipped' && order.order_details && (
@@ -540,7 +551,14 @@ export default function OrdersListClient({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getPaymentStatusBadgeVariant(order.payment_status)}>
+                          <Badge
+                            variant={getPaymentStatusBadgeVariant(order.payment_status)}
+                            className={
+                              order.payment_status?.toLowerCase() === 'pending'
+                                ? pendingBadgeClass
+                                : undefined
+                            }
+                          >
                             {formatPaymentStatus(order.payment_status || 'pending')}
                           </Badge>
                         </TableCell>

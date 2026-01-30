@@ -87,13 +87,14 @@ export default function ThemesListClient() {
   ];
 
   // Fetch all themes
-  const { data: themesData, isLoading: themesLoading } = useQuery({
+  const { data: themesData, isLoading: themesLoading, isError: themesError } = useQuery({
     queryKey: ['themes'],
     queryFn: async () => {
       const response = await fetch('/api/themes');
       if (!response.ok) throw new Error('Failed to fetch themes');
       const data = await response.json();
-      return data.themes as Theme[];
+      const list = data?.themes;
+      return Array.isArray(list) ? list : [];
     },
   });
 
@@ -126,9 +127,11 @@ export default function ThemesListClient() {
   }, [currentThemeData]);
 
   useEffect(() => {
-    if (installedThemesData) {
-      setInstalledThemes(installedThemesData);
-    }
+    // Ensure we never set null/undefined so installedThemes[theme.id] never throws
+    const map = installedThemesData;
+    setInstalledThemes(
+      typeof map === 'object' && map !== null && !Array.isArray(map) ? map : {}
+    );
   }, [installedThemesData]);
 
   // Install/activate theme mutation
@@ -276,7 +279,20 @@ export default function ThemesListClient() {
     );
   }
 
-  const themes = themesData || [];
+  if (themesError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <p className="text-muted-foreground">Failed to load themes.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // Defensive: ensure themes is always an array (avoids crash if API returns null or malformed data)
+  const themes = Array.isArray(themesData) ? themesData : [];
+  const installedMap = typeof installedThemes === 'object' && installedThemes !== null && !Array.isArray(installedThemes) ? installedThemes : {};
 
   // Helper function to check if a theme is the Multipurpose theme (previously Grocery)
   const isMultipurposeTheme = (theme: Theme) => {
@@ -326,7 +342,7 @@ export default function ThemesListClient() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {themes.map((theme: any) => {
           const isActive = activeThemeId === theme.id;
-          const isInstalled = installedThemes[theme.id] !== undefined;
+          const isInstalled = installedMap[theme.id] !== undefined;
           const isInstalling = installThemeMutation.isPending && installThemeMutation.variables?.themeId === theme.id;
           const isAvailable = isMultipurposeTheme(theme);
           const displayName = getThemeDisplayName(theme);

@@ -6,8 +6,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { BanknotesIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon, BeakerIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 
 interface Payment {
   id: string;
@@ -43,10 +45,27 @@ interface Payment {
 
 interface PaymentsClientProps {
   payments: Payment[];
+  pesapalPayments?: Payment[];
 }
 
-export default function PaymentsClient({ payments }: Readonly<PaymentsClientProps>) {
+export default function PaymentsClient({ payments, pesapalPayments = [] }: Readonly<PaymentsClientProps>) {
   const [activeTab, setActiveTab] = useState<string>('mpesa');
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const pesapal = searchParams.get('pesapal');
+    if (pesapal === 'success') {
+      setActiveTab('pesapal');
+      toast.success('PesaPal test payment completed');
+    } else if (pesapal === 'error') {
+      setActiveTab('pesapal');
+      toast.error('PesaPal payment failed', {
+        description: searchParams.get('reason') ?? undefined,
+      });
+    } else if (pesapal === 'cancelled') {
+      toast.info('PesaPal payment was cancelled');
+    }
+  }, [searchParams]);
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
@@ -81,14 +100,24 @@ export default function PaymentsClient({ payments }: Readonly<PaymentsClientProp
             <CardTitle>Payment Transactions</CardTitle>
             <CardDescription>
               {activeTab === 'mpesa' && `${payments.length} Mpesa transaction${payments.length !== 1 ? 's' : ''}`}
+              {activeTab === 'pesapal' && `${pesapalPayments.length} PesaPal transaction${pesapalPayments.length !== 1 ? 's' : ''}`}
             </CardDescription>
           </div>
-          <Button asChild>
-            <Link href="/admin/payments/test-mpesa">
-              <BeakerIcon className="mr-2 h-4 w-4" />
-              Test Mpesa
-            </Link>
-          </Button>
+          {activeTab === 'mpesa' ? (
+            <Button asChild>
+              <Link href="/admin/payments/test-mpesa">
+                <BeakerIcon className="mr-2 h-4 w-4" />
+                Test Mpesa
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link href="/admin/payments/test-pesapal">
+                <BeakerIcon className="mr-2 h-4 w-4" />
+                Test PesaPal
+              </Link>
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -97,6 +126,10 @@ export default function PaymentsClient({ payments }: Readonly<PaymentsClientProp
             <TabsTrigger value="mpesa">
               <BanknotesIcon className="mr-2 h-4 w-4" />
               Mpesa
+            </TabsTrigger>
+            <TabsTrigger value="pesapal">
+              <CreditCardIcon className="mr-2 h-4 w-4" />
+              PesaPal
             </TabsTrigger>
           </TabsList>
 
@@ -128,6 +161,83 @@ export default function PaymentsClient({ payments }: Readonly<PaymentsClientProp
                 </TableHeader>
                 <TableBody>
                   {payments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell className="font-medium">
+                        {payment.tenants.name}
+                        <br />
+                        <code className="text-xs text-muted-foreground">
+                          {payment.tenants.subdomain}
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(payment.amount, payment.currency)}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(payment.status)}
+                      </TableCell>
+                      <TableCell>
+                        {payment.payment_id ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {payment.payment_id.slice(0, 20)}...
+                          </code>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {payment.transaction_id ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {payment.transaction_id}
+                          </code>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {payment.created_at
+                          ? new Date(payment.created_at).toLocaleString()
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {payment.updated_at
+                          ? new Date(payment.updated_at).toLocaleString()
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+
+          <TabsContent value="pesapal" className="space-y-4">
+            {pesapalPayments.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">
+                  No PesaPal transactions found
+                </p>
+                <Button asChild>
+                  <Link href="/admin/payments/test-pesapal">
+                    <BeakerIcon className="mr-2 h-4 w-4" />
+                    Test PesaPal Payment
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Payment ID</TableHead>
+                    <TableHead>Transaction ID</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Updated</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pesapalPayments.map((payment: Payment) => (
                     <TableRow key={payment.id}>
                       <TableCell className="font-medium">
                         {payment.tenants.name}

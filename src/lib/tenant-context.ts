@@ -50,6 +50,7 @@ export interface Tenant {
   settings?: Record<string, any>;
   created_at: Date;
   updated_at: Date;
+  country?: string | null;
 }
 
 /**

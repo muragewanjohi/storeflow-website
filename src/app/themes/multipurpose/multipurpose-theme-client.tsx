@@ -21,7 +21,7 @@ const BUSINESS_TYPE_DEMOS: BusinessTypeDemo[] = [
     id: 'electronics',
     businessType: 'electronics',
     title: 'Electronics',
-    image: '/images/themes/electronics.png',
+    image: '/images/themes/electronics_multipurpose.png',
     demoUrl: 'https://electronics.dukanest.com/',
     description: 'Tech and gadgets store',
   },

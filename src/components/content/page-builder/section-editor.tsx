@@ -2326,7 +2326,8 @@ function SplitLayoutSectionEditor({
             </>
           )}
           
-          {(section.left_side.type === 'text' || section.left_side.type === 'banner') && (
+          {/* Title, subtitle and text colors only for non-banner (banner uses image as CTA, no overlay text) */}
+          {section.left_side.type === 'text' && (
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -2334,10 +2335,11 @@ function SplitLayoutSectionEditor({
               onChange={(e) => onUpdate({
                 left_side: { ...section.left_side, title: e.target.value }
               })}
-              placeholder="Banner title"
+              placeholder="Section title"
             />
           </div>
           )}
+          {section.left_side.type !== 'banner' && (
           <ColorPicker
             label="Title Color"
             colorKey="title_color"
@@ -2347,7 +2349,9 @@ function SplitLayoutSectionEditor({
             onColorChange={handleLeftSideColorChange}
             onColorReset={handleLeftSideColorReset}
           />
+          )}
           
+          {section.left_side.type !== 'banner' && (
           <div className="space-y-2">
             <Label>Subtitle</Label>
             <Input
@@ -2355,9 +2359,11 @@ function SplitLayoutSectionEditor({
               onChange={(e) => onUpdate({
                 left_side: { ...section.left_side, subtitle: e.target.value }
               })}
-              placeholder="Banner subtitle"
+              placeholder="Section subtitle"
             />
           </div>
+          )}
+          {section.left_side.type !== 'banner' && (
           <ColorPicker
             label="Subtitle Color"
             colorKey="subtitle_color"
@@ -2367,6 +2373,7 @@ function SplitLayoutSectionEditor({
             onColorChange={handleLeftSideColorChange}
             onColorReset={handleLeftSideColorReset}
           />
+          )}
           
           {/* Text Content Editor for text type */}
           {section.left_side.type === 'text' && (
@@ -2384,6 +2391,7 @@ function SplitLayoutSectionEditor({
               </p>
             </div>
           )}
+          {section.left_side.type !== 'banner' && (
           <ColorPicker
             label="Content Color"
             colorKey="content_color"
@@ -2393,6 +2401,7 @@ function SplitLayoutSectionEditor({
             onColorChange={handleLeftSideColorChange}
             onColorReset={handleLeftSideColorReset}
           />
+          )}
           
           {/* Image upload for banner - image acts as CTA (upload can include styled CTA in image) */}
           {section.left_side.type === 'banner' && (

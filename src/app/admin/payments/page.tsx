@@ -14,39 +14,48 @@ export default async function PaymentsPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');
 
-  // Fetch all Mpesa payment logs
-  const mpesaPayments = await prisma.payment_logs.findMany({
-    where: {
-      gateway: 'mpesa_buy_goods',
-    },
-    orderBy: {
-      created_at: 'desc',
-    },
-    select: {
-      id: true,
-      tenant_id: true,
-      user_id: true,
-      amount: true,
-      currency: true,
-      status: true,
-      payment_id: true,
-      transaction_id: true,
-      metadata: true,
-      created_at: true,
-      updated_at: true,
-      tenants: {
-        select: {
-          id: true,
-          name: true,
-          subdomain: true,
-        },
+  const select = {
+    id: true,
+    tenant_id: true,
+    user_id: true,
+    amount: true,
+    currency: true,
+    status: true,
+    payment_id: true,
+    transaction_id: true,
+    metadata: true,
+    created_at: true,
+    updated_at: true,
+    gateway: true,
+    tenants: {
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
       },
     },
-    take: 100, // Limit to recent 100 transactions
-  });
+  };
 
-  // Convert Prisma Decimal to number for client component
-  const payments = mpesaPayments.map((payment: any) => ({
+  const [mpesaPayments, pesapalPayments] = await Promise.all([
+    prisma.payment_logs.findMany({
+      where: { gateway: 'mpesa_buy_goods' },
+      orderBy: { created_at: 'desc' },
+      select,
+      take: 100,
+    }),
+    prisma.payment_logs.findMany({
+      where: { gateway: 'pesapal' },
+      orderBy: { created_at: 'desc' },
+      select,
+      take: 100,
+    }),
+  ]);
+
+  const payments = mpesaPayments.map((payment) => ({
+    ...payment,
+    amount: Number(payment.amount),
+  }));
+  const pesapalPaymentsList = pesapalPayments.map((payment) => ({
     ...payment,
     amount: Number(payment.amount),
   }));
@@ -59,7 +68,7 @@ export default async function PaymentsPage() {
           View and manage payment transactions
         </p>
       </div>
-      <PaymentsClient payments={payments} />
+      <PaymentsClient payments={payments} pesapalPayments={pesapalPaymentsList} />
     </div>
   );
 }

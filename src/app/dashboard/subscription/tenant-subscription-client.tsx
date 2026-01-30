@@ -167,13 +167,47 @@ export default function TenantSubscriptionClient({
   const [mpesaLoading, setMpesaLoading] = useState(false);
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
 
-  // Handle tab navigation from URL query params
+  // PesaPal payment state
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'pesapal'>('mpesa');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [pesapalLoading, setPesapalLoading] = useState(false);
+
+  // PesaPal config (yearly discount %)
+  const { data: pesapalConfig } = useQuery({
+    queryKey: ['pesapal-subscription-config'],
+    queryFn: async () => {
+      const res = await fetch('/api/pesapal/subscription/config');
+      if (!res.ok) return { yearlyDiscountPercent: 17 };
+      const data = await res.json();
+      return { yearlyDiscountPercent: data.yearlyDiscountPercent ?? 17 };
+    },
+  });
+  const yearlyDiscountPercent = pesapalConfig?.yearlyDiscountPercent ?? 17;
+
+  // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam && ['overview', 'usage', 'plans', 'billing'].includes(tabParam)) {
       setActiveTab(tabParam);
-      // Clean up URL after setting tab
       router.replace('/dashboard/subscription', { scroll: false });
+    }
+    const success = searchParams.get('success');
+    const errorParam = searchParams.get('error');
+    if (success === '1') {
+      setUpgradeSuccess('Payment successful! Your subscription has been activated.');
+      setActiveTab('plans');
+      router.replace('/dashboard/subscription?tab=plans', { scroll: false });
+    } else if (errorParam) {
+      const messages: Record<string, string> = {
+        missing_params: 'Invalid return from payment. Please try again.',
+        payment_failed: 'Payment was not completed. Please try again.',
+        payment_not_found: 'Payment record not found. Please contact support.',
+        plan_not_found: 'Plan not found. Please contact support.',
+        callback_failed: 'We couldn’t confirm your payment. Please contact support if you were charged.',
+      };
+      setUpgradeError(messages[errorParam] ?? `Payment error: ${errorParam}`);
+      setActiveTab('plans');
+      router.replace('/dashboard/subscription?tab=plans', { scroll: false });
     }
   }, [searchParams, router]);
 
@@ -350,6 +384,42 @@ export default function TenantSubscriptionClient({
     };
 
     poll();
+  };
+
+  // PesaPal payment handler: initiate then redirect to PesaPal
+  const handlePesapalPayment = async (planId: string) => {
+    setPesapalLoading(true);
+    setUpgradeError(null);
+    try {
+      const response = await fetch('/api/pesapal/subscription/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_id: planId,
+          billing_interval: billingInterval,
+          enable_recurring: false,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate payment');
+      }
+      const data = await response.json();
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+      throw new Error('No redirect URL received');
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'Payment initiation failed');
+      setPesapalLoading(false);
+    }
+  };
+
+  // Yearly price from monthly with discount (client-side display)
+  const getYearlyPriceDisplay = (monthlyPrice: number) => {
+    const discount = yearlyDiscountPercent / 100;
+    return Math.round(monthlyPrice * 12 * (1 - discount) * 100) / 100;
   };
 
   return (
@@ -817,11 +887,11 @@ export default function TenantSubscriptionClient({
                                   }
                                 }
                               }}
-                              disabled={isUpgrading || mpesaLoading}
+                              disabled={isUpgrading || mpesaLoading || pesapalLoading}
                               className="w-full"
                               variant={isUpgrade ? 'default' : 'outline'}
                             >
-                              {isUpgrading || mpesaLoading ? (
+                              {isUpgrading || mpesaLoading || pesapalLoading ? (
                                 'Processing...'
                               ) : isUpgrade ? (
                                 <>
@@ -966,51 +1036,138 @@ export default function TenantSubscriptionClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* M-Pesa Payment Dialog */}
-      <AlertDialog open={showMpesaPayment} onOpenChange={setShowMpesaPayment}>
+      {/* Payment method dialog: M-Pesa or PesaPal */}
+      <AlertDialog
+        open={showMpesaPayment}
+        onOpenChange={(open) => {
+          setShowMpesaPayment(open);
+          if (!open) {
+            setPaymentMethod('mpesa');
+            setBillingInterval('monthly');
+            setMpesaPhoneNumber('');
+            setCheckoutRequestId(null);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Pay with M-Pesa</AlertDialogTitle>
+            <AlertDialogTitle>Subscribe to {selectedPlanName}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               <p>
-                You&apos;re about to subscribe to <strong>{selectedPlanName}</strong>.
+                Choose how you&apos;d like to pay for <strong>{selectedPlanName}</strong>.
               </p>
-              {selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
-                  <p className="text-2xl font-bold">
-                    KES {Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toLocaleString()}
-                  </p>
-                </div>
-              )}
+
+              {/* Payment method choice */}
               <div className="space-y-2">
-                <Label htmlFor="mpesa-phone">
-                  M-Pesa Phone Number *
-                </Label>
-                <Input
-                  id="mpesa-phone"
-                  type="tel"
-                  value={mpesaPhoneNumber}
-                  onChange={(e) => setMpesaPhoneNumber(e.target.value)}
-                  placeholder="254712345678 or 0712345678"
-                  disabled={mpesaLoading}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter your M-Pesa registered phone number. You&apos;ll receive an STK Push prompt to complete the payment.
-                </p>
-              </div>
-              {checkoutRequestId && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    ⏳ Waiting for payment confirmation... Please check your phone and enter your M-Pesa PIN.
-                  </p>
+                <Label>Payment method</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      checked={paymentMethod === 'mpesa'}
+                      onChange={() => setPaymentMethod('mpesa')}
+                      className="rounded-full"
+                    />
+                    <span>M-Pesa (STK Push)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      checked={paymentMethod === 'pesapal'}
+                      onChange={() => setPaymentMethod('pesapal')}
+                      className="rounded-full"
+                    />
+                    <span>PesaPal (Card, M-Pesa, etc.)</span>
+                  </label>
                 </div>
+              </div>
+
+              {/* M-Pesa: amount + phone */}
+              {paymentMethod === 'mpesa' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
+                <>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                    <p className="text-2xl font-bold">
+                      KES {Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mpesa-phone">M-Pesa Phone Number *</Label>
+                    <Input
+                      id="mpesa-phone"
+                      type="tel"
+                      value={mpesaPhoneNumber}
+                      onChange={(e) => setMpesaPhoneNumber(e.target.value)}
+                      placeholder="254712345678 or 0712345678"
+                      disabled={mpesaLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      You&apos;ll receive an STK Push prompt to complete the payment.
+                    </p>
+                  </div>
+                  {checkoutRequestId && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        ⏳ Waiting for payment... Check your phone and enter your M-Pesa PIN.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* PesaPal: billing interval + amount */}
+              {paymentMethod === 'pesapal' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Billing</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="billing-interval"
+                          checked={billingInterval === 'monthly'}
+                          onChange={() => setBillingInterval('monthly')}
+                          className="rounded-full"
+                        />
+                        <span>Monthly</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="billing-interval"
+                          checked={billingInterval === 'yearly'}
+                          onChange={() => setBillingInterval('yearly')}
+                          className="rounded-full"
+                        />
+                        <span>Yearly (save {yearlyDiscountPercent}%)</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
+                    <p className="text-2xl font-bold">
+                      {billingInterval === 'monthly'
+                        ? `$${Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toFixed(2)} / month`
+                        : `$${getYearlyPriceDisplay(Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0)).toFixed(2)} / year`}
+                    </p>
+                    {billingInterval === 'yearly' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        2 months free when billed annually
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    You&apos;ll be redirected to PesaPal to complete payment with card, M-Pesa, or other methods.
+                  </p>
+                </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
-              disabled={mpesaLoading}
+            <AlertDialogCancel
+              disabled={mpesaLoading || pesapalLoading}
               onClick={() => {
                 setMpesaPhoneNumber('');
                 setCheckoutRequestId(null);
@@ -1018,22 +1175,21 @@ export default function TenantSubscriptionClient({
             >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (selectedPlanId) {
-                  handleMpesaPayment(selectedPlanId);
-                }
-              }}
-              disabled={mpesaLoading || !mpesaPhoneNumber || !!checkoutRequestId}
-            >
-              {mpesaLoading ? (
-                'Processing...'
-              ) : checkoutRequestId ? (
-                'Waiting for Payment...'
-              ) : (
-                'Pay with M-Pesa'
-              )}
-            </AlertDialogAction>
+            {paymentMethod === 'mpesa' ? (
+              <AlertDialogAction
+                onClick={() => selectedPlanId && handleMpesaPayment(selectedPlanId)}
+                disabled={mpesaLoading || !mpesaPhoneNumber || !!checkoutRequestId}
+              >
+                {mpesaLoading ? 'Processing...' : checkoutRequestId ? 'Waiting for Payment...' : 'Pay with M-Pesa'}
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => selectedPlanId && handlePesapalPayment(selectedPlanId)}
+                disabled={pesapalLoading}
+              >
+                {pesapalLoading ? 'Redirecting...' : 'Pay with PesaPal'}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

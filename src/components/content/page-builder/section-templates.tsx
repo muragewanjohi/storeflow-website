@@ -1887,16 +1887,22 @@ function SplitLayoutSectionComponent({
   const columnGap = spacing.column_gap !== undefined ? `${spacing.column_gap}px` : '3rem';
   const contentPadding = spacing.content_padding !== undefined ? `${spacing.content_padding}px` : '2rem';
 
+  // Left/right background: treat explicit 'transparent' or '' as transparent (e.g. when image position is Contain, letterboxing shows this)
+  const leftBg = section.left_side.background_color;
+  const leftBgTransparent = leftBg === 'transparent' || leftBg === '' || leftBg == null;
+  const rightBg = section.right_side.background_color;
+  const rightBgTransparent = rightBg === 'transparent' || rightBg === '' || rightBg == null;
+
   // Set CSS variables on section for better performance
   const sectionStyle = {
     '--split-layout-bg': section.background_gradient || section.background_color || 'transparent',
-    '--split-layout-left-bg': section.left_side.background_gradient || section.left_side.background_color || 'var(--color-background, #f3f4f6)',
+    '--split-layout-left-bg': section.left_side.background_gradient ? 'transparent' : (leftBgTransparent ? 'transparent' : (leftBg || 'var(--color-background, #f3f4f6)')),
     '--split-layout-left-title-color': section.left_side.title_color || 'var(--color-text, currentColor)',
     '--split-layout-left-subtitle-color': section.left_side.subtitle_color || 'var(--color-text, #666666)',
     '--split-layout-left-content-color': section.left_side.content_color || 'var(--color-text, #666666)',
     '--split-layout-left-cta-text-color': section.left_side.cta_text_color || '#FFFFFF',
     '--split-layout-left-cta-bg-color': section.left_side.cta_button_color || 'var(--color-primary, hsl(var(--primary)))',
-    '--split-layout-right-bg': section.right_side.background_color || 'transparent',
+    '--split-layout-right-bg': rightBgTransparent ? 'transparent' : (rightBg || 'transparent'),
     '--split-layout-right-title-color': section.right_side.title_color || 'var(--color-text, currentColor)',
     '--split-layout-right-subtitle-color': section.right_side.subtitle_color || 'var(--color-text, #666666)',
     '--font-heading': headingFont,
@@ -1937,7 +1943,7 @@ function SplitLayoutSectionComponent({
             {section.left_side.image && !section.left_side.image.startsWith('blob:') && (section.left_side.type === 'banner' || (section.left_side as { type?: string }).type === 'image') && (
               <div className="absolute inset-0 z-0">
                 {section.left_side.cta_link ? (
-                  <Link href={section.left_side.cta_link} className="block absolute inset-0">
+                  <Link href={section.left_side.cta_link} className="block absolute inset-0 cursor-pointer z-10" aria-label={section.left_side.alt_text || section.left_side.title || 'View more'}>
                     <Image
                       src={section.left_side.image}
                       alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
