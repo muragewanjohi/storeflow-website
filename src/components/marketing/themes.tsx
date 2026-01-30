@@ -1,43 +1,55 @@
 'use client';
 
+import Link from 'next/link';
 import { ImageWithFallback } from './image-with-fallback';
 
-const templates = [
+const DEMO_STORE_URL = 'https://electronics.dukanest.com/';
+
+type ThemeTemplate = {
+  name: string;
+  image: string;
+  color: string;
+  available: boolean;
+  previewUrl?: string;
+};
+
+const templates: ThemeTemplate[] = [
   {
     name: 'Multipurpose Theme',
-    image: '/images/themes/electronics.png',
+    image: '/images/themes/multipurpose.png',
     color: 'from-blue-500 to-cyan-500',
-    available: true
+    available: true,
+    previewUrl: DEMO_STORE_URL,
   },
   {
     name: 'Grocery Theme',
     image: '/images/themes/grocery.png',
     color: 'from-green-500 to-emerald-500',
-    available: true
+    available: false,
   },
   {
     name: 'Fashion Theme',
     image: '/images/themes/clothes.png',
     color: 'from-pink-500 to-rose-500',
-    available: true
+    available: false
   },
   {
     name: 'Electronics Theme',
     image: '/images/themes/electronics.png',
     color: 'from-blue-500 to-cyan-500',
-    available: true
+    available: false
   },
   {
     name: 'Furniture Theme',
     image: '/images/themes/furniture.png',
     color: 'from-amber-500 to-orange-500',
-    available: true
+    available: false
   },
   {
     name: 'Beauty Theme',
     image: '/images/themes/general.png',
     color: 'from-red-500 to-pink-500',
-    available: true
+    available: false
   },
   {
     name: 'Automotive Theme',
@@ -85,9 +97,9 @@ export function Themes() {
         <div className="text-center max-w-3xl mx-auto mb-16">
           <p className="text-[#0025cc] font-medium mb-2">Tailored to Your Business Style</p>
           <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
-            Choose Your Perfect{' '}
+            Choose Your Preferred{' '}
             <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-              Template
+              Theme
             </span>
           </h2>
           <p className="text-[#8d8d8d] mt-4">
@@ -124,12 +136,17 @@ export function Themes() {
                       isAvailable ? 'group-hover:scale-110' : 'grayscale'
                     }`}
                   />
-                  {/* Preview Button Overlay - Only show for available themes */}
-                  {isAvailable && (
+                  {/* Preview Button Overlay - Only show for available themes with a demo URL */}
+                  {isAvailable && template.previewUrl && (
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                      <button className="bg-white text-[#0025cc] px-6 py-3 rounded-lg font-medium transform translate-y-4 group-hover:translate-y-0 transition-all hover:bg-[#0025cc] hover:text-white">
-                        Preview Template
-                      </button>
+                      <Link
+                        href={template.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-white text-[#0025cc] px-6 py-3 rounded-lg font-medium transform translate-y-4 group-hover:translate-y-0 transition-all hover:bg-[#0025cc] hover:text-white"
+                      >
+                        Preview Theme
+                      </Link>
                     </div>
                   )}
                   {/* Coming Soon Overlay - Show for unavailable themes */}
