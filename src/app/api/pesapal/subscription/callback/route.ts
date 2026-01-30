@@ -20,6 +20,7 @@ import { getPlanChangeType } from '@/lib/subscriptions/proration';
 export const dynamic = 'force-dynamic';
 
 const subscriptionPagePath = '/dashboard/subscription';
+const embedDonePath = '/dashboard/subscription/pesapal-done';
 
 function redirectUrl(request: NextRequest, path: string, params: Record<string, string>): string {
   const base = request.nextUrl.origin;
@@ -33,9 +34,12 @@ export async function GET(request: NextRequest) {
   const orderMerchantReference = searchParams.get('OrderMerchantReference');
   const orderNotificationType = searchParams.get('OrderNotificationType');
 
+  const embed = searchParams.get('embed') === '1';
+  const donePath = embed ? embedDonePath : subscriptionPagePath;
+
   if (!orderTrackingId || !orderMerchantReference) {
     return NextResponse.redirect(
-      redirectUrl(request, subscriptionPagePath, { error: 'missing_params' })
+      redirectUrl(request, donePath, { error: 'missing_params' })
     );
   }
 
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
       const reason =
         statusResult.payment_status_description?.toLowerCase() ?? 'failed';
       return NextResponse.redirect(
-        redirectUrl(request, subscriptionPagePath, { error: 'payment_failed', reason })
+        redirectUrl(request, donePath, { error: 'payment_failed', reason })
       );
     }
 
@@ -66,13 +70,13 @@ export async function GET(request: NextRequest) {
 
     if (!paymentLog) {
       return NextResponse.redirect(
-        redirectUrl(request, subscriptionPagePath, { error: 'payment_not_found' })
+        redirectUrl(request, donePath, { error: 'payment_not_found' })
       );
     }
 
     if (paymentLog.status === 'completed') {
       return NextResponse.redirect(
-        redirectUrl(request, subscriptionPagePath, { success: '1' })
+        redirectUrl(request, donePath, { success: '1' })
       );
     }
 
@@ -92,7 +96,7 @@ export async function GET(request: NextRequest) {
         data: { status: 'failed', metadata: { ...metadata, error: 'plan_not_found' } },
       });
       return NextResponse.redirect(
-        redirectUrl(request, subscriptionPagePath, { error: 'plan_not_found' })
+        redirectUrl(request, donePath, { error: 'plan_not_found' })
       );
     }
 
@@ -192,12 +196,12 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      redirectUrl(request, subscriptionPagePath, { success: '1' })
+      redirectUrl(request, donePath, { success: '1' })
     );
   } catch (error) {
     console.error('[PesaPal Callback] Error:', error);
     return NextResponse.redirect(
-      redirectUrl(request, subscriptionPagePath, {
+      redirectUrl(request, donePath, {
         error: 'callback_failed',
         message: error instanceof Error ? error.message : 'Unknown error',
       })

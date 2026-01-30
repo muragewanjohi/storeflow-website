@@ -26,6 +26,7 @@ const initiateSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
   billing_interval: z.enum(['monthly', 'yearly']),
   enable_recurring: z.boolean().optional().default(false),
+  embed: z.boolean().optional().default(false),
 });
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { plan_id, billing_interval, enable_recurring } = initiateSchema.parse(body);
+    const { plan_id, billing_interval, enable_recurring, embed } = initiateSchema.parse(body);
 
     const plan = await prisma.price_plans.findUnique({
       where: { id: plan_id },
@@ -130,8 +131,13 @@ export async function POST(request: NextRequest) {
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-    const callbackUrl = `${appUrl}/api/pesapal/subscription/callback`;
-    const cancellationUrl = `${appUrl}/dashboard/subscription`;
+    const callbackPath = embed
+      ? '/api/pesapal/subscription/callback?embed=1'
+      : '/api/pesapal/subscription/callback';
+    const callbackUrl = `${appUrl}${callbackPath}`;
+    const cancellationUrl = embed
+      ? `${appUrl}/dashboard/subscription/pesapal-done?cancelled=1`
+      : `${appUrl}/dashboard/subscription`;
 
     const paymentLog = await prisma.payment_logs.create({
       data: {

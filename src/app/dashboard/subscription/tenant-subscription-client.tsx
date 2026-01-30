@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { Tenant } from '@/lib/tenant-context';
+import { getLocalizedPrice, formatPrice } from '@/lib/pricing/location';
 
 interface PricePlan {
   id: string;
@@ -184,6 +185,13 @@ export default function TenantSubscriptionClient({
   });
   const yearlyDiscountPercent = pesapalConfig?.yearlyDiscountPercent ?? 17;
 
+  const isKenya = tenant?.country === 'KE';
+  const currencySymbol = isKenya ? 'Ksh' : '$';
+  const getDisplayPrice = (planName: string, usdPrice: number) =>
+    getLocalizedPrice(planName, isKenya, usdPrice);
+  const formatPlanPrice = (planName: string, usdPrice: number) =>
+    formatPrice(getDisplayPrice(planName, usdPrice), currencySymbol);
+
   // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -261,7 +269,7 @@ export default function TenantSubscriptionClient({
         );
       } else if (data.changeType === 'upgrade') {
         const proratedMsg = data.proratedAmount && data.proratedAmount > 0
-          ? ` You've been charged a prorated amount of $${data.proratedAmount.toFixed(2)} for the remaining days in your billing cycle.`
+          ? ` You've been charged a prorated amount of ${formatPrice(Number(data.proratedAmount), currencySymbol)} for the remaining days in your billing cycle.`
           : '';
         setUpgradeSuccess(
           `Upgrade successful! Your plan has been upgraded to ${data.plan?.name || 'the new plan'} and is now active.${proratedMsg}`
@@ -386,7 +394,7 @@ export default function TenantSubscriptionClient({
     poll();
   };
 
-  // PesaPal payment handler: initiate then redirect to PesaPal
+  // PesaPal payment handler: initiate then load PesaPal in our page (embedded iframe)
   const handlePesapalPayment = async (planId: string) => {
     setPesapalLoading(true);
     setUpgradeError(null);
@@ -398,6 +406,7 @@ export default function TenantSubscriptionClient({
           plan_id: planId,
           billing_interval: billingInterval,
           enable_recurring: false,
+          embed: true,
         }),
       });
       if (!response.ok) {
@@ -406,7 +415,8 @@ export default function TenantSubscriptionClient({
       }
       const data = await response.json();
       if (data.redirect_url) {
-        window.location.href = data.redirect_url;
+        const checkoutUrl = `/dashboard/subscription/pesapal-checkout?redirect_url=${encodeURIComponent(data.redirect_url)}`;
+        window.location.href = checkoutUrl;
         return;
       }
       throw new Error('No redirect URL received');
@@ -444,7 +454,7 @@ export default function TenantSubscriptionClient({
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Monthly Price</p>
                 <p className="text-xl font-bold">
-                  ${Number(currentPlan.price).toFixed(2)}
+                  {formatPlanPrice(currentPlan.name, currentPlan.price)}
                   <span className="text-sm font-normal text-muted-foreground">
                     {' '}/ {currentPlan.duration_months === 1 ? 'month' : `${currentPlan.duration_months} months`}
                   </span>
@@ -513,35 +523,50 @@ export default function TenantSubscriptionClient({
             : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
         }`}>
           <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <ClockIcon className={`h-5 w-5 mt-0.5 ${
-                currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-yellow-600 dark:text-yellow-400'
-              }`} />
-              <div>
-                <p className={`font-semibold ${
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <ClockIcon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
                   currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'text-blue-900 dark:text-blue-100'
-                    : 'text-yellow-900 dark:text-yellow-100'
-                }`}>
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'Trial Period Ending Soon'
-                    : 'Renewal Reminder'}
-                </p>
-                <p className={`text-sm mt-1 ${
-                  currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'text-blue-800 dark:text-blue-200'
-                    : 'text-yellow-800 dark:text-yellow-200'
-                }`}>
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? `Your ${currentPlan.trial_days}-day free trial expires on ` : 'Your subscription will renew on '}
-                  <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}).
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? ' Subscribe now to continue using the service.'
-                    : daysUntilRenewal <= 3 && ' Please ensure your payment method is up to date.'}
-                </p>
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-yellow-600 dark:text-yellow-400'
+                }`} />
+                <div>
+                  <p className={`font-semibold ${
+                    currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'text-blue-900 dark:text-blue-100'
+                      : 'text-yellow-900 dark:text-yellow-100'
+                  }`}>
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'Trial Period Ending Soon'
+                      : 'Renewal Reminder'}
+                  </p>
+                  <p className={`text-sm mt-1 ${
+                    currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'text-blue-800 dark:text-blue-200'
+                      : 'text-yellow-800 dark:text-yellow-200'
+                  }`}>
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? `Your ${currentPlan.trial_days}-day free trial expires on ` : 'Your subscription will renew on '}
+                    <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}).
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? ' Subscribe now to continue using the service.'
+                      : ' Pay now to avoid interruption.'}
+                  </p>
+                </div>
               </div>
+              {Number(getDisplayPrice(currentPlan.name, currentPlan.price)) > 0 && (
+                <Button
+                  onClick={() => {
+                    setSelectedPlanId(currentPlan.id);
+                    setSelectedPlanName(currentPlan.name);
+                    setShowMpesaPayment(true);
+                  }}
+                  disabled={mpesaLoading || pesapalLoading}
+                  className="sm:flex-shrink-0"
+                >
+                  {mpesaLoading || pesapalLoading ? 'Processing...' : 'Pay now'}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -789,8 +814,10 @@ export default function TenantSubscriptionClient({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {availablePlans.map((plan: any) => {
                   const isCurrentPlan = plan.id === currentPlan?.id;
-                  const isUpgrade = currentPlan && Number(plan.price) > Number(currentPlan.price);
-                  const isDowngrade = currentPlan && Number(plan.price) < Number(currentPlan.price);
+                  const currentDisplayPrice = currentPlan ? getDisplayPrice(currentPlan.name, currentPlan.price) : 0;
+                  const planDisplayPrice = getDisplayPrice(plan.name, plan.price);
+                  const isUpgrade = currentPlan && planDisplayPrice > currentDisplayPrice;
+                  const isDowngrade = currentPlan && planDisplayPrice < currentDisplayPrice;
                   const features = (plan.features as any) || {};
 
                   return (
@@ -806,7 +833,7 @@ export default function TenantSubscriptionClient({
                       <CardHeader>
                         <CardTitle className="text-2xl">{plan.name}</CardTitle>
                         <div className="mt-4">
-                          <span className="text-4xl font-bold">${Number(plan.price).toFixed(2)}</span>
+                          <span className="text-4xl font-bold">{formatPlanPrice(plan.name, plan.price)}</span>
                           <span className="text-muted-foreground ml-2">
                             / {plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
                           </span>
@@ -877,7 +904,7 @@ export default function TenantSubscriptionClient({
                                   setShowDowngradeDialog(true);
                                 } else {
                                   // For upgrades/new subscriptions, show payment option
-                                  if (Number(plan.price) > 0) {
+                                  if (getDisplayPrice(plan.name, plan.price) > 0) {
                                     setSelectedPlanId(plan.id);
                                     setSelectedPlanName(plan.name);
                                     setShowMpesaPayment(true);
@@ -950,6 +977,32 @@ export default function TenantSubscriptionClient({
 
         {/* Billing History Tab */}
         <TabsContent value="billing" className="space-y-6">
+          {/* Pay now card: show when due within 7 days (best practice: renewal CTA in billing) */}
+          {isExpiringSoon && currentPlan && Number(getDisplayPrice(currentPlan.name, currentPlan.price)) > 0 && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <p className="font-semibold">Renewal due soon</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Your subscription renews on <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}). Pay now to avoid interruption.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setSelectedPlanId(currentPlan.id);
+                      setSelectedPlanName(currentPlan.name);
+                      setShowMpesaPayment(true);
+                    }}
+                    disabled={mpesaLoading || pesapalLoading}
+                  >
+                    {mpesaLoading || pesapalLoading ? 'Processing...' : 'Pay now'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Billing History</CardTitle>
@@ -974,7 +1027,17 @@ export default function TenantSubscriptionClient({
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">${Number(item.amount).toFixed(2)}</p>
+                        <p className="font-semibold">
+                          {isKenya
+                            ? formatPrice(
+                                getLocalizedPrice(
+                                  (item.description ?? '').replace(/^Subscription:\s*/i, '').trim() || 'Basic',
+                                  true
+                                ),
+                                'Ksh'
+                              )
+                            : `${currencySymbol}${Number(item.amount).toFixed(2)}`}
+                        </p>
                         <Badge
                           variant={
                             item.status === 'active'
@@ -1085,12 +1148,14 @@ export default function TenantSubscriptionClient({
               </div>
 
               {/* M-Pesa: amount + phone */}
-              {paymentMethod === 'mpesa' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
+              {paymentMethod === 'mpesa' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
+                const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
+                return sel ? (
                 <>
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
                     <p className="text-2xl font-bold">
-                      KES {Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toLocaleString()}
+                      {formatPlanPrice(sel.name, sel.price)}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -1115,10 +1180,16 @@ export default function TenantSubscriptionClient({
                     </div>
                   )}
                 </>
-              )}
+                ) : null;
+              })()}
 
               {/* PesaPal: billing interval + amount */}
-              {paymentMethod === 'pesapal' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (
+              {paymentMethod === 'pesapal' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
+                const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
+                if (!sel) return null;
+                const monthlyDisplay = getDisplayPrice(sel.name, sel.price);
+                const yearlyDisplay = getYearlyPriceDisplay(monthlyDisplay);
+                return (
                 <>
                   <div className="space-y-2">
                     <Label>Billing</Label>
@@ -1149,8 +1220,8 @@ export default function TenantSubscriptionClient({
                     <p className="text-sm text-muted-foreground mb-1">Amount to Pay</p>
                     <p className="text-2xl font-bold">
                       {billingInterval === 'monthly'
-                        ? `$${Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0).toFixed(2)} / month`
-                        : `$${getYearlyPriceDisplay(Number(availablePlans.find((p: any) => p.id === selectedPlanId)?.price || 0)).toFixed(2)} / year`}
+                        ? `${formatPrice(monthlyDisplay, currencySymbol)} / month`
+                        : `${formatPrice(yearlyDisplay, currencySymbol)} / year`}
                     </p>
                     {billingInterval === 'yearly' && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -1162,7 +1233,8 @@ export default function TenantSubscriptionClient({
                     You&apos;ll be redirected to PesaPal to complete payment with card, M-Pesa, or other methods.
                   </p>
                 </>
-              )}
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
