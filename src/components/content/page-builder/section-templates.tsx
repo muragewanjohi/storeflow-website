@@ -1933,38 +1933,35 @@ function SplitLayoutSectionComponent({
               minHeight: mobileBehavior === 'scroll' ? '400px' : '500px',
             }}
           >
-            {/* Background Image (for banner type only) */}
-            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type === 'banner' && (
+            {/* Banner - fills container, image is the CTA when cta_link set (backward compat: legacy type 'image' treated as banner) */}
+            {section.left_side.image && !section.left_side.image.startsWith('blob:') && (section.left_side.type === 'banner' || (section.left_side as { type?: string }).type === 'image') && (
               <div className="absolute inset-0 z-0">
-                <Image
-                  src={section.left_side.image}
-                  alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
-                  fill
-                  className={getImagePositionClass(section.left_side.image_position)}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
+                {section.left_side.cta_link ? (
+                  <Link href={section.left_side.cta_link} className="block absolute inset-0">
+                    <Image
+                      src={section.left_side.image}
+                      alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
+                      fill
+                      className={getImagePositionClass(section.left_side.image_position)}
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                    />
+                  </Link>
+                ) : (
+                  <Image
+                    src={section.left_side.image}
+                    alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
+                    fill
+                    className={getImagePositionClass(section.left_side.image_position)}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                )}
                 {/* Overlay */}
                 {section.left_side.overlay_opacity !== undefined && section.left_side.overlay_opacity > 0 && (
                   <div 
-                    className="absolute inset-0 bg-black"
+                    className="absolute inset-0 bg-black pointer-events-none"
                     style={{ opacity: section.left_side.overlay_opacity / 100 }}
                   />
                 )}
-              </div>
-            )}
-            
-            {/* Regular Image (for image type only) */}
-            {section.left_side.image && !section.left_side.image.startsWith('blob:') && section.left_side.type === 'image' && (
-              <div className="relative w-full h-full min-h-[400px] flex items-center justify-center p-8">
-                <div className="relative w-full h-full max-w-2xl">
-                  <Image
-                    src={section.left_side.image}
-                    alt={section.left_side.alt_text || 'Image'}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                </div>
               </div>
             )}
             
@@ -2029,7 +2026,7 @@ function SplitLayoutSectionComponent({
             )}
             
             {/* Content Overlay - Show for banner, text, and form types */}
-            {section.left_side.type !== 'image' && section.left_side.type !== 'products' && (
+            {section.left_side.type !== 'products' && (
               <div 
                 className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
                 style={{ padding: contentPadding, zIndex: 10 }}
@@ -2066,7 +2063,8 @@ function SplitLayoutSectionComponent({
                     dangerouslySetInnerHTML={{ __html: section.left_side.content }}
                   />
                 )}
-                {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && (
+                {/* CTA button only for text/form (banner uses image as CTA) */}
+                {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && section.left_side.type !== 'banner' && (
                   <Link href={section.left_side.cta_link}>
                     <Button
                       size="lg"
@@ -2093,14 +2091,44 @@ function SplitLayoutSectionComponent({
 
           {/* Right Side */}
           <div 
-            className={`${section.right_side.border_radius ? '' : 'rounded-lg'}`}
+            className={`relative overflow-hidden ${section.right_side.border_radius ? '' : 'rounded-lg'} ${section.right_side.type === 'banner' ? 'min-h-[400px]' : ''}`}
             style={{
               backgroundColor: 'var(--split-layout-right-bg)',
               borderRadius: section.right_side.border_radius ? `${section.right_side.border_radius}px` : '0.5rem',
-              padding: contentPadding,
+              padding: section.right_side.type === 'banner' ? 0 : contentPadding,
             }}
           >
-            {section.right_side.title && (
+            {/* Right side: banner - full-bleed image, fills container (backward compat: legacy type 'image' treated as banner) */}
+            {(section.right_side.type === 'banner' || (section.right_side as { type?: string }).type === 'image') && section.right_side.image && !section.right_side.image.startsWith('blob:') && (
+              <div className="absolute inset-0 z-0">
+                {section.right_side.cta_link ? (
+                  <Link href={section.right_side.cta_link} className="block absolute inset-0">
+                    <Image
+                      src={section.right_side.image}
+                      alt={section.right_side.alt_text || section.right_side.title || 'Banner'}
+                      fill
+                      className={getImagePositionClass(section.right_side.image_position)}
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                    />
+                  </Link>
+                ) : (
+                  <Image
+                    src={section.right_side.image}
+                    alt={section.right_side.alt_text || section.right_side.title || 'Banner'}
+                    fill
+                    className={getImagePositionClass(section.right_side.image_position)}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                )}
+                {section.right_side.overlay_opacity !== undefined && section.right_side.overlay_opacity > 0 && (
+                  <div 
+                    className="absolute inset-0 bg-black pointer-events-none"
+                    style={{ opacity: section.right_side.overlay_opacity / 100 }}
+                  />
+                )}
+              </div>
+            )}
+            {section.right_side.title && section.right_side.type !== 'banner' && (
               <h2 
                 className={`text-2xl md:text-3xl font-bold mb-6 ${getTextAlignClass(section.right_side.text_alignment).split(' ')[0]}`}
                 style={{ 
@@ -2111,7 +2139,7 @@ function SplitLayoutSectionComponent({
                 {section.right_side.title}
               </h2>
             )}
-            {section.right_side.subtitle && (
+            {section.right_side.subtitle && section.right_side.type !== 'banner' && (
               <p 
                 className={`text-lg mb-6 ${getTextAlignClass(section.right_side.text_alignment).split(' ')[0]}`}
                 style={{ 
@@ -2182,31 +2210,6 @@ function SplitLayoutSectionComponent({
                 style={{ fontFamily: bodyFont }}
                 dangerouslySetInnerHTML={{ __html: section.right_side.content }}
               />
-            )}
-
-            {section.right_side.type === 'image' && (
-              <>
-                {section.right_side.image && !section.right_side.image.startsWith('blob:') && (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-muted/20 mb-6">
-                    <Image
-                      src={section.right_side.image}
-                      alt={section.right_side.alt_text || 'Image'}
-                      fill
-                      className="object-contain"
-                      sizes="(max-width: 1024px) 100vw, 50vw"
-                    />
-                  </div>
-                )}
-                {section.right_side.cta_text && section.right_side.cta_link && (
-                  <div className={`flex ${section.right_side.text_alignment === 'center' ? 'justify-center' : section.right_side.text_alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
-                    <Link href={section.right_side.cta_link}>
-                      <Button size="lg">
-                        {section.right_side.cta_text}
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </>
             )}
 
             {section.right_side.type === 'form' && (

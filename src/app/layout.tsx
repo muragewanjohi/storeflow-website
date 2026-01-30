@@ -9,6 +9,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import ThemeStylesServer from "@/components/storefront/theme-styles-server";
+import DemoStorefrontExtras from "@/components/storefront/demo-storefront-extras";
 
 export const metadata: Metadata = {
   title: "DukaNest - Multi-Tenant Ecommerce Platform",
@@ -49,6 +50,9 @@ export default function RootLayout({
           >
             <CurrencyProvider>
               {children}
+              <Suspense fallback={null}>
+                <DemoStorefrontExtras />
+              </Suspense>
             </CurrencyProvider>
             <Toaster />
             <SpeedInsights />

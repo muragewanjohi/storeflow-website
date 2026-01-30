@@ -199,7 +199,7 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Left Side Configuration
   left_side: {
-    type: 'banner' | 'image' | 'text' | 'form' | 'products';
+    type: 'banner' | 'text' | 'form' | 'products';
     title?: string;
     subtitle?: string;
     content?: string; // For text type or rich HTML
@@ -235,7 +235,7 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Right Side Configuration
   right_side: {
-    type: 'products' | 'features' | 'text' | 'image' | 'form';
+    type: 'products' | 'features' | 'text' | 'banner' | 'form';
     title?: string;
     subtitle?: string;
     content?: string; // For text type
@@ -260,12 +260,15 @@ export interface SplitLayoutSection extends BaseSection {
       icon?: string;
     }>;
     
-    // Styling
+    // Styling (banner/image: background_color or transparent)
     background_color?: string;
+    background_gradient?: string;
     title_color?: string;
     subtitle_color?: string;
     text_alignment?: 'left' | 'center' | 'right';
     border_radius?: number;
+    image_position?: 'cover' | 'contain' | 'top' | 'center' | 'bottom';
+    overlay_opacity?: number; // 0-100 for banner overlay
   };
   
   // Section-Level Spacing & Styling

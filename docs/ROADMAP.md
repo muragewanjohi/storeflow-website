@@ -50,12 +50,109 @@ This document outlines planned features and enhancements for StoreFlow. Features
 - ✅ User management
 - ✅ Platform settings
 - ✅ Cron job monitoring
+- ✅ Staff users (landlord and tenant side) with plan-based limits enforced in API
 
 ---
 
 ## 🚧 In Progress / Planned Features
 
 ### Phase 1: Core Enhancements (High Priority)
+
+#### 0. Plan Limits Enforcement & Usage Visibility
+
+**Status:** Partially implemented (staff enforced; products/orders enforced in API; usage shown in tenant subscription). Remaining: storage enforcement, orders-per-month semantics, full usage display, and UI blocks with upgrade CTA.
+
+**Pricing alignment (from pricing table):**
+
+| Limit            | Basic (Ksh 1,000) | Pro (Ksh 3,000) | Premium   |
+|------------------|-------------------|------------------|-----------|
+| Staff Users      | 1                 | 5                | 10        |
+| Products         | 100               | 1,000            | Unlimited |
+| Orders per Month | 500               | 5,000            | Unlimited |
+| Storage          | 5 GB              | 25 GB            | 200 GB    |
+| Customers        | 1,000             | 10,000           | Unlimited |
+
+**Implementation plan:**
+
+1. **Plan data alignment**
+   - Ensure `price_plans.features` JSON in DB matches the pricing table for Basic, Pro, and Premium (e.g. `max_staff_users`, `max_products`, `max_orders_per_month` or `max_orders`, `max_storage_mb`, `max_customers`; use `-1` for unlimited).
+   - Add/run a seed or migration so existing plans have correct `features` (e.g. Basic: 1 staff, 100 products, 500 orders/month, 5120 MB storage, 1000 customers).
+
+2. **Enforcement (backend)**
+   - **Staff users:** Already enforced in tenant user create/invite API (landlord and tenant side). Keep as-is.
+   - **Products:** Already enforced in products create API via `canCreateProduct`. Keep as-is.
+   - **Orders:** Currently `canCreateOrder` uses total order count. Decide and implement: either (a) keep total cap, or (b) add `max_orders_per_month` and count orders in current billing month; enforce in checkout/order-creation API.
+   - **Storage:** Implement real storage usage: query Supabase Storage (bucket per tenant or prefix) for total bytes; enforce in upload API using `canUseStorage` and block upload when over limit; store/use `max_storage_mb` from plan `features` (5 GB = 5120 MB, 25 GB = 25600 MB, 200 GB = 204800 MB).
+   - **Customers:** Add `canCreateCustomer` (or equivalent) and enforce in customer registration/invite API when plan has `max_customers`.
+   - **Pages / Blogs:** Use existing `canCreatePage` and `canCreateBlog` in page and blog create APIs if not already; add if missing.
+
+3. **Showcasing to the tenant (dashboard)**
+   - **Subscription / Billing page:** Already shows usage vs limits for products, orders, pages, blogs, customers. Add: (a) **Storage:** current usage (from Supabase) and limit (from plan); (b) **Staff users:** current count and limit. Use same pattern (progress bar, “X / Y”, “Approaching limit” at e.g. 90%).
+   - **Usage API:** Extend `getTenantUsage` (or equivalent) to return storage (bytes/MB from Supabase) and staff count; ensure subscription page reads from this so all numbers are consistent.
+   - **Contextual messaging:** When a limit is reached or near (e.g. 90%+), show a short message and CTA: “You’ve reached your plan limit. Upgrade to add more [products/staff/storage/…].”
+
+4. **UI blocks and upgrade CTA**
+   - **Create product:** If at product limit, disable or hide “Add product” and show banner: “Product limit reached. Upgrade your plan to add more products” with link to subscription/upgrade.
+   - **Add staff user:** Already blocked by API with clear message; optionally show same message in UI before opening the form (e.g. check limit on “Add user” click).
+   - **Upload media / storage:** Before upload, check storage limit (or after upload in API); if over, reject and show: “Storage limit reached. Upgrade your plan for more storage” with link to subscription.
+   - **Create page / blog:** If at limit, show similar banner and link to upgrade.
+   - **Checkout / new order:** If order limit (total or per-month) reached, block checkout with message and link to upgrade.
+
+5. **Landlord (admin) side**
+   - **Tenant detail / settings:** Show tenant’s current plan name and key limits (staff, products, orders, storage, customers) and optionally current usage so landlords can see at a glance.
+   - **Creating/editing tenant:** When assigning a plan, show the limits for that plan (from `price_plans.features`) so admins know what the tenant will get.
+
+6. **Documentation and testing**
+   - Document in admin/tenant docs: where limits are defined (DB + pricing page), how enforcement works (which APIs and UI), and how to upgrade.
+   - Add or extend tests: enforce limits in API tests (products, orders, staff, storage when implemented); optionally E2E for “at limit” flows (e.g. create product when at limit shows upgrade CTA).
+
+**Dependencies:** Supabase Storage API for storage usage and tenant-scoped buckets/prefixes; existing `lib/subscriptions/limits.ts` and plan `features` schema.
+
+**Related code:** `src/lib/subscriptions/limits.ts`, `src/app/api/admin/users/route.ts`, `src/app/api/products/route.ts`, `src/app/api/checkout/route.ts`, `src/app/dashboard/subscription/` (page + client), `src/app/pricing/page.tsx` (feature table).
+
+---
+
+#### 0.1. Theme selector on demo websites
+
+**Status:** Planned.
+
+**Goal:** Allow visitors on a demo store (e.g. electronics.dukanest.com) to **select and switch themes** so that **one demo website per business type** can showcase **multiple themes** (e.g. Multipurpose, Grocery, Fashion) with the same content. Each business-type demo remains a single tenant/store, but the storefront can be viewed in different theme “skins” for comparison.
+
+**Use cases:**
+- Visitor lands on Electronics demo (Multipurpose theme) and can switch to “Grocery theme” or “Fashion theme” to see how the same electronics store would look in another theme.
+- One URL per business type (e.g. electronics.dukanest.com), multiple theme options — no need for a separate demo URL per theme per business type.
+
+**Implementation outline:**
+
+1. **Data / configuration**
+   - For demo tenants (e.g. `data.is_demo === true`), define which themes are available for preview (e.g. list of theme slugs: `grocery`, `default`, etc.). Could live in tenant `data.demo_themes` or in a shared config.
+   - Ensure each theme has a storefront implementation (layout, components) so switching theme_slug actually changes the rendered storefront.
+
+2. **Theme selector UI (storefront)**
+   - On demo storefront only: show a **theme selector** (dropdown, pills, or sidebar) that lists available themes for this demo. Placement: e.g. in the demo banner, in the sticky “Create your own store” area, or a compact floating control so it doesn’t block content.
+   - On change: either (a) persist selection in URL (e.g. `?theme=grocery`) or (b) persist in session/cookie for the demo tenant so the chosen theme is used for subsequent requests.
+   - Server or client resolves the selected theme and renders the storefront with that theme’s layout/styles (reuse existing theme system by setting or overriding `theme_slug` for the request).
+
+3. **Rendering by selected theme**
+   - When a theme is selected for a demo tenant, the storefront should render using that theme’s components/layout (same products, categories, pages; different theme). Options:
+     - **Option A:** Override or pass `theme_slug` per request (e.g. from query or cookie) so the existing theme pipeline (ThemeProviderWrapper, theme-specific components) uses the selected theme for that demo tenant.
+     - **Option B:** If themes are fully separate builds/tenants, keep one demo per business type and add a “preview theme” mode that loads the same content with a different theme bundle/slug (may require theme switching API or redirect to a preview URL that encodes theme).
+   - Prefer reusing the current tenant + theme_slug model so one tenant (one business type) can render with different theme_slug values without duplicating data.
+
+4. **One website per business type, different themes**
+   - Each demo remains **one website (one tenant) per business type** (e.g. electronics = one tenant, grocery = another). Within that website, the **theme selector** only changes which theme is used to render that same content.
+   - No requirement for “one website per theme” — the same demo URL serves multiple themes via the selector.
+
+5. **Edge cases**
+   - Non-demo tenants: no theme selector; normal single-theme behavior.
+   - If a selected theme is removed or renamed, fall back to the tenant’s default theme_slug.
+   - Optional: persist “last selected theme” per visitor (cookie/localStorage) for the demo so returning visitors see their last choice.
+
+**Dependencies:** Existing theme system (theme_slug, ThemeProviderWrapper, theme-specific components); demo tenant flag (`data.is_demo`); possibly URL or cookie for selected theme.
+
+**Related code:** Demo storefront components (e.g. demo banner, demo-storefront-extras), theme provider/layout, `tenant_themes` / theme resolution; marketing theme pages (e.g. `/themes/multipurpose`).
+
+---
 
 #### 1. Payment Gateway Integration
 - [ ] Stripe integration
@@ -235,19 +332,21 @@ Full Instagram Shopping integration that allows tenants to tag products in Insta
 ## 🎯 Priority Matrix
 
 ### High Priority (Next 3 Months)
-1. Payment gateway integrations (Stripe, PayPal)
-2. Email marketing features
-3. Inventory management enhancements
+1. **Plan limits enforcement & usage visibility** (staff ✅; products/orders ✅ in API; storage, orders-per-month, full usage display, UI blocks + upgrade CTA)
+2. **Theme selector on demo websites** (one website per business type; visitors can switch themes on the same demo store)
+3. Payment gateway integrations (Stripe, PayPal)
+4. Email marketing features
+5. Inventory management enhancements
 
 ### Medium Priority (3-6 Months)
-4. Instagram Shopping integration
-5. SEO enhancements
-6. Advanced content management
+6. Instagram Shopping integration
+7. SEO enhancements
+8. Advanced content management
 
 ### Low Priority (6+ Months)
-7. Mobile app development
-8. Advanced analytics features
-9. Third-party integrations
+9. Mobile app development
+10. Advanced analytics features
+11. Third-party integrations
 
 ---
 
@@ -278,7 +377,8 @@ If you'd like to contribute to any of these features:
 - `docs/INSTAGRAM_SHARING_GUIDE.md` - Instagram sharing specifics
 - `docs/ANALYTICS_FEATURE_COMPARISON.md` - Analytics features
 - `docs/API_DOCUMENTATION.md` - API reference
+- Plan limits: `src/lib/subscriptions/limits.ts` - Limit checks; tenant subscription UI: `src/app/dashboard/subscription/`
 
 ---
 
-**Last Updated:** 2025-01-22
+**Last Updated:** 2025-01-30

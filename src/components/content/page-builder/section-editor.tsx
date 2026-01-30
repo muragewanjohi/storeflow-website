@@ -2242,8 +2242,7 @@ function SplitLayoutSectionEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="banner">Banner (with overlay)</SelectItem>
-                <SelectItem value="image">Image Only</SelectItem>
+                <SelectItem value="banner">Banner</SelectItem>
                 <SelectItem value="text">Text Content</SelectItem>
                 <SelectItem value="form">Form</SelectItem>
                 <SelectItem value="products">Products</SelectItem>
@@ -2327,7 +2326,7 @@ function SplitLayoutSectionEditor({
             </>
           )}
           
-          {section.left_side.type !== 'form' && section.left_side.type !== 'products' && (
+          {(section.left_side.type === 'text' || section.left_side.type === 'banner') && (
           <div className="space-y-2">
             <Label>Title</Label>
             <Input
@@ -2395,28 +2394,25 @@ function SplitLayoutSectionEditor({
             onColorReset={handleLeftSideColorReset}
           />
           
-          {/* Image upload for banner and image types */}
-          {(section.left_side.type === 'banner' || section.left_side.type === 'image') && (
+          {/* Image upload for banner - image acts as CTA (upload can include styled CTA in image) */}
+          {section.left_side.type === 'banner' && (
             <>
               <div className="space-y-2">
-                <Label>Image {section.left_side.type === 'banner' ? '(Background)' : ''}</Label>
+                <Label>Image (background; can include your own CTA in the image)</Label>
                 <ImageUploadField
                   label="left side image"
                   value={section.left_side.image || ''}
                   onChange={(url) => onUpdate({
                     left_side: { ...section.left_side, image: url || '' }
                   })}
-                  enableCrop={section.left_side.type === 'banner'}
-                  aspectRatio={section.left_side.type === 'banner' ? 16 / 9 : undefined}
-                  recommendedDimensions={section.left_side.type === 'banner' 
-                    ? "1920x1080px (16:9 ratio) for banner backgrounds. Image will be cropped to fit."
-                    : "800x600px or larger. Any aspect ratio. Image will be displayed in full without cropping."}
+                  enableCrop={true}
+                  aspectRatio={16 / 9}
+                  recommendedDimensions="1920x1080px or larger. Image fills the container (cover)."
                 />
               </div>
-              {section.left_side.type === 'banner' && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Image Position</Label>
+              <>
+                <div className="space-y-2">
+                  <Label>Image Position</Label>
                     <Select
                       value={section.left_side.image_position || 'cover'}
                       onValueChange={(value) => onUpdate({
@@ -2448,8 +2444,7 @@ function SplitLayoutSectionEditor({
                       className="w-full"
                     />
                   </div>
-                </>
-              )}
+              </>
             </>
           )}
           
@@ -2492,60 +2487,114 @@ function SplitLayoutSectionEditor({
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label>Background Type</Label>
-            <Select
-              value={section.left_side.background_gradient ? 'gradient' : 'color'}
-              onValueChange={(value) => {
-                if (value === 'gradient') {
-                  onUpdate({ 
-                    left_side: {
-                      ...section.left_side,
-                      background_gradient: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
-                      background_color: undefined 
-                    }
-                  });
-                } else {
-                  onUpdate({ 
-                    left_side: {
-                      ...section.left_side,
-                      background_gradient: undefined
-                    }
-                  });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="color">Solid Color</SelectItem>
-                <SelectItem value="gradient">Gradient</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Background: transparent or colour (for left side when banner) */}
+          {section.left_side.type === 'banner' && (
+            <>
+              <div className="space-y-2">
+                <Label>Background</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="left_background"
+                      checked={(section.left_side.background_color || '') === 'transparent' || section.left_side.background_color === ''}
+                      onChange={() => onUpdate({
+                        left_side: {
+                          ...section.left_side,
+                          background_color: 'transparent',
+                          background_gradient: undefined,
+                        },
+                      })}
+                      className="rounded-full"
+                    />
+                    <span>Transparent</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="left_background"
+                      checked={(section.left_side.background_color || '') !== 'transparent' && section.left_side.background_color !== ''}
+                      onChange={() => onUpdate({
+                        left_side: {
+                          ...section.left_side,
+                          background_color: section.left_side.background_color && section.left_side.background_color !== 'transparent' ? section.left_side.background_color : '#f3f4f6',
+                          background_gradient: undefined,
+                        },
+                      })}
+                      className="rounded-full"
+                    />
+                    <span>Background colour</span>
+                  </label>
+                </div>
+              </div>
+              {(section.left_side.background_color || '') !== 'transparent' && section.left_side.background_color !== '' && (
+                <ColorPicker
+                  label="Background Colour"
+                  colorKey="background_color"
+                  defaultValue="#f3f4f6"
+                  description="Background colour for the left side"
+                  section={section.left_side}
+                  onColorChange={handleLeftSideColorChange}
+                  onColorReset={handleLeftSideColorReset}
+                />
+              )}
+            </>
+          )}
           
-          {section.left_side.background_gradient ? (
-            <div className="space-y-2">
-              <Label>Background Gradient</Label>
-              <Input
-                value={section.left_side.background_gradient || ''}
-                onChange={(e) => onUpdate({
-                  left_side: { ...section.left_side, background_gradient: e.target.value }
-                })}
-                placeholder="linear-gradient(to right, #f3f4f6, #e5e7eb)"
-              />
-            </div>
-          ) : (
-            <ColorPicker
-              label="Background Color"
-              colorKey="background_color"
-              defaultValue="#f3f4f6"
-              description="Background color for the left side"
-              section={section.left_side}
-              onColorChange={handleLeftSideColorChange}
-              onColorReset={handleLeftSideColorReset}
-            />
+          {section.left_side.type !== 'banner' && (
+            <>
+              <div className="space-y-2">
+                <Label>Background Type</Label>
+                <Select
+                  value={section.left_side.background_gradient ? 'gradient' : 'color'}
+                  onValueChange={(value) => {
+                    if (value === 'gradient') {
+                      onUpdate({
+                        left_side: {
+                          ...section.left_side,
+                          background_gradient: 'linear-gradient(to right, #f3f4f6, #e5e7eb)',
+                          background_color: undefined,
+                        },
+                      });
+                    } else {
+                      onUpdate({
+                        left_side: { ...section.left_side, background_gradient: undefined },
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="color">Solid Color</SelectItem>
+                    <SelectItem value="gradient">Gradient</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {section.left_side.background_gradient ? (
+                <div className="space-y-2">
+                  <Label>Background Gradient</Label>
+                  <Input
+                    value={section.left_side.background_gradient || ''}
+                    onChange={(e) => onUpdate({
+                      left_side: { ...section.left_side, background_gradient: e.target.value },
+                    })}
+                    placeholder="linear-gradient(to right, #f3f4f6, #e5e7eb)"
+                  />
+                </div>
+              ) : (
+                <ColorPicker
+                  label="Background Color"
+                  colorKey="background_color"
+                  defaultValue="#f3f4f6"
+                  description="Background color for the left side"
+                  section={section.left_side}
+                  onColorChange={handleLeftSideColorChange}
+                  onColorReset={handleLeftSideColorReset}
+                />
+              )}
+            </>
           )}
           
           <div className="space-y-2">
@@ -2554,51 +2603,73 @@ function SplitLayoutSectionEditor({
               type="number"
               value={section.left_side.border_radius ?? 8}
               onChange={(e) => onUpdate({
-                left_side: { ...section.left_side, border_radius: parseInt(e.target.value) || 0 }
+                left_side: { ...section.left_side, border_radius: parseInt(e.target.value) || 0 },
               })}
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>CTA Text</Label>
-              <Input
-                value={section.left_side.cta_text || ''}
-                onChange={(e) => onUpdate({
-                  left_side: { ...section.left_side, cta_text: e.target.value }
-                })}
-                placeholder="Order Now"
-              />
-            </div>
+          {/* CTA Link only for banner (image is the CTA; link wraps the image) */}
+          {section.left_side.type === 'banner' && (
             <div className="space-y-2">
               <Label>CTA Link</Label>
               <Input
                 value={section.left_side.cta_link || ''}
                 onChange={(e) => onUpdate({
-                  left_side: { ...section.left_side, cta_link: e.target.value }
+                  left_side: { ...section.left_side, cta_link: e.target.value },
                 })}
-                placeholder="/products"
+                placeholder="/products or https://..."
               />
+              <p className="text-xs text-muted-foreground">The whole image is clickable and will go to this link. Add your own CTA button in the image if desired.</p>
             </div>
-          </div>
-          <ColorPicker
-            label="CTA Text Color"
-            colorKey="cta_text_color"
-            defaultValue="#FFFFFF"
-            description="Color for the CTA button text"
-            section={section.left_side}
-            onColorChange={handleLeftSideColorChange}
-            onColorReset={handleLeftSideColorReset}
-          />
-          <ColorPicker
-            label="CTA Button Color"
-            colorKey="cta_button_color"
-            defaultValue="#4CAF50"
-            description="Background color for the CTA button"
-            section={section.left_side}
-            onColorChange={handleLeftSideColorChange}
-            onColorReset={handleLeftSideColorReset}
-          />
+          )}
+          
+          {/* CTA Text + Link + colors only for non-banner types */}
+          {section.left_side.type !== 'banner' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>CTA Text</Label>
+                <Input
+                  value={section.left_side.cta_text || ''}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, cta_text: e.target.value },
+                  })}
+                  placeholder="Order Now"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CTA Link</Label>
+                <Input
+                  value={section.left_side.cta_link || ''}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, cta_link: e.target.value },
+                  })}
+                  placeholder="/products"
+                />
+              </div>
+            </div>
+          )}
+          {section.left_side.type !== 'banner' && (
+            <>
+              <ColorPicker
+                label="CTA Text Color"
+                colorKey="cta_text_color"
+                defaultValue="#FFFFFF"
+                description="Color for the CTA button text"
+                section={section.left_side}
+                onColorChange={handleLeftSideColorChange}
+                onColorReset={handleLeftSideColorReset}
+              />
+              <ColorPicker
+                label="CTA Button Color"
+                colorKey="cta_button_color"
+                defaultValue="#4CAF50"
+                description="Background color for the CTA button"
+                section={section.left_side}
+                onColorChange={handleLeftSideColorChange}
+                onColorReset={handleLeftSideColorReset}
+              />
+            </>
+          )}
         </div>
 
         {/* Right Side Configuration */}
@@ -2619,7 +2690,7 @@ function SplitLayoutSectionEditor({
                 <SelectItem value="products">Products</SelectItem>
                 <SelectItem value="features">Features</SelectItem>
                 <SelectItem value="text">Text Content</SelectItem>
-                <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="banner">Banner</SelectItem>
                 <SelectItem value="form">Form</SelectItem>
               </SelectContent>
             </Select>
@@ -2694,19 +2765,20 @@ function SplitLayoutSectionEditor({
             </div>
           )}
           
-          {/* Image upload for image type */}
-          {section.right_side.type === 'image' && (
+          {/* Image upload for banner - image acts as CTA */}
+          {section.right_side.type === 'banner' && (
             <>
               <div className="space-y-2">
-                <Label>Image</Label>
+                <Label>Image (background; can include your own CTA in the image)</Label>
                 <ImageUploadField
                   label="right side image"
                   value={section.right_side.image || ''}
                   onChange={(url) => onUpdate({
                     right_side: { ...section.right_side, image: url || '' }
                   })}
-                  enableCrop={false}
-                  recommendedDimensions="800x600px or larger. Any aspect ratio. Image will be displayed in full without cropping."
+                  enableCrop={true}
+                  aspectRatio={16 / 9}
+                  recommendedDimensions="1920x1080px or larger. Image fills the container (cover)."
                 />
               </div>
               <div className="space-y-2">
@@ -2719,33 +2791,97 @@ function SplitLayoutSectionEditor({
                   placeholder="Image alt text"
                 />
               </div>
-            </>
-          )}
-          
-          {/* CTA for image type */}
-          {section.right_side.type === 'image' && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>CTA Text</Label>
-                  <Input
-                    value={section.right_side.cta_text || ''}
-                    onChange={(e) => onUpdate({
-                      right_side: { ...section.right_side, cta_text: e.target.value }
-                    })}
-                    placeholder="Order Now"
-                  />
+              <div className="space-y-2">
+                <Label>CTA Link</Label>
+                <Input
+                  value={section.right_side.cta_link || ''}
+                  onChange={(e) => onUpdate({
+                    right_side: { ...section.right_side, cta_link: e.target.value }
+                  })}
+                  placeholder="/products or https://..."
+                />
+                <p className="text-xs text-muted-foreground">The whole image is clickable. Add your own CTA in the image if desired.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Background</Label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="right_background"
+                      checked={(section.right_side.background_color || '') === 'transparent' || section.right_side.background_color === ''}
+                      onChange={() => onUpdate({
+                        right_side: {
+                          ...section.right_side,
+                          background_color: 'transparent',
+                          background_gradient: undefined,
+                        },
+                      })}
+                      className="rounded-full"
+                    />
+                    <span>Transparent</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="right_background"
+                      checked={(section.right_side.background_color || '') !== 'transparent' && section.right_side.background_color !== ''}
+                      onChange={() => onUpdate({
+                        right_side: {
+                          ...section.right_side,
+                          background_color: section.right_side.background_color && section.right_side.background_color !== 'transparent' ? section.right_side.background_color : '#f3f4f6',
+                          background_gradient: undefined,
+                        },
+                      })}
+                      className="rounded-full"
+                    />
+                    <span>Background colour</span>
+                  </label>
                 </div>
-                <div className="space-y-2">
-                  <Label>CTA Link</Label>
-                  <Input
-                    value={section.right_side.cta_link || ''}
-                    onChange={(e) => onUpdate({
-                      right_side: { ...section.right_side, cta_link: e.target.value }
-                    })}
-                    placeholder="/products"
-                  />
-                </div>
+              </div>
+              {(section.right_side.background_color || '') !== 'transparent' && section.right_side.background_color !== '' && (
+                <ColorPicker
+                  label="Background Colour"
+                  colorKey="background_color"
+                  defaultValue="#f3f4f6"
+                  description="Background colour for the right side"
+                  section={section.right_side}
+                  onColorChange={handleRightSideColorChange}
+                  onColorReset={handleRightSideColorReset}
+                />
+              )}
+              <div className="space-y-2">
+                <Label>Image Position</Label>
+                <Select
+                  value={section.right_side.image_position || 'cover'}
+                  onValueChange={(value) => onUpdate({
+                    right_side: { ...section.right_side, image_position: value as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cover">Cover (fill)</SelectItem>
+                    <SelectItem value="contain">Contain</SelectItem>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Overlay Opacity ({(section.right_side as any).overlay_opacity ?? 0}%)</Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={(section.right_side as any).overlay_opacity ?? 0}
+                  onChange={(e) => onUpdate({
+                    right_side: { ...section.right_side, overlay_opacity: parseInt(e.target.value) }
+                  })}
+                  className="w-full"
+                />
               </div>
             </>
           )}
@@ -2816,15 +2952,18 @@ function SplitLayoutSectionEditor({
             </Select>
           </div>
           
-          <ColorPicker
-            label="Background Color"
-            colorKey="background_color"
-            defaultValue="transparent"
-            description="Background color for the right side"
-            section={section.right_side}
-            onColorChange={handleRightSideColorChange}
-            onColorReset={handleRightSideColorReset}
-          />
+          {/* Background colour picker only when not banner (banner uses radio above) */}
+          {section.right_side.type !== 'banner' && (
+            <ColorPicker
+              label="Background Color"
+              colorKey="background_color"
+              defaultValue="transparent"
+              description="Background color for the right side"
+              section={section.right_side}
+              onColorChange={handleRightSideColorChange}
+              onColorReset={handleRightSideColorReset}
+            />
+          )}
           
           <div className="space-y-2">
             <Label>Border Radius (px)</Label>

@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import { ImageWithFallback } from './image-with-fallback';
 
-const DEMO_STORE_URL = 'https://electronics.dukanest.com/';
-
 type ThemeTemplate = {
   name: string;
   image: string;
   color: string;
   available: boolean;
+  /** Link to theme detail page (e.g. /themes/multipurpose) or direct demo URL */
   previewUrl?: string;
 };
 
@@ -19,7 +18,7 @@ const templates: ThemeTemplate[] = [
     image: '/images/themes/multipurpose.png',
     color: 'from-blue-500 to-cyan-500',
     available: true,
-    previewUrl: DEMO_STORE_URL,
+    previewUrl: '/themes/multipurpose',
   },
   {
     name: 'Grocery Theme',
@@ -136,13 +135,14 @@ export function Themes() {
                       isAvailable ? 'group-hover:scale-110' : 'grayscale'
                     }`}
                   />
-                  {/* Preview Button Overlay - Only show for available themes with a demo URL */}
+                  {/* Preview Button Overlay - Only show for available themes with a preview URL */}
                   {isAvailable && template.previewUrl && (
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                       <Link
                         href={template.previewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        {...(template.previewUrl.startsWith('http')
+                          ? { target: '_blank', rel: 'noopener noreferrer' }
+                          : {})}
                         className="bg-white text-[#0025cc] px-6 py-3 rounded-lg font-medium transform translate-y-4 group-hover:translate-y-0 transition-all hover:bg-[#0025cc] hover:text-white"
                       >
                         Preview Theme

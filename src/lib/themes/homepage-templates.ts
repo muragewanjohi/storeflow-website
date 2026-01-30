@@ -916,6 +916,7 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
         columns: 4,
         default_tab: 'tab-popular',
       },
+      // Split layout: left side banner (image fills container, image-as-CTA via cta_link only; no cta_text)
       {
         id: 'split-layout-1',
         type: 'split_layout' as const,
@@ -924,10 +925,9 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
           type: 'banner',
           title: content.splitLayout.title,
           image: content.splitLayout.image,
-          cta_text: 'Order Now',
           cta_link: content.splitLayout.cta_link,
           background_color: content.splitLayout.background_color,
-          image_position: 'cover', // Use image as background
+          image_position: 'cover',
         },
         right_side: {
           type: 'products',
