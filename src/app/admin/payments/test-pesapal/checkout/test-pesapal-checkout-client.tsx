@@ -84,12 +84,8 @@ function TestPesaPalCheckoutContent() {
         <p className="text-sm text-muted-foreground">
           Complete your test payment below. You remain on our site.
         </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => (window.location.href = redirectUrl)}
-        >
-          Open payment in full page
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/admin/payments/test-pesapal">Back to test</Link>
         </Button>
       </div>
       <div className="flex-1 w-full min-h-[70vh]">
@@ -97,8 +93,17 @@ function TestPesaPalCheckoutContent() {
           src={redirectUrl}
           title="PesaPal payment"
           className="w-full h-full min-h-[70vh] border-0"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
         />
+      </div>
+      <div className="border-t bg-muted/20 px-4 py-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <span>Payment complete?</span>
+        <Link
+          href="/admin/payments?pesapal=success"
+          className="font-medium text-primary hover:underline"
+        >
+          Return to payments
+        </Link>
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, PencilIcon, TrashIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, LockClosedIcon, EyeIcon } from '@heroicons/react/24/outline';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -349,6 +349,17 @@ export default function PagesListClient({
                                 variant="ghost"
                                 size="sm"
                                 asChild
+                                title="Preview page"
+                              >
+                                <Link href={`/dashboard/pages/${page.id}/preview`} target="_blank" rel="noopener noreferrer">
+                                  <EyeIcon className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                title="Edit page"
                               >
                                 <Link href={`/dashboard/pages/${page.id}/edit`}>
                                   <PencilIcon className="h-4 w-4" />

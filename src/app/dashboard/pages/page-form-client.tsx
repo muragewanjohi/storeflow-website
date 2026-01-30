@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 // Lazy load rich text editor for better performance
@@ -113,8 +112,9 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     });
   };
 
-  // Extracted save logic so it can be called from PageBuilder save button too
-  const performSave = async () => {
+  // Extracted save logic so it can be called from PageBuilder save button too.
+  // saveAsDraft: if true, saves with status 'draft'; if false, saves with status 'published'.
+  const performSave = async (saveAsDraft: boolean) => {
     setIsSubmitting(true);
     setError(null);
 
@@ -128,6 +128,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
       const url = isEditing ? `/api/pages/${page.id}` : '/api/pages';
       const method = isEditing ? 'PUT' : 'POST';
+      const statusToSave = saveAsDraft ? 'draft' : 'published';
 
       // Helper function to check if URL is a blob URL
       const isBlobUrl = (url: string | null | undefined): boolean => {
@@ -194,7 +195,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
       // Prepare data, ensuring all fields are properly formatted
       const submitData: any = {
         title: formData.title.trim(),
-        status: formData.status,
+        status: statusToSave,
       };
 
       // Only include optional fields if they have values
@@ -247,14 +248,19 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmitDraft = async (e: React.FormEvent) => {
     e.preventDefault();
-    await performSave();
+    await performSave(true);
   };
 
-  // Handler for PageBuilder save button
+  const handleSubmitPublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave(false);
+  };
+
+  // Handler for PageBuilder save button (saves as draft by default so edits don't go live accidentally)
   const handlePageBuilderSave = () => {
-    performSave();
+    performSave(true);
   };
 
   return (
@@ -301,7 +307,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
+      <form className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
         <div className="space-y-6">
           {/* Basic Information */}
           <Card>
@@ -453,23 +459,9 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                 </Tabs>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: 'draft' | 'published' | 'archived') =>
-                    setFormData({ ...formData, status: value })
-                  }
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+                <strong className="text-foreground">Status:</strong>{' '}
+                {formData.status === 'published' ? 'Published (live on storefront)' : formData.status === 'archived' ? 'Archived' : 'Draft (not visible to customers)'}
               </div>
             </CardContent>
           </Card>
@@ -566,20 +558,52 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
             )}
           </Card>
 
-          {/* Form Actions */}
+          {/* Form Actions - Draft/Publish (best practice: explicit actions, preview before publish) */}
           <Card>
-            <CardFooter className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push('/dashboard/pages')}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isEditing ? 'Update Page' : 'Create Page'}
-              </Button>
+            <CardFooter className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <a
+                      href={`/dashboard/pages/${page.id}/preview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Preview
+                    </a>
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/pages')}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={handleSubmitDraft}
+                >
+                  {isSubmitting ? 'Saving...' : isEditing ? 'Save as draft' : 'Save draft'}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleSubmitPublish}
+                >
+                  {isSubmitting ? 'Saving...' : isEditing ? 'Publish' : 'Create & Publish'}
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </div>
