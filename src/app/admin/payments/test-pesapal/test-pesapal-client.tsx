@@ -49,17 +49,18 @@ export default function TestPesaPalClient() {
       const response = await fetch('/api/admin/payments/test-pesapal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: Number(amount) }),
+        body: JSON.stringify({ amount: Number(amount), embed: true }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.redirect_url) {
-        toast.success('Redirecting to PesaPal...', {
-          description: 'Complete payment using card or M-Pesa',
+        toast.success('Opening PesaPal in this page...', {
+          description: 'Complete payment using card or M-Pesa. You can stay on our site.',
           duration: 2000,
         });
-        window.location.href = data.redirect_url;
+        const checkoutUrl = `/admin/payments/test-pesapal/checkout?redirect_url=${encodeURIComponent(data.redirect_url)}`;
+        window.location.href = checkoutUrl;
         return;
       }
 

@@ -15,6 +15,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const adminPaymentsPath = '/admin/payments';
+const testPesapalDonePath = '/admin/payments/test-pesapal/done';
 
 function redirectUrl(
   request: NextRequest,
@@ -30,10 +31,12 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const orderTrackingId = searchParams.get('OrderTrackingId');
   const orderMerchantReference = searchParams.get('OrderMerchantReference');
+  const embed = searchParams.get('embed') === '1';
+  const basePath = embed ? testPesapalDonePath : adminPaymentsPath;
 
   if (!orderTrackingId || !orderMerchantReference) {
     return NextResponse.redirect(
-      redirectUrl(request, adminPaymentsPath, { pesapal: 'missing_params' })
+      redirectUrl(request, basePath, { pesapal: 'missing_params' })
     );
   }
 
@@ -44,7 +47,7 @@ export async function GET(request: NextRequest) {
       const reason =
         statusResult.payment_status_description?.toLowerCase() ?? 'failed';
       return NextResponse.redirect(
-        redirectUrl(request, adminPaymentsPath, {
+        redirectUrl(request, basePath, {
           pesapal: 'error',
           reason,
         })
@@ -60,13 +63,13 @@ export async function GET(request: NextRequest) {
 
     if (!paymentLog) {
       return NextResponse.redirect(
-        redirectUrl(request, adminPaymentsPath, { pesapal: 'not_found' })
+        redirectUrl(request, basePath, { pesapal: 'not_found' })
       );
     }
 
     if (paymentLog.status === 'completed') {
       return NextResponse.redirect(
-        redirectUrl(request, adminPaymentsPath, { pesapal: 'success' })
+        redirectUrl(request, basePath, { pesapal: 'success' })
       );
     }
 
@@ -87,12 +90,12 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      redirectUrl(request, adminPaymentsPath, { pesapal: 'success' })
+      redirectUrl(request, basePath, { pesapal: 'success' })
     );
   } catch (error) {
     console.error('[Test PesaPal Callback] Error:', error);
     return NextResponse.redirect(
-      redirectUrl(request, adminPaymentsPath, {
+      redirectUrl(request, basePath, {
         pesapal: 'error',
         reason: 'callback_failed',
       })

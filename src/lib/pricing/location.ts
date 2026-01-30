@@ -66,9 +66,15 @@ export function detectUserLocation(headers: Headers): PricingInfo {
 /**
  * Get localized price based on plan name and location
  * For Kenya: Fixed KES prices (no conversion)
+ * For demo stores (Kenya): KSh 10 Basic, KSh 30 Pro monthly (for testing)
  * For others: USD prices
  */
-export function getLocalizedPrice(planName: string, isKenya: boolean, usdPrice?: number): number {
+export function getLocalizedPrice(
+  planName: string,
+  isKenya: boolean,
+  usdPrice?: number,
+  isDemoStore?: boolean
+): number {
   if (!isKenya) {
     // Return USD prices as-is
     if (usdPrice !== undefined) {
@@ -84,6 +90,19 @@ export function getLocalizedPrice(planName: string, isKenya: boolean, usdPrice?:
     }
     return 0;
   } else {
+    // Demo store: low KES prices for testing (KSh 10 Basic, KSh 30 Pro monthly)
+    if (isDemoStore) {
+      if (planName.toLowerCase().includes('basic')) {
+        return 10; // KES 10/month
+      }
+      if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
+        return 30; // KES 30/month
+      }
+      if (planName.toLowerCase().includes('premium')) {
+        return 60; // KES 60/month for testing
+      }
+      return 10;
+    }
     // Fixed KES prices for Kenya (no conversion)
     if (planName.toLowerCase().includes('basic')) {
       return 1000; // KES 1,000

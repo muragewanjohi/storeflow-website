@@ -18,6 +18,7 @@ import { pesapalConfig } from '@/lib/pesapal/config';
 const testPaymentSchema = z.object({
   amount: z.number().positive('Amount must be greater than 0'),
   currency: z.string().length(3).optional().default('KES'),
+  embed: z.boolean().optional().default(false),
 });
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     await requireRoleOrRedirect(user, 'landlord', '/admin/login');
 
     const body = await request.json();
-    const { amount, currency } = testPaymentSchema.parse(body);
+    const { amount, currency, embed } = testPaymentSchema.parse(body);
 
     const roundedAmount = Math.round(amount * 100) / 100;
     if (roundedAmount <= 0) {
@@ -65,7 +66,10 @@ export async function POST(request: NextRequest) {
       request.nextUrl.origin ||
       process.env.NEXT_PUBLIC_APP_URL ||
       'https://dukanest.com';
-    const callbackUrl = `${origin}/api/admin/payments/test-pesapal/callback`;
+    const callbackPath = embed
+      ? '/api/admin/payments/test-pesapal/callback?embed=1'
+      : '/api/admin/payments/test-pesapal/callback';
+    const callbackUrl = `${origin}${callbackPath}`;
 
     const paymentLog = await prisma.payment_logs.create({
       data: {

@@ -70,13 +70,15 @@ export async function POST(request: NextRequest) {
       : null;
 
     const locationInfo = { isKenya: tenant.country === 'KE' };
+    const tenantData = (tenant as { data?: { is_demo?: boolean; isDemo?: boolean } }).data;
+    const isDemoStore = tenantData?.is_demo === true || tenantData?.isDemo === true;
     const monthlyPlanPrice = Number(plan.price);
     const monthlyPrice = locationInfo.isKenya
-      ? getLocalizedPrice(plan.name, true, monthlyPlanPrice)
+      ? getLocalizedPrice(plan.name, true, monthlyPlanPrice, isDemoStore)
       : monthlyPlanPrice;
     const currentPlanPrice = currentPlan
       ? locationInfo.isKenya
-        ? getLocalizedPrice(currentPlan.name, true, Number(currentPlan.price))
+        ? getLocalizedPrice(currentPlan.name, true, Number(currentPlan.price), isDemoStore)
         : Number(currentPlan.price)
       : 0;
     const changeType = getPlanChangeType(currentPlanPrice, monthlyPrice);

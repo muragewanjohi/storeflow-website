@@ -51,6 +51,8 @@ export interface Tenant {
   created_at: Date;
   updated_at: Date;
   country?: string | null;
+  /** JSON field; may contain is_demo, business_type, etc. */
+  data?: Record<string, unknown> | null;
 }
 
 /**
