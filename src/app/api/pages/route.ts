@@ -178,18 +178,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const status = validatedData.status || 'draft';
+    const content = validatedData.content || null;
+    // When creating as published, snapshot content so draft mode later can show this version to visitors
+    const publishedContent = status === 'published' && content ? content : null;
+
     // Create page
     const page = await prisma.pages.create({
       data: {
         tenant_id: tenant.id,
         title: validatedData.title,
         slug,
-        content: validatedData.content || null,
+        content,
+        published_content: publishedContent,
         banner_image: validatedData.banner_image || null,
         meta_title: validatedData.meta_title || null,
         meta_description: validatedData.meta_description || null,
         meta_tags: validatedData.meta_tags || null,
-        status: validatedData.status || 'draft',
+        status,
       },
     });
 

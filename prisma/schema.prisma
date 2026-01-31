@@ -474,19 +474,20 @@ model orders {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model pages {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id        String    @db.Uuid
-  title            String    @db.VarChar(255)
-  slug             String?   @db.VarChar(255)
-  content          String?
-  meta_title       String?   @db.VarChar(255)
-  meta_description String?
-  meta_tags        String?
-  status           String?   @default("draft") @db.VarChar(50)
-  created_at       DateTime? @default(now()) @db.Timestamp(6)
-  updated_at       DateTime? @default(now()) @db.Timestamp(6)
-  banner_image     String?   @db.VarChar(255)
-  tenants          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  title              String    @db.VarChar(255)
+  slug               String?   @db.VarChar(255)
+  content            String?
+  published_content  String?   @db.Text
+  meta_title         String?   @db.VarChar(255)
+  meta_description   String?
+  meta_tags          String?
+  status             String?   @default("draft") @db.VarChar(50)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+  banner_image       String?   @db.VarChar(255)
+  tenants            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([tenant_id, slug], map: "idx_pages_tenant_slug_unique")
   @@index([slug], map: "idx_pages_slug")

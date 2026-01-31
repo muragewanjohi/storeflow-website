@@ -1893,25 +1893,44 @@ function SalesTabSectionEditor({
         {/* Styling */}
         <div className="space-y-4 border-t pt-4">
           <h3 className="font-semibold">Styling</h3>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="sales-hide-banner"
+              checked={bannerStyle === 'none'}
+              onCheckedChange={(checked) =>
+                onUpdate({ banner_style: checked ? 'none' : 'contained' })
+              }
+            />
+            <label
+              htmlFor="sales-hide-banner"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Hide sales banner
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            When enabled, the large sales banner image above the products is hidden on the homepage.
+          </p>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Banner Style</Label>
-              <Select
-                value={bannerStyle}
-                onValueChange={(value: 'full_width' | 'contained' | 'none') =>
-                  onUpdate({ banner_style: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="full_width">Full Width</SelectItem>
-                  <SelectItem value="contained">Contained</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {bannerStyle !== 'none' && (
+              <div className="space-y-2">
+                <Label>Banner Style</Label>
+                <Select
+                  value={bannerStyle}
+                  onValueChange={(value: 'full_width' | 'contained') =>
+                    onUpdate({ banner_style: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full_width">Full Width</SelectItem>
+                    <SelectItem value="contained">Contained</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Product Card Style</Label>
               <Select

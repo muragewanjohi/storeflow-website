@@ -123,6 +123,16 @@ export async function PUT(
       }
     }
 
+    // When publishing, snapshot content into published_content so visitors still see it when page is later set to draft
+    const contentToSave = validatedData.content !== undefined ? validatedData.content : existingPage.content;
+    const isPublishing = validatedData.status === 'published';
+    // Backfill: when saving as draft, if we have no published_content yet but had content (e.g. was published), preserve it so visitors still see the previous version
+    const publishedContentUpdate = isPublishing
+      ? { published_content: contentToSave ?? existingPage.published_content }
+      : !existingPage.published_content && existingPage.content
+        ? { published_content: existingPage.content }
+        : {};
+
     // Update page
     const page = await prisma.pages.update({
       where: { id },
@@ -130,6 +140,7 @@ export async function PUT(
         title: validatedData.title,
         slug: slug || undefined,
         content: validatedData.content !== undefined ? validatedData.content : undefined,
+        ...publishedContentUpdate,
         banner_image: validatedData.banner_image !== undefined ? (validatedData.banner_image || null) : undefined,
         meta_title: validatedData.meta_title !== undefined ? validatedData.meta_title : undefined,
         meta_description: validatedData.meta_description !== undefined ? validatedData.meta_description : undefined,

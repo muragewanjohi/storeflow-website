@@ -163,6 +163,28 @@ storeflow/
 
 ## Database Management
 
+### Preferred workflow: SQL in Supabase, then Prisma generate
+
+**Going forward, schema changes are applied as follows:**
+
+1. **Update** `prisma/schema.prisma` with the new column(s), table(s), or relation(s).
+2. **Write the SQL** for the change (e.g. `ALTER TABLE ... ADD COLUMN ...`).
+3. **Run the SQL in Supabase:** open your Supabase project → SQL Editor → paste and run the SQL.
+4. **Regenerate the Prisma client** (no migrate step):
+
+   ```bash
+   npx prisma generate
+   ```
+
+Example for adding a nullable column:
+
+```sql
+ALTER TABLE your_table
+ADD COLUMN IF NOT EXISTS new_column TEXT NULL;
+```
+
+Then run `npx prisma generate`. Do **not** use `prisma migrate dev` for this workflow.
+
 ### Prisma Studio (Visual Database Browser)
 
 ```bash
@@ -171,7 +193,7 @@ npm run db:studio
 
 Opens a visual database browser at `http://localhost:5555`
 
-### Create Migration
+### Alternative: Prisma Migrate (if not using Supabase SQL)
 
 ```bash
 # Make changes to prisma/schema.prisma

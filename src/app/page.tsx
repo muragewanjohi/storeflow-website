@@ -107,10 +107,11 @@ export default async function HomePage() {
     },
   });
 
-  // Published home page with content → show tenant's page (not a generic default)
-  if (homePageAnyStatus?.status === 'published' && homePageAnyStatus.content) {
+  // Helper to render homepage from parsed page builder content
+  const renderHomeFromContent = (content: string | null | undefined) => {
+    if (!content) return null;
     try {
-      const pageData: PageBuilderData = JSON.parse(homePageAnyStatus.content);
+      const pageData: PageBuilderData = JSON.parse(content);
       if (pageData.sections && pageData.sections.length > 0) {
         return (
           <ThemeProviderWrapper>
@@ -129,11 +130,24 @@ export default async function HomePage() {
         );
       }
     } catch {
-      // If JSON parsing fails, fall through
+      // If JSON parsing fails, return null
     }
+    return null;
+  };
+
+  // Published home page → show current content (live version)
+  if (homePageAnyStatus?.status === 'published' && homePageAnyStatus.content) {
+    const rendered = renderHomeFromContent(homePageAnyStatus.content);
+    if (rendered) return rendered;
   }
 
-  // Tenant has a home page but it's draft → show tenant message (not generic default)
+  // Draft home page but we have a previous published version → show that so visitors don't see "updating"
+  if (homePageAnyStatus?.status === 'draft' && homePageAnyStatus.published_content) {
+    const rendered = renderHomeFromContent(homePageAnyStatus.published_content);
+    if (rendered) return rendered;
+  }
+
+  // Tenant has a home page in draft and no previous published version → show "updating" message
   if (homePageAnyStatus?.status === 'draft') {
     return (
       <ThemeProviderWrapper>
