@@ -213,12 +213,16 @@ async function handleIpn(request: NextRequest): Promise<NextResponse> {
       include: { price_plans: true },
     });
     if (updatedTenant) {
+      const amountPaid = Number(paymentLog.amount);
+      const currencyCode = paymentLog.currency ?? (tenant.country === 'KE' ? 'KES' : 'USD');
       sendSubscriptionActivatedEmail({
         tenant: updatedTenant as any,
         plan: {
           name: plan.name,
-          price: Number(plan.price),
-          duration_months: plan.duration_months,
+          price: amountPaid,
+          duration_months: monthsToAdd,
+          currency: currencyCode === 'KES' ? 'KES' : 'USD',
+          currencySymbol: currencyCode === 'KES' ? 'Ksh' : '$',
         },
         expireDate: newExpireDate,
       }).catch((err) => console.error('[PesaPal IPN] Email error:', err));

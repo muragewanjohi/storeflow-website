@@ -118,6 +118,7 @@ export async function PUT(
 
     // Send activation email if this is a new subscription or renewal
     if (action === 'renew' || !oldPlan) {
+      const isKenya = updatedTenant.country === 'KE';
       sendSubscriptionActivatedEmail({
         tenant: updatedTenant as any,
         plan: updatedPlan
@@ -125,6 +126,8 @@ export async function PUT(
               name: updatedPlan.name,
               price: Number(updatedPlan.price),
               duration_months: updatedPlan.duration_months,
+              currency: isKenya ? 'KES' : 'USD',
+              currencySymbol: isKenya ? 'Ksh' : '$',
             }
           : null,
         expireDate: updatedTenant.expire_date || new Date(),

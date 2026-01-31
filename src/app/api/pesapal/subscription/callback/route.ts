@@ -184,12 +184,16 @@ export async function GET(request: NextRequest) {
         proratedAmount: (metadata.prorated_amount as number) || undefined,
       }).catch((err) => console.error('[PesaPal Callback] Upgrade email error:', err));
     } else if (updatedTenant) {
+      const amountPaid = Number(paymentLog.amount);
+      const currencyCode = paymentLog.currency ?? (tenant.country === 'KE' ? 'KES' : 'USD');
       sendSubscriptionActivatedEmail({
         tenant: updatedTenant as any,
         plan: {
           name: plan.name,
-          price: newPlanPrice,
-          duration_months: plan.duration_months,
+          price: amountPaid,
+          duration_months: monthsToAdd,
+          currency: currencyCode === 'KES' ? 'KES' : 'USD',
+          currencySymbol: currencyCode === 'KES' ? 'Ksh' : '$',
         },
         expireDate: newExpireDate,
       }).catch((err) => console.error('[PesaPal Callback] Activation email error:', err));

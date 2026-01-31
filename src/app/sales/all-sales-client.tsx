@@ -8,12 +8,11 @@
 
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import CountdownTimer from '@/components/storefront/countdown-timer';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 
@@ -38,15 +37,6 @@ interface AllSalesClientProps {
 }
 
 export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>) {
-  const router = useRouter();
-
-  const handleSaleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    // Allow middle-click and modifier keys (open in new tab) to use default link behavior
-    if (e.ctrlKey || e.metaKey || e.button !== 0) return;
-    e.preventDefault();
-    router.push(href);
-  };
-
   if (sales.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -122,8 +112,8 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
 
             {/* Content Section */}
             <div className="p-6 flex flex-col flex-1">
-              {/* Title - Clickable */}
-              <Link 
+              {/* Title - links to sale page */}
+              <Link
                 href={`/sales/${sale.slug}`}
                 className="block mb-3 group/title"
               >
@@ -154,46 +144,31 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                 </div>
               )}
 
-              {/* CTA Button and link - explicit router.push on click so navigation always fires */}
+              {/* Shop Now - native anchor so navigation always goes to individual sale page */}
               {sale.slug ? (
-                <div className="mt-auto space-y-2">
-                  <Button
-                    asChild
-                    className="w-full"
-                    size="lg"
+                <div className="mt-auto">
+                  <a
+                    href={`/sales/${sale.slug}`}
+                    className={cn(
+                      'inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors',
+                      'hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      'group/btn'
+                    )}
                   >
-                    <Link
-                      href={`/sales/${sale.slug}`}
-                      className="inline-flex items-center justify-center gap-2 group/btn"
-                      scroll={true}
-                      onClick={(e) => handleSaleNavigation(e, `/sales/${sale.slug}`)}
-                    >
-                      Shop Now
-                      <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
-                    </Link>
-                  </Button>
-                  <p className="text-center">
-                    <Link
-                      href={`/sales/${sale.slug}`}
-                      className="text-sm text-primary underline hover:no-underline"
-                      scroll={true}
-                      onClick={(e) => handleSaleNavigation(e, `/sales/${sale.slug}`)}
-                    >
-                      Open sale page →
-                    </Link>
-                  </p>
+                    Shop Now
+                    <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </a>
                 </div>
               ) : (
                 <div className="mt-auto">
-                  <Button 
-                    className="w-full"
-                    size="lg"
-                    disabled
-                    variant="outline"
+                  <span
+                    className={cn(
+                      'inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md border border-input bg-muted px-8 text-sm font-medium text-muted-foreground'
+                    )}
                   >
                     Shop Now
-                    <ArrowRightIcon className="ml-2 h-4 w-4" />
-                  </Button>
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </span>
                   <p className="text-xs text-muted-foreground mt-1 text-center">
                     Sale slug missing
                   </p>

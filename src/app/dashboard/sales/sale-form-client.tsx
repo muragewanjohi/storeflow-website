@@ -17,11 +17,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
 import ImageUploadField from '@/components/content/image-upload-field';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useCurrency } from '@/lib/currency/currency-context';
 import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
+import { toast } from 'sonner';
 
 interface Sale {
   id: string;
@@ -117,6 +119,10 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
   const [salePrice, setSalePrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('basic');
+  const [editingProductSale, setEditingProductSale] = useState<NonNullable<Sale['product_sales']>[number] | null>(null);
+  const [editSalePriceValue, setEditSalePriceValue] = useState('');
+  const [isUpdatingSalePrice, setIsUpdatingSalePrice] = useState(false);
 
   // Load available products for assignment
   useEffect(() => {
@@ -212,7 +218,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       if (!isEditing) {
         router.push(`/dashboard/sales/${savedSale.id}`);
       } else {
-        // Refresh the page
+        toast.success('Sale updated successfully');
+        setActiveTab('preview');
         router.refresh();
       }
     } catch (err) {
@@ -257,6 +264,43 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       setSalePrice('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add product to sale');
+    }
+  };
+
+  const handleUpdateSalePrice = async () => {
+    if (!sale?.id || !editingProductSale) return;
+    const salePriceNum = editSalePriceValue.trim() === '' ? null : parseFloat(editSalePriceValue);
+    if (salePriceNum !== null && (isNaN(salePriceNum) || salePriceNum < 0)) {
+      setError('Please enter a valid sale price');
+      return;
+    }
+    setIsUpdatingSalePrice(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/dashboard/sales/${sale.id}/products`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: editingProductSale.products.id,
+          sale_price: salePriceNum,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update sale price');
+      }
+      const saleResponse = await fetch(`/api/dashboard/sales/${sale.id}`);
+      if (saleResponse.ok) {
+        const data = await saleResponse.json();
+        setProducts(data.sale?.product_sales || []);
+      }
+      setEditingProductSale(null);
+      setEditSalePriceValue('');
+      toast.success('Sale price updated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update sale price');
+    } finally {
+      setIsUpdatingSalePrice(false);
     }
   };
 
@@ -334,7 +378,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       )}
 
       <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="basic" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-muted/50 border border-border">
             <TabsTrigger 
               value="basic"
@@ -629,14 +673,29 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                               )}
                             </div>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveProduct(productSale.id)}
-                          >
-                            <TrashIcon className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingProductSale(productSale);
+                                setEditSalePriceValue(productSale.sale_price != null ? String(productSale.sale_price) : '');
+                              }}
+                              title="Edit sale price"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveProduct(productSale.id)}
+                              title="Remove from sale"
+                            >
+                              <TrashIcon className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -711,7 +770,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
           <AlertDialogHeader>
             <AlertDialogTitle>Add Product to Sale</AlertDialogTitle>
             <AlertDialogDescription>
-              Select a product to add to this sale
+              Select one product to add. You can add more products one at a time after this.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
@@ -729,35 +788,35 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
               ) : filteredProducts.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">No products found</div>
               ) : (
-                filteredProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className={`flex cursor-pointer items-center gap-4 rounded-lg border p-3 transition-colors ${
-                      selectedProductId === product.id ? 'border-primary bg-primary/5' : 'hover:bg-muted'
-                    }`}
-                    onClick={() => setSelectedProductId(product.id)}
-                  >
-                    <Checkbox
-                      checked={selectedProductId === product.id}
-                      onCheckedChange={() =>
-                        setSelectedProductId(selectedProductId === product.id ? '' : product.id)
-                      }
-                    />
-                    {product.image && (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="h-12 w-12 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatCurrency(Number(product.price))}
+                <RadioGroup
+                  value={selectedProductId}
+                  onValueChange={setSelectedProductId}
+                  className="space-y-2"
+                >
+                  {filteredProducts.map((product) => (
+                    <label
+                      key={product.id}
+                      className={`flex cursor-pointer items-center gap-4 rounded-lg border p-3 transition-colors ${
+                        selectedProductId === product.id ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                      }`}
+                    >
+                      <RadioGroupItem value={product.id} id={`product-${product.id}`} />
+                      {product.image && (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatCurrency(Number(product.price))}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))
+                    </label>
+                  ))}
+                </RadioGroup>
               )}
             </div>
             {selectedProductId && (
@@ -785,6 +844,51 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
               disabled={!selectedProductId || !isEditing}
             >
               Add Product
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Sale Price Dialog */}
+      <AlertDialog open={!!editingProductSale} onOpenChange={(open) => !open && setEditingProductSale(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Sale Price</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editingProductSale && (
+                <>Set the sale price for {editingProductSale.products.name}. Leave empty to clear.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {editingProductSale && (
+            <div className="space-y-4 py-4">
+              <div className="text-sm text-muted-foreground">
+                Regular price: {formatCurrency(Number(editingProductSale.products.price))}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_sale_price">Sale Price</Label>
+                <Input
+                  id="edit_sale_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editSalePriceValue}
+                  onChange={(e) => setEditSalePriceValue(e.target.value)}
+                  placeholder="e.g. 999.00"
+                />
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEditingProductSale(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleUpdateSalePrice();
+              }}
+              disabled={isUpdatingSalePrice}
+            >
+              {isUpdatingSalePrice ? 'Saving...' : 'Save'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

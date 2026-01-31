@@ -78,6 +78,7 @@ interface BillingHistoryItem {
   type: string;
   description: string;
   amount: number;
+  currency?: string;
   status: string;
   date: Date | string;
   expireDate?: Date | string | null;
@@ -1032,17 +1033,9 @@ export default function TenantSubscriptionClient({
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          {isKenya
-                            ? formatPrice(
-                                getLocalizedPrice(
-                                  (item.description ?? '').replace(/^Subscription:\s*/i, '').trim() || 'Basic',
-                                  true,
-                                  undefined,
-                                  isDemoStore
-                                ),
-                                'Ksh'
-                              )
-                            : `${currencySymbol}${Number(item.amount).toFixed(2)}`}
+                          {item.currency === 'KES' || (isKenya && item.currency !== 'USD')
+                            ? formatPrice(Number(item.amount), 'Ksh')
+                            : formatPrice(Number(item.amount), currencySymbol)}
                         </p>
                         <Badge
                           variant={

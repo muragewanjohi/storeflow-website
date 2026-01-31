@@ -1,6 +1,21 @@
 {
-  "version": "0.1.3",
+  "version": "0.1.4",
   "entries": [
+    {
+      "version": "0.1.4",
+      "date": "2026-01-30",
+      "features": [
+        "Subscription activation email now shows correct duration (12 months for yearly, 1 month for monthly) and actual amount paid with correct currency (KSh or $) from the payment",
+        "Billing history on Subscription & Billing page now shows all completed payments from payment_logs with actual amount and currency per entry",
+        "Page edit (Split Layout): when Banner is selected on left or right, Text Alignment and Vertical Alignment are hidden; Image Position option removed; banner uses standardized dimensions (1080×1080 or 1080×1350) without cropping and fits a 4:5 aspect-ratio container",
+        "Sales page: Shop Now button uses full page navigation so it reliably directs to the individual sale page; removed redundant 'Open sale page' link from sale cards"
+      ],
+      "bugfixes": [
+        "Fixed Sales page 'Shop Now' not directing to individual sale page (client-side navigation could fail to update; now uses native anchor for reliable full page navigation)",
+        "Fixed subscription activation email showing 'Duration: 1 month' and wrong price/currency when user paid for yearly subscription (email now uses actual payment amount, currency, and purchased interval)",
+        "Fixed Subscription & Billing page showing only one billing entry instead of full payment history (API now returns all completed payment_logs for the tenant)"
+      ]
+    },
     {
       "version": "0.1.3",
       "date": "2025-01-22",

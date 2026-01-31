@@ -461,7 +461,11 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
               <div className="rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
                 <strong className="text-foreground">Status:</strong>{' '}
-                {formData.status === 'published' ? 'Published (live on storefront)' : formData.status === 'archived' ? 'Archived' : 'Draft (not visible to customers)'}
+                {formData.status === 'published'
+                  ? 'Published — visible on your storefront'
+                  : formData.status === 'archived'
+                    ? 'Archived — hidden from storefront'
+                    : 'Draft — not visible to customers. Use Preview to see how it will look.'}
               </div>
             </CardContent>
           </Card>

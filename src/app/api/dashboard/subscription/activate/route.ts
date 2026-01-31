@@ -243,7 +243,8 @@ export async function POST(request: NextRequest) {
       const updatedPlan = updatedTenant.price_plans;
 
       if (!currentPlan) {
-        // New subscription
+        // New subscription (manual activation; no payment log)
+        const isKenya = updatedTenant.country === 'KE';
         sendSubscriptionActivatedEmail({
           tenant: updatedTenant as any,
           plan: updatedPlan
@@ -251,6 +252,8 @@ export async function POST(request: NextRequest) {
                 name: updatedPlan.name,
                 price: Number(updatedPlan.price),
                 duration_months: updatedPlan.duration_months,
+                currency: isKenya ? 'KES' : 'USD',
+                currencySymbol: isKenya ? 'Ksh' : '$',
               }
             : null,
           expireDate: updatedTenant.expire_date || new Date(),

@@ -273,12 +273,17 @@ export async function POST(request: NextRequest) {
         console.error('[Mpesa Callback] Error sending upgrade email:', error);
       });
     } else {
+      const amountPaid = Number(paymentLog.amount);
+      const currencyCode = paymentLog.currency ?? (tenant.country === 'KE' ? 'KES' : 'USD');
+      const monthsToAdd = (metadata.months_to_add as number) ?? plan.duration_months;
       sendSubscriptionActivatedEmail({
         tenant: updatedTenant as any,
         plan: {
           name: plan.name,
-          price: newPlanPrice,
-          duration_months: plan.duration_months,
+          price: amountPaid,
+          duration_months: monthsToAdd,
+          currency: currencyCode === 'KES' ? 'KES' : 'USD',
+          currencySymbol: currencyCode === 'KES' ? 'Ksh' : '$',
         },
         expireDate: newExpireDate,
       }).catch((error) => {

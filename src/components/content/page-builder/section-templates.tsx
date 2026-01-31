@@ -1939,35 +1939,37 @@ function SplitLayoutSectionComponent({
               minHeight: mobileBehavior === 'scroll' ? '400px' : '500px',
             }}
           >
-            {/* Banner - fills container, image is the CTA when cta_link set (backward compat: legacy type 'image' treated as banner) */}
+            {/* Banner - standardized aspect ratio (4:5), image fits without cropping; image is the CTA when cta_link set */}
             {section.left_side.image && !section.left_side.image.startsWith('blob:') && (section.left_side.type === 'banner' || (section.left_side as { type?: string }).type === 'image') && (
-              <div className="absolute inset-0 z-0">
-                {section.left_side.cta_link ? (
-                  <Link href={section.left_side.cta_link} className="block absolute inset-0 cursor-pointer z-10" aria-label={section.left_side.alt_text || section.left_side.title || 'View more'}>
+              <div className="absolute inset-0 z-0 flex items-center justify-center">
+                <div className="relative w-full max-h-full aspect-[4/5]">
+                  {section.left_side.cta_link ? (
+                    <Link href={section.left_side.cta_link} className="block absolute inset-0 cursor-pointer z-10" aria-label={section.left_side.alt_text || section.left_side.title || 'View more'}>
+                      <Image
+                        src={section.left_side.image}
+                        alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                      />
+                    </Link>
+                  ) : (
                     <Image
                       src={section.left_side.image}
                       alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
                       fill
-                      className={getImagePositionClass(section.left_side.image_position)}
+                      className="object-contain"
                       sizes="(max-width: 1024px) 100vw, 50vw"
                     />
-                  </Link>
-                ) : (
-                  <Image
-                    src={section.left_side.image}
-                    alt={section.left_side.alt_text || section.left_side.title || 'Banner'}
-                    fill
-                    className={getImagePositionClass(section.left_side.image_position)}
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                )}
-                {/* Overlay */}
-                {section.left_side.overlay_opacity !== undefined && section.left_side.overlay_opacity > 0 && (
-                  <div 
-                    className="absolute inset-0 bg-black pointer-events-none"
-                    style={{ opacity: section.left_side.overlay_opacity / 100 }}
-                  />
-                )}
+                  )}
+                  {/* Overlay */}
+                  {section.left_side.overlay_opacity !== undefined && section.left_side.overlay_opacity > 0 && (
+                    <div 
+                      className="absolute inset-0 bg-black pointer-events-none"
+                      style={{ opacity: section.left_side.overlay_opacity / 100 }}
+                    />
+                  )}
+                </div>
               </div>
             )}
             
@@ -2031,10 +2033,10 @@ function SplitLayoutSectionComponent({
               </div>
             )}
             
-            {/* Content Overlay - Show for banner, text, and form types */}
+            {/* Content Overlay - Show for banner, text, and form types. When banner, use pointer-events-none so the banner image link receives clicks. */}
             {section.left_side.type !== 'products' && (
               <div 
-                className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
+                className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)} ${(section.left_side.type === 'banner' || (section.left_side as { type?: string }).type === 'image') ? 'pointer-events-none' : ''}`}
                 style={{ padding: contentPadding, zIndex: 10 }}
               >
                 {section.left_side.title && (
@@ -2104,34 +2106,36 @@ function SplitLayoutSectionComponent({
               padding: section.right_side.type === 'banner' ? 0 : contentPadding,
             }}
           >
-            {/* Right side: banner - full-bleed image, fills container (backward compat: legacy type 'image' treated as banner) */}
+            {/* Right side: banner - standardized aspect ratio (4:5), image fits without cropping */}
             {(section.right_side.type === 'banner' || (section.right_side as { type?: string }).type === 'image') && section.right_side.image && !section.right_side.image.startsWith('blob:') && (
-              <div className="absolute inset-0 z-0">
-                {section.right_side.cta_link ? (
-                  <Link href={section.right_side.cta_link} className="block absolute inset-0">
+              <div className="absolute inset-0 z-0 flex items-center justify-center">
+                <div className="relative w-full max-h-full aspect-[4/5]">
+                  {section.right_side.cta_link ? (
+                    <Link href={section.right_side.cta_link} className="block absolute inset-0 z-10 cursor-pointer" aria-label={section.right_side.alt_text || section.right_side.title || 'View more'}>
+                      <Image
+                        src={section.right_side.image}
+                        alt={section.right_side.alt_text || section.right_side.title || 'Banner'}
+                        fill
+                        className="object-contain"
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                      />
+                    </Link>
+                  ) : (
                     <Image
                       src={section.right_side.image}
                       alt={section.right_side.alt_text || section.right_side.title || 'Banner'}
                       fill
-                      className={getImagePositionClass(section.right_side.image_position)}
+                      className="object-contain"
                       sizes="(max-width: 1024px) 100vw, 50vw"
                     />
-                  </Link>
-                ) : (
-                  <Image
-                    src={section.right_side.image}
-                    alt={section.right_side.alt_text || section.right_side.title || 'Banner'}
-                    fill
-                    className={getImagePositionClass(section.right_side.image_position)}
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                )}
-                {section.right_side.overlay_opacity !== undefined && section.right_side.overlay_opacity > 0 && (
-                  <div 
-                    className="absolute inset-0 bg-black pointer-events-none"
-                    style={{ opacity: section.right_side.overlay_opacity / 100 }}
-                  />
-                )}
+                  )}
+                  {section.right_side.overlay_opacity !== undefined && section.right_side.overlay_opacity > 0 && (
+                    <div 
+                      className="absolute inset-0 bg-black pointer-events-none"
+                      style={{ opacity: section.right_side.overlay_opacity / 100 }}
+                    />
+                  )}
+                </div>
               </div>
             )}
             {section.right_side.title && section.right_side.type !== 'banner' && (

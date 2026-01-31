@@ -2403,7 +2403,7 @@ function SplitLayoutSectionEditor({
           />
           )}
           
-          {/* Image upload for banner - image acts as CTA (upload can include styled CTA in image) */}
+          {/* Image upload for banner - image acts as CTA (upload can include styled CTA in image); no crop, fits container without cropping */}
           {section.left_side.type === 'banner' && (
             <>
               <div className="space-y-2">
@@ -2414,87 +2414,67 @@ function SplitLayoutSectionEditor({
                   onChange={(url) => onUpdate({
                     left_side: { ...section.left_side, image: url || '' }
                   })}
-                  enableCrop={true}
-                  aspectRatio={16 / 9}
-                  recommendedDimensions="1920x1080px or larger. Image fills the container (cover)."
+                  enableCrop={false}
+                  recommendedDimensions="1080×1080 (1:1) or 1080×1350 (4:5). Image fits inside banner without cropping."
                 />
               </div>
-              <>
-                <div className="space-y-2">
-                  <Label>Image Position</Label>
-                    <Select
-                      value={section.left_side.image_position || 'cover'}
-                      onValueChange={(value) => onUpdate({
-                        left_side: { ...section.left_side, image_position: value as any }
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cover">Cover</SelectItem>
-                        <SelectItem value="contain">Contain</SelectItem>
-                        <SelectItem value="top">Top</SelectItem>
-                        <SelectItem value="center">Center</SelectItem>
-                        <SelectItem value="bottom">Bottom</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Overlay Opacity ({section.left_side.overlay_opacity || 0}%)</Label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={section.left_side.overlay_opacity || 0}
-                      onChange={(e) => onUpdate({
-                        left_side: { ...section.left_side, overlay_opacity: parseInt(e.target.value) }
-                      })}
-                      className="w-full"
-                    />
-                  </div>
-              </>
+              <div className="space-y-2">
+                <Label>Overlay Opacity ({section.left_side.overlay_opacity || 0}%)</Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={section.left_side.overlay_opacity || 0}
+                  onChange={(e) => onUpdate({
+                    left_side: { ...section.left_side, overlay_opacity: parseInt(e.target.value) }
+                  })}
+                  className="w-full"
+                />
+              </div>
             </>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Text Alignment</Label>
-              <Select
-                value={section.left_side.text_alignment || 'center'}
-                onValueChange={(value) => onUpdate({
-                  left_side: { ...section.left_side, text_alignment: value as any }
-                })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="left">Left</SelectItem>
-                  <SelectItem value="center">Center</SelectItem>
-                  <SelectItem value="right">Right</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Text Alignment and Vertical Alignment hidden for banner (banner is image-only) */}
+          {section.left_side.type !== 'banner' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Text Alignment</Label>
+                <Select
+                  value={section.left_side.text_alignment || 'center'}
+                  onValueChange={(value) => onUpdate({
+                    left_side: { ...section.left_side, text_alignment: value as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Vertical Alignment</Label>
+                <Select
+                  value={section.left_side.vertical_alignment || 'middle'}
+                  onValueChange={(value) => onUpdate({
+                    left_side: { ...section.left_side, vertical_alignment: value as any }
+                  })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="middle">Middle</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Vertical Alignment</Label>
-              <Select
-                value={section.left_side.vertical_alignment || 'middle'}
-                onValueChange={(value) => onUpdate({
-                  left_side: { ...section.left_side, vertical_alignment: value as any }
-                })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top">Top</SelectItem>
-                  <SelectItem value="middle">Middle</SelectItem>
-                  <SelectItem value="bottom">Bottom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
           
           {/* Background: transparent or colour (for left side when banner) */}
           {section.left_side.type === 'banner' && (
@@ -2774,7 +2754,7 @@ function SplitLayoutSectionEditor({
             </div>
           )}
           
-          {/* Image upload for banner - image acts as CTA */}
+          {/* Image upload for banner - image acts as CTA; no crop, fits container without cropping */}
           {section.right_side.type === 'banner' && (
             <>
               <div className="space-y-2">
@@ -2785,9 +2765,8 @@ function SplitLayoutSectionEditor({
                   onChange={(url) => onUpdate({
                     right_side: { ...section.right_side, image: url || '' }
                   })}
-                  enableCrop={true}
-                  aspectRatio={16 / 9}
-                  recommendedDimensions="1920x1080px or larger. Image fills the container (cover)."
+                  enableCrop={false}
+                  recommendedDimensions="1080×1080 (1:1) or 1080×1350 (4:5). Image fits inside banner without cropping."
                 />
               </div>
               <div className="space-y-2">
@@ -2860,26 +2839,6 @@ function SplitLayoutSectionEditor({
                 />
               )}
               <div className="space-y-2">
-                <Label>Image Position</Label>
-                <Select
-                  value={section.right_side.image_position || 'cover'}
-                  onValueChange={(value) => onUpdate({
-                    right_side: { ...section.right_side, image_position: value as any }
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cover">Cover (fill)</SelectItem>
-                    <SelectItem value="contain">Contain</SelectItem>
-                    <SelectItem value="top">Top</SelectItem>
-                    <SelectItem value="center">Center</SelectItem>
-                    <SelectItem value="bottom">Bottom</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label>Overlay Opacity ({(section.right_side as any).overlay_opacity ?? 0}%)</Label>
                 <input
                   type="range"
@@ -2942,24 +2901,27 @@ function SplitLayoutSectionEditor({
             </>
           )}
           
-          <div className="space-y-2">
-            <Label>Text Alignment</Label>
-            <Select
-              value={section.right_side.text_alignment || 'left'}
-              onValueChange={(value) => onUpdate({
-                right_side: { ...section.right_side, text_alignment: value as any }
-              })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="left">Left</SelectItem>
-                <SelectItem value="center">Center</SelectItem>
-                <SelectItem value="right">Right</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Text Alignment hidden for banner (banner is image-only) */}
+          {section.right_side.type !== 'banner' && (
+            <div className="space-y-2">
+              <Label>Text Alignment</Label>
+              <Select
+                value={section.right_side.text_alignment || 'left'}
+                onValueChange={(value) => onUpdate({
+                  right_side: { ...section.right_side, text_alignment: value as any }
+                })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           {/* Background colour picker only when not banner (banner uses radio above) */}
           {section.right_side.type !== 'banner' && (

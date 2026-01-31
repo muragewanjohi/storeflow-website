@@ -415,16 +415,16 @@ export async function sendSubscriptionActivatedEmail({
                 <td style="padding: 8px 0;">${plan?.name || 'N/A'}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">${plan?.price 
-                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
+                <td style="padding: 8px 0; font-weight: bold;">Amount paid:</td>
+                <td style="padding: 8px 0;">${plan?.price != null
+                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh'
                       ? Number(plan.price).toLocaleString('en-KE')
                       : Number(plan.price).toFixed(2))
-                  : '$0.00'}</td>
+                  : 'N/A'}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Duration:</td>
-                <td style="padding: 8px 0;">${plan?.duration_months || 0} month${plan?.duration_months !== 1 ? 's' : ''}</td>
+                <td style="padding: 8px 0;">${plan?.duration_months != null ? plan.duration_months : 0} month${plan?.duration_months !== 1 ? 's' : ''}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Expires:</td>
