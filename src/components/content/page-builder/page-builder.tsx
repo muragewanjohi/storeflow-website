@@ -28,9 +28,12 @@ interface PageBuilderProps {
   pageStatus?: string; // Page status (draft, published, archived)
   onSave?: () => void; // Callback to save the page
   isSaving?: boolean; // Whether the page is currently being saved
+  /** Controlled preview open state – when provided, survives parent/child remounts */
+  previewOpen?: boolean;
+  onPreviewOpenChange?: (open: boolean) => void;
 }
 
-export default function PageBuilder({ value, onChange, pageSlug, pageId, pageStatus, onSave, isSaving }: Readonly<PageBuilderProps>) {
+export default function PageBuilder({ value, onChange, pageSlug, pageId, pageStatus, onSave, isSaving, previewOpen: controlledPreviewOpen, onPreviewOpenChange }: Readonly<PageBuilderProps>) {
   // Parse initial data
   const parseData = (): PageBuilderData => {
     if (!value || value.trim() === '') {
@@ -46,8 +49,13 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
 
   const [data, setData] = useState<PageBuilderData>(parseData());
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
-  const [previewMode, setPreviewMode] = useState(false);
+  const [internalPreviewOpen, setInternalPreviewOpen] = useState(false);
   const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
+
+  // Use controlled preview state when provided (survives remounts); otherwise internal state
+  const isControlledPreview = controlledPreviewOpen !== undefined && onPreviewOpenChange !== undefined;
+  const previewMode = isControlledPreview ? controlledPreviewOpen : internalPreviewOpen;
+  const setPreviewMode = isControlledPreview ? onPreviewOpenChange! : setInternalPreviewOpen;
 
   // Fetch available themes for preview
   const { data: themesData } = useQuery({

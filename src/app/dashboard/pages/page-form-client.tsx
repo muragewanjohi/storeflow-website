@@ -99,6 +99,8 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Preview open state lifted so it survives PageBuilder remounts (e.g. from RSC refetch) */
+  const [pageBuilderPreviewOpen, setPageBuilderPreviewOpen] = useState(false);
   
   const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
     detectContentMode(page?.content)
@@ -451,6 +453,8 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       pageStatus={formData.status}
                       onSave={handlePageBuilderSave}
                       isSaving={isSubmitting}
+                      previewOpen={pageBuilderPreviewOpen}
+                      onPreviewOpenChange={setPageBuilderPreviewOpen}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.

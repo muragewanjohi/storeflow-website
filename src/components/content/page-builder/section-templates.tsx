@@ -1893,6 +1893,8 @@ function SplitLayoutSectionComponent({
   const rightBg = section.right_side.background_color;
   const rightBgTransparent = rightBg === 'transparent' || rightBg === '' || rightBg == null;
 
+  const sectionBgTransparent = !section.background_gradient && (section.background_color === 'transparent' || section.background_color === '' || section.background_color == null);
+
   // Set CSS variables on section for better performance
   const sectionStyle = {
     '--split-layout-bg': section.background_gradient || section.background_color || 'transparent',
@@ -1910,7 +1912,7 @@ function SplitLayoutSectionComponent({
     paddingTop,
     paddingBottom,
     backgroundImage: section.background_gradient || undefined,
-    backgroundColor: section.background_gradient ? undefined : (section.background_color || 'transparent'),
+    ...(section.background_gradient ? {} : sectionBgTransparent ? {} : { backgroundColor: section.background_color || 'transparent' }),
     minHeight: section.min_height ? `${section.min_height}px` : undefined,
   } as React.CSSProperties & Record<string, string | undefined>;
 
@@ -1929,12 +1931,16 @@ function SplitLayoutSectionComponent({
           className={`grid ${getMobileBehaviorClass()} ${getGridColsClass()} ${shouldReverse ? 'lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1' : ''}`}
           style={{ gap: columnGap }}
         >
-          {/* Left Side */}
+          {/* Left Side - when background is transparent, set no backgroundColor so nothing paints behind the content */}
           <div
             className={`relative overflow-hidden ${section.left_side.border_radius ? '' : 'rounded-lg'}`}
             style={{
               backgroundImage: section.left_side.background_gradient || undefined,
-              backgroundColor: section.left_side.background_gradient ? undefined : 'var(--split-layout-left-bg)',
+              ...(section.left_side.background_gradient
+                ? {}
+                : leftBgTransparent
+                  ? { backgroundColor: undefined }
+                  : { backgroundColor: 'var(--split-layout-left-bg)' }),
               borderRadius: section.left_side.border_radius ? `${section.left_side.border_radius}px` : '0.5rem',
               minHeight: mobileBehavior === 'scroll' ? '400px' : '500px',
             }}
@@ -2097,11 +2103,11 @@ function SplitLayoutSectionComponent({
             )}
           </div>
 
-          {/* Right Side */}
+          {/* Right Side - when background is transparent, set no backgroundColor so nothing paints behind the content */}
           <div 
             className={`relative overflow-hidden ${section.right_side.border_radius ? '' : 'rounded-lg'} ${section.right_side.type === 'banner' ? 'min-h-[400px]' : ''}`}
             style={{
-              backgroundColor: 'var(--split-layout-right-bg)',
+              ...(rightBgTransparent ? {} : { backgroundColor: 'var(--split-layout-right-bg)' }),
               borderRadius: section.right_side.border_radius ? `${section.right_side.border_radius}px` : '0.5rem',
               padding: section.right_side.type === 'banner' ? 0 : contentPadding,
             }}
