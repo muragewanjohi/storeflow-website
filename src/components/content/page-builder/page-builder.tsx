@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, EyeIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PageSection, PageBuilderData, SectionType } from '@/lib/content/page-builder-types';
 import { SectionRenderer } from './section-templates';
 import { SectionEditor } from './section-editor';
@@ -150,67 +150,55 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
           </p>
         </div>
         <div className="flex gap-2">
-          {pageSlug && (
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              disabled={pageStatus !== 'published'}
-              title={pageStatus !== 'published' ? 'Publish the page first to preview it on the frontend' : 'Preview this page on the frontend'}
-            >
-              <a 
-                href={pageStatus === 'published' ? `/${pageSlug}` : '#'} 
-                target={pageStatus === 'published' ? '_blank' : undefined}
-                rel={pageStatus === 'published' ? 'noopener noreferrer' : undefined}
-                onClick={(e) => {
-                  if (pageStatus !== 'published') {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <EyeIcon className="mr-2 h-4 w-4" />
-                Preview Page
-              </a>
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPreviewMode(!previewMode)}
+            onClick={() => setPreviewMode(true)}
           >
             <EyeIcon className="mr-2 h-4 w-4" />
-            {previewMode ? 'Edit Sections' : 'Preview Sections'}
+            Preview
           </Button>
         </div>
       </div>
 
       {previewMode ? (
-        // Preview Mode
+        // Preview Mode — stays open until user clicks Close
         <div className="space-y-4">
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <Label htmlFor="preview-theme" className="text-sm font-medium">
-                  Preview with Theme:
-                </Label>
-                <Select
-                  value={previewThemeId || currentThemeData?.theme?.id || ''}
-                  onValueChange={setPreviewThemeId}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="preview-theme" className="text-sm font-medium">
+                    Preview with Theme:
+                  </Label>
+                  <Select
+                    value={previewThemeId || currentThemeData?.theme?.id || ''}
+                    onValueChange={setPreviewThemeId}
+                  >
+                    <SelectTrigger id="preview-theme" className="w-[250px]">
+                      <SelectValue placeholder="Select a theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {themesData?.themes?.map((theme: any) => (
+                        <SelectItem key={theme.id} value={theme.id}>
+                          {theme.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Preview how sections look with different themes
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPreviewMode(false)}
+                  aria-label="Close preview"
                 >
-                  <SelectTrigger id="preview-theme" className="w-[250px]">
-                    <SelectValue placeholder="Select a theme" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {themesData?.themes?.map((theme: any) => (
-                      <SelectItem key={theme.id} value={theme.id}>
-                        {theme.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Preview how sections look with different themes
-                </p>
+                  <XMarkIcon className="mr-2 h-4 w-4" />
+                  Close
+                </Button>
               </div>
             </CardContent>
           </Card>
