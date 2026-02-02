@@ -117,39 +117,41 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Background style - use background color only (banner image is handled separately)
-  const backgroundStyle: React.CSSProperties = {
-    backgroundColor: hasBannerImage ? 'transparent' : (section.background_color || 'var(--color-background, transparent)'),
+  // Hero background: fit full image (no stretching, no trimming of header/footer).
+  // Use contain so the entire image is visible; letterboxing uses background color.
+  const heroBackgroundStyle: React.CSSProperties = {
+    backgroundColor: section.background_color || (hasBannerImage ? 'var(--color-muted, #f1f5f9)' : 'var(--color-background, transparent)'),
+    ...(hasBannerImage
+      ? {
+          backgroundImage: `url("${section.banner_image!.trim()}")`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'scroll',
+        }
+      : {}),
   };
 
   return (
     <section
-      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
+      className={`relative ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
-        ...backgroundStyle,
-        // Ensure section is properly contained and doesn't extend beyond boundaries
         position: 'relative',
-        isolation: 'isolate', // Create new stacking context
+        isolation: 'isolate',
       }}
     >
-      {/* Background image container - properly contained within section, clipped by overflow-hidden */}
-      {hasBannerImage && (
-        <div 
-          className="absolute inset-0 z-0 bg-center bg-no-repeat bg-cover md:bg-cover"
-          style={{
-            backgroundImage: `url("${section.banner_image!.trim()}")`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'scroll',
-          }}
+      {/* Container aligned with header (logo to shopping cart) – background and content stay within */}
+      <div
+        className={`container mx-auto px-2 sm:px-4 lg:px-8 relative rounded-lg overflow-hidden ${hasBannerImage ? 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]' : ''}`}
+        style={{ maxWidth: 'var(--container-max-width, 1200px)' }}
+      >
+        {/* Background colour and image – full image fitted (contain), no stretch or trim */}
+        <div
+          className="absolute inset-0 z-0 bg-center bg-no-repeat"
+          style={heroBackgroundStyle}
         />
-      )}
-      
-      {/* No overlay - banner image colors should display vibrantly without color modification */}
-      
-      <div className="container mx-auto px-4 relative z-[2]" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
+        <div className="relative z-[2]">
         {hasBannerImage ? (
           // Full-width background image layout - can include normal image
           (() => {
@@ -517,6 +519,7 @@ function HeroSectionComponent({
             )}
           </div>
         )}
+      </div>
       </div>
     </section>
   );

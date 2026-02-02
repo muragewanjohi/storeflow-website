@@ -335,10 +335,11 @@ function HeroSectionEditor({
                 }}
                 enableCrop={true}
                 aspectRatio={16 / 9}
-                recommendedDimensions="1920x1080px (16:9 ratio). This image will be used as the background of the hero section."
+                allowSkipCrop={true}
+                recommendedDimensions="1920×1080 or larger (16:9 ratio). Images under 1920px wide: use “Use full image (no crop)” to avoid width cropping."
               />
               <p className="text-xs text-muted-foreground">
-                The banner image will be displayed as the background of the hero section. It will be cropped to fit the section dimensions.
+                Crop uses 16:9 ratio. The banner is shown as the hero background. To show the full image without cropping (e.g. 1890×945), click “Use full image (no crop)” in the crop dialog.
               </p>
             </div>
           )}

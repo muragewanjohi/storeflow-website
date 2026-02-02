@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -99,8 +99,33 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Preview open state lifted so it survives PageBuilder remounts (e.g. from RSC refetch) */
+  /** Preview open state; persisted in sessionStorage so it survives remounts/refreshes until user closes */
   const [pageBuilderPreviewOpen, setPageBuilderPreviewOpen] = useState(false);
+
+  const previewStorageKey = `page-builder-preview-open-${page?.id ?? 'new'}`;
+
+  // Restore preview open state after mount (e.g. after router.refresh() or RSC refetch)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem(previewStorageKey) === '1') {
+        setPageBuilderPreviewOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [previewStorageKey]);
+
+  const handlePreviewOpenChange = (open: boolean) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (open) sessionStorage.setItem(previewStorageKey, '1');
+        else sessionStorage.removeItem(previewStorageKey);
+      }
+    } catch {
+      // ignore
+    }
+    setPageBuilderPreviewOpen(open);
+  };
   
   const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
     detectContentMode(page?.content)
@@ -384,7 +409,9 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       value={formData.banner_image || null}
                       onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
                       aspectRatio={16 / 9}
-                      helpText="Upload a banner image for this page (max 5MB)"
+                      allowSkipCrop={true}
+                      recommendedDimensions="1920×1080 or larger (16:9). Images under 1920px wide: use “Use full image (no crop)” to avoid width cropping."
+                      helpText="Upload a banner image for this page (max 5MB). Crop uses 16:9."
                     />
                     
                     {/* Guidance on when to use Banner Image */}
@@ -454,7 +481,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       onSave={handlePageBuilderSave}
                       isSaving={isSubmitting}
                       previewOpen={pageBuilderPreviewOpen}
-                      onPreviewOpenChange={setPageBuilderPreviewOpen}
+                      onPreviewOpenChange={handlePreviewOpenChange}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       Build your page using pre-designed sections. Content is stored as JSON.
