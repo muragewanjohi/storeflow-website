@@ -117,10 +117,9 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Hero background: fit full image (no stretching, no trimming of header/footer).
-  // Use contain so the entire image is visible; letterboxing uses background color.
+  // Hero background: full-width so no left/right trim; contain so full image visible; no grey when image set.
   const heroBackgroundStyle: React.CSSProperties = {
-    backgroundColor: section.background_color || (hasBannerImage ? 'var(--color-muted, #f1f5f9)' : 'var(--color-background, transparent)'),
+    backgroundColor: hasBannerImage ? 'transparent' : (section.background_color || 'var(--color-background, transparent)'),
     ...(hasBannerImage
       ? {
           backgroundImage: `url("${section.banner_image!.trim()}")`,
@@ -134,24 +133,32 @@ function HeroSectionComponent({
 
   return (
     <section
-      className={`relative ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
+      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         position: 'relative',
         isolation: 'isolate',
       }}
     >
-      {/* Container aligned with header (logo to shopping cart) – background and content stay within */}
-      <div
-        className={`container mx-auto px-2 sm:px-4 lg:px-8 relative rounded-lg overflow-hidden ${hasBannerImage ? 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]' : ''}`}
-        style={{ maxWidth: 'var(--container-max-width, 1200px)' }}
-      >
-        {/* Background colour and image – full image fitted (contain), no stretch or trim */}
+      {/* Full-width background so image is not trimmed on left/right; no background colour when image set */}
+      {hasBannerImage && (
         <div
           className="absolute inset-0 z-0 bg-center bg-no-repeat"
           style={heroBackgroundStyle}
         />
-        <div className="relative z-[2]">
+      )}
+      {/* Content in container aligned with header */}
+      <div
+        className={`container mx-auto px-2 sm:px-4 lg:px-8 relative ${hasBannerImage ? '' : 'rounded-lg'}`}
+        style={{ maxWidth: 'var(--container-max-width, 1200px)' }}
+      >
+        {!hasBannerImage && (
+          <div
+            className="absolute inset-0 z-0 rounded-lg"
+            style={{ backgroundColor: section.background_color || 'var(--color-background, transparent)' }}
+          />
+        )}
+        <div className={`relative z-[2] ${hasBannerImage ? 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]' : ''}`}>
         {hasBannerImage ? (
           // Full-width background image layout - can include normal image
           (() => {
