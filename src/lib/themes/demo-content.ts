@@ -1543,15 +1543,18 @@ export async function createDemoPages(
 
 /**
  * Create demo sales/promotions for a tenant
- * Links products to sales via product_sales junction table
+ * Links products to sales via product_sales junction table.
+ * @param businessType - Optional; used to set a sales banner image specific to business type
  */
 export async function createDemoSales(
   prisma: PrismaClient,
   tenantId: string,
-  productIds?: string[]
+  productIds?: string[],
+  businessType?: string
 ): Promise<number> {
   let salesCreated = 0;
-  
+  const bannerImage = getSalesBannerImageByBusinessType(businessType || '');
+
   const now = new Date();
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -1619,6 +1622,7 @@ export async function createDemoSales(
             end_date: saleData.end_date,
             status: saleData.status,
             is_featured: saleData.is_featured,
+            banner_image: bannerImage,
           },
         });
         salesCreated++;
@@ -1685,6 +1689,100 @@ export async function createDemoSales(
 }
 
 /**
+ * Get theme featured image URLs for demo blogs by business type (one per blog index)
+ */
+function getBlogFeaturedImagesByBusinessType(businessType: string): string[] {
+  const type = (businessType || '').toLowerCase();
+  // Default generic blog images
+  const defaultImages = [
+    'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1504711331083-9c895941bf81?w=800&h=600&fit=crop',
+  ];
+  if (type.includes('grocery') || type.includes('supermarket')) {
+    return [
+      'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    return [
+      'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('fashion') || type.includes('clothing')) {
+    return [
+      'https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('electronics') || type.includes('mobile')) {
+    return [
+      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('beauty') || type.includes('personal care')) {
+    return [
+      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1522335789203-aabd1f54eabb?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('home') || type.includes('kitchen')) {
+    return [
+      'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+    return [
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=600&fit=crop',
+    ];
+  }
+  if (type.includes('furniture') || type.includes('home decor')) {
+    return [
+      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&h=600&fit=crop',
+    ];
+  }
+  return defaultImages;
+}
+
+/**
+ * Get sales banner image URL by business type
+ */
+function getSalesBannerImageByBusinessType(businessType: string): string {
+  const type = (businessType || '').toLowerCase();
+  const defaultBanner = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=400&fit=crop';
+  if (type.includes('grocery') || type.includes('supermarket')) {
+    return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    return 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('fashion') || type.includes('clothing')) {
+    return 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('electronics') || type.includes('mobile')) {
+    return 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('beauty') || type.includes('personal care')) {
+    return 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('home') || type.includes('kitchen')) {
+    return 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+    return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('furniture') || type.includes('home decor')) {
+    return 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&h=400&fit=crop';
+  }
+  return defaultBanner;
+}
+
+/**
  * Create demo blog categories for a tenant
  */
 export async function createDemoBlogCategories(
@@ -1731,14 +1829,17 @@ export async function createDemoBlogCategories(
 
 /**
  * Create demo blog posts for a tenant
+ * @param businessType - Optional; used to set theme featured images specific to business type
  */
 export async function createDemoBlogs(
   prisma: PrismaClient,
   tenantId: string,
-  categoryMap: Record<string, string>
+  categoryMap: Record<string, string>,
+  businessType?: string
 ): Promise<number> {
   let blogsCreated = 0;
-  
+  const featuredImages = getBlogFeaturedImagesByBusinessType(businessType || '');
+
   const demoBlogs = [
     {
       title: 'Welcome to Our Store!',
@@ -1758,7 +1859,8 @@ export async function createDemoBlogs(
     },
   ];
 
-  for (const blogData of demoBlogs) {
+  for (let i = 0; i < demoBlogs.length; i++) {
+    const blogData = demoBlogs[i];
     try {
       // Check if blog already exists
       const existingBlog = await prisma.blogs.findFirst({
@@ -1770,7 +1872,8 @@ export async function createDemoBlogs(
 
       if (!existingBlog) {
         const categoryId = categoryMap[blogData.category_slug] || null;
-        
+        const image = featuredImages[i] ?? featuredImages[0];
+
         await prisma.blogs.create({
           data: {
             tenant_id: tenantId,
@@ -1780,6 +1883,7 @@ export async function createDemoBlogs(
             content: blogData.content,
             category_id: categoryId,
             status: blogData.status,
+            image,
           },
         });
         blogsCreated++;
@@ -1901,9 +2005,9 @@ export async function createDemoContent(
 
     // Create additional demo content: pages, sales, blogs, blog categories, and forms
     const pagesCreated = await createDemoPages(prisma, tenantId, tenantName);
-    const salesCreated = await createDemoSales(prisma, tenantId);
+    const salesCreated = await createDemoSales(prisma, tenantId, undefined, businessType);
     const blogCategoriesMap = await createDemoBlogCategories(prisma, tenantId);
-    const blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap);
+    const blogsCreated = await createDemoBlogs(prisma, tenantId, blogCategoriesMap, businessType);
     const formsCreated = await createDemoForm(prisma, tenantId);
 
     return {

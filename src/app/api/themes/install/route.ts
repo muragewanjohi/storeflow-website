@@ -221,13 +221,12 @@ export async function POST(request: NextRequest) {
       // Get homepage template data for this theme
       const layoutData = getHomepageLayout(theme.slug);
 
-      // Convert layout to page builder format
+      // Convert layout to page builder format (pass business_type for split banner, colors, etc.)
       let pageBuilderData;
       if (layoutData && layoutData.length > 0) {
         pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
       } else {
-        // Use default template if theme-specific one doesn't exist
-        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, business_type);
       }
 
       // Clean any blob URLs from page builder content

@@ -451,6 +451,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     value={formData.banner_image || null}
                     onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
                     aspectRatio={16 / 9}
+                    allowSkipCrop={true}
+                    recommendedDimensions="1920×1080 or larger (16:9). Use “Use full image (no crop)” in the crop dialog to upload without cropping."
                     helpText="Upload a banner image for this sale (max 5MB)"
                   />
                 </div>

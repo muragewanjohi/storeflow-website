@@ -121,39 +121,23 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // CRITICAL: Create response first, then create Supabase client that writes cookies to it
-      // This ensures cookies are properly written to the response headers
+      // CRITICAL: Return a REDIRECT response with cookies set on it.
+      // This ensures the browser stores session cookies and then requests /dashboard with them,
+      // fixing "redirected back to login" after MFA (cookies from JSON response were not always sent on next request).
       const { createServerClient } = await import('@supabase/ssr');
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      
-      // Create response object that we'll use to write cookies
-      const response = NextResponse.json({
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: role as string,
-          tenant_id: tenant.id,
-          name: user.user_metadata?.name,
-        },
-        session: {
-          access_token: tempSession.access_token,
-          refresh_token: tempSession.refresh_token,
-          expires_at: tempSession.expires_at,
-        },
-        message: 'Code verified successfully',
-      });
 
-      // Create a Supabase client that writes cookies directly to our response
-      // This ensures cookies are set in the response headers
+      const dashboardUrl = new URL('/dashboard', request.url);
+
+      const response = NextResponse.redirect(dashboardUrl, 302);
+
       const responseSupabase = createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            // Write cookies directly to the response object
             cookiesToSet.forEach(({ name, value, options }) => {
               response.cookies.set(name, value, options);
             });
@@ -161,8 +145,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Set the session using the response-aware client
-      // This will write cookies to the response object
       const { data: finalSessionData, error: finalSessionError } = await responseSupabase.auth.setSession({
         access_token: tempSession.access_token,
         refresh_token: tempSession.refresh_token,
@@ -171,53 +153,21 @@ export async function POST(request: NextRequest) {
       if (finalSessionError || !finalSessionData.session) {
         console.error('[MFA Verify] ❌ Failed to set session with response client:', finalSessionError);
         return NextResponse.json(
-          { 
-            error: 'Session error',
-            message: 'Failed to establish session. Please try logging in again.'
-          },
+          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
           { status: 500 }
         );
       }
 
-      // Verify the session user matches
       const { data: { user: finalUser }, error: finalUserError } = await responseSupabase.auth.getUser();
-      
       if (finalUserError || !finalUser || finalUser.id !== userId) {
         console.error('[MFA Verify] ❌ Session validation failed with response client:', finalUserError);
         return NextResponse.json(
-          { 
-            error: 'Session error',
-            message: 'Session validation failed. Please try logging in again.'
-          },
+          { error: 'Session error', message: 'Session validation failed. Please try logging in again.' },
           { status: 500 }
         );
       }
 
-      console.log('[MFA Verify] ✅ Session set and verified with response client:', {
-        userId: finalUser.id,
-        email: finalUser.email,
-      });
-
-      // Verify cookies are in the response
-      const responseCookies = response.cookies.getAll();
-      console.log('[MFA Verify] Cookies in response:', {
-        count: responseCookies.length,
-        cookieNames: responseCookies.map(c => c.name),
-        hasAccessToken: responseCookies.some(c => 
-          c.name.includes('access-token') || 
-          c.name.includes('auth-token') ||
-          (c.name.includes('sb-') && (c.name.includes('auth-token') || c.name.includes('access-token')))
-        ),
-      });
-
-      // If no cookies were set, this is a critical issue
-      if (responseCookies.length === 0) {
-        console.error('[MFA Verify] ❌ CRITICAL: No cookies found in response! Session will not persist.');
-        console.error('[MFA Verify] This will cause redirect loops. Check Supabase SSR configuration.');
-      } else {
-        console.log('[MFA Verify] ✅ Cookies successfully written to response');
-      }
-
+      console.log('[MFA Verify] ✅ Session set; redirecting to dashboard with cookies');
       return response;
     }
 

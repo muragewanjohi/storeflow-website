@@ -55,63 +55,28 @@ export default function TenantAdminLoginPage() {
       if (requiresMFA && userId) {
         const response = await fetch('/api/auth/tenant/mfa/verify', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            userId, 
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId,
             code: mfaCode,
-            tempSession, // Pass the temporary session from initial login
+            tempSession,
           }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.message || data.error || 'Invalid code. Please try again.');
-          setMfaCode(''); // Clear code on error
+        // Server returns 302 redirect to /dashboard with Set-Cookie; fetch follows redirect
+        if (response.ok && (response.redirected || response.url?.includes('/dashboard'))) {
+          setIsLoading(false);
+          window.location.href = response.redirected ? response.url : '/dashboard';
           return;
         }
 
-        // If session is returned, set it in Supabase client
-        // The server already set cookies in the verify response, but we also set client-side
-        // for browser storage (localStorage/cookies)
-        if (data.session && data.session.access_token) {
-          // Set the session in Supabase client-side (for browser storage)
-          const { createClient } = await import('@/lib/supabase/client');
-          const supabase = createClient();
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token || '',
-          });
-          
-          if (sessionError) {
-            console.error('[Login] Failed to set session client-side:', sessionError);
-            setError('Failed to establish session. Please try again.');
-            setIsLoading(false);
-            return;
-          }
-          
-          if (!sessionData.session) {
-            console.error('[Login] No session returned from setSession');
-            setError('Session not established. Please try again.');
-            setIsLoading(false);
-            return;
-          }
-          
-          console.log('[Login] ✅ Session set client-side successfully');
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.message || data.error || 'Invalid code. Please try again.');
+          setMfaCode('');
+          return;
         }
-
-        // 2FA verified - redirect to dashboard
-        // Use a small delay to ensure cookies are fully set before redirecting
-        setIsLoading(false);
-        
-        // Small delay to ensure cookies are set before redirect
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Use full page reload to ensure cookies are sent with the request
-        window.location.href = '/dashboard';
-        return;
       }
 
       // Initial login (password only)

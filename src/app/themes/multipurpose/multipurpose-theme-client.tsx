@@ -29,8 +29,8 @@ const BUSINESS_TYPE_DEMOS: BusinessTypeDemo[] = [
     id: 'grocery',
     businessType: 'grocery',
     title: 'Grocery',
-    image: '/images/themes/grocery.png',
-    demoUrl: null,
+    image: '/images/themes/grocery_multipurpose.png',
+    demoUrl: 'https://grocery.dukanest.com/',
     description: 'Fresh produce and daily essentials',
   },
   {

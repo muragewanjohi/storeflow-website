@@ -2049,10 +2049,10 @@ function SplitLayoutSectionComponent({
               </div>
             )}
             
-            {/* Content Overlay - Show for banner, text, and form types. When banner, use pointer-events-none so the banner image link receives clicks. */}
-            {section.left_side.type !== 'products' && (
+            {/* Content Overlay - Show for text and form only. Banner is image-only (no text overlay). */}
+            {section.left_side.type !== 'products' && section.left_side.type !== 'banner' && (section.left_side as { type?: string }).type !== 'image' && (
               <div 
-                className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)} ${(section.left_side.type === 'banner' || (section.left_side as { type?: string }).type === 'image') ? 'pointer-events-none' : ''}`}
+                className={`relative h-full flex flex-col ${getTextAlignClass(section.left_side.text_alignment)} ${getVerticalAlignClass(section.left_side.vertical_alignment)}`}
                 style={{ padding: contentPadding, zIndex: 10 }}
               >
                 {section.left_side.title && (
@@ -2087,8 +2087,8 @@ function SplitLayoutSectionComponent({
                     dangerouslySetInnerHTML={{ __html: section.left_side.content }}
                   />
                 )}
-                {/* CTA button only for text/form (banner uses image as CTA) */}
-                {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && section.left_side.type !== 'banner' && (
+                {/* CTA button only for text (form has its own submit) */}
+                {section.left_side.cta_text && section.left_side.cta_link && section.left_side.type !== 'form' && (
                   <Link href={section.left_side.cta_link}>
                     <Button
                       size="lg"

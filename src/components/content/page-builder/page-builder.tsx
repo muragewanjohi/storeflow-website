@@ -665,16 +665,11 @@ function createDefaultSection(type: SectionType, order: number): PageSection {
         full_width: false,
         left_side: {
           type: 'banner',
-          title: 'Special Offer',
-          subtitle: 'Limited Time Only',
           image: '',
-          cta_text: 'Shop Now',
           cta_link: '/products',
-          text_alignment: 'center',
-          vertical_alignment: 'middle',
           image_position: 'cover',
-          overlay_opacity: 30,
           border_radius: 8,
+          background_color: 'transparent',
         },
         right_side: {
           type: 'products',

@@ -916,17 +916,16 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
         columns: 4,
         default_tab: 'tab-popular',
       },
-      // Split layout: left side banner (image fills container, image-as-CTA via cta_link only; no cta_text)
+      // Split layout: left side banner is image-only (no text overlay), transparent background
       {
         id: 'split-layout-1',
         type: 'split_layout' as const,
         order: 7,
         left_side: {
           type: 'banner',
-          title: content.splitLayout.title,
           image: content.splitLayout.image,
           cta_link: content.splitLayout.cta_link,
-          background_color: content.splitLayout.background_color,
+          background_color: 'transparent',
           image_position: 'cover',
         },
         right_side: {
