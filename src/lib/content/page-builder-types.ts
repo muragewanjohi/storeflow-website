@@ -157,6 +157,8 @@ export interface SalesTabSection extends BaseSection {
   // Content
   title?: string;
   subtitle?: string;
+  title_color?: string;
+  subtitle_color?: string;
   limit?: number; // Products per sale
   
   // Features

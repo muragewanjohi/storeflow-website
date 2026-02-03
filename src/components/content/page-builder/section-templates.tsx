@@ -1584,7 +1584,7 @@ function SalesTabSectionComponent({
             {section.title && (
               <h2
                 className="text-3xl md:text-4xl font-bold mb-2"
-                style={{ fontFamily: headingFont, color: 'var(--color-text, currentColor)' }}
+                style={{ fontFamily: headingFont, color: section.title_color || 'var(--color-text, currentColor)' }}
               >
                 {section.title}
               </h2>
@@ -1592,7 +1592,14 @@ function SalesTabSectionComponent({
             {!useVerticalLayout && section.show_sale_name && sales.length > 0 && (
               <p className="text-lg font-semibold text-primary mb-2">{sales[0].name}</p>
             )}
-            {section.subtitle && <p className="text-muted-foreground">{section.subtitle}</p>}
+            {section.subtitle && (
+              <p
+                className="mb-0"
+                style={{ color: section.subtitle_color || 'var(--color-muted-foreground)' }}
+              >
+                {section.subtitle}
+              </p>
+            )}
           </div>
           {section.cta_position === 'top_right' && section.cta_text && section.cta_link && (
             <Link href={section.cta_link}>
@@ -1636,12 +1643,12 @@ function SalesTabSectionComponent({
             )}
             {section.banner_style !== 'none' && block.sale.banner_image && (
               <div className={`${containerClass} mb-6`} style={containerStyle}>
-                <div className="relative aspect-[32/9] overflow-hidden rounded-lg">
+                <div className="relative aspect-[32/9] overflow-hidden rounded-lg bg-muted">
                   <Image
                     src={block.sale.banner_image}
                     alt={block.sale.name}
                     fill
-                    className="object-cover"
+                    className="object-contain"
                     sizes="(max-width: 1200px) 100vw, 1200px"
                   />
                 </div>
@@ -1672,12 +1679,12 @@ function SalesTabSectionComponent({
             <>
               {section.banner_style !== 'none' && block.sale.banner_image && (
                 <div className={`${containerClass} mb-8`} style={containerStyle}>
-                  <div className="relative aspect-[32/9] overflow-hidden rounded-lg">
+                  <div className="relative aspect-[32/9] overflow-hidden rounded-lg bg-muted">
                     <Image
                       src={block.sale.banner_image}
                       alt={block.sale.name}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 1200px) 100vw, 1200px"
                     />
                   </div>

@@ -132,7 +132,7 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
   };
 
   return (
-    <Card className={`group overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
+    <Card className={`group overflow-hidden hover:shadow-lg transition-shadow w-full md:max-w-[280px] mx-auto ${className ?? ''}`}>
       <div className="relative">
         {isPreview ? (
           <div

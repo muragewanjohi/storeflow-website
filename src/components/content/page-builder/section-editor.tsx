@@ -1806,6 +1806,24 @@ function SalesTabSectionEditor({
                 placeholder="Optional subtitle"
               />
             </div>
+            <ColorPicker
+              label="Title Color"
+              colorKey="title_color"
+              defaultValue="#000000"
+              description="Color for the section title"
+              section={section}
+              onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
+              onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
+            />
+            <ColorPicker
+              label="Subtitle Color"
+              colorKey="subtitle_color"
+              defaultValue="#666666"
+              description="Color for the section subtitle"
+              section={section}
+              onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
+              onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
+            />
             <div className="space-y-2">
               <Label>Product Limit</Label>
               <Input
