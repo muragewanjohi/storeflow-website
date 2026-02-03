@@ -1635,14 +1635,14 @@ function SalesTabSectionComponent({
               </div>
             )}
             {section.banner_style !== 'none' && block.sale.banner_image && (
-              <div className="w-full mb-6">
-                <div className="relative aspect-video overflow-hidden">
+              <div className={`${containerClass} mb-6`} style={containerStyle}>
+                <div className="relative aspect-[32/9] overflow-hidden rounded-lg">
                   <Image
                     src={block.sale.banner_image}
                     alt={block.sale.name}
                     fill
                     className="object-cover"
-                    sizes="100vw"
+                    sizes="(max-width: 1200px) 100vw, 1200px"
                   />
                 </div>
               </div>
@@ -1671,14 +1671,14 @@ function SalesTabSectionComponent({
           return (
             <>
               {section.banner_style !== 'none' && block.sale.banner_image && (
-                <div className="w-full mb-8">
-                  <div className="relative aspect-video overflow-hidden">
+                <div className={`${containerClass} mb-8`} style={containerStyle}>
+                  <div className="relative aspect-[32/9] overflow-hidden rounded-lg">
                     <Image
                       src={block.sale.banner_image}
                       alt={block.sale.name}
                       fill
                       className="object-cover"
-                      sizes="100vw"
+                      sizes="(max-width: 1200px) 100vw, 1200px"
                     />
                   </div>
                 </div>
