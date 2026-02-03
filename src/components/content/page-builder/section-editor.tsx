@@ -373,27 +373,25 @@ function HeroSectionEditor({
                   </div>
                 </Label>
               </div>
-              {section.banner_image && (
-                <div className="space-y-2">
-                  <Label>Image Position</Label>
-                  <Select
-                    value={section.image_position || 'right'}
-                    onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ image_position: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="left">Left</SelectItem>
-                      <SelectItem value="center">Center</SelectItem>
-                      <SelectItem value="right">Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Position of the normal image when both banner and normal images are selected. Image will be vertically centered.
-                  </p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Image alignment</Label>
+                <Select
+                  value={section.image_position || 'right'}
+                  onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ image_position: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Where the normal image appears: left, center (below/above text), or right. Used when the hero has a background image or background colour.
+                </p>
+              </div>
             </>
           )}
         </div>

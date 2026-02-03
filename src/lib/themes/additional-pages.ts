@@ -151,6 +151,18 @@ export function createContactPageTemplate(tenantName: string, contactFormId?: st
           content_padding: 32,
         },
       },
+      {
+        id: 'contact-location-1',
+        type: 'location',
+        order: 2,
+        title: 'Find Us',
+        subtitle: 'Visit us at our office',
+        address: 'Loita Street, Nairobi, Kenya',
+        map_type: 'roadmap',
+        zoom: 15,
+        height: 400,
+        show_info_window: true,
+      },
     ],
   };
 }

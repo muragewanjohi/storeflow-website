@@ -262,10 +262,28 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
         throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} page`);
       }
 
-      // Force a hard refresh by redirecting with cache busting and refreshing router
+      // Save as draft: stay on edit page so user can click Preview (or go to new page's edit when creating)
+      if (saveAsDraft) {
+        setIsSubmitting(false);
+        if (isEditing) {
+          router.refresh();
+        } else {
+          const data = await response.json();
+          const newId = data.page?.id;
+          if (newId) {
+            router.push(`/dashboard/pages/${newId}`);
+            setTimeout(() => router.refresh(), 100);
+          } else {
+            router.push(`/dashboard/pages?refresh=${Date.now()}`);
+            setTimeout(() => router.refresh(), 100);
+          }
+        }
+        return;
+      }
+
+      // Publish: redirect to pages list
       const refreshUrl = `/dashboard/pages?refresh=${Date.now()}`;
       router.push(refreshUrl);
-      // Use setTimeout to ensure router.push completes before refresh
       setTimeout(() => {
         router.refresh();
       }, 100);

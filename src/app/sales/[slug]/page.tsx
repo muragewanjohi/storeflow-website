@@ -14,7 +14,9 @@ import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import { getCurrencyForTenant } from '@/lib/currency/get-currency-server';
 import SalePageClient from './sale-page-client';
+import SalePageCurrencyWrapper from './sale-page-currency-wrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +138,9 @@ export default async function SalePage({
   const skip = (page - 1) * limit;
   const paginatedProductSales = productSales.slice(skip, skip + limit);
 
+  // Fetch tenant currency so sale page shows selected currency on first paint
+  const currency = await getCurrencyForTenant(tenant.id);
+
   // Map products with sale pricing
   const products = paginatedProductSales.map((productSale) => {
     const product = productSale.products;
@@ -171,7 +176,8 @@ export default async function SalePage({
       <div className="min-h-screen bg-background flex flex-col">
         <StorefrontHeader />
         <main className="flex-1">
-          <SalePageClient
+          <SalePageCurrencyWrapper initialCurrency={currency}>
+            <SalePageClient
             sale={{
               id: sale.id,
               name: sale.name,
@@ -190,6 +196,7 @@ export default async function SalePage({
             limit={limit}
             themeSlug={tenant.theme_slug || 'default'}
           />
+          </SalePageCurrencyWrapper>
         </main>
         <StorefrontFooter />
       </div>

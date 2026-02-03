@@ -10,6 +10,7 @@
 import { PrismaClient } from '@prisma/client';
 import type { ThemeIndustry } from './theme-registry';
 import { generateSlug, generateSKU } from '@/lib/products/validation';
+import { createContactPageTemplate } from './additional-pages';
 
 /**
  * Demo Product type for preview/demo purposes
@@ -1519,12 +1520,53 @@ export async function createDemoPages(
       });
 
       if (!existingPage) {
+        let content: string;
+        if (pageData.slug === 'contact') {
+          // Use page-builder contact template (contact form + location: Loita Street, Nairobi, Kenya)
+          let contactFormId: string | undefined;
+          const existingForm = await prisma.form_builders.findFirst({
+            where: { tenant_id: tenantId, slug: 'contact-form' },
+            select: { id: true },
+          });
+          if (existingForm) {
+            contactFormId = existingForm.id;
+          } else {
+            const contactForm = await prisma.form_builders.create({
+              data: {
+                tenant_id: tenantId,
+                title: 'Contact Form',
+                slug: 'contact-form',
+                description: 'Get in touch with us using this form',
+                email: null,
+                button_text: 'Send Message',
+                fields: [
+                  { id: `field-${Date.now()}-1`, type: 'text', label: 'Name', name: 'name', required: true, placeholder: 'Your full name' },
+                  { id: `field-${Date.now()}-2`, type: 'email', label: 'Email', name: 'email', required: true, placeholder: 'your.email@example.com' },
+                  { id: `field-${Date.now()}-3`, type: 'text', label: 'Subject', name: 'subject', required: true, placeholder: 'What is this regarding?' },
+                  { id: `field-${Date.now()}-4`, type: 'textarea', label: 'Message', name: 'message', required: true, placeholder: 'Tell us how we can help you...' },
+                ],
+                success_message: 'Thank you for your message! We will get back to you soon.',
+                status: 'active',
+              },
+            });
+            contactFormId = contactForm.id;
+          }
+          const tenant = await prisma.tenants.findUnique({
+            where: { id: tenantId },
+            select: { contact_email: true },
+          });
+          const contactEmail = tenant?.contact_email ?? undefined;
+          const template = createContactPageTemplate(tenantName, contactFormId, contactEmail);
+          content = JSON.stringify(template);
+        } else {
+          content = pageData.content;
+        }
         await prisma.pages.create({
           data: {
             tenant_id: tenantId,
             title: pageData.title,
             slug: pageData.slug,
-            content: pageData.content,
+            content,
             status: 'published',
             meta_title: pageData.meta_title,
             meta_description: pageData.meta_description,

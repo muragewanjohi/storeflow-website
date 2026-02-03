@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageSection } from '@/lib/content/page-builder-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -75,6 +75,13 @@ const HERO_SUBTITLE_FONT_SIZES: Record<string, string> = {
   xl: 'clamp(1.625rem, 4vw, 2.25rem)',
 };
 
+// Hero with background (image or colour) uses one consistent size
+const HERO_VISUAL_MIN_H = 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px]';
+const HERO_CONTENT_MIN_H = 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]';
+// Normal image in hero: larger so it fits the big hero space (best practice: ~40–50% of hero height)
+const HERO_NORMAL_IMAGE_SIDE = 'h-[300px] sm:h-[380px] md:h-[480px] lg:h-[560px]';
+const HERO_NORMAL_IMAGE_CENTER = 'h-[280px] sm:h-[360px] md:h-[440px] lg:h-[520px]';
+
 function HeroSectionComponent({ 
   section, 
   isPreview 
@@ -83,6 +90,8 @@ function HeroSectionComponent({
   isPreview: boolean;
 }) {
   const hasBannerImage = section.banner_image && !section.banner_image.startsWith('blob:');
+  const hasBackgroundColor = !!(section.background_color && section.background_color.trim());
+  const hasVisualBackground = hasBannerImage || hasBackgroundColor;
   const hasNormalImage = section.image && !section.image.startsWith('blob:');
   const textAlignment = section.text_alignment || 'center';
   const shouldCropImage = section.image_crop !== false;
@@ -117,7 +126,7 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Hero background: full-width so no left/right trim; contain so full image visible; no grey when image set.
+  // Hero background: same container for image or colour (full-width; image uses contain, colour fills).
   const heroBackgroundStyle: React.CSSProperties = {
     backgroundColor: hasBannerImage ? 'transparent' : (section.background_color || 'var(--color-background, transparent)'),
     ...(hasBannerImage
@@ -133,15 +142,15 @@ function HeroSectionComponent({
 
   return (
     <section
-      className={`relative overflow-hidden ${hasBannerImage ? 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] py-4 sm:py-6 md:py-8' : 'py-12 sm:py-16 md:py-24'}`}
+      className={`relative overflow-hidden ${hasVisualBackground ? `${HERO_VISUAL_MIN_H} py-4 sm:py-6 md:py-8` : 'py-12 sm:py-16 md:py-24'}`}
       style={{
         ...sectionStyle,
         position: 'relative',
         isolation: 'isolate',
       }}
     >
-      {/* Full-width background so image is not trimmed on left/right; no background colour when image set */}
-      {hasBannerImage && (
+      {/* Full-width background: image or colour, same size so container is consistent */}
+      {hasVisualBackground && (
         <div
           className="absolute inset-0 z-0 bg-center bg-no-repeat"
           style={heroBackgroundStyle}
@@ -149,17 +158,17 @@ function HeroSectionComponent({
       )}
       {/* Content in container aligned with header */}
       <div
-        className={`container mx-auto px-2 sm:px-4 lg:px-8 relative ${hasBannerImage ? '' : 'rounded-lg'}`}
+        className={`container mx-auto px-2 sm:px-4 lg:px-8 relative ${hasVisualBackground ? '' : 'rounded-lg'}`}
         style={{ maxWidth: 'var(--container-max-width, 1200px)' }}
       >
-        {!hasBannerImage && (
+        {!hasVisualBackground && hasBackgroundColor && (
           <div
             className="absolute inset-0 z-0 rounded-lg"
             style={{ backgroundColor: section.background_color || 'var(--color-background, transparent)' }}
           />
         )}
-        <div className={`relative z-[2] ${hasBannerImage ? 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]' : ''}`}>
-        {hasBannerImage ? (
+        <div className={`relative z-[2] ${hasVisualBackground ? HERO_CONTENT_MIN_H : ''}`}>
+        {hasVisualBackground ? (
           // Full-width background image layout - can include normal image
           (() => {
             const imagePosition = section.image_position || 'right';
@@ -174,7 +183,7 @@ function HeroSectionComponent({
               if (isImageCenter) {
                 // Center image layout - image in center, text above/below
                 return (
-                  <div className={`flex flex-col items-center justify-center min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] ${alignmentClasses}`}>
+                  <div className={`flex flex-col items-center justify-center ${HERO_VISUAL_MIN_H} ${alignmentClasses}`}>
                     <div className={`w-full max-w-4xl ${textAlignment === 'center' ? 'text-center' : textAlignment === 'right' ? 'text-right' : 'text-left'}`}>
                       {section.title && (
                         <h1 
@@ -213,8 +222,8 @@ function HeroSectionComponent({
                       )}
                     </div>
                     
-                    {/* Center image - no border, transparent-friendly */}
-                    <div className="relative w-full max-w-2xl h-[240px] sm:h-[300px] md:h-[400px] my-6 md:my-8 overflow-hidden rounded-lg">
+                    {/* Center image - sized for hero (best practice: proportional to hero height) */}
+                    <div className={`relative w-full max-w-3xl ${HERO_NORMAL_IMAGE_CENTER} my-6 md:my-8 overflow-hidden rounded-lg`}>
                       {section.image!.startsWith('blob:') ? (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           <div className="text-center">
@@ -258,10 +267,10 @@ function HeroSectionComponent({
               } else {
                 // Left or right image layout - side by side
                 return (
-                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px] ${isImageLeft ? 'lg:grid-flow-col-dense' : ''}`}>
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center ${HERO_VISUAL_MIN_H} ${isImageLeft ? 'lg:grid-flow-col-dense' : ''}`}>
                     {/* Image column */}
                     {isImageLeft && (
-                      <div className="relative w-full h-[240px] sm:h-[300px] md:h-[400px] lg:h-[500px] order-1 overflow-hidden rounded-lg">
+                      <div className={`relative w-full ${HERO_NORMAL_IMAGE_SIDE} order-1 overflow-hidden rounded-lg`}>
                         {section.image!.startsWith('blob:') ? (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
@@ -342,7 +351,7 @@ function HeroSectionComponent({
                     
                     {/* Image column - right */}
                     {isImageRight && (
-                      <div className="relative w-full h-[240px] sm:h-[300px] md:h-[400px] lg:h-[500px] order-2 overflow-hidden rounded-lg">
+                      <div className={`relative w-full ${HERO_NORMAL_IMAGE_SIDE} order-2 overflow-hidden rounded-lg`}>
                         {section.image!.startsWith('blob:') ? (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
@@ -372,7 +381,7 @@ function HeroSectionComponent({
             } else {
               // No normal image - just text content
               return (
-                <div className={`flex ${alignmentClasses} min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px]`}>
+                <div className={`flex ${alignmentClasses} ${HERO_VISUAL_MIN_H}`}>
                   <div className={`max-w-4xl w-full ${textAlignment === 'center' ? 'mx-auto' : textAlignment === 'right' ? 'ml-auto' : ''}`}>
                     {section.title && (
                       <h1 
@@ -485,7 +494,7 @@ function HeroSectionComponent({
               )}
             </div>
             {hasNormalImage && (
-              <div className="relative w-full h-[280px] sm:h-[360px] md:h-[450px] lg:h-[550px] overflow-hidden rounded-lg">
+              <div className={`relative w-full ${HERO_NORMAL_IMAGE_SIDE} overflow-hidden rounded-lg`}>
                 {section.image!.startsWith('blob:') ? (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                     <div className="text-center">
@@ -1293,10 +1302,35 @@ function SalesTabSectionComponent({
   const bodyFont = 'var(--font-body, inherit)';
   
   const [sales, setSales] = useState<any[]>([]);
+  /** Each block has one sale and its products – for vertical layout (one sale = title, banner, timer, products) */
+  const [saleBlocks, setSaleBlocks] = useState<Array<{ sale: any; products: Product[] }>>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+
+  const mapSaleProducts = useCallback((productsArray: any[], sale: any, limit: number): Product[] =>
+    (productsArray || []).map((product: any) => {
+      const regularPrice = Number(product.compareAtPrice || product.price);
+      const salePrice = Number(product.price);
+      const discountPercent = product.discount_percent
+        ? Number(product.discount_percent)
+        : product.compareAtPrice && salePrice < regularPrice
+          ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
+          : 0;
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        price: salePrice,
+        compareAtPrice: product.compareAtPrice || undefined,
+        image: product.image,
+        stock_quantity: product.stock_quantity,
+        saleBadge: section.badge_text || sale.badge_text || 'SALE',
+        saleBadgeColor: section.badge_color || sale.badge_color || '#EF4444',
+        discountPercent,
+      };
+    }).slice(0, limit), [section.badge_text, section.badge_color]);
 
   useEffect(() => {
     if (isPreview) {
@@ -1336,35 +1370,10 @@ function SalesTabSectionComponent({
             throw new Error('Failed to fetch sale');
           }
           const saleData = await saleResponse.json();
-          
-          // Products from public API are already mapped - they're direct product objects
-          const productsArray = saleData.products || [];
-          
-          const saleProducts: Product[] = productsArray.map((product: any) => {
-            const regularPrice = Number(product.compareAtPrice || product.price);
-            const salePrice = Number(product.price);
-            const discountPercent = product.discount_percent 
-              ? Number(product.discount_percent)
-              : product.compareAtPrice && salePrice < regularPrice
-              ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
-              : 0;
-
-            return {
-              id: product.id,
-              name: product.name,
-              slug: product.slug,
-              price: salePrice,
-              compareAtPrice: product.compareAtPrice || undefined,
-              image: product.image,
-              stock_quantity: product.stock_quantity,
-              saleBadge: section.badge_text || saleData.sale?.badge_text || 'SALE',
-              saleBadgeColor: section.badge_color || saleData.sale?.badge_color || '#EF4444',
-              discountPercent,
-            };
-          }).slice(0, section.limit || 8);
-
+          const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || {}, section.limit || 8);
           setProducts(saleProducts);
           setSales([saleData.sale]);
+          setSaleBlocks([{ sale: saleData.sale, products: saleProducts }]);
         } else if (displayMode === 'featured_sales' && section.featured_sale_ids && section.featured_sale_ids.length > 0) {
           // Fetch featured sales from public API
           const featuredSalesResponse = await fetch('/api/sales?status=active&is_featured=true&limit=10');
@@ -1398,89 +1407,37 @@ function SalesTabSectionComponent({
           
           const validSalesData = salesWithProducts.filter(s => s !== null);
           setSales(validSalesData);
-
-          // Load products from first sale or active tab
-          if (validSalesData.length > 0) {
-            const activeSale = validSalesData[activeTab] || validSalesData[0];
-            const productsArray = activeSale.products || [];
-            
-            if (productsArray.length > 0) {
-              // Products from public API are already mapped - they're direct product objects
-              const saleProducts: Product[] = productsArray.map((product: any) => {
-                const regularPrice = Number(product.compareAtPrice || product.price);
-                const salePrice = Number(product.price);
-                const discountPercent = product.discount_percent 
-                  ? Number(product.discount_percent)
-                  : product.compareAtPrice && salePrice < regularPrice
-                  ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
-                  : 0;
-
-                return {
-                  id: product.id,
-                  name: product.name,
-                  slug: product.slug,
-                  price: salePrice,
-                  compareAtPrice: product.compareAtPrice || undefined,
-                  image: product.image,
-                  stock_quantity: product.stock_quantity,
-                  saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
-                  saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
-                  discountPercent,
-                };
-              }).slice(0, section.limit || 8);
-              setProducts(saleProducts);
-            } else {
-              setProducts([]);
-            }
+          const blocks = validSalesData.map((s: any) => ({
+            sale: s,
+            products: mapSaleProducts(s.products || [], s, section.limit || 8),
+          }));
+          setSaleBlocks(blocks);
+          if (blocks.length > 0) {
+            setProducts(blocks[activeTab]?.products ?? blocks[0].products);
           } else {
             setProducts([]);
           }
         } else if (displayMode === 'all_active') {
-          // Fetch all active sales
           const salesResponse = await fetch('/api/sales?status=active&limit=10');
-          if (!salesResponse.ok) {
-            throw new Error('Failed to fetch sales');
-          }
+          if (!salesResponse.ok) throw new Error('Failed to fetch sales');
           const salesData = await salesResponse.json();
           const allSales = salesData.sales || [];
           setSales(allSales);
 
-          // Get products from all sales (combined)
-          const allProducts: Product[] = [];
-          for (const sale of allSales.slice(0, 3)) { // Limit to first 3 sales
+          const blocks: Array<{ sale: any; products: Product[] }> = [];
+          for (const sale of allSales) {
             const saleResponse = await fetch(`/api/sales/${sale.slug}`);
             if (saleResponse.ok) {
               const saleData = await saleResponse.json();
-              // Products from public API are already mapped - they're direct product objects
-              const productsArray = saleData.products || [];
-              const saleProducts = productsArray.map((product: any) => {
-                const regularPrice = Number(product.compareAtPrice || product.price);
-                const salePrice = Number(product.price);
-                const discountPercent = product.discount_percent 
-                  ? Number(product.discount_percent)
-                  : product.compareAtPrice && salePrice < regularPrice
-                  ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
-                  : 0;
-
-                return {
-                  id: product.id,
-                  name: product.name,
-                  slug: product.slug,
-                  price: salePrice,
-                  compareAtPrice: product.compareAtPrice || undefined,
-                  image: product.image,
-                  stock_quantity: product.stock_quantity,
-                  saleBadge: section.badge_text || sale.badge_text || 'SALE',
-                  saleBadgeColor: section.badge_color || sale.badge_color || '#EF4444',
-                  discountPercent,
-                };
-              });
-              allProducts.push(...saleProducts);
+              const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || sale, section.limit || 8);
+              blocks.push({ sale: saleData.sale || sale, products: saleProducts });
             }
           }
-          setProducts(allProducts.slice(0, section.limit || 8));
+          setSaleBlocks(blocks);
+          setProducts(blocks[0]?.products ?? []);
         } else {
           setProducts([]);
+          setSaleBlocks([]);
         }
       } catch (err) {
         console.error('Error fetching sales data:', err);
@@ -1491,39 +1448,18 @@ function SalesTabSectionComponent({
     };
 
     fetchData();
-  }, [displayMode, section.sale_id, section.sale_slug, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview]);
+  }, [displayMode, section.sale_id, section.sale_slug, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview, mapSaleProducts]);
 
-  // Update products when active tab changes (for featured_sales mode)
+  // Update products when active tab changes (featured_sales with tabs layout)
   useEffect(() => {
+    if (displayMode === 'featured_sales' && saleBlocks.length > 0 && !isPreview) {
+      const block = saleBlocks[activeTab] ?? saleBlocks[0];
+      if (block) setProducts(block.products);
+      return;
+    }
     if (displayMode === 'featured_sales' && sales.length > 0 && !isPreview) {
       const activeSale = sales[activeTab] || sales[0];
-      if (activeSale && activeSale.products) {
-        // Products are already loaded in the sale object
-        const productsArray = activeSale.products || [];
-        const saleProducts: Product[] = productsArray.map((product: any) => {
-          const regularPrice = Number(product.compareAtPrice || product.price);
-          const salePrice = Number(product.price);
-          const discountPercent = product.discount_percent 
-            ? Number(product.discount_percent)
-            : product.compareAtPrice && salePrice < regularPrice
-            ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)
-            : 0;
-
-          return {
-            id: product.id,
-            name: product.name,
-            slug: product.slug,
-            price: salePrice,
-            compareAtPrice: product.compareAtPrice || undefined,
-            image: product.image,
-            stock_quantity: product.stock_quantity,
-            saleBadge: section.badge_text || activeSale.badge_text || 'SALE',
-            saleBadgeColor: section.badge_color || activeSale.badge_color || '#EF4444',
-            discountPercent,
-          };
-        }).slice(0, section.limit || 8);
-        setProducts(saleProducts);
-      } else if (activeSale && activeSale.slug) {
+      if (activeSale && activeSale.slug) {
         // Fallback: fetch if products not already loaded
         fetch(`/api/sales/${activeSale.slug}`)
           .then(res => res.json())
@@ -1559,42 +1495,17 @@ function SalesTabSectionComponent({
           });
       }
     }
-  }, [activeTab, displayMode, sales, section.limit, section.badge_text, section.badge_color, isPreview]);
+  }, [activeTab, displayMode, sales, saleBlocks, section.limit, section.badge_text, section.badge_color, isPreview]);
 
-  const renderProducts = () => {
-    if (isPreview) {
-      return (
-        <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
-          Sales Tab products will be displayed here
-        </div>
-      );
-    }
-
-    if (isLoading) {
-      return (
-        <div className="col-span-full text-center text-muted-foreground py-12">
-          Loading products...
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="col-span-full text-center text-destructive py-12">
-          {error}
-        </div>
-      );
-    }
-
-    if (products.length === 0) {
+  const renderProductCards = (productsList: Product[]) => {
+    if (!productsList.length) {
       return (
         <div className="col-span-full text-center text-muted-foreground py-12">
           No products found
         </div>
       );
     }
-
-    return products.map((product) => (
+    return productsList.map((product) => (
       <div key={product.id} className="relative">
         {section.show_badge !== false && product.saleBadge && (
           <Badge
@@ -1615,73 +1526,85 @@ function SalesTabSectionComponent({
     ));
   };
 
+  const renderProducts = () => {
+    if (isPreview) {
+      return (
+        <div className="text-center text-muted-foreground py-12 border-2 border-dashed rounded-lg col-span-full">
+          Sales Tab products will be displayed here
+        </div>
+      );
+    }
+    if (isLoading) {
+      return (
+        <div className="col-span-full text-center text-muted-foreground py-12">
+          Loading products...
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <div className="col-span-full text-center text-destructive py-12">
+          {error}
+        </div>
+      );
+    }
+    return renderProductCards(products);
+  };
+
+  const containerClass = 'container mx-auto px-4';
+  const containerStyle = { maxWidth: 'var(--container-max-width, 1200px)' };
+
+  if (isLoading) {
+    return (
+      <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
+        <div className={containerClass} style={containerStyle}>
+          <div className="text-center text-muted-foreground py-12">Loading sales...</div>
+        </div>
+      </section>
+    );
+  }
+  if (error) {
+    return (
+      <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
+        <div className={containerClass} style={containerStyle}>
+          <div className="text-center text-destructive py-12">{error}</div>
+        </div>
+      </section>
+    );
+  }
+
+  const useVerticalLayout = saleBlocks.length > 1;
+
   return (
     <section className="py-16 bg-white" style={{ fontFamily: bodyFont }}>
-      <div className="container mx-auto px-4" style={{ maxWidth: 'var(--container-max-width, 1200px)' }}>
-        {/* Header */}
+      {/* Section header (title, subtitle, top CTA) */}
+      <div className={containerClass} style={containerStyle}>
         <div className="flex items-center justify-between mb-8">
           <div>
             {section.title && (
-              <h2 
+              <h2
                 className="text-3xl md:text-4xl font-bold mb-2"
-                style={{ 
-                  fontFamily: headingFont,
-                  color: 'var(--color-text, currentColor)',
-                }}
+                style={{ fontFamily: headingFont, color: 'var(--color-text, currentColor)' }}
               >
                 {section.title}
               </h2>
             )}
-            {section.show_sale_name && sales.length > 0 && (
-              <div className="mb-2">
-                {displayMode === 'all_active' && sales.length > 1 ? (
-                  <p className="text-lg font-semibold text-primary">
-                    Active Sales: {sales.map(s => s.name).join(', ')}
-                  </p>
-                ) : sales.length > 0 ? (
-                  <p className="text-lg font-semibold text-primary">
-                    {sales[0].name}
-                  </p>
-                ) : null}
-              </div>
+            {!useVerticalLayout && section.show_sale_name && sales.length > 0 && (
+              <p className="text-lg font-semibold text-primary mb-2">{sales[0].name}</p>
             )}
-            {section.subtitle && (
-              <p className="text-muted-foreground">{section.subtitle}</p>
-            )}
+            {section.subtitle && <p className="text-muted-foreground">{section.subtitle}</p>}
           </div>
           {section.cta_position === 'top_right' && section.cta_text && section.cta_link && (
             <Link href={section.cta_link}>
-              <Button variant="outline">
-                {section.cta_text}
-              </Button>
+              <Button variant="outline">{section.cta_text}</Button>
             </Link>
           )}
         </div>
+      </div>
 
-        {/* Banner (if enabled) */}
-        {section.banner_style !== 'none' && sales.length > 0 && sales[0]?.banner_image && (
-          <div className={`mb-8 ${section.banner_style === 'full_width' ? 'w-full' : 'max-w-4xl mx-auto'}`}>
-            <div className="relative aspect-video overflow-hidden rounded-lg">
-              <Image
-                src={sales[0].banner_image}
-                alt={sales[0].name}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Countdown Timer (if enabled) */}
-        {section.show_countdown && sales.length > 0 && sales[0]?.end_date && (
-          <div className="mb-8 flex justify-center">
-            <CountdownTimer endDate={sales[0].end_date} />
-          </div>
-        )}
-
-        {/* Tabs (for featured_sales mode) */}
-        {displayMode === 'featured_sales' && layout === 'tabs' && sales.length > 1 && (
+      {/* Tabs only when multiple sales and not using vertical layout (legacy tabs mode) */}
+      {!useVerticalLayout && displayMode === 'featured_sales' && layout === 'tabs' && sales.length > 1 && (
+        <div className={containerClass} style={containerStyle}>
           <div className="mb-8 border-b">
             <div className="flex gap-4 overflow-x-auto">
               {sales.map((sale, index) => (
@@ -1689,9 +1612,7 @@ function SalesTabSectionComponent({
                   key={sale.id}
                   onClick={() => setActiveTab(index)}
                   className={`px-4 py-2 border-b-2 transition-colors ${
-                    activeTab === index
-                      ? 'border-primary text-primary font-semibold'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                    activeTab === index ? 'border-primary text-primary font-semibold' : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {sale.name}
@@ -1699,23 +1620,96 @@ function SalesTabSectionComponent({
               ))}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Products Grid/Carousel */}
-        {layout === 'carousel' ? (
-          <div className="overflow-x-auto">
-            <div className={`flex gap-6 min-w-max ${gridCols}`}>
-              {renderProducts()}
+      {/* Per-sale blocks: each sale gets its own title, full-width banner, timer, products */}
+      {useVerticalLayout ? (
+        saleBlocks.map((block) => (
+          <div key={block.sale.id} className="mb-12 md:mb-16">
+            {section.show_sale_name && (
+              <div className={containerClass} style={containerStyle}>
+                <h3 className="text-2xl md:text-3xl font-bold mb-4" style={{ fontFamily: headingFont, color: 'var(--color-text, currentColor)' }}>
+                  {block.sale.name}
+                </h3>
+              </div>
+            )}
+            {section.banner_style !== 'none' && block.sale.banner_image && (
+              <div className="w-full mb-6">
+                <div className="relative aspect-video overflow-hidden">
+                  <Image
+                    src={block.sale.banner_image}
+                    alt={block.sale.name}
+                    fill
+                    className="object-cover"
+                    sizes="100vw"
+                  />
+                </div>
+              </div>
+            )}
+            {section.show_countdown && block.sale.end_date && (
+              <div className={containerClass} style={containerStyle}>
+                <div className="mb-8 flex justify-center">
+                  <CountdownTimer endDate={block.sale.end_date} />
+                </div>
+              </div>
+            )}
+            <div className={containerClass} style={containerStyle}>
+              {layout === 'carousel' ? (
+                <div className="overflow-x-auto">
+                  <div className={`flex gap-6 min-w-max ${gridCols}`}>{renderProductCards(block.products)}</div>
+                </div>
+              ) : (
+                <div className={`grid grid-cols-1 ${gridCols} gap-6`}>{renderProductCards(block.products)}</div>
+              )}
             </div>
           </div>
-        ) : (
-          <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-            {renderProducts()}
-          </div>
-        )}
+        ))
+      ) : saleBlocks.length > 0 ? (
+        (() => {
+          const block = saleBlocks[0];
+          return (
+            <>
+              {section.banner_style !== 'none' && block.sale.banner_image && (
+                <div className="w-full mb-8">
+                  <div className="relative aspect-video overflow-hidden">
+                    <Image
+                      src={block.sale.banner_image}
+                      alt={block.sale.name}
+                      fill
+                      className="object-cover"
+                      sizes="100vw"
+                    />
+                  </div>
+                </div>
+              )}
+              {section.show_countdown && block.sale.end_date && (
+                <div className={containerClass} style={containerStyle}>
+                  <div className="mb-8 flex justify-center">
+                    <CountdownTimer endDate={block.sale.end_date} />
+                  </div>
+                </div>
+              )}
+              <div className={containerClass} style={containerStyle}>
+                {layout === 'carousel' ? (
+                  <div className="overflow-x-auto">
+                    <div className={`flex gap-6 min-w-max ${gridCols}`}>{renderProducts()}</div>
+                  </div>
+                ) : (
+                  <div className={`grid grid-cols-1 ${gridCols} gap-6`}>{renderProducts()}</div>
+                )}
+              </div>
+            </>
+          );
+        })()
+      ) : (
+        <div className={containerClass} style={containerStyle}>
+          <div className="text-center text-muted-foreground py-12">No sales found</div>
+        </div>
+      )}
 
-        {/* Bottom CTA */}
-        {section.cta_position === 'bottom_center' && section.cta_text && section.cta_link && (
+      {section.cta_position === 'bottom_center' && section.cta_text && section.cta_link && (
+        <div className={containerClass} style={containerStyle}>
           <div className="mt-8 text-center">
             <Link href={section.cta_link}>
               <Button variant="outline" size="lg">
@@ -1723,8 +1717,8 @@ function SalesTabSectionComponent({
               </Button>
             </Link>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -3176,12 +3170,12 @@ function BlogsSectionComponent({
           </div>
         )}
 
-        {/* CTA Button */}
+        {/* CTA Button - uses theme primary (same as login button) */}
         {section.cta_text && section.cta_link && (
           <div className="text-center mt-12">
             <Link
               href={section.cta_link}
-              className="inline-block bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all"
+              className="inline-block bg-primary text-primary-foreground hover:bg-accent px-8 py-4 rounded-lg hover:shadow-lg transition-colors font-medium"
             >
               {section.cta_text}
             </Link>
@@ -3258,7 +3252,7 @@ function BlogCard({
             </p>
           )}
           {section.show_read_more && (
-            <span className="text-[#0025cc] text-sm font-medium hover:underline">
+            <span className="text-primary text-sm font-medium hover:underline">
               Read More →
             </span>
           )}
@@ -3326,7 +3320,7 @@ function BlogCard({
           </p>
         )}
         {section.show_read_more && (
-          <span className="text-[#0025cc] text-sm font-medium hover:underline">
+          <span className="text-primary text-sm font-medium hover:underline">
             Read More →
           </span>
         )}
