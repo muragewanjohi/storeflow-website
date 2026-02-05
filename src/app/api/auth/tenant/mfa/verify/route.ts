@@ -158,23 +158,28 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // CRITICAL: Return a REDIRECT response with cookies set on it.
-      // This ensures the browser stores session cookies and then requests /dashboard with them,
-      // fixing "redirected back to login" after MFA (cookies from JSON response were not always sent on next request).
+      // Return a JSON response with cookies properly set.
+      // Using JSON instead of redirect because opaque redirects (with redirect: 'manual')
+      // don't reliably process Set-Cookie headers in all browsers.
       const { createServerClient } = await import('@supabase/ssr');
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-      const dashboardUrl = new URL('/dashboard', request.url);
+      // Create JSON response first
+      const response = NextResponse.json({
+        success: true,
+        message: 'MFA verification successful',
+        redirectTo: '/dashboard',
+      });
 
-      const response = NextResponse.redirect(dashboardUrl, 302);
-
+      // Create Supabase client that sets cookies on the JSON response
       const responseSupabase = createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
+            console.log('[MFA Verify] Setting cookies on response:', cookiesToSet.map(c => c.name));
             cookiesToSet.forEach(({ name, value, options }) => {
               response.cookies.set(name, value, options);
             });
@@ -204,7 +209,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      console.log('[MFA Verify] ✅ Session set; redirecting to dashboard with cookies');
+      // Log the cookies that will be sent
+      const responseCookies = response.cookies.getAll();
+      console.log('[MFA Verify] ✅ Session set; returning JSON with cookies:', responseCookies.map(c => c.name));
+      
       return response;
     }
 
