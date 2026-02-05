@@ -42,6 +42,14 @@ const BUSINESS_TYPE_DEMOS: BusinessTypeDemo[] = [
     description: 'Medications and wellness products',
   },
   {
+    id: 'shoes',
+    businessType: 'shoes',
+    title: 'Shoes',
+    image: '/images/themes/shoes_multipurpose.png',
+    demoUrl: 'https://shoes.dukanest.com/',
+    description: 'Footwear and shoe accessories',
+  },
+  {
     id: 'fashion',
     businessType: 'fashion',
     title: 'Fashion',

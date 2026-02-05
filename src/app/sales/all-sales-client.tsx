@@ -64,7 +64,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
             className="group overflow-hidden hover:shadow-xl transition-all duration-300 h-full flex flex-col border-2 hover:border-primary/20"
           >
             {/* Image Section with Overlay */}
-            <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-muted to-muted/50">
+            <div className="relative aspect-[4/3] overflow-hidden bg-transparent">
               {sale.banner_image ? (
                 <Image
                   src={sale.banner_image}

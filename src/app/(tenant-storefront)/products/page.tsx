@@ -187,9 +187,22 @@ export default async function ProductsPage({
   // Handle attribute filters
   const attributeFilters: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (typeof key === 'string' && key.startsWith('attr_')) {
+    if (typeof key === 'string' && key.startsWith('attr_') && value) {
       const attributeId = key.replace('attr_', '');
-      const valueIds = (value as string).split(',').filter(id => id.trim());
+      let valueIds: string[] = [];
+      
+      // Handle both string and array values (URL params can be either)
+      if (Array.isArray(value)) {
+        // Value is an array of strings - flatten and split any comma-separated values
+        valueIds = value
+          .flatMap(v => typeof v === 'string' ? v.split(',') : [])
+          .map(id => id.trim())
+          .filter(id => id.length > 0);
+      } else if (typeof value === 'string') {
+        // Value is a single string - split by comma
+        valueIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
+      
       if (valueIds.length > 0) {
         attributeFilters[attributeId] = valueIds;
       }

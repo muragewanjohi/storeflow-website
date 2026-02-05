@@ -8,7 +8,7 @@
 
 import type { ThemeConfig } from '@/types/theme';
 
-export type ThemeIndustry = 'electronics' | 'fashion' | 'general' | 'grocery' | 'furniture' | 'pharmacy';
+export type ThemeIndustry = 'electronics' | 'fashion' | 'general' | 'grocery' | 'furniture' | 'pharmacy' | 'shoes';
 
 export interface ThemeTemplateConfig {
   id: string;

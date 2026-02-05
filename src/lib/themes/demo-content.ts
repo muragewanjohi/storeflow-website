@@ -760,6 +760,105 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
     };
   }
 
+  // Shoes / Footwear Store
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return {
+      categories: [
+        { name: 'Sneakers', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=300&fit=crop' },
+        { name: 'Running Shoes', image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=300&fit=crop' },
+        { name: 'Formal Shoes', image: 'https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=400&h=300&fit=crop' },
+        { name: 'Boots', image: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=400&h=300&fit=crop' },
+        { name: 'Sandals', image: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=400&h=300&fit=crop' },
+        { name: 'Kids Shoes', image: 'https://images.unsplash.com/photo-1555274175-6cbf6f3b137b?w=400&h=300&fit=crop' },
+      ],
+      products: [
+        {
+          name: 'Classic Running Sneakers',
+          description: 'Lightweight and breathable running sneakers with excellent cushioning for everyday comfort.',
+          short_description: 'Lightweight running sneakers',
+          price: 89.99,
+          sale_price: 74.99,
+          category_index: 0,
+          image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop',
+          sku: 'SHO-SNK-001',
+        },
+        {
+          name: 'Performance Running Shoes',
+          description: 'High-performance running shoes designed for athletes. Superior grip and energy return.',
+          short_description: 'High-performance running shoes',
+          price: 129.99,
+          category_index: 1,
+          image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=400&fit=crop',
+          sku: 'SHO-RUN-001',
+        },
+        {
+          name: 'Leather Oxford Shoes',
+          description: 'Classic leather oxford shoes perfect for formal occasions and business wear.',
+          short_description: 'Classic leather oxfords',
+          price: 149.99,
+          category_index: 2,
+          image: 'https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=400&h=400&fit=crop',
+          sku: 'SHO-FRM-001',
+        },
+        {
+          name: 'Casual Canvas Sneakers',
+          description: 'Versatile canvas sneakers for everyday casual wear. Comfortable and stylish.',
+          short_description: 'Casual canvas sneakers',
+          price: 59.99,
+          category_index: 0,
+          image: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=400&h=400&fit=crop',
+          sku: 'SHO-CAS-001',
+        },
+        {
+          name: 'Leather Chelsea Boots',
+          description: 'Premium leather Chelsea boots with elastic side panels. Timeless style.',
+          short_description: 'Premium Chelsea boots',
+          price: 179.99,
+          category_index: 3,
+          image: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=400&h=400&fit=crop',
+          sku: 'SHO-BOT-001',
+        },
+        {
+          name: 'Summer Sandals',
+          description: 'Comfortable leather sandals perfect for summer days. Adjustable straps for perfect fit.',
+          short_description: 'Comfortable summer sandals',
+          price: 49.99,
+          category_index: 4,
+          image: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=400&h=400&fit=crop',
+          sku: 'SHO-SAN-001',
+        },
+        {
+          name: 'Kids Sports Sneakers',
+          description: 'Durable and colorful sports sneakers for active kids. Easy velcro closure.',
+          short_description: 'Kids sports sneakers',
+          price: 44.99,
+          category_index: 5,
+          image: 'https://images.unsplash.com/photo-1555274175-6cbf6f3b137b?w=400&h=400&fit=crop',
+          sku: 'SHO-KID-001',
+        },
+        {
+          name: 'Slip-On Loafers',
+          description: 'Elegant slip-on loafers for a smart casual look. Soft leather with cushioned insole.',
+          short_description: 'Elegant slip-on loafers',
+          price: 99.99,
+          sale_price: 79.99,
+          category_index: 2,
+          image: 'https://images.unsplash.com/photo-1533867617858-e7b97e060509?w=400&h=400&fit=crop',
+          sku: 'SHO-LOA-001',
+        },
+        {
+          name: 'Trail Hiking Boots',
+          description: 'Rugged hiking boots with waterproof membrane and excellent ankle support.',
+          short_description: 'Waterproof hiking boots',
+          price: 159.99,
+          category_index: 3,
+          image: 'https://images.unsplash.com/photo-1520219306100-ec4afeeefe58?w=400&h=400&fit=crop',
+          sku: 'SHO-HIK-001',
+        },
+      ],
+    };
+  }
+
   // Default/Generic - fallback
   return getDefaultDemoContent();
 }
@@ -1373,6 +1472,36 @@ export async function createDemoAttributes(
     );
   }
   
+  // Shoes / Footwear - shoe sizes and colors
+  if (type.includes('shoes') || type.includes('footwear')) {
+    attributeConfigs.push(
+      {
+        name: 'Size',
+        type: 'size',
+        values: [
+          { value: 'US 6' },
+          { value: 'US 7' },
+          { value: 'US 8' },
+          { value: 'US 9' },
+          { value: 'US 10' },
+          { value: 'US 11' },
+          { value: 'US 12' },
+        ],
+      },
+      {
+        name: 'Color',
+        type: 'color',
+        values: [
+          { value: 'Black', color_code: '#000000' },
+          { value: 'White', color_code: '#FFFFFF' },
+          { value: 'Red', color_code: '#DC3545' },
+          { value: 'Blue', color_code: '#007BFF' },
+          { value: 'Brown', color_code: '#8B4513' },
+        ],
+      }
+    );
+  }
+  
   // Default attributes for any theme (ensure we have at least 2)
   if (attributeConfigs.length === 0) {
     attributeConfigs.push(
@@ -1788,6 +1917,12 @@ function getBlogFeaturedImagesByBusinessType(businessType: string): string[] {
       'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&h=600&fit=crop',
     ];
   }
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return [
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop',
+    ];
+  }
   return defaultImages;
 }
 
@@ -1820,6 +1955,9 @@ function getSalesBannerImageByBusinessType(businessType: string): string {
   }
   if (type.includes('furniture') || type.includes('home decor')) {
     return 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&h=400&fit=crop';
+  }
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1200&h=400&fit=crop';
   }
   return defaultBanner;
 }

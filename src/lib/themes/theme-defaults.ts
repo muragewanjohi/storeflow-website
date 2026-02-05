@@ -416,6 +416,20 @@ export function getBusinessTypeColorScheme(businessType: string): Partial<ThemeC
     };
   }
 
+  // Shoes / Footwear
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return {
+      primary: '#007BFF',        // Vibrant blue
+      secondary: '#FF4500',      // Orange red
+      accent: '#DC3545',         // Red accent
+      background: '#FFFFFF',     // White background
+      text: '#212529',           // Dark text
+      muted: '#6C757D',          // Gray muted
+      buttonBackground: '#0066CC', // Blue button
+      buttonText: '#FFFFFF',     // White button text
+    };
+  }
+
   // Default/Other - use neutral colors
   return {
     primary: '#0066CC',         // Standard blue
