@@ -181,7 +181,16 @@ export async function POST(request: NextRequest) {
           setAll(cookiesToSet) {
             console.log('[MFA Verify] Setting cookies on response:', cookiesToSet.map(c => c.name));
             cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
+              // Set cookies with proper security options for production
+              response.cookies.set(name, value, {
+                ...options,
+                // Ensure secure in production (required for SameSite=None, recommended always)
+                secure: process.env.NODE_ENV === 'production',
+                // SameSite lax allows navigation from external links while preventing CSRF
+                sameSite: 'lax',
+                // Path should be root for auth cookies
+                path: '/',
+              });
             });
           },
         },

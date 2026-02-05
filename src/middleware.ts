@@ -172,18 +172,30 @@ export async function middleware(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
+              // Ensure cookies are set with proper security options
+              response.cookies.set(name, value, {
+                ...options,
+                // Ensure secure in production
+                secure: process.env.NODE_ENV === 'production',
+                // SameSite lax allows navigation from external links
+                sameSite: 'lax',
+                // Path should be root for auth cookies
+                path: '/',
+              });
             });
           },
         },
       }
     );
 
+    // IMPORTANT: Refresh session FIRST to ensure valid tokens before any checks
+    // This updates cookies if the session was refreshed
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
     // CRITICAL SECURITY: Block landlords from accessing tenant subdomains
     // Landlords should only access the platform admin at /admin routes on marketing domain
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const userRole = session.user.user_metadata?.role;
+    if (user && !userError) {
+      const userRole = user.user_metadata?.role;
       if (userRole === 'landlord') {
         // Landlord trying to access tenant subdomain - BLOCK and redirect
         // Build redirect URL to marketing domain
@@ -197,9 +209,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
       }
     }
-
-    // Refresh session (this updates cookies if needed)
-    await supabase.auth.getSession();
 
     // Also set response headers (for client-side access)
     response.headers.set('x-tenant-id', tenant.id);
