@@ -237,7 +237,7 @@ export default function MultipurposeThemeClient() {
                     ))
                   ) : (
                     <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                      No industries found for "{searchQuery}"
+                      No industries found for &ldquo;{searchQuery}&rdquo;
                     </div>
                   )}
                 </div>
