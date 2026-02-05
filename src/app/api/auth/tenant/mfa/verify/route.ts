@@ -23,11 +23,48 @@ const verifySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  console.log('[MFA Verify] ========================================');
+  console.log('[MFA Verify] POST /api/auth/tenant/mfa/verify');
+  console.log('[MFA Verify] Request received at:', new Date().toISOString());
+  
   try {
     const tenant = await requireTenant();
+    console.log('[MFA Verify] Tenant:', tenant.subdomain);
+    
     const body = await request.json();
     const validatedData = verifySchema.parse(body);
     const { userId, code, tempSession } = validatedData;
+    
+    console.log('[MFA Verify] userId:', userId);
+    console.log('[MFA Verify] code length:', code?.length);
+    console.log('[MFA Verify] tempSession provided:', !!tempSession);
+    if (tempSession) {
+      console.log('[MFA Verify] tempSession.access_token:', tempSession.access_token ? `${tempSession.access_token.substring(0, 20)}...` : 'MISSING');
+      console.log('[MFA Verify] tempSession.refresh_token:', tempSession.refresh_token ? 'present' : 'MISSING');
+      console.log('[MFA Verify] tempSession.expires_at:', tempSession.expires_at);
+      
+      // Check if token is expired
+      if (tempSession.expires_at) {
+        const expiresAt = new Date(tempSession.expires_at * 1000);
+        const now = new Date();
+        const isExpired = now > expiresAt;
+        console.log('[MFA Verify] Token expires at:', expiresAt.toISOString());
+        console.log('[MFA Verify] Current time:', now.toISOString());
+        console.log('[MFA Verify] Token expired:', isExpired);
+        if (isExpired) {
+          console.error('[MFA Verify] ❌ TOKEN IS EXPIRED!');
+          return NextResponse.json(
+            { 
+              error: 'Session expired',
+              message: 'Your login session has expired. Please log in again.'
+            },
+            { status: 401 }
+          );
+        }
+      }
+    } else {
+      console.warn('[MFA Verify] ⚠️ No tempSession provided!');
+    }
 
     // Create Supabase client for initial operations
     const supabase = await createClient();

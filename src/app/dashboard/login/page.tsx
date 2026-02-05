@@ -53,10 +53,33 @@ export default function TenantAdminLoginPage() {
     try {
       // If 2FA is required, verify the code
       if (requiresMFA && userId) {
+        console.log('[Login Client] ========================================');
+        console.log('[Login Client] Starting MFA verification');
+        console.log('[Login Client] userId:', userId);
+        console.log('[Login Client] tempSession exists:', !!tempSession);
+        console.log('[Login Client] tempSession.access_token exists:', !!tempSession?.access_token);
+        console.log('[Login Client] tempSession.refresh_token exists:', !!tempSession?.refresh_token);
+        console.log('[Login Client] tempSession.expires_at:', tempSession?.expires_at);
+        
+        // Check if temp session might be expired
+        if (tempSession?.expires_at) {
+          const expiresAt = new Date(tempSession.expires_at * 1000);
+          const now = new Date();
+          console.log('[Login Client] Token expires at:', expiresAt.toISOString());
+          console.log('[Login Client] Current time:', now.toISOString());
+          console.log('[Login Client] Token expired:', now > expiresAt);
+          if (now > expiresAt) {
+            console.warn('[Login Client] ⚠️ Token appears to be expired!');
+          }
+        }
+
+        // Use redirect: 'manual' to handle 302 redirects ourselves
+        // This ensures cookies are properly set before navigation
         const response = await fetch('/api/auth/tenant/mfa/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
+          redirect: 'manual', // Don't auto-follow redirects
           body: JSON.stringify({
             userId,
             code: mfaCode,
@@ -64,19 +87,68 @@ export default function TenantAdminLoginPage() {
           }),
         });
 
-        // Server returns 302 redirect to /dashboard with Set-Cookie; fetch follows redirect
-        if (response.ok && (response.redirected || response.url?.includes('/dashboard'))) {
+        console.log('[Login Client] MFA verify response received');
+        console.log('[Login Client] response.type:', response.type);
+        console.log('[Login Client] response.status:', response.status);
+        console.log('[Login Client] response.ok:', response.ok);
+        console.log('[Login Client] response.url:', response.url);
+        console.log('[Login Client] response.redirected:', response.redirected);
+
+        // Handle 302 redirect response (opaque redirect with redirect: 'manual')
+        // Status 0 with type 'opaqueredirect' means redirect was returned
+        if (response.type === 'opaqueredirect') {
+          console.log('[Login Client] ✅ Received opaque redirect - MFA successful');
+          console.log('[Login Client] Waiting 150ms for cookie processing...');
+          // Cookies should be set from the 302 response
+          // Small delay to ensure cookies are processed by the browser
+          await new Promise(resolve => setTimeout(resolve, 150));
+          console.log('[Login Client] Navigating to /dashboard');
           setIsLoading(false);
-          window.location.href = response.redirected ? response.url : '/dashboard';
+          window.location.href = '/dashboard';
           return;
         }
 
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          setError(data.message || data.error || 'Invalid code. Please try again.');
-          setMfaCode('');
+        // Parse response body for all other cases
+        console.log('[Login Client] Parsing response body...');
+        const data = await response.json().catch((err) => {
+          console.error('[Login Client] Failed to parse response as JSON:', err);
+          return {};
+        });
+        console.log('[Login Client] Response data:', JSON.stringify(data, null, 2));
+
+        // If server returned success JSON (fallback path without redirect)
+        if (response.ok && data.success) {
+          console.log('[Login Client] ✅ Success response (JSON path) - navigating to dashboard');
+          setIsLoading(false);
+          window.location.href = '/dashboard';
           return;
         }
+
+        // Handle error responses
+        if (!response.ok || data.error) {
+          console.error('[Login Client] ❌ Error response received');
+          console.error('[Login Client] Status:', response.status);
+          console.error('[Login Client] Error:', data.error);
+          console.error('[Login Client] Message:', data.message);
+          
+          const errorMsg = data.message || data.error || 'Invalid code. Please try again.';
+          // Check for session expiry hints
+          if (errorMsg.includes('session') || errorMsg.includes('expired') || errorMsg.includes('try logging in again')) {
+            console.error('[Login Client] Session expired - resetting MFA state');
+            setError('Your session has expired. Please log in again.');
+            // Reset MFA state to go back to password entry
+            setRequiresMFA(false);
+            setUserId(null);
+            setTempSession(null);
+          } else {
+            setError(errorMsg);
+          }
+          setMfaCode('');
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('[Login Client] ========================================');
       }
 
       // Initial login (password only)
@@ -98,6 +170,24 @@ export default function TenantAdminLoginPage() {
       // 2FA is ALWAYS required for tenant admin accounts
       // The API will always return requiresMFA: true for tenant admins
       if (data.requiresMFA && data.userId) {
+        console.log('[Login Client] ========================================');
+        console.log('[Login Client] Password verified, MFA required');
+        console.log('[Login Client] userId:', data.userId);
+        console.log('[Login Client] tempSession received:', !!data.tempSession);
+        if (data.tempSession) {
+          console.log('[Login Client] tempSession.access_token:', data.tempSession.access_token ? `${data.tempSession.access_token.substring(0, 20)}...` : 'MISSING');
+          console.log('[Login Client] tempSession.refresh_token:', data.tempSession.refresh_token ? 'present' : 'MISSING');
+          console.log('[Login Client] tempSession.expires_at:', data.tempSession.expires_at);
+          if (data.tempSession.expires_at) {
+            const expiresAt = new Date(data.tempSession.expires_at * 1000);
+            console.log('[Login Client] Token expires at:', expiresAt.toISOString());
+            console.log('[Login Client] Time until expiry:', Math.round((expiresAt.getTime() - Date.now()) / 1000 / 60), 'minutes');
+          }
+        } else {
+          console.error('[Login Client] ⚠️ NO TEMP SESSION RECEIVED - MFA will fail!');
+        }
+        console.log('[Login Client] ========================================');
+        
         setRequiresMFA(true);
         setUserId(data.userId);
         setTempSession(data.tempSession); // Store temporary session

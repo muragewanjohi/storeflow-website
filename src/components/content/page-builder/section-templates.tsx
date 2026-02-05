@@ -78,9 +78,9 @@ const HERO_SUBTITLE_FONT_SIZES: Record<string, string> = {
 // Hero with background (image or colour) uses one consistent size
 const HERO_VISUAL_MIN_H = 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px]';
 const HERO_CONTENT_MIN_H = 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]';
-// Normal image in hero: larger so it fits the big hero space (best practice: ~40–50% of hero height)
-const HERO_NORMAL_IMAGE_SIDE = 'h-[300px] sm:h-[380px] md:h-[480px] lg:h-[560px]';
-const HERO_NORMAL_IMAGE_CENTER = 'h-[280px] sm:h-[360px] md:h-[440px] lg:h-[520px]';
+// Normal image in hero: sized to fill ~85-95% of hero height for visual impact
+const HERO_NORMAL_IMAGE_SIDE = 'h-[340px] sm:h-[440px] md:h-[560px] lg:h-[660px]';
+const HERO_NORMAL_IMAGE_CENTER = 'h-[320px] sm:h-[420px] md:h-[520px] lg:h-[620px]';
 
 function HeroSectionComponent({ 
   section, 
@@ -1643,12 +1643,12 @@ function SalesTabSectionComponent({
             )}
             {section.banner_style !== 'none' && block.sale.banner_image && (
               <div className={`${containerClass} mb-6`} style={containerStyle}>
-                <div className="relative aspect-[32/9] overflow-hidden rounded-lg bg-muted">
+                <div className="relative aspect-[3/1] overflow-hidden rounded-lg">
                   <Image
                     src={block.sale.banner_image}
                     alt={block.sale.name}
                     fill
-                    className="object-contain"
+                    className="object-cover"
                     sizes="(max-width: 1200px) 100vw, 1200px"
                   />
                 </div>
@@ -1679,12 +1679,12 @@ function SalesTabSectionComponent({
             <>
               {section.banner_style !== 'none' && block.sale.banner_image && (
                 <div className={`${containerClass} mb-8`} style={containerStyle}>
-                  <div className="relative aspect-[32/9] overflow-hidden rounded-lg bg-muted">
+                  <div className="relative aspect-[3/1] overflow-hidden rounded-lg">
                     <Image
                       src={block.sale.banner_image}
                       alt={block.sale.name}
                       fill
-                      className="object-contain"
+                      className="object-cover"
                       sizes="(max-width: 1200px) 100vw, 1200px"
                     />
                   </div>
