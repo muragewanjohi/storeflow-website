@@ -124,12 +124,12 @@ export default function SalePageClient({
 
       {/* Sale Banner */}
       {sale.banner_image && (
-        <div className="relative mb-8 h-64 w-full overflow-hidden rounded-lg">
+        <div className="relative mb-8 aspect-[3/1] w-full overflow-hidden rounded-lg">
           <Image
             src={sale.banner_image}
             alt={sale.name}
             fill
-            className="object-cover"
+            className="object-contain"
             priority
           />
         </div>

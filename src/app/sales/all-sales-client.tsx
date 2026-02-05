@@ -70,7 +70,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
                   src={sale.banner_image}
                   alt={sale.name}
                   fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="object-contain group-hover:scale-105 transition-transform duration-500"
                   priority={sale.is_featured}
                 />
               ) : (
@@ -132,14 +132,9 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
               {/* Countdown Timer */}
               {sale.end_date && (
                 <div className="mb-4 pb-4 border-b">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Ends in:
-                    </span>
-                  </div>
                   <CountdownTimer 
                     endDate={sale.end_date} 
-                    className="text-sm"
+                    showLabels={true}
                   />
                 </div>
               )}

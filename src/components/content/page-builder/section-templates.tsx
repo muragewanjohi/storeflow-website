@@ -75,12 +75,14 @@ const HERO_SUBTITLE_FONT_SIZES: Record<string, string> = {
   xl: 'clamp(1.625rem, 4vw, 2.25rem)',
 };
 
-// Hero with background (image or colour) uses one consistent size
-const HERO_VISUAL_MIN_H = 'min-h-[380px] sm:min-h-[480px] md:min-h-[600px] lg:min-h-[700px]';
-const HERO_CONTENT_MIN_H = 'min-h-[340px] sm:min-h-[440px] md:min-h-[560px] lg:min-h-[660px]';
-// Normal image in hero: sized to fill ~85-95% of hero height for visual impact
-const HERO_NORMAL_IMAGE_SIDE = 'h-[340px] sm:h-[440px] md:h-[560px] lg:h-[660px]';
-const HERO_NORMAL_IMAGE_CENTER = 'h-[320px] sm:h-[420px] md:h-[520px] lg:h-[620px]';
+// Hero with background (image or colour) - tighter spacing for better visual impact
+// Best practice: content should fill ~90-95% of container, minimal wasted space
+const HERO_VISUAL_MIN_H = 'min-h-[340px] sm:min-h-[420px] md:min-h-[500px] lg:min-h-[560px]';
+const HERO_CONTENT_MIN_H = 'min-h-[320px] sm:min-h-[400px] md:min-h-[480px] lg:min-h-[540px]';
+// Normal image in hero: sized to fill most of the hero height
+// Using consistent dimensions for both side (left/right) and center alignments
+const HERO_NORMAL_IMAGE_SIDE = 'h-[280px] sm:h-[360px] md:h-[440px] lg:h-[500px]';
+const HERO_NORMAL_IMAGE_CENTER = 'h-[280px] sm:h-[360px] md:h-[440px] lg:h-[500px]';
 
 function HeroSectionComponent({ 
   section, 
@@ -223,7 +225,7 @@ function HeroSectionComponent({
                     </div>
                     
                     {/* Center image - sized for hero (best practice: proportional to hero height) */}
-                    <div className={`relative w-full max-w-3xl ${HERO_NORMAL_IMAGE_CENTER} my-6 md:my-8 overflow-hidden rounded-lg`}>
+                    <div className={`relative w-full max-w-3xl ${HERO_NORMAL_IMAGE_CENTER} my-3 md:my-4 overflow-hidden rounded-lg`}>
                       {section.image!.startsWith('blob:') ? (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           <div className="text-center">
@@ -1241,7 +1243,7 @@ function BannersSectionComponent({
                     src={banner.image}
                     alt={banner.title}
                     fill
-                    className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
+                    className="object-cover group-hover:scale-110 transition-transform duration-500"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />
                 )}
@@ -1648,7 +1650,7 @@ function SalesTabSectionComponent({
                     src={block.sale.banner_image}
                     alt={block.sale.name}
                     fill
-                    className="object-cover"
+                    className="object-contain"
                     sizes="(max-width: 1200px) 100vw, 1200px"
                   />
                 </div>
@@ -1684,7 +1686,7 @@ function SalesTabSectionComponent({
                       src={block.sale.banner_image}
                       alt={block.sale.name}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 1200px) 100vw, 1200px"
                     />
                   </div>
