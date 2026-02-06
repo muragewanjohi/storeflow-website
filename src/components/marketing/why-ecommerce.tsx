@@ -87,7 +87,7 @@ export function WhyEcommerce() {
             </span>
           </h2>
           <p className="text-[#8d8d8d] mt-4 text-lg">
-            The digital marketplace is where modern businesses thrive. Here's why having an online store is essential for your success.
+            The digital marketplace is where modern businesses thrive. Here&apos;s why having an online store is essential for your success.
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export function WhyEcommerce() {
               </span>
             </h2>
             <p className="text-[#8d8d8d] mt-4 text-lg">
-              Building an ecommerce website from scratch is time-consuming, expensive, and complex. Here's why DukaNest is the smarter choice.
+              Building an ecommerce website from scratch is time-consuming, expensive, and complex. Here&apos;s why DukaNest is the smarter choice.
             </p>
           </div>
 

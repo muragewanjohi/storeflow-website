@@ -227,7 +227,7 @@ export default function TermsOfServicePage() {
 
               <h4 className="text-lg font-semibold text-[#0c0528] mb-2 mt-4">9.1.3 Soft-Deleted Status</h4>
               <p className="text-gray-700 leading-relaxed mb-3">
-                If your account doesn't renew, it enters a 90-day retention period. During this period:
+                If your account doesn&apos;t renew, it enters a 90-day retention period. During this period:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700 mb-4">
                 <li>You will receive a warning email 30 days before permanent deletion</li>
