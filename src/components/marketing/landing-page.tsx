@@ -15,6 +15,7 @@ import { MoreFeatures } from './more-features';
 import { Themes } from './themes';
 import { Stats } from './stats';
 import { WhyChooseUs } from './why-choose-us';
+import { WhyEcommerce } from './why-ecommerce';
 import { Pricing } from './pricing';
 import { Testimonials } from './testimonials';
 import { Blog } from './blog';
@@ -59,6 +60,7 @@ export default function MarketingLandingPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero />
+      <WhyEcommerce />
       <HowItWorks />
       <MoreFeatures />
       <Themes />
@@ -66,7 +68,7 @@ export default function MarketingLandingPage() {
       <Pricing />
       <Testimonials />
       <Blog />
-      {/* <FAQ /> */}
+      <FAQ />
       <Newsletter />
       <Footer />
     </div>

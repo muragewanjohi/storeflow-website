@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { 
-  ShoppingCart, 
+  Calendar,
   Palette,
   Store,
   DollarSign,
@@ -10,15 +10,16 @@ import {
   CreditCard,
   TrendingUp,
   Settings,
+  RefreshCw,
   ArrowRight,
 } from 'lucide-react';
 
 const howItWorksSteps = [
   {
-    icon: ShoppingCart,
-    title: 'Purchase Subscription',
-    description: 'Select a plan that fits your needs and get access to exclusive features.',
-    color: 'from-blue-400 to-blue-600'
+    icon: Calendar,
+    title: 'Start 14-Day Free Trial',
+    description: 'Sign up and start building your store immediately with a full-featured plan. No credit card required. Explore all features risk-free for 14 days.',
+    color: 'from-emerald-400 to-emerald-600'
   },
   {
     icon: Palette,
@@ -61,6 +62,12 @@ const howItWorksSteps = [
     title: 'Manage Orders',
     description: 'Track, process, and update customer orders efficiently to ensure timely fulfillment and satisfaction.',
     color: 'from-red-400 to-red-600'
+  },
+  {
+    icon: RefreshCw,
+    title: 'Renew Subscription',
+    description: 'After experiencing the platform and seeing results, choose to continue with a subscription plan that fits your growing business needs.',
+    color: 'from-blue-400 to-blue-600'
   }
 ];
 
@@ -78,7 +85,7 @@ export function HowItWorks() {
             </span>
           </h2>
           <p className="text-[#8d8d8d] mt-4">
-            8 Step Power Builders
+            9 Step Power Builders
           </p>
         </div>
 
