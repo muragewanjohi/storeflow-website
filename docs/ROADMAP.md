@@ -182,11 +182,123 @@ This document outlines planned features and enhancements for StoreFlow. Features
 - [ ] Customer referral program
 - [ ] Gift cards
 
+#### 5. User Learning & Onboarding System
+
+**Status:** Planned - High Priority
+
+**Goal:** Help users learn how to use the system effectively through comprehensive learning resources, interactive guides, and contextual help, similar to what popular ecommerce platforms (Shopify, WooCommerce, BigCommerce) offer.
+
+**High Priority (Quick Wins):**
+
+1. **Help Center / Knowledge Base** ✅
+   - [x] Searchable help center with categorized articles
+   - [x] Article categories (Getting Started, Products, Orders, Settings, Payments, etc.)
+   - [ ] Video tutorials embedded in articles
+   - [ ] PDF guides for download
+   - [ ] FAQ section with common questions
+   - [x] Search functionality with autocomplete
+   - **Status:** Implemented - Available at `/dashboard/help` with searchable articles and categories
+
+2. **Contextual Help Tooltips**
+   - [ ] Help icon (?) buttons next to complex features
+   - [ ] Inline help text explaining what each field does
+   - [ ] Contextual help panels that slide in
+   - [ ] "Learn more" links to relevant documentation
+   - [ ] Feature discovery tooltips for new features
+   - **Implementation:** Add help tooltip component and integrate into dashboard forms
+
+3. **Setup Checklist Widget**
+   - [ ] Dashboard checklist widget ("Complete your store setup")
+   - [ ] Progress bars showing store completion percentage
+   - [ ] Suggested next steps based on current progress
+   - [ ] Completion tracking (products added, payment configured, etc.)
+   - **Implementation:** Create checklist component for dashboard with progress tracking
+
+4. **Welcome Email Series**
+   - [ ] Welcome email on signup (Day 1)
+   - [ ] Follow-up emails (Day 3, 7, 14)
+   - [ ] Tips and tricks emails
+   - [ ] Feature announcement emails
+   - [ ] Best practices newsletter
+   - **Implementation:** Email templates and automated email sending system
+
+**Medium Priority (User Engagement):**
+
+5. **Video Tutorials**
+   - [ ] Video library organized by topic
+   - [ ] Embedded videos in help articles
+   - [ ] YouTube channel integration
+   - [ ] Screen recordings for complex workflows
+   - [ ] Live webinars for new users
+
+6. **Interactive Onboarding Tour**
+   - [ ] First-time user welcome modal with quick tour option
+   - [ ] Step-by-step setup wizard (connect domain, add products, configure payments)
+   - [ ] Interactive tooltips highlighting key features
+   - [ ] Progress checklist showing completed steps
+   - [ ] Skip/dismiss functionality
+
+7. **In-App Help Widgets**
+   - [ ] Floating help widget on dashboard pages
+   - [ ] Contextual help panels
+   - [ ] Quick access to relevant articles
+   - [ ] Support ticket creation from widget
+   - [ ] Chat support integration (future)
+
+8. **Community Forum**
+   - [ ] Community forum for user discussions
+   - [ ] User groups or Discord/Slack community
+   - [ ] Expert marketplace for hiring help
+   - [ ] Q&A section
+
+**Low Priority (Nice to Have):**
+
+9. **Achievement Badges & Gamification**
+   - [ ] Achievement badges for completing milestones
+   - [ ] Progress tracking with visual indicators
+   - [ ] Completion rewards
+
+10. **Sample Data & Templates**
+    - [ ] Option to import sample products during setup
+    - [ ] Demo store mode for testing
+    - [ ] Pre-configured templates for different industries
+    - [ ] Example product categories and attributes
+
+11. **Feature Discovery & Announcements**
+    - [ ] "What's New" modal for feature updates
+    - [ ] Feature spotlight banners
+    - [ ] In-app notifications for new features
+    - [ ] Release notes with links to tutorials
+
+12. **Guided Workflows**
+    - [ ] Guided product import wizard
+    - [ ] Step-by-step payment setup
+    - [ ] Guided theme customization
+    - [ ] Walkthrough for first order processing
+
+**Implementation Priority:**
+1. Help Center / Knowledge Base (Foundation)
+2. Contextual Help Tooltips (Quick wins)
+3. Setup Checklist Widget (User engagement)
+4. Welcome Email Series (Automated support)
+
+**Dependencies:** 
+- Content management system for help articles
+- Email service for automated emails
+- Video hosting (YouTube or self-hosted)
+- User progress tracking system
+
+**Related Documentation:**
+- Help articles structure and content guidelines
+- Email template designs
+- Video tutorial scripts
+- Onboarding flow diagrams
+
 ---
 
 ### Phase 2: Marketing & Growth (Medium Priority)
 
-#### 5. Social Media Integration
+#### 6. Social Media Integration
 - [x] Basic social sharing (Facebook, Twitter, LinkedIn, WhatsApp, Pinterest, Instagram)
 - [ ] **Instagram Shopping Integration** (Advanced)
   - [ ] Facebook Catalog API integration
@@ -211,7 +323,7 @@ This document outlines planned features and enhancements for StoreFlow. Features
 **Estimated Complexity:** High
 **Dependencies:** Facebook Graph API, Instagram Graph API, Catalog management system
 
-#### 6. SEO Enhancements
+#### 7. SEO Enhancements
 - [ ] Advanced SEO settings per product/page
 - [ ] XML sitemap generation
 - [ ] Robots.txt management
@@ -219,14 +331,14 @@ This document outlines planned features and enhancements for StoreFlow. Features
 - [ ] Meta tag customization
 - [ ] URL structure optimization
 
-#### 7. Content Management
+#### 8. Content Management
 - [ ] Advanced blog features
 - [ ] Media library improvements
 - [ ] Page builder (drag-and-drop)
 - [ ] Form builder enhancements
 - [ ] Custom fields for products
 
-#### 8. Multi-Language Support
+#### 9. Multi-Language Support
 - [ ] Language switcher
 - [ ] Translation management
 - [ ] RTL language support
@@ -236,27 +348,27 @@ This document outlines planned features and enhancements for StoreFlow. Features
 
 ### Phase 3: Advanced Features (Lower Priority)
 
-#### 9. Mobile App
+#### 10. Mobile App
 - [ ] React Native mobile app
 - [ ] Push notifications
 - [ ] Mobile-specific features
 - [ ] App store listings
 
-#### 10. Advanced Analytics
+#### 11. Advanced Analytics
 - [ ] Predictive analytics
 - [ ] Customer segmentation (advanced)
 - [ ] A/B testing framework
 - [ ] Custom dashboard builder
 - [ ] Export to Excel/PDF
 
-#### 11. API & Integrations
+#### 12. API & Integrations
 - [ ] RESTful API for third-party integrations
 - [ ] Webhook system
 - [ ] Zapier integration
 - [ ] Google Analytics integration
 - [ ] Facebook Pixel integration
 
-#### 12. Advanced Shipping
+#### 13. Advanced Shipping
 - [ ] Multiple shipping providers
 - [ ] Shipping rate calculator
 - [ ] Label printing
@@ -334,19 +446,22 @@ Full Instagram Shopping integration that allows tenants to tag products in Insta
 ### High Priority (Next 3 Months)
 1. **Plan limits enforcement & usage visibility** (staff ✅; products/orders ✅ in API; storage, orders-per-month, full usage display, UI blocks + upgrade CTA)
 2. **Theme selector on demo websites** (one website per business type; visitors can switch themes on the same demo store)
-3. Payment gateway integrations (Stripe, PayPal)
-4. Email marketing features
-5. Inventory management enhancements
+3. **User Learning & Onboarding System** (Help center, contextual help, setup checklist, welcome emails)
+4. Payment gateway integrations (Stripe, PayPal)
+5. Email marketing features
+6. Inventory management enhancements
 
 ### Medium Priority (3-6 Months)
-6. Instagram Shopping integration
-7. SEO enhancements
-8. Advanced content management
+6. User Learning & Onboarding (Video tutorials, interactive tours, community forum)
+7. Instagram Shopping integration
+8. SEO enhancements
+9. Advanced content management
 
 ### Low Priority (6+ Months)
-9. Mobile app development
-10. Advanced analytics features
-11. Third-party integrations
+10. User Learning & Onboarding (Achievement badges, sample data, feature discovery)
+11. Mobile app development
+12. Advanced analytics features
+13. Third-party integrations
 
 ---
 
@@ -381,4 +496,4 @@ If you'd like to contribute to any of these features:
 
 ---
 
-**Last Updated:** 2025-01-30
+**Last Updated:** 2026-02-06

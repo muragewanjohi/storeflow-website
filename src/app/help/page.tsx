@@ -7,6 +7,7 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma/client';
 import UserGuideContent from './user-guide-content';
 import MarketingHeader from '@/components/marketing/header';
 import { Footer as MarketingFooter } from '@/components/marketing/footer';
@@ -47,11 +48,31 @@ export default async function HelpPage() {
     redirect(`${protocol}//${marketingDomain}${port ? `:${port}` : ''}/help`);
   }
 
+  // Fetch user guide data from database
+  const categories = await prisma.user_guide_categories.findMany({
+    where: {
+      is_active: true,
+    },
+    include: {
+      articles: {
+        where: {
+          is_active: true,
+        },
+        orderBy: {
+          sort_order: 'asc',
+        },
+      },
+    },
+    orderBy: {
+      sort_order: 'asc',
+    },
+  });
+
   return (
     <div className="min-h-screen flex flex-col">
       <MarketingHeader />
       <main className="flex-1">
-        <UserGuideContent tenantName="DukaNest Stores" />
+        <UserGuideContent tenantName="DukaNest Stores" categories={categories} />
       </main>
       <MarketingFooter />
     </div>

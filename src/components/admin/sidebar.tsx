@@ -21,6 +21,7 @@ import {
   ClockIcon,
   DocumentTextIcon,
   BanknotesIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Payments', href: '/admin/payments', icon: BanknotesIcon },
   { name: 'Blogs', href: '/admin/blogs', icon: DocumentTextIcon },
   { name: 'Blog Categories', href: '/admin/blogs/categories', icon: DocumentTextIcon },
+  { name: 'User Guide', href: '/admin/user-guide', icon: BookOpenIcon },
   { name: 'Support Tickets', href: '/admin/support/tickets', icon: ChatBubbleLeftRightIcon },
   { name: 'Cron Jobs', href: '/admin/cron-jobs', icon: ClockIcon },
   { name: 'Users', href: '/admin/users', icon: UsersIcon },

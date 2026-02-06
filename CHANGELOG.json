@@ -1,6 +1,33 @@
 {
-  "version": "0.1.4",
+  "version": "0.1.5",
   "entries": [
+    {
+      "version": "0.1.5",
+      "date": "2026-02-06",
+      "features": [
+        "Enhanced home page with 'Why E-commerce' section explaining platform benefits and comparison with building custom websites",
+        "Updated 'How It Works' section to start with 14-day free trial period and repositioned subscription purchase as 'Renew Subscription' final step",
+        "Expanded FAQs from 4 to 16 entries covering system features, manual payment verification, and custom domain status",
+        "Updated Terms of Service with comprehensive inactive store termination section detailing tenant lifecycle statuses and email notifications",
+        "Redesigned footer with blue gradient theme colors, improved contrast for icons and links, and enhanced hover states",
+        "Enhanced marketing navigation with Resources dropdown (Knowledge Center link) and integrated theme colors throughout",
+        "Redesigned public user guide page (/help) with left sidebar navigation, search functionality, and modern three-column layout inspired by Medusa",
+        "Migrated user guide content from hardcoded data to database-driven system with user_guide_categories and user_guide_articles tables",
+        "Created comprehensive admin interface in landlord dashboard for managing user guide categories and articles (CRUD operations)",
+        "Implemented API endpoints for user guide management (admin routes) and public content retrieval",
+        "Added seed script for populating initial user guide data with proper database connection handling",
+        "Removed /dashboard/help route, keeping only public /help page for unified user guide experience"
+      ],
+      "bugfixes": [
+        "Fixed Vercel deployment errors caused by unescaped apostrophes in JSX (replaced with &apos; in Terms of Service and Why E-commerce components)",
+        "Fixed list rendering issue in user guide content where items were creating separate lists instead of grouping consecutive items",
+        "Fixed database connection issues in seed script by adding proper environment variable loading and Prisma adapter initialization",
+        "Fixed TypeScript build errors by creating missing Switch UI component (src/components/ui/switch.tsx)",
+        "Fixed TypeScript type errors by adding explicit boolean type annotations to Switch onCheckedChange handlers in admin forms",
+        "Fixed JSX namespace error in user guide content component by changing JSX.Element[] to React.ReactElement[]",
+        "Fixed seed script database connection handling for Prisma Accelerate URLs and IPv4 compatibility with Session Pooler connections"
+      ]
+    },
     {
       "version": "0.1.4",
       "date": "2026-01-30",

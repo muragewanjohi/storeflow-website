@@ -34,6 +34,7 @@ import {
   ArrowTrendingUpIcon,
   PaintBrushIcon,
   FireIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
