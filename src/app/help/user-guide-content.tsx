@@ -2,12 +2,19 @@
  * User Guide Content Component
  * 
  * Modern help center inspired by Medusa's user guide structure
- * Features: Left sidebar navigation, right sidebar table of contents, search
+ * Features: Sticky left sidebar navigation, sticky right sidebar table of contents,
+ *           scrollable center content, next/prev navigation, internal article linking
+ * 
+ * Internal Article Linking:
+ *   In the rich text editor (admin), you can link to other articles using:
+ *     href="/help?article=ARTICLE_SLUG"
+ *   Example: <a href="/help?article=managing-orders">Managing Orders</a>
+ *   The public help page will intercept these links and navigate to the article.
  */
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -24,6 +31,7 @@ import {
   XMarkIcon,
   BookOpenIcon,
   ChevronRightIcon,
+  ChevronLeftIcon,
   Bars3Icon,
   HomeIcon,
   PaintBrushIcon,
@@ -34,9 +42,6 @@ import {
   ChatBubbleLeftRightIcon,
   RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
-import { 
-  BookOpenIcon as BookOpenIconSolid,
-} from '@heroicons/react/24/solid';
 
 // Icon mapping
 const iconMap: Record<string, typeof UserIcon> = {
@@ -60,29 +65,33 @@ const iconMap: Record<string, typeof UserIcon> = {
   'RocketLaunchIcon': RocketLaunchIcon,
 };
 
+interface Article {
+  id: string;
+  title: string;
+  slug: string | null;
+  content: string;
+  image: string | null;
+  image_alt: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  is_popular: boolean | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string | null;
+  icon: string | null;
+  color: string | null;
+  bg_color: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  articles: Article[];
+}
+
 interface UserGuideContentProps {
   tenantName?: string | null;
-  categories: Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    icon: string | null;
-    color: string | null;
-    bg_color: string | null;
-    sort_order: number | null;
-    is_active: boolean | null;
-    articles: Array<{
-      id: string;
-      title: string;
-      slug: string | null;
-      content: string;
-      image: string | null;
-      image_alt: string | null;
-      sort_order: number | null;
-      is_active: boolean | null;
-      is_popular: boolean | null;
-    }>;
-  }>;
+  categories: Category[];
 }
 
 export default function UserGuideContent({ tenantName, categories: dbCategories }: Readonly<UserGuideContentProps>) {
@@ -92,6 +101,7 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Map database categories to component format
@@ -101,6 +111,68 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
       icon: cat.icon ? (iconMap[cat.icon] || BookOpenIcon) : BookOpenIcon,
     }));
   }, [dbCategories]);
+
+  // Flatten all articles into a sequential list for prev/next navigation
+  const allArticles = useMemo(() => {
+    const articles: { article: Article; categoryId: string; categoryName: string }[] = [];
+    for (const category of categories) {
+      for (const article of category.articles) {
+        articles.push({ article, categoryId: category.id, categoryName: category.name });
+      }
+    }
+    return articles;
+  }, [categories]);
+
+  // Find current article index in the flat list
+  const currentArticleIndex = useMemo(() => {
+    return allArticles.findIndex(a => a.article.id === selectedArticle);
+  }, [allArticles, selectedArticle]);
+
+  // Previous and next articles
+  const prevArticle = currentArticleIndex > 0 ? allArticles[currentArticleIndex - 1] : null;
+  const nextArticle = currentArticleIndex < allArticles.length - 1 ? allArticles[currentArticleIndex + 1] : null;
+
+  // Navigate to an article by slug
+  const navigateToArticleBySlug = useCallback((slug: string) => {
+    for (const category of categories) {
+      const article = category.articles.find(a => a.slug === slug);
+      if (article) {
+        setSelectedArticle(article.id);
+        setSelectedCategory(category.id);
+        const newExpanded = new Set(expandedCategories);
+        newExpanded.add(category.id);
+        setExpandedCategories(newExpanded);
+        // Scroll content to top
+        if (contentScrollRef.current) {
+          contentScrollRef.current.scrollTop = 0;
+        }
+        return true;
+      }
+    }
+    return false;
+  }, [categories, expandedCategories]);
+
+  // Navigate to an article
+  const navigateToArticle = useCallback((articleId: string, categoryId: string) => {
+    setSelectedArticle(articleId);
+    setSelectedCategory(categoryId);
+    const newExpanded = new Set(expandedCategories);
+    newExpanded.add(categoryId);
+    setExpandedCategories(newExpanded);
+    // Scroll content to top
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTop = 0;
+    }
+  }, [expandedCategories]);
+
+  // Handle URL query params for direct article linking
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const articleSlug = params.get('article');
+    if (articleSlug) {
+      navigateToArticleBySlug(articleSlug);
+    }
+  }, [navigateToArticleBySlug]);
 
   // Set default selected category and article on mount
   useEffect(() => {
@@ -147,10 +219,8 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     const content = currentArticle.content;
 
     if (isHtmlContent(content)) {
-      // Parse HTML headings
       const h2Regex = /<h2[^>]*>(.*?)<\/h2>/gi;
       const h3Regex = /<h3[^>]*>(.*?)<\/h3>/gi;
-      // Collect all headings with their positions for proper ordering
       const allMatches: { text: string; level: number; index: number }[] = [];
       
       let match;
@@ -167,7 +237,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
         }
       }
       
-      // Sort by position in content
       allMatches.sort((a, b) => a.index - b.index);
       
       for (const m of allMatches) {
@@ -175,7 +244,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
         headings.push({ id, text: m.text, level: m.level });
       }
     } else {
-      // Parse Markdown headings
       const lines = content.split('\n');
       lines.forEach((line) => {
         const trimmed = line.trim();
@@ -228,7 +296,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     return html.replace(/<(h[23])([^>]*)>(.*?)<\/h[23]>/gi, (match, tag, attrs, text) => {
       const plainText = text.replace(/<[^>]*>/g, '').trim();
       const id = plainText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      // Check if id already exists in attrs
       if (/id\s*=/.test(attrs)) return match;
       return `<${tag}${attrs} id="${id}">${text}</${tag}>`;
     });
@@ -273,7 +340,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     lines.forEach((line) => {
       const trimmed = line.trim();
 
-      // Headings
       if (trimmed.startsWith('## ')) {
         flushList();
         const text = trimmed.replace('## ', '').replace(/!\[.*?\]\(.*?\)/, '').trim();
@@ -301,7 +367,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           </h4>
         );
       }
-      // Images
       else if (trimmed.match(/^!\[.*?\]\(.*?\)$/)) {
         flushList();
         const match = trimmed.match(/!\[(.*?)\]\((.*?)\)/);
@@ -321,7 +386,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           );
         }
       }
-      // Numbered lists
       else if (trimmed.match(/^\d+\.\s/)) {
         const text = trimmed.replace(/^\d+\.\s/, '');
         if (!currentList || currentList.type !== 'ol') {
@@ -331,7 +395,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           currentList.items.push(text);
         }
       }
-      // Bullet lists
       else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         const text = trimmed.replace(/^[-*]\s/, '');
         if (!currentList || currentList.type !== 'ul') {
@@ -341,7 +404,6 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           currentList.items.push(text);
         }
       }
-      // Bold text (standalone)
       else if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.split('**').length === 3) {
         flushList();
         const text = trimmed.replace(/\*\*/g, '');
@@ -351,10 +413,8 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           </p>
         );
       }
-      // Regular paragraphs
       else if (trimmed && !trimmed.startsWith('#')) {
         flushList();
-        // Handle inline bold
         const parts = trimmed.split(/(\*\*.*?\*\*)/g);
         if (parts.length > 1) {
           elements.push(
@@ -382,8 +442,7 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
       }
     });
 
-    flushList(); // Flush any remaining list
-
+    flushList();
     return elements;
   };
 
@@ -395,18 +454,50 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     return renderMarkdownContent(content);
   };
 
+  // Handle internal article links: intercept clicks on /help?article=SLUG links
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href) return;
+
+      // Handle /help?article=slug links
+      if (href.startsWith('/help?article=') || href.startsWith('/help/?article=')) {
+        e.preventDefault();
+        const url = new URL(href, window.location.origin);
+        const articleSlug = url.searchParams.get('article');
+        if (articleSlug) {
+          navigateToArticleBySlug(articleSlug);
+          // Update browser URL without reload
+          window.history.pushState({}, '', `/help?article=${articleSlug}`);
+        }
+      }
+    };
+
+    const container = contentRef.current;
+    if (container) {
+      container.addEventListener('click', handleClick);
+      return () => container.removeEventListener('click', handleClick);
+    }
+  }, [navigateToArticleBySlug]);
+
   // Handle scroll for table of contents highlighting
   useEffect(() => {
-    if (!contentRef.current) return;
+    const scrollContainer = contentScrollRef.current;
+    if (!scrollContainer) return;
 
     const handleScroll = () => {
-      const headings = contentRef.current?.querySelectorAll('h2, h3');
-      if (!headings) return;
+      const headings = scrollContainer.querySelectorAll('h2[id], h3[id]');
+      if (!headings || headings.length === 0) return;
 
       let current = '';
       headings.forEach((heading) => {
         const rect = heading.getBoundingClientRect();
-        if (rect.top <= 100) {
+        // Account for the sticky header offset (~80px)
+        if (rect.top <= 120) {
           current = heading.id;
         }
       });
@@ -414,107 +505,102 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
       setActiveHeading(current);
     };
 
-    const container = contentRef.current;
-    container.addEventListener('scroll', handleScroll);
-    window.addEventListener('scroll', handleScroll);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleScroll);
-    };
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
   }, [currentArticle]);
 
   return (
-    <div className="min-h-screen bg-white flex">
-      {/* Left Sidebar Navigation */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-gray-50 border-r border-gray-200 flex-shrink-0`}>
-        <div className="h-full overflow-y-auto">
-          {/* Search */}
-          <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0025cc] focus:border-transparent"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
-                >
-                  <XMarkIcon className="w-3 h-3 text-gray-400" />
-                </button>
-              )}
-            </div>
+    <div className="bg-white flex h-full">
+      {/* Left Sidebar Navigation - sticky/fixed */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-gray-50 border-r border-gray-200 flex-shrink-0 flex flex-col`}>
+        {/* Search - fixed at top */}
+        <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0025cc] focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+              >
+                <XMarkIcon className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
           </div>
-
-          {/* Navigation */}
-          <nav className="p-4 space-y-1">
-            {filteredCategories.map((category) => {
-              const Icon = category.icon;
-              const isExpanded = expandedCategories.has(category.id);
-              const isSelected = selectedCategory === category.id;
-
-              return (
-                <div key={category.id}>
-                  <button
-                    onClick={() => {
-                      if (category.articles.length > 0) {
-                        toggleCategory(category.id);
-                        setSelectedCategory(category.id);
-                        if (category.articles.length > 0) {
-                          setSelectedArticle(category.articles[0].id);
-                        }
-                      }
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-[#0025cc] text-white'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="flex-1 text-left">{category.name}</span>
-                  </button>
-
-                  {/* Articles in category */}
-                  {isExpanded && category.articles.length > 0 && (
-                    <div className="ml-7 mt-1 space-y-1">
-                      {category.articles.map((article) => {
-                        const isArticleSelected = selectedArticle === article.id;
-                        return (
-                          <button
-                            key={article.id}
-                            onClick={() => {
-                              setSelectedArticle(article.id);
-                              setSelectedCategory(category.id);
-                            }}
-                            className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
-                              isArticleSelected
-                                ? 'bg-[#0025cc]/10 text-[#0025cc] font-medium'
-                                : 'text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {article.title}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
         </div>
+
+        {/* Navigation - scrollable */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+          {filteredCategories.map((category) => {
+            const Icon = category.icon;
+            const isExpanded = expandedCategories.has(category.id);
+            const isSelected = selectedCategory === category.id;
+
+            return (
+              <div key={category.id}>
+                <button
+                  onClick={() => {
+                    if (category.articles.length > 0) {
+                      toggleCategory(category.id);
+                      setSelectedCategory(category.id);
+                      if (category.articles.length > 0) {
+                        setSelectedArticle(category.articles[0].id);
+                      }
+                      // Scroll content to top
+                      if (contentScrollRef.current) {
+                        contentScrollRef.current.scrollTop = 0;
+                      }
+                    }
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isSelected
+                      ? 'bg-[#0025cc] text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="flex-1 text-left">{category.name}</span>
+                </button>
+
+                {/* Articles in category */}
+                {isExpanded && category.articles.length > 0 && (
+                  <div className="ml-7 mt-1 space-y-1">
+                    {category.articles.map((article) => {
+                      const isArticleSelected = selectedArticle === article.id;
+                      return (
+                        <button
+                          key={article.id}
+                          onClick={() => {
+                            navigateToArticle(article.id, category.id);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                            isArticleSelected
+                              ? 'bg-[#0025cc]/10 text-[#0025cc] font-medium'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {article.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - scrollable center */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        {/* Top Header - sticky */}
+        <div className="bg-white border-b border-gray-200 flex-shrink-0 z-10">
           <div className="px-8 py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -537,8 +623,8 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Content - this is the only scrollable area */}
+        <div ref={contentScrollRef} className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-8 py-8">
             {currentArticle ? (
               <article ref={contentRef} className="prose prose-lg max-w-none">
@@ -553,14 +639,59 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
                 <p className="text-gray-600">Choose a topic from the sidebar to get started</p>
               </div>
             )}
+
+            {/* Previous / Next Navigation */}
+            {currentArticle && (
+              <nav className="mt-16 mb-8 border-t border-gray-200 pt-8">
+                <div className="flex items-stretch justify-between gap-4">
+                  {/* Previous Article */}
+                  {prevArticle ? (
+                    <button
+                      onClick={() => navigateToArticle(prevArticle.article.id, prevArticle.categoryId)}
+                      className="flex-1 group text-left p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
+                        <ChevronLeftIcon className="w-3.5 h-3.5" />
+                        <span>Previous</span>
+                      </div>
+                      <div className="font-medium text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                        {prevArticle.article.title}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{prevArticle.categoryName}</div>
+                    </button>
+                  ) : (
+                    <div className="flex-1" />
+                  )}
+
+                  {/* Next Article */}
+                  {nextArticle ? (
+                    <button
+                      onClick={() => navigateToArticle(nextArticle.article.id, nextArticle.categoryId)}
+                      className="flex-1 group text-right p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                    >
+                      <div className="flex items-center justify-end gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
+                        <span>Next</span>
+                        <ChevronRightIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="font-medium text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                        {nextArticle.article.title}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{nextArticle.categoryName}</div>
+                    </button>
+                  ) : (
+                    <div className="flex-1" />
+                  )}
+                </div>
+              </nav>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Right Sidebar - Table of Contents */}
+      {/* Right Sidebar - Table of Contents - sticky */}
       {currentArticle && tableOfContents.length > 0 && (
-        <aside className="hidden xl:block w-64 flex-shrink-0 border-l border-gray-200 bg-gray-50">
-          <div className="sticky top-0 p-6">
+        <aside className="hidden xl:flex w-64 flex-shrink-0 border-l border-gray-200 bg-gray-50 flex-col">
+          <div className="flex-1 overflow-y-auto p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">On this page</h3>
             <nav className="space-y-2">
               {tableOfContents.map((heading) => (
@@ -569,9 +700,15 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
                   href={`#${heading.id}`}
                   onClick={(e) => {
                     e.preventDefault();
-                    const element = document.getElementById(heading.id);
-                    if (element) {
-                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    const scrollContainer = contentScrollRef.current;
+                    const element = scrollContainer?.querySelector(`#${CSS.escape(heading.id)}`);
+                    if (element && scrollContainer) {
+                      const elementTop = element.getBoundingClientRect().top;
+                      const containerTop = scrollContainer.getBoundingClientRect().top;
+                      scrollContainer.scrollTo({
+                        top: scrollContainer.scrollTop + (elementTop - containerTop) - 20,
+                        behavior: 'smooth',
+                      });
                     }
                   }}
                   className={`block text-sm transition-colors ${

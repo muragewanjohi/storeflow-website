@@ -10,7 +10,6 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
 import UserGuideContent from './user-guide-content';
 import MarketingHeader from '@/components/marketing/header';
-import { Footer as MarketingFooter } from '@/components/marketing/footer';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,12 +68,11 @@ export default async function HelpPage() {
   });
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <MarketingHeader />
-      <main className="flex-1">
+      <main className="flex-1 min-h-0">
         <UserGuideContent tenantName="DukaNest Stores" categories={categories} />
       </main>
-      <MarketingFooter />
     </div>
   );
 }

@@ -111,20 +111,20 @@ html {
 }
 
 .user-guide-html-content ul {
-  @apply list-disc list-inside space-y-2 text-gray-700 ml-4 my-4;
+  @apply list-disc list-outside space-y-2 text-gray-700 pl-6 my-4;
 }
 
 .user-guide-html-content ol {
-  @apply list-decimal list-inside space-y-2 text-gray-700 ml-4 my-4;
+  @apply list-decimal list-outside space-y-2 text-gray-700 pl-6 my-4;
 }
 
 .user-guide-html-content li {
-  @apply leading-relaxed;
+  @apply leading-relaxed pl-1;
 }
 
 .user-guide-html-content li ul,
 .user-guide-html-content li ol {
-  @apply mt-2 ml-4;
+  @apply mt-2;
 }
 
 .user-guide-html-content strong {
