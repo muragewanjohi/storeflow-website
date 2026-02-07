@@ -13,6 +13,8 @@ import Image from 'next/image';
 import { 
   ShoppingCartIcon,
   UserIcon,
+  UserGroupIcon,
+  UsersIcon,
   QuestionMarkCircleIcon,
   MagnifyingGlassIcon,
   CreditCardIcon,
@@ -23,6 +25,14 @@ import {
   BookOpenIcon,
   ChevronRightIcon,
   Bars3Icon,
+  HomeIcon,
+  PaintBrushIcon,
+  CubeIcon,
+  FireIcon,
+  DocumentTextIcon,
+  Cog6ToothIcon,
+  ChatBubbleLeftRightIcon,
+  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
 import { 
   BookOpenIcon as BookOpenIconSolid,
@@ -31,6 +41,8 @@ import {
 // Icon mapping
 const iconMap: Record<string, typeof UserIcon> = {
   'UserIcon': UserIcon,
+  'UserGroupIcon': UserGroupIcon,
+  'UsersIcon': UsersIcon,
   'ShoppingCartIcon': ShoppingCartIcon,
   'QuestionMarkCircleIcon': QuestionMarkCircleIcon,
   'CreditCardIcon': CreditCardIcon,
@@ -38,6 +50,14 @@ const iconMap: Record<string, typeof UserIcon> = {
   'HeartIcon': HeartIcon,
   'EnvelopeIcon': EnvelopeIcon,
   'BookOpenIcon': BookOpenIcon,
+  'HomeIcon': HomeIcon,
+  'PaintBrushIcon': PaintBrushIcon,
+  'CubeIcon': CubeIcon,
+  'FireIcon': FireIcon,
+  'DocumentTextIcon': DocumentTextIcon,
+  'Cog6ToothIcon': Cog6ToothIcon,
+  'ChatBubbleLeftRightIcon': ChatBubbleLeftRightIcon,
+  'RocketLaunchIcon': RocketLaunchIcon,
 };
 
 interface UserGuideContentProps {
@@ -114,29 +134,66 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     return null;
   }, [selectedArticle, categories]);
 
-  // Extract headings from content for table of contents
+  // Detect if content is HTML
+  const isHtmlContent = (content: string) => {
+    return /<[a-z][\s\S]*>/i.test(content);
+  };
+
+  // Extract headings from content for table of contents (supports both HTML and Markdown)
   const tableOfContents = useMemo(() => {
     if (!currentArticle) return [];
     
     const headings: { id: string; text: string; level: number }[] = [];
-    const lines = currentArticle.content.split('\n');
-    
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('## ')) {
-        const text = trimmed.replace('## ', '').replace(/!\[.*?\]\(.*?\)/, '').trim();
+    const content = currentArticle.content;
+
+    if (isHtmlContent(content)) {
+      // Parse HTML headings
+      const h2Regex = /<h2[^>]*>(.*?)<\/h2>/gi;
+      const h3Regex = /<h3[^>]*>(.*?)<\/h3>/gi;
+      // Collect all headings with their positions for proper ordering
+      const allMatches: { text: string; level: number; index: number }[] = [];
+      
+      let match;
+      while ((match = h2Regex.exec(content)) !== null) {
+        const text = match[1].replace(/<[^>]*>/g, '').trim();
         if (text) {
-          const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          headings.push({ id, text, level: 2 });
-        }
-      } else if (trimmed.startsWith('### ')) {
-        const text = trimmed.replace('### ', '').trim();
-        if (text) {
-          const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          headings.push({ id, text, level: 3 });
+          allMatches.push({ text, level: 2, index: match.index });
         }
       }
-    });
+      while ((match = h3Regex.exec(content)) !== null) {
+        const text = match[1].replace(/<[^>]*>/g, '').trim();
+        if (text) {
+          allMatches.push({ text, level: 3, index: match.index });
+        }
+      }
+      
+      // Sort by position in content
+      allMatches.sort((a, b) => a.index - b.index);
+      
+      for (const m of allMatches) {
+        const id = m.text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        headings.push({ id, text: m.text, level: m.level });
+      }
+    } else {
+      // Parse Markdown headings
+      const lines = content.split('\n');
+      lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('## ')) {
+          const text = trimmed.replace('## ', '').replace(/!\[.*?\]\(.*?\)/, '').trim();
+          if (text) {
+            const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            headings.push({ id, text, level: 2 });
+          }
+        } else if (trimmed.startsWith('### ')) {
+          const text = trimmed.replace('### ', '').trim();
+          if (text) {
+            const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            headings.push({ id, text, level: 3 });
+          }
+        }
+      });
+    }
     
     return headings;
   }, [currentArticle]);
@@ -166,8 +223,30 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
       .filter((category) => category !== null);
   }, [searchQuery, categories]);
 
-  // Render content with proper formatting
-  const renderContent = (content: string) => {
+  // Add IDs to HTML headings for table of contents navigation
+  const addHeadingIds = (html: string) => {
+    return html.replace(/<(h[23])([^>]*)>(.*?)<\/h[23]>/gi, (match, tag, attrs, text) => {
+      const plainText = text.replace(/<[^>]*>/g, '').trim();
+      const id = plainText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      // Check if id already exists in attrs
+      if (/id\s*=/.test(attrs)) return match;
+      return `<${tag}${attrs} id="${id}">${text}</${tag}>`;
+    });
+  };
+
+  // Render HTML content with proper styling
+  const renderHtmlContent = (content: string) => {
+    const styledContent = addHeadingIds(content);
+    return (
+      <div 
+        className="user-guide-html-content"
+        dangerouslySetInnerHTML={{ __html: styledContent }}
+      />
+    );
+  };
+
+  // Render markdown content with proper formatting (legacy support)
+  const renderMarkdownContent = (content: string) => {
     const lines = content.split('\n');
     const elements: React.ReactElement[] = [];
     let key = 0;
@@ -308,6 +387,14 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
     return elements;
   };
 
+  // Render content - auto-detect HTML vs Markdown
+  const renderContent = (content: string) => {
+    if (isHtmlContent(content)) {
+      return renderHtmlContent(content);
+    }
+    return renderMarkdownContent(content);
+  };
+
   // Handle scroll for table of contents highlighting
   useEffect(() => {
     if (!contentRef.current) return;
@@ -366,7 +453,7 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
 
           {/* Navigation */}
           <nav className="p-4 space-y-1">
-            {(selectedCategory ? categories.filter(c => c.id === selectedCategory) : filteredCategories).map((category) => {
+            {filteredCategories.map((category) => {
               const Icon = category.icon;
               const isExpanded = expandedCategories.has(category.id);
               const isSelected = selectedCategory === category.id;
