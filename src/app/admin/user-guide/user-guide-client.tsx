@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { PlusIcon, PencilIcon, TrashIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import UserGuideCategoriesClient from './user-guide-categories-client';
 
 interface Article {
   id: string;
@@ -50,9 +51,23 @@ interface UserGuideClientProps {
 
 export default function UserGuideClient({ categories }: Readonly<UserGuideClientProps>) {
   const router = useRouter();
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  // Initialize expanded categories with all categories that have articles
+  const initialExpandedCategories = useMemo(() => {
+    return new Set(
+      categories
+        .filter(category => category.articles.length > 0)
+        .map(category => category.id)
+    );
+  }, [categories]);
+  
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(initialExpandedCategories);
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
   const [deletingArticle, setDeletingArticle] = useState<string | null>(null);
+
+  // Update expanded categories when categories prop changes
+  useEffect(() => {
+    setExpandedCategories(initialExpandedCategories);
+  }, [initialExpandedCategories]);
 
   const toggleCategory = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -141,8 +156,16 @@ export default function UserGuideClient({ categories }: Readonly<UserGuideClient
         </Button>
       </div>
 
-      {/* Categories List */}
-      <Card>
+      {/* Tabs */}
+      <Tabs defaultValue="articles" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="articles">Categories & Articles</TabsTrigger>
+          <TabsTrigger value="categories">Manage Categories</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="articles" className="space-y-4">
+          {/* Categories List */}
+          <Card>
         <CardHeader>
           <CardTitle>Categories & Articles</CardTitle>
           <CardDescription>
@@ -276,6 +299,12 @@ export default function UserGuideClient({ categories }: Readonly<UserGuideClient
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <UserGuideCategoriesClient categories={categories} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

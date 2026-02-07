@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import RichTextEditor from '@/components/content/rich-text-editor';
+import ImageUploadField from '@/components/content/image-upload-field';
 
 interface Category {
   id: string;
@@ -133,23 +134,34 @@ export default function EditArticleForm({ article, categories }: Readonly<EditAr
 
           <div className="space-y-2">
             <Label htmlFor="content">Content *</Label>
-            <Textarea
-              id="content"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              rows={15}
-              required
+            <RichTextEditor
+              content={formData.content}
+              onChange={(content) => setFormData({ ...formData, content })}
+              placeholder="Start writing your article content..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="image">Image URL</Label>
-              <Input
-                id="image"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+              <ImageUploadField
+                label="Image"
+                value={formData.image || null}
+                onChange={(url) => setFormData({ ...formData, image: url || '' })}
+                enableCrop={false}
+                allowSkipCrop={true}
               />
+              <div className="mt-2">
+                <Label htmlFor="image_url" className="text-xs text-muted-foreground">
+                  Or enter image URL manually:
+                </Label>
+                <Input
+                  id="image_url"
+                  value={formData.image}
+                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                  placeholder="/images/user-guide/example.png"
+                  className="mt-1"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -158,6 +170,7 @@ export default function EditArticleForm({ article, categories }: Readonly<EditAr
                 id="image_alt"
                 value={formData.image_alt}
                 onChange={(e) => setFormData({ ...formData, image_alt: e.target.value })}
+                placeholder="Descriptive alt text for the image"
               />
             </div>
           </div>
