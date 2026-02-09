@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
@@ -80,6 +82,26 @@ export function FAQ() {
             </AccordionItem>
           ))}
         </Accordion>
+
+        {/* CTA after FAQ */}
+        <div className="text-center mt-12 pt-8 border-t">
+          <p className="text-lg text-[#555] mb-4">Still have questions?</p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link 
+              href="/contact" 
+              className="bg-white text-[#0025cc] px-6 py-3 rounded-lg border-2 border-[#0025cc] hover:bg-[#0025cc] hover:text-white transition-all font-semibold inline-flex items-center justify-center gap-2"
+            >
+              Contact Us
+            </Link>
+            <Link 
+              href="/register" 
+              className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-6 py-3 rounded-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2 font-semibold"
+            >
+              Start Free Trial
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );

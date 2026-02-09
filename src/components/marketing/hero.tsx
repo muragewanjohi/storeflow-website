@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { ImageWithFallback } from './image-with-fallback';
 
 export function Hero() {
@@ -18,38 +18,57 @@ export function Hero() {
           {/* Left Content */}
           <div className="space-y-8 lg:ml-5">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 text-[#0c0528]">
-              <span className="text-base">{`Our Platform, Your Success Icon `}</span>
-              <span className="text-xl">🎯</span>
+            <div className="inline-flex items-center gap-2 bg-[#0025cc]/10 text-[#0025cc] px-4 py-2 rounded-full text-sm font-semibold">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0025cc] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0025cc]"></span>
+              </span>
+              14-Day Free Trial &mdash; No Credit Card Required
             </div>
 
             {/* Main Heading */}
-            <h1 className="text-5xl lg:text-6xl font-bold text-[#0c0528] leading-tight">
-              Build your Online Shop site within{' '}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#0c0528] leading-tight">
+              Launch Your Online Store in{' '}
               <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-                minutes
+                Minutes, Not Months
               </span>
             </h1>
 
-            {/* Description */}
-            <p className="text-lg text-[#8d8d8d] leading-relaxed">
-              Create your own online store with a unique web address and dedicated dashboard. Manage products, payments, and sales effortlessly. Everything you need to grow your business is just a click away. Start today and simplify your e-commerce journey.
+            {/* Value Proposition */}
+            <p className="text-lg text-[#555] leading-relaxed max-w-xl">
+              The all-in-one ecommerce platform built for diverse businesses. Get your own branded store with payments, inventory, and analytics &mdash; everything you need to sell online, without writing a single line of code.
             </p>
+
+            {/* Trust Signals */}
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[#555]">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                Free 14-day trial
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                No credit card needed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                Cancel anytime
+              </span>
+            </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               <Link 
-                href="/pricing" 
-                className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all flex items-center gap-2"
+                href="/register" 
+                className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all flex items-center gap-2 text-lg font-semibold"
               >
-                Get Started Now
+                Start Your Free Trial
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 
-                href="/pricing" 
-                className="bg-white text-[#0025cc] px-8 py-4 rounded-full border-2 border-[#0025cc] hover:bg-[#0025cc] hover:text-white transition-all flex items-center justify-center gap-2"
+                href="#pricing" 
+                className="bg-white text-[#0025cc] px-8 py-4 rounded-lg border-2 border-[#0025cc] hover:bg-[#0025cc] hover:text-white transition-all font-semibold"
               >
-                <ArrowRight className="w-5 h-5" />
+                View Pricing Plans
               </Link>
             </div>
           </div>
@@ -58,7 +77,7 @@ export function Hero() {
           <div className="relative flex items-end justify-end self-stretch">
             <div className="relative w-full lg:w-[130%] xl:w-[150%] -mr-0 lg:-mr-[28px] xl:-mr-[60px] h-full">
               <ImageWithFallback
-                alt="Build your online shop"
+                alt="DukaNest ecommerce platform dashboard"
                 src="/hero_image.png"
                 className="w-full h-full object-contain object-bottom"
               />

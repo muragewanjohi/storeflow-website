@@ -99,7 +99,7 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -510,12 +510,29 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
   }, [currentArticle]);
 
   return (
-    <div className="bg-white flex h-full">
-      {/* Left Sidebar Navigation - sticky/fixed */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden bg-gray-50 border-r border-gray-200 flex-shrink-0 flex flex-col`}>
-        {/* Search - fixed at top */}
-        <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
-          <div className="relative">
+    <div className="bg-white flex h-full relative">
+      {/* Mobile sidebar overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Left Sidebar Navigation */}
+      {/* Desktop: always visible as a flex column */}
+      {/* Mobile: fixed overlay sliding in from left */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-gray-50 border-r border-gray-200 flex flex-col
+          transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:static lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:z-auto
+        `}
+      >
+        {/* Sidebar header with close button (mobile only) */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -533,6 +550,12 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
               </button>
             )}
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-3 p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+          >
+            <XMarkIcon className="w-5 h-5 text-gray-500" />
+          </button>
         </div>
 
         {/* Navigation - scrollable */}
@@ -552,6 +575,8 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
                       if (category.articles.length > 0) {
                         setSelectedArticle(category.articles[0].id);
                       }
+                      // Close mobile sidebar after selection
+                      setSidebarOpen(false);
                       // Scroll content to top
                       if (contentScrollRef.current) {
                         contentScrollRef.current.scrollTop = 0;
@@ -578,6 +603,8 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
                           key={article.id}
                           onClick={() => {
                             navigateToArticle(article.id, category.id);
+                            // Close mobile sidebar after selection
+                            setSidebarOpen(false);
                           }}
                           className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
                             isArticleSelected
@@ -601,21 +628,22 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header - sticky */}
         <div className="bg-white border-b border-gray-200 flex-shrink-0 z-10">
-          <div className="px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+          <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 mb-1">
                   <span>Documentation</span>
                   <ChevronRightIcon className="w-4 h-4" />
                   <span>User Guide</span>
                 </div>
-                <h1 className="text-2xl font-bold text-[#0c0528]">
+                <h1 className="text-lg sm:text-2xl font-bold text-[#0c0528] truncate">
                   {currentArticle?.title || 'User Guide'}
                 </h1>
               </div>
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
+                aria-label="Toggle navigation"
               >
                 <Bars3Icon className="w-5 h-5 text-gray-500" />
               </button>
@@ -625,61 +653,61 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
 
         {/* Content - this is the only scrollable area */}
         <div ref={contentScrollRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 py-8">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             {currentArticle ? (
-              <article ref={contentRef} className="prose prose-lg max-w-none">
+              <article ref={contentRef} className="prose prose-sm sm:prose-lg max-w-none">
                 <div className="text-gray-700 leading-relaxed">
                   {renderContent(currentArticle.content)}
                 </div>
               </article>
             ) : (
               <div className="text-center py-12">
-                <BookOpenIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">Select an article</h2>
-                <p className="text-gray-600">Choose a topic from the sidebar to get started</p>
+                <BookOpenIcon className="w-12 sm:w-16 h-12 sm:h-16 text-gray-300 mx-auto mb-4" />
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Select an article</h2>
+                <p className="text-sm sm:text-base text-gray-600">Choose a topic from the sidebar to get started</p>
               </div>
             )}
 
             {/* Previous / Next Navigation */}
             {currentArticle && (
-              <nav className="mt-16 mb-8 border-t border-gray-200 pt-8">
-                <div className="flex items-stretch justify-between gap-4">
+              <nav className="mt-10 sm:mt-16 mb-6 sm:mb-8 border-t border-gray-200 pt-6 sm:pt-8">
+                <div className="flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-3 sm:gap-4">
                   {/* Previous Article */}
                   {prevArticle ? (
                     <button
                       onClick={() => navigateToArticle(prevArticle.article.id, prevArticle.categoryId)}
-                      className="flex-1 group text-left p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                      className="flex-1 group text-left p-3 sm:p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
                     >
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
                         <ChevronLeftIcon className="w-3.5 h-3.5" />
                         <span>Previous</span>
                       </div>
-                      <div className="font-medium text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                      <div className="font-medium text-sm sm:text-base text-gray-900 group-hover:text-[#0025cc] transition-colors">
                         {prevArticle.article.title}
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">{prevArticle.categoryName}</div>
                     </button>
                   ) : (
-                    <div className="flex-1" />
+                    <div className="hidden sm:block flex-1" />
                   )}
 
                   {/* Next Article */}
                   {nextArticle ? (
                     <button
                       onClick={() => navigateToArticle(nextArticle.article.id, nextArticle.categoryId)}
-                      className="flex-1 group text-right p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                      className="flex-1 group text-left sm:text-right p-3 sm:p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
                     >
-                      <div className="flex items-center justify-end gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
+                      <div className="flex items-center sm:justify-end gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
                         <span>Next</span>
                         <ChevronRightIcon className="w-3.5 h-3.5" />
                       </div>
-                      <div className="font-medium text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                      <div className="font-medium text-sm sm:text-base text-gray-900 group-hover:text-[#0025cc] transition-colors">
                         {nextArticle.article.title}
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">{nextArticle.categoryName}</div>
                     </button>
                   ) : (
-                    <div className="flex-1" />
+                    <div className="hidden sm:block flex-1" />
                   )}
                 </div>
               </nav>
@@ -688,7 +716,7 @@ export default function UserGuideContent({ tenantName, categories: dbCategories 
         </div>
       </div>
 
-      {/* Right Sidebar - Table of Contents - sticky */}
+      {/* Right Sidebar - Table of Contents - desktop only */}
       {currentArticle && tableOfContents.length > 0 && (
         <aside className="hidden xl:flex w-64 flex-shrink-0 border-l border-gray-200 bg-gray-50 flex-col">
           <div className="flex-1 overflow-y-auto p-6">

@@ -14,14 +14,12 @@ import { HowItWorks } from './how-it-works';
 import { MoreFeatures } from './more-features';
 import { Themes } from './themes';
 import { Stats } from './stats';
-import { WhyChooseUs } from './why-choose-us';
 import { WhyEcommerce } from './why-ecommerce';
 import { Pricing } from './pricing';
 import { Testimonials } from './testimonials';
 import { Blog } from './blog';
 import { FAQ } from './faq';
 import { Newsletter } from './newsletter';
-import { LandingFooter } from './landing-footer';
 import { Footer } from './footer';
 import { trackEvent } from '@/lib/analytics/google-analytics';
 
@@ -60,16 +58,16 @@ export default function MarketingLandingPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero />
-      <WhyEcommerce />
+      <Stats />
       <HowItWorks />
       <MoreFeatures />
       <Themes />
-      {/* <Stats /> */}
       <Pricing />
       <Testimonials />
-      <Blog />
+      <WhyEcommerce />
       <FAQ />
       <Newsletter />
+      <Blog />
       <Footer />
     </div>
   );

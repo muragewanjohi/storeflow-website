@@ -51,14 +51,14 @@ const buildVsBuy = [
     color: 'text-blue-600'
   },
   {
-    aspect: 'Development Cost',
-    buildYourself: '$1,000 - $5,000+',
-    withDukaNest: 'Starting at $10/month',
+    aspect: 'Setup Cost',
+    buildYourself: 'Ksh 130,000+',
+    withDukaNest: 'From Ksh 1,000/mo',
     icon: DollarSign,
     color: 'text-green-600'
   },
   {
-    aspect: 'Technical Skills Required',
+    aspect: 'Technical Skills',
     buildYourself: 'Expert-level coding',
     withDukaNest: 'No coding needed',
     icon: Code,
@@ -67,7 +67,7 @@ const buildVsBuy = [
   {
     aspect: 'Security & Updates',
     buildYourself: 'Your responsibility',
-    withDukaNest: 'Handled automatically',
+    withDukaNest: 'Handled for you',
     icon: Shield,
     color: 'text-red-600'
   }
@@ -192,16 +192,17 @@ export function WhyEcommerce() {
 
         {/* CTA Section */}
         <div className="text-center">
-          <p className="text-lg text-[#8d8d8d] mb-6">
-            Ready to start your online store? Get started in minutes, not months.
+          <p className="text-lg text-[#555] mb-6">
+            Stop paying developers. Start selling today.
           </p>
           <Link 
-            href="/pricing" 
-            className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all inline-flex items-center gap-2"
+            href="/register" 
+            className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all inline-flex items-center gap-2 font-semibold"
           >
-            Start Your Store Today
+            Try DukaNest Free for 14 Days
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
+          <p className="text-sm text-[#8d8d8d] mt-3">No credit card required</p>
         </div>
       </div>
     </section>

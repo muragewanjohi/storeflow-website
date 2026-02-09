@@ -1,27 +1,46 @@
 'use client';
 
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 const moreFeatures = [
   {
     icon: '📊',
-    title: 'Easy to Use Dashboard',
-    description: 'Manage your business effortlessly with an intuitive dashboard that gives you full control over products, orders, and analytics in one place.'
+    title: 'Powerful Dashboard',
+    description: 'Manage products, orders, customers, and analytics from one intuitive dashboard. Everything at your fingertips.'
   },
   {
-    icon: '🔒',
-    title: 'Secure Payments',
-    description: "Ensure your customers' data is protected with top-tier security for seamless and trusted payment processing."
+    icon: '📦',
+    title: 'Smart Inventory',
+    description: 'Track stock levels in real time with low-stock alerts, bulk updates, and inventory history. Never run out of a best-seller again.'
   },
   {
     icon: '📈',
-    title: 'Scalable for Growth',
-    description: 'Our platform grows with your business, providing the flexibility to add new products, features, and users easily'
+    title: 'Built to Scale',
+    description: 'Start with 50 products and grow to unlimited. Our platform scales with your business, from side hustle to full enterprise.'
   },
   {
     icon: '💬',
-    title: '24/7 Customer Support',
-    description: 'Get round-the-clock support whenever you need it. Our team is here to help you with any issues or questions.'
+    title: '24/7 Support',
+    description: 'Get help whenever you need it. Our support team is available around the clock to keep your store running smoothly.'
+  }
+];
+
+const whoIsThisFor = [
+  {
+    emoji: '🛍️',
+    title: 'Retail Shops Going Online',
+    description: 'Take your physical store to the internet and reach customers beyond your neighbourhood.'
+  },
+  {
+    emoji: '🚀',
+    title: 'New Entrepreneurs',
+    description: 'Starting your first business? Launch an online store without technical skills or a big budget.'
+  },
+  {
+    emoji: '🔄',
+    title: 'Switching Platforms',
+    description: 'Frustrated with your current setup? Migrate to DukaNest for better features and local payment support.'
   }
 ];
 
@@ -32,15 +51,22 @@ export function MoreFeatures() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-6">
-            <p className="text-[#0025cc] font-medium">Why To Choose Our Template</p>
+            <p className="text-[#0025cc] font-medium">Everything You Need to Succeed</p>
             <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] leading-tight">
-              Bring More Profit With More Features
+              More Features, More{' '}
+              <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
+                Profit
+              </span>
             </h2>
-            <p className="text-[#8d8d8d] leading-relaxed">
-              With our platform, you get powerful tools, seamless integrations, and top-notch support to grow your business. We offer reliable performance, user-friendly features, and the flexibility to scale as you do. Choose us for a partner in your success.
+            <p className="text-[#555] leading-relaxed text-lg">
+              Powerful tools, seamless integrations, and reliable performance &mdash; all included out of the box. Focus on selling, we handle the tech.
             </p>
-            <Link href="/customer-register" className="bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all inline-block">
-              Signup Now
+            <Link 
+              href="/register" 
+              className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all inline-flex items-center gap-2 font-semibold"
+            >
+              Create Your Store
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
 
@@ -58,6 +84,28 @@ export function MoreFeatures() {
                 <p className="text-sm text-[#8d8d8d] leading-relaxed">
                   {feature.description}
                 </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Who Is This For */}
+        <div className="mt-20 pt-16 border-t border-[#0025cc]/10">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <p className="text-[#0025cc] font-medium mb-2">Built For You</p>
+            <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
+              Who Is DukaNest{' '}
+              <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
+                For?
+              </span>
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {whoIsThisFor.map((item, index) => (
+              <div key={index} className="bg-white p-8 rounded-2xl border border-[#eaeaea] hover:shadow-lg transition-all text-center">
+                <div className="text-5xl mb-4">{item.emoji}</div>
+                <h3 className="text-xl font-semibold text-[#0c0528] mb-3">{item.title}</h3>
+                <p className="text-[#8d8d8d] leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>

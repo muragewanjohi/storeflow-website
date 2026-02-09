@@ -151,18 +151,18 @@ function HeroSectionComponent({
         isolation: 'isolate',
       }}
     >
-      {/* Full-width background: image or colour, same size so container is consistent */}
-      {hasVisualBackground && (
-        <div
-          className="absolute inset-0 z-0 bg-center bg-no-repeat"
-          style={heroBackgroundStyle}
-        />
-      )}
       {/* Content in container aligned with header */}
       <div
         className={`container mx-auto px-2 sm:px-4 lg:px-8 relative ${hasVisualBackground ? '' : 'rounded-lg'}`}
         style={{ maxWidth: 'var(--container-max-width, 1200px)' }}
       >
+        {/* Background: image or colour, constrained to same width as content */}
+        {hasVisualBackground && (
+          <div
+            className="absolute inset-0 z-0 bg-center bg-no-repeat rounded-lg"
+            style={heroBackgroundStyle}
+          />
+        )}
         {!hasVisualBackground && hasBackgroundColor && (
           <div
             className="absolute inset-0 z-0 rounded-lg"
