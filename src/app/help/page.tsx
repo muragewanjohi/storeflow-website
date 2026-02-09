@@ -35,8 +35,8 @@ export default async function HelpPage() {
     hostnameWithoutPort === 'dukanest.com' ||
     (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
     hostnameWithoutPort === '127.0.0.1' ||
-    hostnameWithoutPort.includes('dukanest') ||
-    hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort === 'www.storeflow.com' ||
+    hostnameWithoutPort === 'storeflow.com' ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
   

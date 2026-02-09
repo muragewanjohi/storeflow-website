@@ -88,13 +88,17 @@ export async function getTenant(): Promise<Tenant | null> {
                              process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
     
     // Check if this is a marketing site hostname - don't resolve tenant for these
+    // Use exact root domain matches only - subdomains like shoes.dukanest.com are tenant sites
     const isMarketingSite = 
       hostnameWithoutPort === 'www' ||
       hostnameWithoutPort === 'marketing' ||
       (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
       hostnameWithoutPort === '127.0.0.1' ||
-      hostnameWithoutPort.includes('dukanest') ||
-      hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort === 'dukanest.com' ||
+      hostnameWithoutPort === 'www.dukanest.com' ||
+      hostnameWithoutPort === 'storeflow.com' ||
+      hostnameWithoutPort === 'www.storeflow.com' ||
+      hostnameWithoutPort.includes('vercel.app') ||
       hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
     
     if (isMarketingSite) {

@@ -42,14 +42,14 @@ export async function middleware(request: NextRequest) {
   const isLocalhost = hostnameWithoutPort === 'localhost' || hostnameWithoutPort === '127.0.0.1';
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   
-  // Marketing site hostnames
+  // Marketing site hostnames (exact root domain matches only - subdomains are tenant sites)
   const isMarketingSite = 
     hostnameWithoutPort === 'www' ||
     hostnameWithoutPort === 'marketing' ||
     hostnameWithoutPort === 'www.dukanest.com' ||
     hostnameWithoutPort === 'dukanest.com' ||
-    hostnameWithoutPort.includes('dukanest') ||
-    hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort === 'www.storeflow.com' ||
+    hostnameWithoutPort === 'storeflow.com' ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
   
