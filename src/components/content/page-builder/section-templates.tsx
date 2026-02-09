@@ -128,13 +128,13 @@ function HeroSectionComponent({
     '--font-body': 'var(--font-body, inherit)',
   } as React.CSSProperties & Record<string, string | undefined>;
 
-  // Hero background: same container for image or colour (full-width; image uses contain, colour fills).
+  // Hero background: same container for image or colour, aligned with content container.
   const heroBackgroundStyle: React.CSSProperties = {
     backgroundColor: hasBannerImage ? 'transparent' : (section.background_color || 'var(--color-background, transparent)'),
     ...(hasBannerImage
       ? {
           backgroundImage: `url("${section.banner_image!.trim()}")`,
-          backgroundSize: 'contain',
+          backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundAttachment: 'scroll',
