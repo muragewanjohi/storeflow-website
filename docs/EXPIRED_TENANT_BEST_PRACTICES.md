@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document explains how expired tenants are handled in StoreFlow and aligns with industry best practices.
+This document explains how expired tenants are handled in DukaNest and aligns with industry best practices.
 
 ## Current Implementation
 
 ### Grace Period System
 
-StoreFlow implements a **2-day grace period** (configurable via `SUBSCRIPTION_GRACE_PERIOD_DAYS`) for expired tenants:
+DukaNest implements a **2-day grace period** (configurable via `SUBSCRIPTION_GRACE_PERIOD_DAYS`) for expired tenants:
 
 1. **Expiration Day (Day 0)**
    - Tenant status changes from `active` to `expired`
@@ -60,11 +60,11 @@ active → expired (grace period) → suspended → [renewal] → active
 - ✅ Order processing disabled
 - ✅ Data retention for compliance
 
-### StoreFlow Implementation
+### DukaNest Implementation
 
 Our implementation aligns with best practices:
 
-| Feature | StoreFlow | Industry Standard |
+| Feature | DukaNest | Industry Standard |
 |---------|-----------|------------------|
 | Grace Period | ✅ 2 days | ✅ 1-7 days |
 | Read-Only Access | ✅ Yes | ✅ Yes |

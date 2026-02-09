@@ -1,10 +1,10 @@
-# Analytics Feature Comparison: StoreFlow vs Shopify & Industry Standards
+# Analytics Feature Comparison: DukaNest vs Shopify & Industry Standards
 
 ## Overview
 
-This document compares StoreFlow's analytics capabilities with Shopify and other leading e-commerce platforms to identify gaps and opportunities for enhancement.
+This document compares DukaNest's analytics capabilities with Shopify and other leading e-commerce platforms to identify gaps and opportunities for enhancement.
 
-## Current StoreFlow Analytics Features
+## Current DukaNest Analytics Features
 
 ### ✅ Implemented Features
 
@@ -60,7 +60,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Cart Abandonment Rate
 - Checkout Completion Rate
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - Only has basic "Conversion Rate" (customers with orders)
 - No funnel tracking
 - No cart abandonment analysis
@@ -79,7 +79,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Search Engine Breakdown (Google, Bing, etc.)
 - Social Media Sources
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - No traffic source tracking
 - No marketing attribution
 - No UTM parameter tracking
@@ -99,7 +99,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Worst Performing Products
 - Product Return Rate
 
-**StoreFlow Status:** ⚠️ Partially Implemented
+**DukaNest Status:** ⚠️ Partially Implemented
 - Has "Top Products by Revenue"
 - Missing: Product views, conversion rates, time-based trends
 
@@ -117,7 +117,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Customer Geographic Distribution
 - Shipping Destination Analytics
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - No geographic breakdown
 - Address data exists but not analyzed
 
@@ -134,7 +134,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Return Reasons
 - Refund Trends Over Time
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - No refund/return tracking in analytics
 - Order status may include refunds but not analyzed
 
@@ -152,7 +152,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Recent Activity Feed
 - Live Revenue Updates
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - All analytics are historical
 - No real-time dashboard
 
@@ -173,7 +173,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - AOV Trends Over Time
 - AOV Comparison (period over period)
 
-**StoreFlow Status:** ⚠️ Basic Implementation
+**DukaNest Status:** ⚠️ Basic Implementation
 - Has overall AOV
 - Missing: Breakdowns and comparisons
 
@@ -190,7 +190,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Purchase Frequency Analysis
 - Customer Retention Rate
 
-**StoreFlow Status:** ⚠️ Partial Implementation
+**DukaNest Status:** ⚠️ Partial Implementation
 - Has "New Customers" count
 - Missing: Segmentation, retention rate, purchase frequency
 
@@ -208,7 +208,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Coupon Code Analytics
 - Discount Trends
 
-**StoreFlow Status:** ⚠️ Partial Implementation
+**DukaNest Status:** ⚠️ Partial Implementation
 - Tracks coupon usage in orders
 - Missing: Performance analysis, impact metrics
 
@@ -225,7 +225,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Trend Indicators (↑↓)
 - Benchmark Comparisons
 
-**StoreFlow Status:** ⚠️ Partial Implementation
+**DukaNest Status:** ⚠️ Partial Implementation
 - Has "this month" comparisons
 - Missing: Year-over-year, growth percentages, trend indicators
 
@@ -245,7 +245,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Custom Date Ranges
 - Saved Reports
 
-**StoreFlow Status:** ⚠️ Basic Implementation
+**DukaNest Status:** ⚠️ Basic Implementation
 - Has date range picker
 - Missing: Category filters, customer segments, saved reports
 
@@ -262,7 +262,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 - Custom Report Templates
 - PDF Report Generation
 
-**StoreFlow Status:** ❌ Not Implemented
+**DukaNest Status:** ❌ Not Implemented
 - Only manual export
 - No scheduling
 
@@ -351,7 +351,7 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 
 ## Comparison Summary
 
-| Feature | StoreFlow | Shopify | Priority |
+| Feature | DukaNest | Shopify | Priority |
 |---------|-----------|---------|----------|
 | Basic Revenue/Orders/Customers | ✅ | ✅ | - |
 | Revenue Trends | ✅ | ✅ | - |
@@ -372,14 +372,14 @@ This document compares StoreFlow's analytics capabilities with Shopify and other
 
 ## Conclusion
 
-StoreFlow has a solid foundation with core analytics features, but is missing several key features that Shopify and other platforms provide. The highest priority should be:
+DukaNest has a solid foundation with core analytics features, but is missing several key features that Shopify and other platforms provide. The highest priority should be:
 
 1. **Conversion Funnel Tracking** - Essential for understanding customer behavior
 2. **Traffic Source Analytics** - Critical for marketing optimization
 3. **Product Performance Deep Dive** - Important for inventory and marketing decisions
 4. **Geographic Analytics** - Useful for expansion and marketing
 
-These features would bring StoreFlow's analytics to parity with industry standards and provide merchants with actionable insights for growing their businesses.
+These features would bring DukaNest's analytics to parity with industry standards and provide merchants with actionable insights for growing their businesses.
 
 ---
 

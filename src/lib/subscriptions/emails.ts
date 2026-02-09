@@ -45,6 +45,18 @@ export async function sendSubscriptionRenewalReminderEmail({
       : 0;
     const paymentUrl = getTenantPaymentUrl(tenant);
 
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
+
+    const formattedPrice = price 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(price).toLocaleString('en-KE')}`
+          : `${currencySymbol}${Number(price).toFixed(2)}`)
+      : '$0.00';
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -59,6 +71,20 @@ export async function sendSubscriptionRenewalReminderEmail({
             <p style="margin: 0;">Your subscription will expire in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}.</p>
           </div>
 
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Subscription Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
@@ -68,11 +94,11 @@ export async function sendSubscriptionRenewalReminderEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">${price 
-                  ? (currencySymbol === 'Ksh' 
-                      ? `Ksh ${Number(price).toLocaleString('en-KE')}`
-                      : `${currencySymbol}${Number(price).toFixed(2)}`)
-                  : '$0.00'}</td>
+                <td style="padding: 8px 0;">${formattedPrice}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Currency:</td>
+                <td style="padding: 8px 0;">${currency}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Expires:</td>
@@ -89,8 +115,9 @@ export async function sendSubscriptionRenewalReminderEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated reminder from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated reminder from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">Please renew your subscription to avoid service interruption.</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -98,7 +125,7 @@ export async function sendSubscriptionRenewalReminderEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Subscription Renewal Reminder - Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`,
+      subject: `Subscription Renewal Reminder - ${tenant.name} - Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`,
       html,
     });
   } catch (error) {
@@ -113,6 +140,7 @@ export async function sendSubscriptionRenewalReminderEmail({
 export async function sendSubscriptionExpiredEmail({
   tenant,
   plan,
+  isKenya = false,
 }: {
   tenant: Tenant;
   plan: { 
@@ -122,10 +150,31 @@ export async function sendSubscriptionExpiredEmail({
     currency?: 'KES' | 'USD';
     currencySymbol?: 'Ksh' | '$';
   } | null;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
     const gracePeriodDays = parseInt(process.env.SUBSCRIPTION_GRACE_PERIOD_DAYS || '2');
+    const paymentUrl = getTenantPaymentUrl(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
+    const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
+    const price = plan 
+      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      : 0;
+
+    const formattedPrice = price 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(price).toLocaleString('en-KE')}`
+          : `${currencySymbol}${Number(price).toFixed(2)}`)
+      : '$0.00';
+
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
 
     const html = `
       <!DOCTYPE html>
@@ -141,6 +190,20 @@ export async function sendSubscriptionExpiredEmail({
             <p style="margin: 0;">Your subscription has expired. Please renew to continue using the service.</p>
           </div>
 
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Subscription Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
@@ -149,12 +212,12 @@ export async function sendSubscriptionExpiredEmail({
                 <td style="padding: 8px 0;">${plan?.name || 'N/A'}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">${plan?.price 
-                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh' 
-                      ? Number(plan.price).toLocaleString('en-KE')
-                      : Number(plan.price).toFixed(2))
-                  : '$0.00'}</td>
+                <td style="padding: 8px 0; font-weight: bold;">Renewal Price:</td>
+                <td style="padding: 8px 0; font-size: 16px; font-weight: bold; color: #dc2626;">${formattedPrice}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Currency:</td>
+                <td style="padding: 8px 0;">${currency}</td>
               </tr>
             </table>
           </div>
@@ -166,14 +229,15 @@ export async function sendSubscriptionExpiredEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${paymentUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               Renew Subscription Now
             </a>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -181,7 +245,7 @@ export async function sendSubscriptionExpiredEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: 'Subscription Expired - Renew Now',
+      subject: `Subscription Expired - ${tenant.name} - Renew Now`,
       html,
     });
   } catch (error) {
@@ -196,6 +260,7 @@ export async function sendSubscriptionExpiredEmail({
 export async function sendSubscriptionSuspendedEmail({
   tenant,
   plan,
+  isKenya = false,
 }: {
   tenant: Tenant;
   plan: { 
@@ -205,9 +270,30 @@ export async function sendSubscriptionSuspendedEmail({
     currency?: 'KES' | 'USD';
     currencySymbol?: 'Ksh' | '$';
   } | null;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+    const paymentUrl = getTenantPaymentUrl(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
+    const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
+    const price = plan 
+      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      : 0;
+
+    const formattedPrice = price 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(price).toLocaleString('en-KE')}`
+          : `${currencySymbol}${Number(price).toFixed(2)}`)
+      : '$0.00';
+
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
 
     const html = `
       <!DOCTYPE html>
@@ -221,6 +307,20 @@ export async function sendSubscriptionSuspendedEmail({
           <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
             <h1 style="color: #dc2626; margin-top: 0;">Account Suspended</h1>
             <p style="margin: 0;">Your subscription grace period has ended and your account has been suspended.</p>
+          </div>
+
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
           </div>
 
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
@@ -249,25 +349,28 @@ export async function sendSubscriptionSuspendedEmail({
                 <td style="padding: 8px 0;">${plan.name}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Price:</td>
-                <td style="padding: 8px 0;">${plan.currencySymbol || '$'}${plan.currencySymbol === 'Ksh' 
-                    ? Number(plan.price).toLocaleString('en-KE')
-                    : Number(plan.price).toFixed(2)}</td>
+                <td style="padding: 8px 0; font-weight: bold;">Renewal Price:</td>
+                <td style="padding: 8px 0; font-weight: bold; color: #dc2626;">${formattedPrice}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Currency:</td>
+                <td style="padding: 8px 0;">${currency}</td>
               </tr>
             </table>
           </div>
           ` : ''}
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${paymentUrl}" 
                style="display: inline-block; background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               Restore Access Now
             </a>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">Need help? Contact our support team for assistance with renewal.</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -275,7 +378,7 @@ export async function sendSubscriptionSuspendedEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: 'Account Suspended - Restore Access Now',
+      subject: `Account Suspended - ${tenant.name} - Restore Access Now`,
       html,
     });
   } catch (error) {
@@ -351,7 +454,7 @@ export async function sendPreDeletionWarningEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated warning from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated warning from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">
               Account: ${tenant.name} (${tenant.subdomain})<br/>
               Deletion Date: ${daysUntilDeletion} day${daysUntilDeletion !== 1 ? 's' : ''} from now
@@ -379,6 +482,7 @@ export async function sendSubscriptionActivatedEmail({
   tenant,
   plan,
   expireDate,
+  isKenya = false,
 }: {
   tenant: Tenant;
   plan: { 
@@ -389,9 +493,30 @@ export async function sendSubscriptionActivatedEmail({
     currencySymbol?: 'Ksh' | '$';
   } | null;
   expireDate: Date;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
+    const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
+    const price = plan 
+      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      : 0;
+
+    const formattedPrice = price 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(price).toLocaleString('en-KE')}`
+          : `${currencySymbol}${Number(price).toFixed(2)}`)
+      : 'N/A';
+
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
+    const dashboardUrl = `${storeUrl}/dashboard`;
 
     const html = `
       <!DOCTYPE html>
@@ -407,6 +532,20 @@ export async function sendSubscriptionActivatedEmail({
             <p style="margin: 0;">Your subscription has been successfully activated!</p>
           </div>
 
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Subscription Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
@@ -415,12 +554,12 @@ export async function sendSubscriptionActivatedEmail({
                 <td style="padding: 8px 0;">${plan?.name || 'N/A'}</td>
               </tr>
               <tr>
-                <td style="padding: 8px 0; font-weight: bold;">Amount paid:</td>
-                <td style="padding: 8px 0;">${plan?.price != null
-                  ? (plan.currencySymbol || '$') + (plan.currencySymbol === 'Ksh'
-                      ? Number(plan.price).toLocaleString('en-KE')
-                      : Number(plan.price).toFixed(2))
-                  : 'N/A'}</td>
+                <td style="padding: 8px 0; font-weight: bold;">Amount Paid:</td>
+                <td style="padding: 8px 0; color: #10b981; font-weight: bold;">${formattedPrice}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Currency:</td>
+                <td style="padding: 8px 0;">${currency}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Duration:</td>
@@ -434,15 +573,16 @@ export async function sendSubscriptionActivatedEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard" 
+            <a href="${dashboardUrl}" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               Go to Dashboard
             </a>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated confirmation from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated confirmation from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">Thank you for your subscription!</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -450,7 +590,7 @@ export async function sendSubscriptionActivatedEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Subscription Activated - ${plan?.name || 'Welcome'}`,
+      subject: `Subscription Activated - ${tenant.name} - ${plan?.name || 'Welcome'}`,
       html,
     });
   } catch (error) {
@@ -486,6 +626,16 @@ export async function sendPaymentDueReminderEmail({
       : amount;
     const paymentUrl = getTenantPaymentUrl(tenant);
 
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
+
+    const formattedAmount = currencySymbol === 'Ksh' 
+      ? `Ksh ${Number(finalAmount).toLocaleString('en-KE')}`
+      : `${currencySymbol}${Number(finalAmount).toFixed(2)}`;
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -500,6 +650,20 @@ export async function sendPaymentDueReminderEmail({
             <p style="margin: 0;">A payment is due for your subscription.</p>
           </div>
 
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Payment Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
@@ -509,9 +673,11 @@ export async function sendPaymentDueReminderEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Amount Due:</td>
-                <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #2563eb;">${currencySymbol === 'Ksh' 
-                  ? `Ksh ${Number(finalAmount).toLocaleString('en-KE')}`
-                  : `${currencySymbol}${Number(finalAmount).toFixed(2)}`}</td>
+                <td style="padding: 8px 0; font-size: 18px; font-weight: bold; color: #2563eb;">${formattedAmount}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Currency:</td>
+                <td style="padding: 8px 0;">${currency}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Due Date:</td>
@@ -528,8 +694,9 @@ export async function sendPaymentDueReminderEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated reminder from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated reminder from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">Please make payment to avoid service interruption.</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -537,9 +704,7 @@ export async function sendPaymentDueReminderEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Payment Due Reminder - ${currencySymbol === 'Ksh' 
-        ? `Ksh ${Number(finalAmount).toLocaleString('en-KE')}`
-        : `${currencySymbol}${Number(finalAmount).toFixed(2)}`}`,
+      subject: `Payment Due Reminder - ${formattedAmount} - ${tenant.name}`,
       html,
     });
   } catch (error) {
@@ -557,15 +722,34 @@ export async function sendPlanUpgradeConfirmationEmail({
   newPlan,
   expireDate,
   proratedAmount,
+  isKenya = false,
 }: {
   tenant: Tenant;
   oldPlan: { name: string; price: number } | null;
   newPlan: { name: string; price: number; duration_months: number } | null;
   expireDate: Date;
   proratedAmount?: number;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currencySymbol = isKenya ? 'Ksh' : '$';
+    const newPrice = newPlan 
+      ? (isKenya ? getLocalizedPrice(newPlan.name, true, newPlan.price) : newPlan.price)
+      : 0;
+    const formattedNewPrice = newPrice 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(newPrice).toLocaleString('en-KE')}`
+          : `$${Number(newPrice).toFixed(2)}`)
+      : '$0.00';
+
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
 
     const html = `
       <!DOCTYPE html>
@@ -581,6 +765,20 @@ export async function sendPlanUpgradeConfirmationEmail({
             <p style="margin: 0;">Your subscription plan has been successfully upgraded!</p>
           </div>
 
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
           <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Plan Change Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
@@ -594,7 +792,7 @@ export async function sendPlanUpgradeConfirmationEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">New Price:</td>
-                <td style="padding: 8px 0;">$${newPlan?.price ? Number(newPlan.price).toFixed(2) : '0.00'}</td>
+                <td style="padding: 8px 0;">${formattedNewPrice}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Expires:</td>
@@ -603,7 +801,9 @@ export async function sendPlanUpgradeConfirmationEmail({
               ${proratedAmount && proratedAmount > 0 ? `
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">Prorated Charge:</td>
-                <td style="padding: 8px 0;">$${proratedAmount.toFixed(2)}</td>
+                <td style="padding: 8px 0;">${currencySymbol === 'Ksh' 
+                    ? `Ksh ${Number(proratedAmount).toLocaleString('en-KE')}`
+                    : `$${proratedAmount.toFixed(2)}`}</td>
               </tr>
               <tr>
                 <td colspan="2" style="padding: 8px 0; font-size: 12px; color: #6b7280;">
@@ -615,15 +815,16 @@ export async function sendPlanUpgradeConfirmationEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${storeUrl}/dashboard/subscription" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               View Subscription
             </a>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated confirmation from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated confirmation from DukaNest Platform</p>
             <p style="margin: 5px 0 0 0;">Thank you for upgrading!</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -631,7 +832,7 @@ export async function sendPlanUpgradeConfirmationEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Plan Upgraded to ${newPlan?.name || 'New Plan'}`,
+      subject: `Plan Upgraded to ${newPlan?.name || 'New Plan'} - ${tenant.name}`,
       html,
     });
   } catch (error) {
@@ -648,14 +849,33 @@ export async function sendPlanDowngradeScheduledEmail({
   currentPlan,
   newPlan,
   effectiveDate,
+  isKenya = false,
 }: {
   tenant: Tenant;
   currentPlan: { name: string; price: number } | null;
   newPlan: { name: string; price: number; duration_months: number } | null;
   effectiveDate: Date;
+  isKenya?: boolean;
 }) {
   try {
     const tenantEmail = getTenantContactEmail(tenant);
+
+    // Determine pricing for Kenya vs others
+    const currencySymbol = isKenya ? 'Ksh' : '$';
+    const newPrice = newPlan 
+      ? (isKenya ? getLocalizedPrice(newPlan.name, true, newPlan.price) : newPlan.price)
+      : 0;
+    const formattedNewPrice = newPrice 
+      ? (currencySymbol === 'Ksh' 
+          ? `Ksh ${Number(newPrice).toLocaleString('en-KE')}`
+          : `$${Number(newPrice).toFixed(2)}`)
+      : '$0.00';
+
+    // Build store URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+    const storeUrl = tenant.custom_domain 
+      ? `https://${tenant.custom_domain}` 
+      : `https://${tenant.subdomain}.${baseDomain}`;
 
     const html = `
       <!DOCTYPE html>
@@ -674,7 +894,21 @@ export async function sendPlanDowngradeScheduledEmail({
 
           <p>Your plan downgrade has been scheduled and will take effect at the end of your current billing period.</p>
 
-          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Store Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold; width: 120px;">Store Name:</td>
+                <td style="padding: 6px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; font-weight: bold;">Store URL:</td>
+                <td style="padding: 6px 0;"><a href="${storeUrl}" style="color: #2563eb; text-decoration: none;">${storeUrl}</a></td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
             <h2 style="margin-top: 0; color: #1f2937;">Downgrade Details</h2>
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
@@ -691,7 +925,7 @@ export async function sendPlanDowngradeScheduledEmail({
               </tr>
               <tr>
                 <td style="padding: 8px 0; font-weight: bold;">New Price:</td>
-                <td style="padding: 8px 0;">$${newPlan?.price ? Number(newPlan.price).toFixed(2) : '0.00'}</td>
+                <td style="padding: 8px 0;">${formattedNewPrice}</td>
               </tr>
             </table>
           </div>
@@ -704,14 +938,15 @@ export async function sendPlanDowngradeScheduledEmail({
           </div>
 
           <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/subscription" 
+            <a href="${storeUrl}/dashboard/subscription" 
                style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
               View Subscription
             </a>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
+            <p style="margin: 5px 0 0 0; font-size: 11px;">Store: ${tenant.name} (${tenant.subdomain})</p>
           </div>
         </body>
       </html>
@@ -719,7 +954,7 @@ export async function sendPlanDowngradeScheduledEmail({
 
     return sendPlatformEmail({
       to: tenantEmail,
-      subject: `Plan Downgrade Scheduled - Effective ${effectiveDate.toLocaleDateString()}`,
+      subject: `Plan Downgrade Scheduled - ${tenant.name} - Effective ${effectiveDate.toLocaleDateString()}`,
       html,
     });
   } catch (error) {

@@ -232,4 +232,4 @@ console.log('Auth result:', authResult.debug);
 ---
 
 **Last Updated:** January 2025  
-**Maintained By:** StoreFlow Team
+**Maintained By:** DukaNest Team

@@ -119,6 +119,11 @@ export async function GET(request: NextRequest) {
                 )
               : null;
 
+            // Detect if tenant is from Kenya
+            const tenantCountry = tenant.country || (tenant.data as any)?.subscription?.countryCode || (tenant.data as any)?.settings?.store_country || '';
+            const tenantCurrency = (tenant.data as any)?.subscription?.currency || '';
+            const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA' || tenantCurrency === 'KES';
+
             // Send expired email notification (only once when status changes)
             sendSubscriptionExpiredEmail({
               tenant: tenant as any,
@@ -137,6 +142,7 @@ export async function GET(request: NextRequest) {
                     duration_months: tenant.price_plans.duration_months,
                   }
                 : null,
+              isKenya,
             }).catch((error) => {
               console.error(`Error sending expired email to tenant ${tenant.id}:`, error);
             });
@@ -163,6 +169,11 @@ export async function GET(request: NextRequest) {
                 )
               : null;
 
+            // Detect if tenant is from Kenya
+            const suspTenantCountry = tenant.country || (tenant.data as any)?.subscription?.countryCode || (tenant.data as any)?.settings?.store_country || '';
+            const suspTenantCurrency = (tenant.data as any)?.subscription?.currency || '';
+            const suspIsKenya = suspTenantCountry?.toUpperCase() === 'KE' || suspTenantCountry?.toUpperCase() === 'KENYA' || suspTenantCurrency === 'KES';
+
             sendSubscriptionSuspendedEmail({
               tenant: tenant as any,
               plan: subscriptionPricing
@@ -180,6 +191,7 @@ export async function GET(request: NextRequest) {
                     duration_months: tenant.price_plans.duration_months,
                   }
                 : null,
+              isKenya: suspIsKenya,
             }).catch((error) => {
               console.error(`Error sending suspended email to tenant ${tenant.id}:`, error);
             });

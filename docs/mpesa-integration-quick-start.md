@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides a quick reference for setting up M-Pesa Buy Goods (Till Number) payments for subscriptions in StoreFlow.
+This guide provides a quick reference for setting up M-Pesa Buy Goods (Till Number) payments for subscriptions in DukaNest.
 
 ## Prerequisites Checklist
 

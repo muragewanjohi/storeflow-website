@@ -22,7 +22,7 @@ Describe what you've already tried or researched.
 
 - **OS:** [e.g. Windows 11]
 - **Node.js Version:** [e.g. 18.17.0]
-- **StoreFlow Version:** [e.g. 0.1.0]
+- **DukaNest Version:** [e.g. 0.1.0]
 
 ## Additional Information
 

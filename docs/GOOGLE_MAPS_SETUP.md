@@ -1,12 +1,12 @@
 # Google Maps API Setup Guide
 
-This guide will walk you through setting up Google Maps Places API for address autocomplete in the StoreFlow checkout process.
+This guide will walk you through setting up Google Maps Places API for address autocomplete in the DukaNest checkout process.
 
 ## 📋 Prerequisites
 
 - A Google account (Gmail account works)
 - Access to Google Cloud Console
-- Your StoreFlow project running locally or deployed
+- Your DukaNest project running locally or deployed
 
 ## 🚀 Step-by-Step Setup
 
@@ -19,7 +19,7 @@ This guide will walk you through setting up Google Maps Places API for address a
 2. **Create a New Project**
    - Click the project dropdown at the top of the page
    - Click "New Project"
-   - Enter a project name (e.g., "StoreFlow Maps")
+   - Enter a project name (e.g., "DukaNest Maps")
    - Click "Create"
    - Wait for the project to be created (may take a few seconds)
 
@@ -335,7 +335,7 @@ Before going to production, ensure:
 
 ## 🎉 You're All Set!
 
-Once you've completed these steps, your StoreFlow checkout will have Google Maps Places Autocomplete enabled. Users can now simply type their address and select from Google's suggestions, making checkout faster and more accurate.
+Once you've completed these steps, your DukaNest checkout will have Google Maps Places Autocomplete enabled. Users can now simply type their address and select from Google's suggestions, making checkout faster and more accurate.
 
 ---
 

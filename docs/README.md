@@ -1,6 +1,6 @@
-# StoreFlow Technical Documentation
+# DukaNest Technical Documentation
 
-**Complete technical documentation for the StoreFlow multi-tenant ecommerce platform**
+**Complete technical documentation for the DukaNest multi-tenant ecommerce platform**
 
 ---
 
@@ -28,7 +28,7 @@
 ## 📁 **Project Structure**
 
 ```
-storeflow/
+dukanest/
 ├── docs/                          # 📚 Technical documentation
 │   ├── README.md                  # This index
 │   ├── ARCHITECTURE.md            # System architecture
@@ -88,7 +88,7 @@ storeflow/
 
 ---
 
-**🚀 Ready to work with StoreFlow? Start with the [Development Setup](../DEVELOPMENT.md) or explore the [System Architecture](./ARCHITECTURE.md).**
+**🚀 Ready to work with DukaNest? Start with the [Development Setup](../DEVELOPMENT.md) or explore the [System Architecture](./ARCHITECTURE.md).**
 
 **Last Updated:** January 2026
 

@@ -2,9 +2,9 @@
 
 ## Overview
 
-This document outlines StoreFlow's policy for managing breaking changes, with real-world examples from popular e-commerce platforms and best practices for implementation.
+This document outlines DukaNest's policy for managing breaking changes, with real-world examples from popular e-commerce platforms and best practices for implementation.
 
-**Important**: StoreFlow is a SaaS platform, meaning all users run the same version automatically. Users cannot opt-out of core platform updates, but are given advance notice and migration support for breaking changes.
+**Important**: DukaNest is a SaaS platform, meaning all users run the same version automatically. Users cannot opt-out of core platform updates, but are given advance notice and migration support for breaking changes.
 
 ---
 
@@ -12,7 +12,7 @@ This document outlines StoreFlow's policy for managing breaking changes, with re
 
 1. [What Are Breaking Changes?](#what-are-breaking-changes)
 2. [How Popular Platforms Handle Breaking Changes](#how-popular-platforms-handle-breaking-changes)
-3. [StoreFlow Breaking Changes Policy](#storeflow-breaking-changes-policy)
+3. [DukaNest Breaking Changes Policy](#dukanest-breaking-changes-policy)
 4. [Real-World Examples](#real-world-examples)
 5. [Migration Strategies](#migration-strategies)
 6. [Communication Templates](#communication-templates)
@@ -196,7 +196,7 @@ A **breaking change** is any modification that requires users, developers, or in
 
 ---
 
-## StoreFlow Breaking Changes Policy
+## DukaNest Breaking Changes Policy
 
 ### Versioning Strategy
 
@@ -207,7 +207,7 @@ A **breaking change** is any modification that requires users, developers, or in
 
 #### Single Version Model (SaaS)
 
-**StoreFlow maintains a single version for all users** - this is the standard SaaS approach:
+**DukaNest maintains a single version for all users** - this is the standard SaaS approach:
 
 **How It Works:**
 - ✅ All stores automatically updated to new version
@@ -234,7 +234,7 @@ A **breaking change** is any modification that requires users, developers, or in
 
 | Platform Type | Version Model | User Control | Example |
 |--------------|---------------|--------------|---------|
-| **SaaS** | Single version, auto-update | No opt-out | Shopify, Stripe, StoreFlow |
+| **SaaS** | Single version, auto-update | No opt-out | Shopify, Stripe, DukaNest |
 | **Self-Hosted** | Multiple versions, manual | Full control | WooCommerce, Magento |
 | **API Platform** | Version pinning, platform auto-updates | Choose API version | Stripe API, Shopify API |
 
@@ -347,7 +347,7 @@ Response:
 6. Remove `/api/orders` after 90 days
 
 **Communication:**
-- Email: "API Endpoint Changes in StoreFlow v2.0"
+- Email: "API Endpoint Changes in DukaNest v2.0"
 - Migration guide with before/after examples
 - Code samples for common languages
 - Support available for assistance
@@ -381,7 +381,7 @@ orders table:
 6. Remove old columns after migration period
 
 **Communication:**
-- Email: "Database Schema Changes in StoreFlow v2.0"
+- Email: "Database Schema Changes in DukaNest v2.0"
 - Migration script provided
 - Data validation tool
 - Rollback instructions
@@ -409,7 +409,7 @@ Header: Authorization: Bearer oauth-token-here
 6. Remove API key support after 90 days
 
 **Communication:**
-- Email: "Authentication Changes in StoreFlow v2.0"
+- Email: "Authentication Changes in DukaNest v2.0"
 - OAuth setup guide
 - Migration tool for API keys
 - Token management documentation
@@ -488,12 +488,12 @@ Header: Authorization: Bearer oauth-token-here
 
 ### Email Template: Breaking Change Announcement
 
-**Subject**: Action Required: Breaking Changes in StoreFlow v2.0
+**Subject**: Action Required: Breaking Changes in DukaNest v2.0
 
 ```
-Dear StoreFlow User,
+Dear DukaNest User,
 
-We're writing to inform you about important changes coming in StoreFlow v2.0, 
+We're writing to inform you about important changes coming in DukaNest v2.0, 
 scheduled for release on [DATE].
 
 BREAKING CHANGES:
@@ -515,14 +515,14 @@ MIGRATION GUIDE:
 
 SUPPORT:
 If you need assistance with migration, please contact our support team:
-- Email: support@storeflow.com
+- Email: support@dukanest.com
 - Documentation: [link]
 - Migration tools: [link]
 
-Thank you for being a valued StoreFlow user.
+Thank you for being a valued DukaNest user.
 
 Best regards,
-StoreFlow Team
+DukaNest Team
 ```
 
 ### In-App Banner Template
@@ -613,4 +613,4 @@ Before releasing a breaking change:
 ---
 
 **Last Updated:** January 2025  
-**Maintained By:** StoreFlow Team
+**Maintained By:** DukaNest Team

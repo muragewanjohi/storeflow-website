@@ -36,22 +36,53 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Full name is required';
+    }
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    }
+
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setFieldErrors({});
 
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate password length
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    // Run client-side validation
+    if (!validateForm()) {
       setIsLoading(false);
       return;
     }
@@ -87,7 +118,25 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Registration failed');
+        // Parse field-level errors from server response (Zod validation)
+        if (data.issues && Array.isArray(data.issues)) {
+          const serverFieldErrors: Record<string, string> = {};
+          data.issues.forEach((issue: { path: string[]; message: string }) => {
+            const field = issue.path?.join('.');
+            if (field) {
+              serverFieldErrors[field] = issue.message;
+            }
+          });
+          if (Object.keys(serverFieldErrors).length > 0) {
+            setFieldErrors(serverFieldErrors);
+          }
+        }
+        // Map common server errors to specific fields
+        const errorMsg = data.error || 'Registration failed';
+        if (errorMsg.toLowerCase().includes('email already exists')) {
+          setFieldErrors((prev) => ({ ...prev, email: errorMsg }));
+        }
+        setError(errorMsg);
         return;
       }
 
@@ -139,9 +188,16 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
                 autoComplete="name"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  clearFieldError('name');
+                }}
                 placeholder="John Doe"
+                className={fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.name && (
+                <p className="text-xs text-red-600">{fieldErrors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -153,9 +209,16 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
                 autoComplete="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  clearFieldError('email');
+                }}
                 placeholder="your@email.com"
+                className={fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.email && (
+                <p className="text-xs text-red-600">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -208,10 +271,17 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
                 autoComplete="new-password"
                 required
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  clearFieldError('password');
+                }}
                 placeholder="At least 8 characters"
                 minLength={8}
+                className={fieldErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.password && (
+                <p className="text-xs text-red-600">{fieldErrors.password}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -223,9 +293,16 @@ export default function CustomerRegisterForm({ redirect: initialRedirect }: Cust
                 autoComplete="new-password"
                 required
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, confirmPassword: e.target.value });
+                  clearFieldError('confirmPassword');
+                }}
                 placeholder="Confirm your password"
+                className={fieldErrors.confirmPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.confirmPassword && (
+                <p className="text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
 
             <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base" disabled={isLoading}>

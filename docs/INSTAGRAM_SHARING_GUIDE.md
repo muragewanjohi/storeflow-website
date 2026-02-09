@@ -2,7 +2,7 @@
 
 ## Overview
 
-Instagram works differently from other social media platforms. Unlike Facebook or Twitter, Instagram doesn't support direct link sharing from web browsers. This guide explains the best ways to share StoreFlow products on Instagram.
+Instagram works differently from other social media platforms. Unlike Facebook or Twitter, Instagram doesn't support direct link sharing from web browsers. This guide explains the best ways to share DukaNest products on Instagram.
 
 ## How Instagram Sharing Works
 
@@ -87,7 +87,7 @@ Link in bio 👆
 
 **Setup Process:**
 1. Connect Instagram to Facebook Business Manager
-2. Create Facebook Catalog (can sync from StoreFlow)
+2. Create Facebook Catalog (can sync from DukaNest)
 3. Enable Instagram Shopping in Instagram settings
 4. Wait for approval (usually 1-3 business days)
 5. Start tagging products in posts
@@ -140,7 +140,7 @@ These allow you to have multiple product links in your bio.
 
 **Roadmap Reference:** See `docs/ROADMAP.md` - Phase 2: Marketing & Growth → Instagram Shopping Integration
 
-For full Instagram Shopping support, StoreFlow would need:
+For full Instagram Shopping support, DukaNest would need:
 
 ### Technical Requirements
 1. **Facebook Catalog API Integration**
@@ -155,7 +155,7 @@ For full Instagram Shopping support, StoreFlow would need:
    - Analytics integration
 
 3. **Setup Process**
-   - Connect StoreFlow to Facebook Business Manager
+   - Connect DukaNest to Facebook Business Manager
    - Create product catalog
    - Enable Instagram Shopping
    - Test product tagging
@@ -167,7 +167,7 @@ For full Instagram Shopping support, StoreFlow would need:
 - Better conversion from Instagram traffic
 - Professional appearance
 
-**Status:** ✅ This feature has been added to the StoreFlow development roadmap (`docs/ROADMAP.md`) and will be implemented in Phase 2: Marketing & Growth. Currently, the "Link in bio" strategy works well for most stores and is the industry standard for smaller businesses.
+**Status:** ✅ This feature has been added to the DukaNest development roadmap (`docs/ROADMAP.md`) and will be implemented in Phase 2: Marketing & Growth. Currently, the "Link in bio" strategy works well for most stores and is the industry standard for smaller businesses.
 
 **Roadmap Reference:** 
 - See `docs/ROADMAP.md` - Phase 2: Marketing & Growth → Instagram Shopping Integration
@@ -248,7 +248,7 @@ For full Instagram Shopping support, StoreFlow would need:
 - Set up Facebook Business account
 - Create product catalog
 - Apply for Instagram Shopping
-- Consider StoreFlow's future Instagram Shopping integration
+- Consider DukaNest's future Instagram Shopping integration
 
 ## Resources
 

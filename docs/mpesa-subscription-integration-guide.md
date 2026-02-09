@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides a comprehensive implementation plan for integrating Safaricom M-Pesa Buy Goods (Till Number) API for subscription payments in StoreFlow. This integration allows tenants to pay for their subscription plans using M-Pesa STK Push.
+This guide provides a comprehensive implementation plan for integrating Safaricom M-Pesa Buy Goods (Till Number) API for subscription payments in DukaNest. This integration allows tenants to pay for their subscription plans using M-Pesa STK Push.
 
 ## Table of Contents
 

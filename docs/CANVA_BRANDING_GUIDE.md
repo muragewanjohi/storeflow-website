@@ -1,4 +1,4 @@
-# Canva Branding Guide – DukaNest / StoreFlow
+# Canva Branding Guide – DukaNest / DukaNest
 
 Use these values when setting up your **Brand Kit** or **Brand identity** in Canva so designs stay consistent with the platform.
 
@@ -9,9 +9,9 @@ Use these values when setting up your **Brand Kit** or **Brand identity** in Can
 | Use case | Name to use |
 |----------|-------------|
 | **Customer-facing** (storefront, marketing, help, legal) | **DukaNest** |
-| **Admin / internal** (landlord dashboard) | **StoreFlow Admin** |
+| **Admin / internal** (landlord dashboard) | **DukaNest Admin** |
 
-**Recommended in Canva:** Set **DukaNest** as the main brand name. Use “StoreFlow Admin” only for admin-only assets if needed.
+**Recommended in Canva:** Set **DukaNest** as the main brand name. Use “DukaNest Admin” only for admin-only assets if needed.
 
 ---
 
@@ -77,7 +77,7 @@ Use these in Canva’s **Brand colors** (or “Brand kit” colors).
 
 **Fallback:** If Inter isn’t available, use **System UI** or **Arial** for a similar look.
 
-**Note:** Tenant storefronts can use other themes (e.g. Playfair Display, Roboto). For **DukaNest/StoreFlow brand** materials in Canva, stick to **Inter** for consistency.
+**Note:** Tenant storefronts can use other themes (e.g. Playfair Display, Roboto). For **DukaNest/DukaNest brand** materials in Canva, stick to **Inter** for consistency.
 
 ---
 
@@ -115,4 +115,4 @@ Use these in Canva’s **Brand colors** (or “Brand kit” colors).
 - **Headings:** Inter Bold / Semi-Bold  
 - **Body:** Inter Regular  
 
-Using these in Canva will keep your marketing and support visuals aligned with the DukaNest/StoreFlow product.
+Using these in Canva will keep your marketing and support visuals aligned with the DukaNest/DukaNest product.

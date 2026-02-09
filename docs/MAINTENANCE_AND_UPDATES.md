@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide outlines best practices for maintaining and updating StoreFlow on Vercel, following industry standards used by companies like Vercel, Shopify, and other modern SaaS platforms.
+This guide outlines best practices for maintaining and updating DukaNest on Vercel, following industry standards used by companies like Vercel, Shopify, and other modern SaaS platforms.
 
 ---
 
@@ -556,7 +556,7 @@ MAJOR.MINOR.PATCH
 
 ### Version Display for Users
 
-StoreFlow includes a **Version Information** section in Settings:
+DukaNest includes a **Version Information** section in Settings:
 
 **Location:** Dashboard → Settings → Version Tab
 
@@ -610,7 +610,7 @@ StoreFlow includes a **Version Information** section in Settings:
 - ✅ Release notes and changelog
 - ✅ Email notifications for breaking changes
 
-**StoreFlow Approach:**
+**DukaNest Approach:**
 - ✅ **Single version model** - All users run same version (SaaS)
 - ✅ **Automatic updates** - No user action required
 - ✅ **Zero-downtime** - Vercel atomic deployments
@@ -621,7 +621,7 @@ StoreFlow includes a **Version Information** section in Settings:
 
 ### Single Version vs Multiple Versions
 
-**StoreFlow uses a single version model** (standard for SaaS platforms):
+**DukaNest uses a single version model** (standard for SaaS platforms):
 
 - **All users on same version** - No version fragmentation
 - **Automatic updates** - Deployed automatically to all users
@@ -636,7 +636,7 @@ StoreFlow includes a **Version Information** section in Settings:
 - Enables faster feature deployment
 
 **Comparison:**
-- **SaaS Platforms** (Shopify, Stripe, StoreFlow): Single version, automatic updates
+- **SaaS Platforms** (Shopify, Stripe, DukaNest): Single version, automatic updates
 - **Self-Hosted** (WooCommerce, Magento): Multiple versions, user-controlled updates
 - **API Platforms** (Stripe API, Shopify API): Version pinning, platform auto-updates
 
@@ -683,7 +683,7 @@ git push origin main --tags
 
 ### Overview
 
-Breaking changes are modifications that require users or integrations to update their code, configuration, or workflows. StoreFlow follows industry best practices for managing breaking changes, similar to Shopify, Stripe, and WooCommerce.
+Breaking changes are modifications that require users or integrations to update their code, configuration, or workflows. DukaNest follows industry best practices for managing breaking changes, similar to Shopify, Stripe, and WooCommerce.
 
 ### Policy
 
@@ -714,7 +714,7 @@ Breaking changes are modifications that require users or integrations to update 
 - Migration scripts provided
 - **Example**: WooCommerce 3.0 database restructure (12+ months notice, migration scripts)
 
-### StoreFlow Breaking Change Process
+### DukaNest Breaking Change Process
 
 1. **Planning** (60-90 days before)
    - Impact analysis
@@ -954,4 +954,4 @@ npm run db:migrate:deploy
 ---
 
 **Last Updated:** January 2025
-**Maintained By:** StoreFlow Team
+**Maintained By:** DukaNest Team

@@ -2,7 +2,7 @@
 
 ## Overview
 
-StoreFlow now includes comprehensive analytics tracking for storefronts, including:
+DukaNest now includes comprehensive analytics tracking for storefronts, including:
 - Session tracking
 - Page view tracking
 - Event tracking (add to cart, checkout start, checkout complete)

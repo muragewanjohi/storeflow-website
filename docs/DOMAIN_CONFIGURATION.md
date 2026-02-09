@@ -87,7 +87,7 @@ MARKETING_DOMAIN=www.dukanest.com
 2. **Environment Variables (Preview):**
    ```env
    # Use the preview URL that Vercel generates
-   NEXT_PUBLIC_APP_URL=https://storeflow-git-dev-yourteam.vercel.app
+   NEXT_PUBLIC_APP_URL=https://dukanest-git-dev-yourteam.vercel.app
    
    # For tenant subdomains, you have two options:
    # Option A: Use a test domain (if you have one)
@@ -97,7 +97,7 @@ MARKETING_DOMAIN=www.dukanest.com
    # This won't work with subdomains, so tenants won't have subdomains in dev
    ```
 
-**Limitation:** Tenant subdomains won't work with preview URLs (e.g., `teststore.storeflow-git-dev.vercel.app` won't resolve)
+**Limitation:** Tenant subdomains won't work with preview URLs (e.g., `teststore.dukanest-git-dev.vercel.app` won't resolve)
 
 ### Option 2: Use a Development Subdomain (Recommended for Full Testing)
 
@@ -187,7 +187,7 @@ Since you're using the **preview deployment workflow** with a `dev` branch:
 
 ```env
 # Main app URL (use preview URL or dev subdomain)
-NEXT_PUBLIC_APP_URL=https://storeflow-git-dev-yourteam.vercel.app
+NEXT_PUBLIC_APP_URL=https://dukanest-git-dev-yourteam.vercel.app
 # OR if you set up dev.dukanest.com:
 # NEXT_PUBLIC_APP_URL=https://dev.dukanest.com
 
@@ -201,7 +201,7 @@ NEXT_PUBLIC_BASE_DOMAIN=dev.dukanest.com
 # Marketing domain
 MARKETING_DOMAIN=dev.dukanest.com
 # OR for preview URL:
-# MARKETING_DOMAIN=storeflow-git-dev-yourteam.vercel.app
+# MARKETING_DOMAIN=dukanest-git-dev-yourteam.vercel.app
 ```
 
 ### Step 2: Choose Your Approach
@@ -291,7 +291,7 @@ DISABLE_MFA_TEMPORARILY=false
 ```env
 NODE_ENV=development
 NEXT_PUBLIC_APP_URL=https://dev.dukanest.com
-# OR: https://storeflow-git-dev-yourteam.vercel.app
+# OR: https://dukanest-git-dev-yourteam.vercel.app
 NEXT_PUBLIC_BASE_DOMAIN=dev.dukanest.com
 # OR: dukanest.com (if using production subdomains)
 MARKETING_DOMAIN=dev.dukanest.com

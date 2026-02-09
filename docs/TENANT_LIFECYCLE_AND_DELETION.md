@@ -137,11 +137,11 @@ TENANT_RETENTION_DAYS=90
 - ✅ **Transaction History**: Preserved for compliance
 - ✅ **Personal Data**: Deleted after retention period
 
-## StoreFlow Implementation
+## DukaNest Implementation
 
 ### Comparison with Industry Standards
 
-| Feature | StoreFlow | Shopify | Amazon | WooCommerce |
+| Feature | DukaNest | Shopify | Amazon | WooCommerce |
 |---------|-----------|---------|--------|-------------|
 | **Grace Period** | ✅ 2 days | ✅ Varies | ✅ Varies | ✅ Varies |
 | **Suspension Period** | ✅ Indefinite | ✅ Indefinite | ✅ 90 days | ✅ 30-90 days |

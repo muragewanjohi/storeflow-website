@@ -682,7 +682,7 @@ export default function ThemePreviewClient({
                       <div className="space-y-4">
                         <div>
                           <p className="font-semibold mb-1">Email</p>
-                          <p className="text-muted-foreground">support@storeflow.com</p>
+                          <p className="text-muted-foreground">support@dukanest.com</p>
                         </div>
                         <div>
                           <p className="font-semibold mb-1">Phone</p>

@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
         status: true,
         plan_id: true,
         contact_email: true,
+        country: true,
         data: true,
         price_plans: {
           select: {
@@ -187,9 +188,10 @@ export async function GET(request: NextRequest) {
         const shouldSendRenewalReminder = !lastRenewalReminderDateStr || lastRenewalReminderDateStr < todayStr;
         const shouldSendPaymentReminder = !lastPaymentReminderDateStr || lastPaymentReminderDateStr < todayStr;
 
-        // Detect if tenant is from Kenya (check country from data JSON or settings)
-        const tenantCountry = tenantSettings.store_country || '';
-        const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA';
+        // Detect if tenant is from Kenya (check country field, subscription data, or settings)
+        const tenantCountry = tenant.country || subscriptionData.countryCode || tenantSettings.store_country || '';
+        const tenantCurrency = subscriptionData.currency || '';
+        const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA' || tenantCurrency === 'KES';
 
         // Send renewal reminder (daily for 7 days before expiry, only if payment is unpaid)
         if (daysUntilExpiry <= 7 && daysUntilExpiry > 0 && shouldSendRenewalReminder && isPaymentUnpaid) {

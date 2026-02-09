@@ -2,7 +2,7 @@
 
 ## Overview
 
-StoreFlow now enables tenants to easily share their products on social media platforms with rich previews that drive traffic back to their store. This implementation follows industry best practices used by Shopify, WooCommerce, and other major e-commerce platforms.
+DukaNest now enables tenants to easily share their products on social media platforms with rich previews that drive traffic back to their store. This implementation follows industry best practices used by Shopify, WooCommerce, and other major e-commerce platforms.
 
 ## What's Already Working ✅
 
@@ -65,7 +65,7 @@ StoreFlow now enables tenants to easily share their products on social media pla
 ## How Other E-Commerce Platforms Do It
 
 ### Shopify
-- ✅ Automatic Open Graph tags (same as StoreFlow)
+- ✅ Automatic Open Graph tags (same as DukaNest)
 - ✅ Social share buttons on product pages
 - ✅ Customizable share message templates
 - ✅ Facebook Pixel integration for tracking
@@ -80,7 +80,7 @@ StoreFlow now enables tenants to easily share their products on social media pla
 - ✅ Price and availability shown
 - ✅ Direct "Buy Now" buttons in some platforms
 
-**StoreFlow Implementation:** Matches Shopify's approach with automatic Open Graph tags and share buttons.
+**DukaNest Implementation:** Matches Shopify's approach with automatic Open Graph tags and share buttons.
 
 ## Features Implemented
 

@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "storeflow-api-collection",
-		"name": "StoreFlow API Collection",
-		"description": "Complete API collection for StoreFlow multi-tenant ecommerce platform. Updated after each development day.",
+		"name": "DukaNest API Collection",
+		"description": "Complete API collection for DukaNest multi-tenant ecommerce platform. Updated after each development day.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "storeflow"
 	},

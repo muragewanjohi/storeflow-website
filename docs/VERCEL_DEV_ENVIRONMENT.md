@@ -39,7 +39,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=postgresql://...
 
 # App URL (will be your preview URL)
-NEXT_PUBLIC_APP_URL=https://storeflow-git-dev-yourteam.vercel.app
+NEXT_PUBLIC_APP_URL=https://dukanest-git-dev-yourteam.vercel.app
 
 # SendGrid (optional - can be same as production)
 SENDGRID_API_KEY=your-key
@@ -52,7 +52,7 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 ### Step 3: Verify Preview Deployment
 
 1. Check your Vercel dashboard - you should see a new deployment for the `dev` branch
-2. Access your preview at: `https://storeflow-git-dev-yourteam.vercel.app`
+2. Access your preview at: `https://dukanest-git-dev-yourteam.vercel.app`
 3. The URL format is: `https://[project-name]-git-[branch-name]-[team].vercel.app`
 
 ---
@@ -143,7 +143,7 @@ Make sure your variables are set correctly:
 | **NODE_ENV** | `production` (default) | `development` (set in Preview env vars) |
 | **DISABLE_MFA_TEMPORARILY** | `false` (or not set) | `true` (set in Preview env vars) |
 | **Database** | Production Supabase | Dev Supabase (recommended) |
-| **URL** | `storeflow.vercel.app` | `storeflow-git-dev.vercel.app` |
+| **URL** | `dukanest.vercel.app` | `dukanest-git-dev.vercel.app` |
 | **Deployment Type** | Production | Preview |
 
 ---

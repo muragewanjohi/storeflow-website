@@ -35,8 +35,8 @@ interface UpdateNotificationBannerProps {
   showRefresh?: boolean;
 }
 
-const STORAGE_KEY = 'storeflow_last_seen_version';
-const STORAGE_DISMISS_KEY = 'storeflow_update_dismissed';
+const STORAGE_KEY = 'dukanest_last_seen_version';
+const STORAGE_DISMISS_KEY = 'dukanest_update_dismissed';
 
 export function UpdateNotificationBanner({
   forceShow = false,
@@ -121,7 +121,7 @@ export function UpdateNotificationBanner({
     >
       <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
       <AlertTitle className="text-blue-900 dark:text-blue-100">
-        {customMessage || (isNewVersion ? 'System Updated' : 'Welcome to StoreFlow')}
+        {customMessage || (isNewVersion ? 'System Updated' : 'Welcome to DukaNest')}
       </AlertTitle>
       <AlertDescription className="text-blue-800 dark:text-blue-200">
         <div className="flex items-start justify-between gap-4">
@@ -131,7 +131,7 @@ export function UpdateNotificationBanner({
             ) : isNewVersion ? (
               <>
                 <p>
-                  StoreFlow has been updated to version <strong>v{versionInfo.version}</strong>.
+                  DukaNest has been updated to version <strong>v{versionInfo.version}</strong>.
                 </p>
                 <p className="text-sm">
                   Updates are applied instantly with zero downtime. Your store remains fully 
@@ -146,7 +146,7 @@ export function UpdateNotificationBanner({
             ) : (
               <>
                 <p>
-                  You&apos;re running StoreFlow version <strong>v{versionInfo.version}</strong>.
+                  You&apos;re running DukaNest version <strong>v{versionInfo.version}</strong>.
                 </p>
                 <p className="text-sm">
                   All updates are applied automatically with zero downtime.

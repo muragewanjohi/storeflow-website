@@ -9,7 +9,7 @@ For **STK Push (Lipa na M-Pesa Online)** with Buy Goods, you **DO need a passkey
 ## Your Current Setup
 
 Based on your Daraja portal:
-- **Production App:** "Prod-STOREFLOW MICROSYSTEMS"
+- **Production App:** "Prod-DUKANEST MICROSYSTEMS"
 - **Short Code:** `9584650`
 - **Products:** TransactionStatus, B2B, **Lipa na Mpesa Production** ✅
 - **Consumer Key:** `ollHDX5Vh4eahlguoNu4p2p28x4qp0wgjHIUShvlyuvXOGkm`
@@ -43,7 +43,7 @@ When you registered your Till Number (`9584650`) or completed the "Go Live" proc
 ### Method 2: Safaricom Developer Portal - App Settings
 
 1. **Log in** to [Safaricom Developer Portal](https://developer.safaricom.co.ke/)
-2. **Go to your Production App:** "Prod-STOREFLOW MICROSYSTEMS"
+2. **Go to your Production App:** "Prod-DUKANEST MICROSYSTEMS"
 3. **Look for these sections:**
    - "App Credentials" or "API Credentials"
    - "Security" or "Authentication"
@@ -85,9 +85,9 @@ Dear Safaricom API Support,
 I am requesting the passkey for my M-Pesa API integration.
 
 Details:
-- Business Name: STOREFLOW MICROSYSTEMS LIMITED
+- Business Name: DUKANEST MICROSYSTEMS LIMITED
 - Till Number/Short Code: 9584650
-- Daraja App Name: Prod-STOREFLOW MICROSYSTEMS
+- Daraja App Name: Prod-DUKANEST MICROSYSTEMS
 - Consumer Key: ollHDX5Vh4eahlguoNu4p2p28x4qp0wgjHIUShvlyuvXOGkm
 - Use Case: STK Push (Lipa na Mpesa Online) for subscription payments
 

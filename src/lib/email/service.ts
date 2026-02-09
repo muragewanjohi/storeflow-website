@@ -56,7 +56,7 @@ function getSenderName(tenant?: Tenant, customName?: string): string {
     }
   }
   
-  return process.env.SENDGRID_FROM_NAME || 'StoreFlow';
+  return process.env.SENDGRID_FROM_NAME || 'DukaNest';
 }
 
 /**
@@ -163,7 +163,7 @@ export async function sendAdminEmail({
 }
 
 /**
- * Send platform email (from StoreFlow platform, not tenant)
+ * Send platform email (from DukaNest platform, not tenant)
  * For system-level emails like subscription notifications
  */
 export async function sendPlatformEmail({
@@ -182,7 +182,7 @@ export async function sendPlatformEmail({
     subject,
     html,
     text,
-    fromName: 'StoreFlow Platform',
+    fromName: 'DukaNest Platform',
   });
 }
 

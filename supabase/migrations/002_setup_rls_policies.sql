@@ -1,5 +1,5 @@
 -- ============================================
--- StoreFlow Row-Level Security (RLS) Setup
+-- DukaNest Row-Level Security (RLS) Setup
 -- Multi-Tenant Data Isolation
 -- ============================================
 -- 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-StoreFlow implements a comprehensive version management system that provides transparency to users while ensuring zero-downtime deployments. This document explains how version management works and how to use it effectively.
+DukaNest implements a comprehensive version management system that provides transparency to users while ensuring zero-downtime deployments. This document explains how version management works and how to use it effectively.
 
 ---
 
@@ -71,7 +71,7 @@ StoreFlow implements a comprehensive version management system that provides tra
 
 ### Single Version for All Users (SaaS Model)
 
-**StoreFlow maintains a single version for all users** - everyone runs the same version of the platform automatically. This is the standard approach for SaaS platforms like Shopify, Stripe, and BigCommerce.
+**DukaNest maintains a single version for all users** - everyone runs the same version of the platform automatically. This is the standard approach for SaaS platforms like Shopify, Stripe, and BigCommerce.
 
 #### Why Single Version?
 
@@ -108,9 +108,9 @@ StoreFlow implements a comprehensive version management system that provides tra
 - ✅ **API version choice** - Developers choose API version (during support window)
 - ✅ **Deprecation schedule** - Old API versions sunset after support period
 
-### StoreFlow's Approach
+### DukaNest's Approach
 
-As a **SaaS platform**, StoreFlow follows the SaaS model:
+As a **SaaS platform**, DukaNest follows the SaaS model:
 
 1. **Single Platform Version**
    - All stores run the same version
@@ -298,7 +298,7 @@ Update Complete - No Action Required
 - ✅ Release notes and changelog
 - ✅ Email notifications for breaking changes
 
-### StoreFlow Approach
+### DukaNest Approach
 - ✅ Zero-downtime (Vercel atomic deployments)
 - ✅ Version display in Settings → Version tab
 - ✅ Update notification banner (dismissible)
@@ -320,9 +320,9 @@ Returns version information:
   "buildTime": "2025-01-15T10:30:00Z",
   "commitHash": "abc1234",
   "environment": "production",
-  "deploymentUrl": "https://storeflow.vercel.app",
+  "deploymentUrl": "https://dukanest.vercel.app",
   "nodeVersion": "v20.10.0",
-  "platform": "StoreFlow",
+  "platform": "DukaNest",
   "lastUpdated": "2025-01-15T10:30:00Z"
 }
 ```
@@ -529,7 +529,7 @@ A **breaking change** is any update that requires users, integrations, or code t
 - Plugin compatibility checker
 - Developer documentation updates
 
-### StoreFlow Breaking Changes Policy
+### DukaNest Breaking Changes Policy
 
 #### Versioning Strategy
 
@@ -579,7 +579,7 @@ A **breaking change** is any update that requires users, integrations, or code t
 **For Major Breaking Changes:**
 
 1. **Email Notification** (60-90 days before)
-   - Subject: "Action Required: Breaking Changes in StoreFlow v2.0"
+   - Subject: "Action Required: Breaking Changes in DukaNest v2.0"
    - List affected features
    - Provide migration timeline
    - Link to migration guide
@@ -738,7 +738,7 @@ Before releasing a breaking change:
 
 ## Summary
 
-StoreFlow's version management system provides:
+DukaNest's version management system provides:
 
 - ✅ **Zero-downtime deployments** - No service interruption
 - ✅ **Transparent versioning** - Users see current version
@@ -751,4 +751,4 @@ This ensures users have confidence in the platform while maintaining transparenc
 ---
 
 **Last Updated:** January 2025  
-**Maintained By:** StoreFlow Team
+**Maintained By:** DukaNest Team

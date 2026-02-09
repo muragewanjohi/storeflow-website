@@ -141,7 +141,7 @@ After upgrading, verify your setup:
 ```bash
 # Check your .env.local file has:
 SENDGRID_API_KEY=SG.your_api_key_here
-SENDGRID_FROM_EMAIL=noreply@storeflow.com
+SENDGRID_FROM_EMAIL=noreply@dukanest.com
 ```
 
 ### Step 3: Test Email Sending

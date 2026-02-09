@@ -258,12 +258,12 @@ SUPABASE_SERVICE_ROLE_KEY=your-dev-service-role-key
 DATABASE_URL=postgresql://...your-dev-database...
 
 # Development app URL (will be your preview URL)
-NEXT_PUBLIC_APP_URL=https://storeflow-git-dev-yourteam.vercel.app
+NEXT_PUBLIC_APP_URL=https://dukanest-git-dev-yourteam.vercel.app
 
 # SendGrid (optional - can be same as production or different)
 SENDGRID_API_KEY=your-sendgrid-key
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-SENDGRID_FROM_NAME=StoreFlow Dev
+SENDGRID_FROM_NAME=DukaNest Dev
 ```
 
 3. **Important:** Make sure to select **"Preview"** environment when adding variables
@@ -272,7 +272,7 @@ SENDGRID_FROM_NAME=StoreFlow Dev
 #### Step 3: Access Preview Deployment
 
 - Vercel automatically creates preview deployments for all branches
-- Access at: `https://storeflow-git-dev-yourteam.vercel.app`
+- Access at: `https://dukanest-git-dev-yourteam.vercel.app`
 - Or check the Vercel dashboard for the preview URL
 - The URL format is: `https://[project-name]-git-[branch-name]-[team].vercel.app`
 
@@ -294,7 +294,7 @@ If you prefer a completely separate project:
 1. **Create a new Vercel project**
 2. **Import the same repository** but select the `dev` branch
 3. **Configure environment variables** for "Development" environment
-4. **Access at:** `https://storeflow-dev.vercel.app`
+4. **Access at:** `https://dukanest-dev.vercel.app`
 
 This gives you a separate project but requires more management. The preview deployment approach is simpler and recommended.
 

@@ -2,13 +2,13 @@
 
 ## Overview
 
-This guide explains how StoreFlow enables tenants to share their products on social media platforms (Facebook, Twitter/X, LinkedIn, WhatsApp, Pinterest, etc.) with rich previews that drive traffic back to their store.
+This guide explains how DukaNest enables tenants to share their products on social media platforms (Facebook, Twitter/X, LinkedIn, WhatsApp, Pinterest, etc.) with rich previews that drive traffic back to their store.
 
 ## How It Works
 
 ### 1. **Open Graph Meta Tags** (Already Implemented ✅)
 
-StoreFlow automatically generates Open Graph meta tags for all product pages. These tags tell social media platforms how to display your product when shared:
+DukaNest automatically generates Open Graph meta tags for all product pages. These tags tell social media platforms how to display your product when shared:
 
 - **og:title** - Product name
 - **og:description** - Product description with price
@@ -19,7 +19,7 @@ StoreFlow automatically generates Open Graph meta tags for all product pages. Th
 
 ### 2. **Twitter Cards** (Already Implemented ✅)
 
-Twitter/X uses its own card format, which StoreFlow also generates:
+Twitter/X uses its own card format, which DukaNest also generates:
 
 - **twitter:card** - "summary_large_image" for rich previews
 - **twitter:title** - Product name
@@ -39,7 +39,7 @@ Google and other search engines use structured data to understand products:
 
 ### How It Works
 
-When tenants share products using the share buttons, StoreFlow automatically adds UTM parameters to the shared URLs:
+When tenants share products using the share buttons, DukaNest automatically adds UTM parameters to the shared URLs:
 
 - **`utm_source`**: The social platform (facebook, twitter, linkedin, whatsapp, pinterest, instagram)
 - **`utm_medium`**: Always set to "social"
@@ -193,7 +193,7 @@ For full Instagram Shopping integration:
 
 2. **Setup Steps:**
    - Connect Instagram account to Facebook Business Manager
-   - Create Facebook Catalog (can sync from StoreFlow via API)
+   - Create Facebook Catalog (can sync from DukaNest via API)
    - Enable Instagram Shopping in Instagram settings
    - Products will appear with shopping tags
 
@@ -203,7 +203,7 @@ For full Instagram Shopping integration:
    - Shopping tab on Instagram profile
    - Better product discovery
 
-**Note:** Full Instagram Shopping integration requires Facebook Catalog API integration. This feature has been added to the StoreFlow development roadmap (`docs/ROADMAP.md`) and is planned for Phase 2: Marketing & Growth.
+**Note:** Full Instagram Shopping integration requires Facebook Catalog API integration. This feature has been added to the DukaNest development roadmap (`docs/ROADMAP.md`) and is planned for Phase 2: Marketing & Growth.
 
 **Roadmap Reference:** See `docs/ROADMAP.md` for detailed implementation plan and timeline.
 
@@ -238,7 +238,7 @@ For full Instagram Shopping integration:
 
 ### Open Graph Tags Generated
 
-For each product page, StoreFlow generates:
+For each product page, DukaNest generates:
 
 ```html
 <meta property="og:title" content="Product Name" />
@@ -262,7 +262,7 @@ For each product page, StoreFlow generates:
 
 ### How It Works
 
-When tenants share products using the share buttons, StoreFlow automatically adds UTM parameters to the shared URLs:
+When tenants share products using the share buttons, DukaNest automatically adds UTM parameters to the shared URLs:
 
 - **`utm_source`**: The social platform (facebook, twitter, linkedin, whatsapp, pinterest, instagram)
 - **`utm_medium`**: Always set to "social"
@@ -328,7 +328,7 @@ https://store.dukanest.com/products/product-slug?utm_source=facebook&utm_medium=
 
 **Status:** Added to development roadmap for Phase 2 implementation
 
-For full Instagram Shopping support, StoreFlow would need:
+For full Instagram Shopping support, DukaNest would need:
 
 1. **Facebook Catalog API Integration**
    - Sync products to Facebook Catalog

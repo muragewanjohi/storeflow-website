@@ -1,13 +1,13 @@
-# StoreFlow Postman Collection
+# DukaNest Postman Collection
 
-**Complete API testing collection for StoreFlow multi-tenant ecommerce platform**
+**Complete API testing collection for DukaNest multi-tenant ecommerce platform**
 
 ---
 
 ## 📦 Files
 
-- **`StoreFlow_API_Collection.json`** - Main Postman collection with all API endpoints
-- **`StoreFlow_Environment.json`** - Environment variables for different environments
+- **`DukaNest_API_Collection.json`** - Main Postman collection with all API endpoints
+- **`DukaNest_Environment.json`** - Environment variables for different environments
 - **`README.md`** - This file
 
 ---
@@ -18,15 +18,15 @@
 
 1. Open Postman
 2. Click **Import** button
-3. Select `StoreFlow_API_Collection.json`
+3. Select `DukaNest_API_Collection.json`
 4. Click **Import**
 
 ### 2. Import Environment
 
 1. Click **Import** button
-2. Select `StoreFlow_Environment.json`
+2. Select `DukaNest_Environment.json`
 3. Click **Import**
-4. Select the **StoreFlow Environment** from the environment dropdown (top right)
+4. Select the **DukaNest Environment** from the environment dropdown (top right)
 
 ### 3. Configure Environment Variables
 
@@ -192,7 +192,7 @@ pm.test("Response has expected data", function () {
 
 **Step 6:** Export updated collection:
 - Click **...** (three dots) → **Export**
-- Save as `StoreFlow_API_Collection.json`
+- Save as `DukaNest_API_Collection.json`
 - Replace existing file
 
 ---

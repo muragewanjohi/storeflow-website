@@ -181,7 +181,7 @@ export function VersionInfo() {
         {/* Update Information */}
         <Alert className="mt-4">
           <AlertDescription className="text-sm">
-            <strong>Zero-Downtime Deployments:</strong> StoreFlow uses atomic deployments, 
+            <strong>Zero-Downtime Deployments:</strong> DukaNest uses atomic deployments, 
             meaning updates are applied instantly without service interruption. Your store 
             remains accessible during all updates.
           </AlertDescription>

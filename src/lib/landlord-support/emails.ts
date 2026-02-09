@@ -136,7 +136,7 @@ export async function sendNewLandlordTicketEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
           </div>
         </body>
       </html>
@@ -205,7 +205,7 @@ export async function sendLandlordTicketReplyEmail({
             </div>
 
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-              <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+              <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
             </div>
           </body>
         </html>
@@ -234,7 +234,7 @@ export async function sendLandlordTicketReplyEmail({
           <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
               <h1 style="color: #2563eb; margin-top: 0;">Reply to Your Support Ticket</h1>
-              <p style="margin: 0;">You have received a reply from the StoreFlow support team.</p>
+              <p style="margin: 0;">You have received a reply from the DukaNest support team.</p>
             </div>
 
             <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
@@ -255,7 +255,7 @@ export async function sendLandlordTicketReplyEmail({
             </div>
 
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-              <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+              <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
               <p style="margin: 5px 0 0 0;">If you have any questions, please reply to this email or contact our support team.</p>
             </div>
           </body>
@@ -345,7 +345,7 @@ export async function sendLandlordTicketStatusUpdateEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-            <p style="margin: 0;">This is an automated notification from StoreFlow Platform</p>
+            <p style="margin: 0;">This is an automated notification from DukaNest Platform</p>
           </div>
         </body>
       </html>

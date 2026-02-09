@@ -1,5 +1,5 @@
 -- ============================================
--- StoreFlow: Add deleted_at Column to Tenants Table
+-- DukaNest: Add deleted_at Column to Tenants Table
 -- ============================================
 -- 
 -- This migration adds a deleted_at timestamp column to the tenants table

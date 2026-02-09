@@ -93,6 +93,7 @@ export async function getTenant(): Promise<Tenant | null> {
       hostnameWithoutPort === 'marketing' ||
       (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
       hostnameWithoutPort === '127.0.0.1' ||
+      hostnameWithoutPort.includes('dukanest') ||
       hostnameWithoutPort.includes('storeflow') ||
       hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
     

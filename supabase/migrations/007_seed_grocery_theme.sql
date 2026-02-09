@@ -9,7 +9,7 @@ VALUES (
   'Grocery Theme',
   'grocery',
   'Fresh and organic grocery theme perfect for food stores, farmers markets, and organic food retailers',
-  'StoreFlow',
+  'DukaNest',
   '1.0.0',
   true,
   false,

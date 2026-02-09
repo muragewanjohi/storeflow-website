@@ -48,6 +48,7 @@ export async function middleware(request: NextRequest) {
     hostnameWithoutPort === 'marketing' ||
     hostnameWithoutPort === 'www.dukanest.com' ||
     hostnameWithoutPort === 'dukanest.com' ||
+    hostnameWithoutPort.includes('dukanest') ||
     hostnameWithoutPort.includes('storeflow') ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];

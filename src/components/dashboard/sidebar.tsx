@@ -35,6 +35,7 @@ import {
   PaintBrushIcon,
   FireIcon,
   BookOpenIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -52,6 +53,7 @@ interface NavigationItem {
   adminOnly?: boolean;
   group?: string;
   submenu?: boolean; // Indicates this is a submenu item (indented under parent)
+  external?: boolean; // Opens in a new tab (for links outside the dashboard)
 }
 
 const navigation: NavigationItem[] = [
@@ -91,6 +93,7 @@ const navigation: NavigationItem[] = [
   // 9. Support group
   { name: 'Support Tickets', href: '/dashboard/support/tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
+  { name: 'User Guide', href: '/help', icon: BookOpenIcon, group: 'Support', external: true },
   
   // 10. Admin-only items
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
@@ -380,6 +383,33 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
                             const isItemPending = pendingHref === item.href;
+
+                            // External links open in a new tab
+                            if (item.external) {
+                              return (
+                                <li key={item.href}>
+                                  <a
+                                    href={item.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                      item.submenu ? 'px-6' : 'px-3'
+                                    } text-muted-foreground hover:bg-accent hover:text-accent-foreground`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <item.icon
+                                      className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-accent-foreground"
+                                      aria-hidden="true"
+                                    />
+                                    <span className="flex items-center gap-2">
+                                      {item.name}
+                                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-50" />
+                                    </span>
+                                  </a>
+                                </li>
+                              );
+                            }
+
                             return (
                               <li key={item.href}>
                                 <Link
@@ -491,6 +521,37 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
                           const isItemPending = pendingHref === item.href;
+
+                          // External links open in a new tab
+                          if (item.external) {
+                            return (
+                              <li key={item.href}>
+                                <a
+                                  href={item.href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                    item.submenu ? 'px-6' : 'px-3'
+                                  } ${
+                                    collapsed ? 'justify-center' : ''
+                                  } text-muted-foreground hover:bg-accent hover:text-accent-foreground`}
+                                  title={collapsed ? item.name : undefined}
+                                >
+                                  <item.icon
+                                    className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-accent-foreground"
+                                    aria-hidden="true"
+                                  />
+                                  {!collapsed && (
+                                    <span className="flex items-center gap-2">
+                                      {item.name}
+                                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-50" />
+                                    </span>
+                                  )}
+                                </a>
+                              </li>
+                            );
+                          }
+
                           return (
                             <li key={item.href}>
                               <Link

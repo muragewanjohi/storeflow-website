@@ -34,7 +34,7 @@ const products = await prisma.products.findMany({
 The schema file defines your database structure in a declarative way:
 
 ```prisma
-// storeflow/prisma/schema.prisma
+// dukanest/prisma/schema.prisma
 
 model Product {
   id          String   @id @default(uuid())
@@ -140,7 +140,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 ---
 
-## 💡 How We Use Prisma in StoreFlow
+## 💡 How We Use Prisma in DukaNest
 
 ### Example 1: Querying Products
 
@@ -512,7 +512,7 @@ npx prisma migrate status
 ### File Structure
 
 ```
-storeflow/
+dukanest/
 ├── prisma/
 │   ├── schema.prisma          # Database schema definition
 │   └── migrations/            # Migration history (if using migrations)
@@ -543,7 +543,7 @@ model Customer { ... }
 
 ---
 
-## 🎯 Benefits for StoreFlow
+## 🎯 Benefits for DukaNest
 
 ### 1. **Type Safety**
 - Catch errors at compile-time, not runtime
@@ -709,7 +709,7 @@ await prisma.products.create({
 - ✅ Works seamlessly with Supabase PostgreSQL
 - ✅ Handles relations, transactions, and migrations
 
-**In StoreFlow:**
+**In DukaNest:**
 - ✅ We define our database structure in `schema.prisma`
 - ✅ Prisma generates type-safe client code
 - ✅ We use Prisma Client to query Supabase PostgreSQL

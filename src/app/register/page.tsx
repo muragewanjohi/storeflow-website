@@ -64,6 +64,7 @@ function TenantRegisterForm() {
     adminName: '',
     contactEmail: '',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [themes, setThemes] = useState<any[]>([]);
   const [isLoadingThemes, setIsLoadingThemes] = useState(true);
@@ -193,14 +194,75 @@ function TenantRegisterForm() {
     setFormData({ ...formData, subdomain: cleaned });
   };
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Store name is required';
+    }
+
+    if (!formData.subdomain.trim()) {
+      errors.subdomain = 'Subdomain is required';
+    } else if (formData.subdomain.length < 3) {
+      errors.subdomain = 'Subdomain must be at least 3 characters';
+    } else if (formData.subdomain.length > 63) {
+      errors.subdomain = 'Subdomain must be at most 63 characters';
+    } else if (!/^[a-z0-9-]+$/.test(formData.subdomain)) {
+      errors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+    }
+
+    if (!formData.adminName.trim()) {
+      errors.adminName = 'Your name is required';
+    }
+
+    if (!formData.adminEmail.trim()) {
+      errors.adminEmail = 'Admin email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) {
+      errors.adminEmail = 'Please enter a valid email address';
+    }
+
+    if (!formData.contactEmail.trim()) {
+      errors.contactEmail = 'Contact email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
+      errors.contactEmail = 'Please enter a valid email address';
+    }
+
+    if (!formData.adminPassword) {
+      errors.adminPassword = 'Password is required';
+    } else if (formData.adminPassword.length < 8) {
+      errors.adminPassword = 'Password must be at least 8 characters';
+    }
+
+    if (!selectedThemeId) {
+      errors.theme = 'Please select a theme';
+    }
+
+    if (!businessType) {
+      errors.businessType = 'Please select a business type';
+    } else if (businessType === 'Other' && !otherBusinessType.trim()) {
+      errors.otherBusinessType = 'Please enter your business type';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setFieldErrors({});
 
-    // Validate passwords match
-    if (formData.adminPassword.length < 8) {
-      setError('Password must be at least 8 characters');
+    // Run client-side validation
+    if (!validateForm()) {
       setIsSubmitting(false);
       return;
     }
@@ -239,6 +301,18 @@ function TenantRegisterForm() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Parse field-level errors from server response
+        if (data.errors && Array.isArray(data.errors)) {
+          const serverFieldErrors: Record<string, string> = {};
+          data.errors.forEach((err: { field: string; message: string }) => {
+            if (err.field) {
+              serverFieldErrors[err.field] = err.message;
+            }
+          });
+          if (Object.keys(serverFieldErrors).length > 0) {
+            setFieldErrors(serverFieldErrors);
+          }
+        }
         setError(data.message || 'Registration failed');
         setIsSubmitting(false);
         return;
@@ -424,9 +498,16 @@ function TenantRegisterForm() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    clearFieldError('name');
+                  }}
                   placeholder="My Awesome Store"
+                  className={fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {fieldErrors.name && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -437,18 +518,25 @@ function TenantRegisterForm() {
                     type="text"
                     required
                     value={formData.subdomain}
-                    onChange={(e) => handleSubdomainChange(e.target.value)}
+                    onChange={(e) => {
+                      handleSubdomainChange(e.target.value);
+                      clearFieldError('subdomain');
+                    }}
                     placeholder="mystore"
                     pattern="[a-z0-9\-]+"
-                    className="rounded-r-none"
+                    className={`rounded-r-none ${fieldErrors.subdomain ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                   <span className="px-4 py-2 bg-muted border border-l-0 rounded-r-md text-muted-foreground">
                     .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Only lowercase letters, numbers, and hyphens allowed
-                </p>
+                {fieldErrors.subdomain ? (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.subdomain}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Only lowercase letters, numbers, and hyphens allowed
+                  </p>
+                )}
               </div>
 
               <div>
@@ -458,9 +546,16 @@ function TenantRegisterForm() {
                   type="text"
                   required
                   value={formData.adminName}
-                  onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, adminName: e.target.value });
+                    clearFieldError('adminName');
+                  }}
                   placeholder="John Doe"
+                  className={fieldErrors.adminName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {fieldErrors.adminName && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminName}</p>
+                )}
               </div>
 
               <div>
@@ -470,12 +565,20 @@ function TenantRegisterForm() {
                   type="email"
                   required
                   value={formData.adminEmail}
-                  onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, adminEmail: e.target.value });
+                    clearFieldError('adminEmail');
+                  }}
                   placeholder="admin@example.com"
+                  className={fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  This will be your login email for the admin dashboard
-                </p>
+                {fieldErrors.adminEmail ? (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This will be your login email for the admin dashboard
+                  </p>
+                )}
               </div>
 
               <div>
@@ -485,12 +588,20 @@ function TenantRegisterForm() {
                   type="email"
                   required
                   value={formData.contactEmail}
-                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, contactEmail: e.target.value });
+                    clearFieldError('contactEmail');
+                  }}
                   placeholder="contact@example.com"
+                  className={fieldErrors.contactEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  For store-related communications
-                </p>
+                {fieldErrors.contactEmail ? (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.contactEmail}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    For store-related communications
+                  </p>
+                )}
               </div>
 
               <div>
@@ -500,14 +611,22 @@ function TenantRegisterForm() {
                   type="password"
                   required
                   value={formData.adminPassword}
-                  onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, adminPassword: e.target.value });
+                    clearFieldError('adminPassword');
+                  }}
                   placeholder="••••••••"
                   minLength={8}
                   autoComplete="new-password"
+                  className={fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.
-                </p>
+                {fieldErrors.adminPassword ? (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-4 pt-4 border-t">
@@ -529,10 +648,13 @@ function TenantRegisterForm() {
                   ) : (
                     <Select
                       value={selectedThemeId}
-                      onValueChange={setSelectedThemeId}
+                      onValueChange={(value) => {
+                        setSelectedThemeId(value);
+                        clearFieldError('theme');
+                      }}
                       required
                     >
-                      <SelectTrigger id="theme-select" className="w-full mt-2">
+                      <SelectTrigger id="theme-select" className={`w-full mt-2 ${fieldErrors.theme ? 'border-red-500 ring-red-500' : ''}`}>
                         <SelectValue placeholder="Select a theme" />
                       </SelectTrigger>
                       <SelectContent>
@@ -544,15 +666,27 @@ function TenantRegisterForm() {
                       </SelectContent>
                     </Select>
                   )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Choose a theme for your storefront. You can customize it later.
-                  </p>
+                  {fieldErrors.theme ? (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.theme}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Choose a theme for your storefront. You can customize it later.
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <Label htmlFor="business-type">Business Type *</Label>
-                  <Select value={businessType} onValueChange={setBusinessType} required>
-                    <SelectTrigger id="business-type" className="w-full mt-2">
+                  <Select
+                    value={businessType}
+                    onValueChange={(value) => {
+                      setBusinessType(value);
+                      clearFieldError('businessType');
+                      clearFieldError('otherBusinessType');
+                    }}
+                    required
+                  >
+                    <SelectTrigger id="business-type" className={`w-full mt-2 ${fieldErrors.businessType ? 'border-red-500 ring-red-500' : ''}`}>
                       <SelectValue placeholder="Select your business type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -568,14 +702,25 @@ function TenantRegisterForm() {
                       <Input
                         placeholder="Enter your business type"
                         value={otherBusinessType}
-                        onChange={(e) => setOtherBusinessType(e.target.value)}
+                        onChange={(e) => {
+                          setOtherBusinessType(e.target.value);
+                          clearFieldError('otherBusinessType');
+                        }}
                         required={businessType === 'Other'}
+                        className={fieldErrors.otherBusinessType ? 'border-red-500 focus-visible:ring-red-500' : ''}
                       />
+                      {fieldErrors.otherBusinessType && (
+                        <p className="mt-1 text-xs text-red-600">{fieldErrors.otherBusinessType}</p>
+                      )}
                     </div>
                   )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    This helps us customize colors and settings for your business.
-                  </p>
+                  {fieldErrors.businessType ? (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.businessType}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This helps us customize colors and settings for your business.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

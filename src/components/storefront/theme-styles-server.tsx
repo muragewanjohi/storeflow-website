@@ -43,7 +43,7 @@ function hexToHsl(hex: string): string {
 export default async function ThemeStylesServer() {
   try {
     // Use getTenant() instead of requireTenant() to gracefully handle marketing sites
-    // Marketing sites (like storeflow-website) don't have tenants and should skip theme styles
+    // Marketing sites (like dukanest-website) don't have tenants and should skip theme styles
     const tenant = await getTenant();
     
     // If no tenant (e.g., marketing site), return null - no theme styles needed

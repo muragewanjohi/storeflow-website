@@ -152,7 +152,14 @@ export async function POST(request: NextRequest) {
     console.error('Error registering customer:', error);
     if (error.name === 'ZodError') {
       return NextResponse.json(
-        { error: 'Validation error', issues: error.issues },
+        { 
+          error: 'Validation failed',
+          issues: error.issues.map((issue: any) => ({
+            path: issue.path,
+            field: issue.path.join('.'),
+            message: issue.message,
+          }))
+        },
         { status: 400 }
       );
     }

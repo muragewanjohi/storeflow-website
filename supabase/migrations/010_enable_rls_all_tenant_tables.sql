@@ -1,5 +1,5 @@
 -- ============================================
--- StoreFlow: Enable RLS on ALL Tenant-Scoped Tables
+-- DukaNest: Enable RLS on ALL Tenant-Scoped Tables
 -- ============================================
 -- 
 -- This migration ensures RLS is enabled on ALL tables that have tenant_id,

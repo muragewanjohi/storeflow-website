@@ -33,7 +33,7 @@ async function testEndpoint(name: string, url: string, expectedStatus: number = 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'User-Agent': 'StoreFlow-SmokeTests/1.0',
+        'User-Agent': 'DukaNest-SmokeTests/1.0',
       },
     });
 

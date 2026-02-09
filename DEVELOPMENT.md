@@ -1,6 +1,6 @@
-# StoreFlow Development Guide
+# DukaNest Development Guide
 
-**Complete setup and development instructions for StoreFlow**
+**Complete setup and development instructions for DukaNest**
 
 ---
 

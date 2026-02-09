@@ -1,4 +1,4 @@
-# StoreFlow Architecture Documentation
+# DukaNest Architecture Documentation
 ## Complete System Architecture & Design
 
 **Version:** 1.0  
@@ -16,7 +16,7 @@
 │                    Vercel Multi-Tenant Platform                  │
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │ tenant1.com  │  │ tenant2.com  │  │ *.storeflow  │         │
+│  │ tenant1.com  │  │ tenant2.com  │  │ *.dukanest   │         │
 │  │              │  │              │  │ .com          │         │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘         │
 │         │                  │                  │                  │
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
     if (dbError) throw dbError;
 
     // Add domain to Vercel
-    const domain = `${subdomain}.storeflow.com`;
+    const domain = `${subdomain}.dukanest.com`;
     await addTenantDomain(domain, process.env.VERCEL_PROJECT_ID!);
 
     // Update tenant with domain info
@@ -294,7 +294,7 @@ export async function POST(request: NextRequest) {
 ### Complete Next.js Project Structure
 
 ```
-storeflow/
+dukanest/
 ├── src/
 │   ├── app/                          # Next.js App Router
 │   │   ├── (storefront)/            # Tenant storefront routes
@@ -442,7 +442,7 @@ storeflow/
 ### Tenant Request Flow
 
 ```
-1. User visits tenant1.storeflow.com
+1. User visits tenant1.dukanest.com
    ↓
 2. Next.js Middleware intercepts request
    ↓
@@ -563,7 +563,7 @@ storeflow/
 ### Vercel Multi-Tenant Setup
 
 1. **Domain Management**
-   - Wildcard DNS: `*.storeflow.com`
+   - Wildcard DNS: `*.dukanest.com`
    - Custom domains per tenant
    - Automatic SSL certificates
 

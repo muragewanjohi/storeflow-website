@@ -1,8 +1,8 @@
-# StoreFlow Development Roadmap
+# DukaNest Development Roadmap
 
 ## Overview
 
-This document outlines planned features and enhancements for StoreFlow. Features are organized by priority and implementation phase.
+This document outlines planned features and enhancements for DukaNest. Features are organized by priority and implementation phase.
 
 ---
 

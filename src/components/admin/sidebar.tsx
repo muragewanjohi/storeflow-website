@@ -69,7 +69,7 @@ export default function AdminSidebar({
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <BuildingOfficeIcon className="h-5 w-5" />
                 </div>
-                <span className="text-lg font-semibold">StoreFlow Admin</span>
+                <span className="text-lg font-semibold">DukaNest Admin</span>
               </Link>
               <button
                 type="button"
@@ -123,7 +123,7 @@ export default function AdminSidebar({
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
                 <BuildingOfficeIcon className="h-5 w-5" />
               </div>
-              {!collapsed && <span className="text-lg font-semibold">StoreFlow Admin</span>}
+              {!collapsed && <span className="text-lg font-semibold">DukaNest Admin</span>}
             </Link>
           </div>
           <nav className="flex flex-1 flex-col px-3">

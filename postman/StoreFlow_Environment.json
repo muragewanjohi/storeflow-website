@@ -1,6 +1,6 @@
 {
 	"id": "storeflow-environment",
-	"name": "StoreFlow Environment",
+	"name": "DukaNest Environment",
 	"values": [
 		{
 			"key": "base_url",

@@ -21,7 +21,7 @@ This means the environment variables are either:
 
 ### Step 1: Go to Environment Variables
 
-1. **Vercel Dashboard** → Your Project (`storeflow-website`)
+1. **Vercel Dashboard** → Your Project (`dukanest-website`)
 2. Click **"Settings"** (in the top navigation)
 3. Click **"Environment Variables"** (in the left sidebar)
 

@@ -43,7 +43,7 @@ export async function GET() {
     return NextResponse.json({
       version,
       buildTime,
-      platform: 'StoreFlow',
+      platform: 'DukaNest',
       lastUpdated: buildTime,
       changelog: changelog.entries || [],
     });
