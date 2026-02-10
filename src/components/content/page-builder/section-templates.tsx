@@ -1140,7 +1140,7 @@ function CategoriesSectionComponent({
                 className="block text-center group"
               >
                 <div className="relative mb-4">
-                  <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-green-200 group-hover:border-green-500 transition-colors relative">
+                  <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-primary/20 group-hover:border-primary transition-colors relative">
                     <Image
                       src={getCategoryImage(category)}
                       alt={category.name}
