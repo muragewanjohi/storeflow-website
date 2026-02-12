@@ -23,6 +23,7 @@ import {
   TrashIcon,
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
 interface Tenant {
   id: string;
@@ -266,6 +267,15 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       const data = await response.json();
 
       if (response.ok) {
+        if (subscriptionAction === 'renew') {
+          trackMetaPixelEvent('Subscribe', {
+            content_name: 'Subscription renewed',
+            content_category: 'subscription_renewal',
+            subscription_type: 'renewal',
+            status: 'completed',
+            source: 'admin',
+          });
+        }
         setSubscriptionSuccess(
           `Subscription ${subscriptionAction === 'renew' ? 'renewed' : subscriptionAction === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
         );

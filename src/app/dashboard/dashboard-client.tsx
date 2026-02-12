@@ -22,13 +22,21 @@ import {
   UserGroupIcon,
   CubeIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
   ExclamationTriangleIcon,
   PlusIcon,
   ArrowRightIcon,
   ClockIcon,
   EyeIcon,
   ChartBarIcon,
+  CheckCircleIcon,
+  ClipboardDocumentIcon,
+  LinkIcon,
+  SignalIcon,
+  SparklesIcon,
+  ShareIcon,
+  FireIcon,
+  TruckIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import {
   LineChart,
@@ -43,15 +51,20 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 
 interface DashboardClientProps {
   tenantName: string;
   isNewTenant: boolean;
-  planInfo: { name: string; price: number; duration_months: number } | null;
+  planInfo: { name: string; price: number; duration_months: number; trial_days?: number | null } | null;
   subdomain: string;
   userName: string;
+  storeUrl: string;
+  tenantStatus: string;
+  expireDate: string | null;
+  startDate: string | null;
 }
 
 interface OverviewData {
@@ -67,6 +80,7 @@ interface OverviewData {
     newCustomers: number;
   };
   pendingOrders: number;
+  visitorsToday?: number;
 }
 
 interface RecentOrder {
@@ -114,6 +128,10 @@ export default function DashboardClient({
   planInfo,
   subdomain,
   userName,
+  storeUrl,
+  tenantStatus,
+  expireDate,
+  startDate,
 }: Readonly<DashboardClientProps>) {
   const { formatCurrency, currency } = useCurrency();
   const today = new Date();
@@ -194,6 +212,49 @@ export default function DashboardClient({
 
   const isLoading = overviewLoading || revenueLoading || ordersLoading || salesLoading || inventoryLoading;
 
+  // Fetch getting started checklist
+  const { data: gettingStarted, refetch: refetchGettingStarted } = useQuery({
+    queryKey: ['dashboard-getting-started'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard/getting-started');
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json.data;
+    },
+  });
+
+  const effectiveStoreUrl = gettingStarted?.storeUrl ?? storeUrl;
+
+  const handleCopyStoreLink = async () => {
+    if (!effectiveStoreUrl) return;
+    try {
+      await navigator.clipboard.writeText(effectiveStoreUrl);
+      if (gettingStarted) {
+        await fetch('/api/dashboard/getting-started', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'share_done' }),
+        });
+        refetchGettingStarted();
+      }
+      toast.success('Store link copied to clipboard!');
+    } catch {
+      window.open(effectiveStoreUrl, '_blank');
+      toast.info('Opened your store in a new tab');
+    }
+  };
+
+  // Trial days remaining (only when in trial period)
+  const trialDaysRemaining = (() => {
+    const trialDays = planInfo?.trial_days;
+    if (!trialDays || trialDays <= 0 || !startDate) return null;
+    const start = new Date(startDate);
+    const now = new Date();
+    const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+    if (daysSinceStart >= trialDays) return null; // Trial over
+    return Math.max(0, trialDays - daysSinceStart);
+  })();
+
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -239,6 +300,109 @@ export default function DashboardClient({
           </Button>
         </div>
       </div>
+
+      {/* Getting Started Checklist */}
+      {gettingStarted && (
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-transparent to-primary/5">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20">
+                    <CheckCircleIcon className="h-4 w-4 text-primary" />
+                  </span>
+                  Getting Started
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {gettingStarted.allComplete
+                    ? "You're all set! Your store is ready for customers."
+                    : `Complete these steps to get your store ready. ${gettingStarted.completedCount} of ${gettingStarted.totalCount} done.`}
+                </CardDescription>
+              </div>
+              {!gettingStarted.allComplete && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-500"
+                      style={{ width: `${gettingStarted.progressPercent}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {Math.round(gettingStarted.progressPercent)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {gettingStarted.allComplete ? (
+              <div className="flex items-center gap-3 py-2">
+                <CheckCircleIcon className="h-12 w-12 text-green-500" />
+                <div>
+                  <p className="font-medium">All setup complete!</p>
+                  <p className="text-sm text-muted-foreground">
+                    Share your store:{' '}
+                    <a
+                      href={gettingStarted.storeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {gettingStarted.storeUrl}
+                    </a>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {gettingStarted.items.map((item: { id: string; label: string; description: string; completed: boolean; href: string; cta?: string }) => (
+                  <div
+                    key={item.id}
+                    className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                      item.completed
+                        ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-900/10'
+                        : 'border-border hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className="mt-0.5">
+                      {item.completed ? (
+                        <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : ''}`}>
+                        {item.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                      {!item.completed && item.cta && (
+                        <div className="mt-2">
+                          {item.id === 'share' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyStoreLink}
+                              className="h-7 text-xs"
+                            >
+                              <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                              {item.cta}
+                            </Button>
+                          ) : (
+                            <Button variant="outline" size="sm" asChild className="h-7 text-xs">
+                              <Link href={item.href}>{item.cta}</Link>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Welcome Banner for New Tenants */}
       {isNewTenant && (
@@ -586,7 +750,22 @@ export default function DashboardClient({
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
                   <CubeIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No sales data yet</p>
+                  <p className="text-sm font-medium">No sales data yet</p>
+                  <p className="text-xs mt-1 mb-4">Add products to start tracking sales</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Button variant="default" size="sm" asChild>
+                      <Link href="/dashboard/products/new">
+                        <PlusIcon className="h-4 w-4 mr-1" />
+                        Add product
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/dashboard/inventory/bulk">
+                        <ArrowUpTrayIcon className="h-4 w-4 mr-1" />
+                        Import products
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -594,64 +773,139 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Latest customer orders</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/orders">
-              View All
-              <ArrowRightIcon className="h-4 w-4 ml-1" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {ordersLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i: any) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
+      {/* Store Quick Info + Recent Orders */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Store Quick Info - uses center space */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Store</CardTitle>
+            <CardDescription>Quick links and status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Store link + Copy */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" title={effectiveStoreUrl}>
+                  {effectiveStoreUrl.replace(/^https?:\/\//, '')}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleCopyStoreLink} className="shrink-0">
+                <ClipboardDocumentIcon className="h-4 w-4 mr-1" />
+                Copy
+              </Button>
             </div>
-          ) : recentOrders && recentOrders.length > 0 ? (
-            <div className="space-y-4">
-              {recentOrders.map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <ShoppingCartIcon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Order #{order.order_number}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer_name || 'Guest'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(order.total_amount || 0)}</p>
-                      <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
-                        <ClockIcon className="h-3 w-3" />
-                        {format(new Date(order.created_at), 'MMM dd, HH:mm')}
-                      </p>
-                    </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status}
-                    </Badge>
-                  </div>
+
+            {/* Store status: Draft / Live */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Status:</span>
+              <Badge variant={tenantStatus === 'active' ? 'default' : 'secondary'}>
+                {tenantStatus === 'active' ? 'Live' : 'Draft'}
+              </Badge>
+            </div>
+
+            {/* Visitors today */}
+            <div className="flex items-center gap-2">
+              <SignalIcon className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                <span className="font-medium">{overview?.visitorsToday ?? 0}</span>
+                <span className="text-muted-foreground ml-1">visitors today</span>
+              </span>
+            </div>
+
+            {/* Trial days remaining + upgrade CTA */}
+            {trialDaysRemaining != null && trialDaysRemaining > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <SparklesIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-sm font-medium">
+                    {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} left in trial
+                  </span>
                 </div>
-              ))}
+                <Button size="sm" asChild className="w-full">
+                  <Link href="/dashboard/subscription">Upgrade now</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Orders - compact when empty */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle>Recent Orders</CardTitle>
+              <CardDescription>Latest customer orders</CardDescription>
             </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCartIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No orders yet</p>
-              <p className="text-sm mt-1">Orders will appear here once customers start buying</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/orders">
+                View All
+                <ArrowRightIcon className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {ordersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i: number) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : recentOrders && recentOrders.length > 0 ? (
+              <div className="space-y-3">
+                {recentOrders.map((order: RecentOrder) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <ShoppingCartIcon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Order #{order.order_number}</p>
+                        <p className="text-xs text-muted-foreground">{order.customer_name || 'Guest'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-sm">{formatCurrency(order.total_amount || 0)}</p>
+                        <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                          <ClockIcon className="h-3 w-3" />
+                          {format(new Date(order.created_at), 'MMM dd, HH:mm')}
+                        </p>
+                      </div>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <ShoppingCartIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm font-medium">No orders yet</p>
+                <p className="text-xs mt-1 mb-4">Get your first sale by sharing your store and offering incentives</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <Button variant="default" size="sm" onClick={handleCopyStoreLink}>
+                    <ShareIcon className="h-4 w-4 mr-1" />
+                    Share store link
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/sales/new">
+                      <FireIcon className="h-4 w-4 mr-1" />
+                      Create a discount
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/settings/delivery-zones">
+                      <TruckIcon className="h-4 w-4 mr-1" />
+                      Add delivery options
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Quick Actions Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

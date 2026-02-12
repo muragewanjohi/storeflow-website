@@ -165,23 +165,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Update payment log
-    await prisma.payment_logs.update({
-      where: { id: paymentLog.id },
-      data: {
-        status: 'completed',
-        transaction_id: mpesaReceiptNumber,
-        metadata: {
-          ...metadata,
-          mpesa_receipt_number: mpesaReceiptNumber,
-          transaction_date: transactionDate,
-          phone_number: phoneNumber,
-          callback_received_at: new Date().toISOString(),
-        },
-      },
-    });
-
-    // Activate subscription
+    // Activate subscription - get plan and current plan first (needed for subscription_type)
     const planId = metadata.plan_id;
     const plan = await prisma.price_plans.findUnique({
       where: { id: planId },
@@ -206,6 +190,35 @@ export async function POST(request: NextRequest) {
     const currentPlanPrice = currentPlan ? Number(currentPlan.price) : 0;
     const newPlanPrice = Number(plan.price);
     const changeType = getPlanChangeType(currentPlanPrice, newPlanPrice);
+
+    // Determine subscription type for analytics (renewal vs activation vs upgrade)
+    const isRenewal =
+      currentPlan &&
+      planId === currentPlan.id &&
+      tenant.expire_date &&
+      new Date(tenant.expire_date) > now;
+    const subscriptionType = isRenewal
+      ? 'renewal'
+      : changeType === 'upgrade'
+        ? 'upgrade'
+        : 'activation';
+
+    // Update payment log
+    await prisma.payment_logs.update({
+      where: { id: paymentLog.id },
+      data: {
+        status: 'completed',
+        transaction_id: mpesaReceiptNumber,
+        metadata: {
+          ...metadata,
+          mpesa_receipt_number: mpesaReceiptNumber,
+          transaction_date: transactionDate,
+          phone_number: phoneNumber,
+          callback_received_at: new Date().toISOString(),
+          subscription_type: subscriptionType,
+        },
+      },
+    });
 
     // Calculate expiration date
     let newExpireDate: Date;
@@ -240,9 +253,7 @@ export async function POST(request: NextRequest) {
         tenant_id: tenant.id,
         from_plan_id: currentPlan?.id || null,
         to_plan_id: planId,
-        change_type: currentPlan 
-          ? (changeType === 'upgrade' ? 'upgrade' : 'activation') 
-          : 'activation',
+        change_type: subscriptionType === 'renewal' ? 'renewal' : (currentPlan ? (changeType === 'upgrade' ? 'upgrade' : 'activation') : 'activation'),
         effective_date: now,
         prorated_amount: metadata.prorated_amount || 0,
         status: 'completed',

@@ -223,8 +223,56 @@ function TenantRegisterForm() {
     });
   };
 
+  // Inline validation - run on blur/change to give immediate feedback
+  const validateField = (field: string): string | null => {
+    switch (field) {
+      case 'name':
+        return !formData.name.trim() ? 'Store name is required' : null;
+      case 'subdomain':
+        if (!formData.subdomain.trim()) return 'Subdomain is required';
+        if (formData.subdomain.length < 3) return 'Subdomain must be at least 3 characters';
+        if (formData.subdomain.length > 63) return 'Subdomain must be at most 63 characters';
+        if (!/^[a-z0-9-]+$/.test(formData.subdomain)) return 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+        return null;
+      case 'adminName':
+        return !formData.adminName.trim() ? 'Your name is required' : null;
+      case 'adminEmail':
+        if (!formData.adminEmail.trim()) return 'Admin email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) return 'Please enter a valid email address';
+        return null;
+      case 'adminPassword':
+        if (!formData.adminPassword) return 'Password is required';
+        if (formData.adminPassword.length < 8) return 'Password must be at least 8 characters';
+        return null;
+      case 'plan':
+        return !selectedPlanId ? 'Please select a plan' : null;
+      case 'theme':
+        return !selectedThemeId ? 'Please select a theme' : null;
+      case 'businessType':
+        if (!businessType) return 'Please select a business type';
+        if (businessType === 'Other' && !otherBusinessType.trim()) return 'Please enter your business type';
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    const err = validateField(field);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  };
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+
+    if (!selectedPlanId) {
+      errors.plan = 'Please select a plan';
+    }
 
     if (!formData.name.trim()) {
       errors.name = 'Store name is required';
@@ -272,11 +320,18 @@ function TenantRegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Track click intent (fires on every attempt, including validation failures)
+    trackMetaPixelEvent('Lead', {
+      content_name: 'Start free trial',
+      content_category: 'registration',
+      status: 'attempted',
+    });
+
     setIsSubmitting(true);
     setError(null);
-    setFieldErrors({});
 
-    // Run client-side validation
+    // Run client-side validation (preserves existing field errors for display)
     if (!validateForm()) {
       setIsSubmitting(false);
       return;
@@ -316,19 +371,28 @@ function TenantRegisterForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Parse field-level errors from server response
+        // Map server errors to specific field messages; preserve user inputs (never clear fields)
+        const serverFieldErrors: Record<string, string> = {};
+
         if (data.errors && Array.isArray(data.errors)) {
-          const serverFieldErrors: Record<string, string> = {};
           data.errors.forEach((err: { field: string; message: string }) => {
             if (err.field) {
               serverFieldErrors[err.field] = err.message;
             }
           });
-          if (Object.keys(serverFieldErrors).length > 0) {
-            setFieldErrors(serverFieldErrors);
+        }
+
+        const msg = (data.message || '').toLowerCase();
+        if (Object.keys(serverFieldErrors).length === 0) {
+          if (msg.includes('subdomain') && (msg.includes('taken') || msg.includes('already'))) {
+            serverFieldErrors.subdomain = 'Subdomain taken — choose another';
+          } else if (msg.includes('email') && (msg.includes('already') || msg.includes('exists') || msg.includes('use'))) {
+            serverFieldErrors.adminEmail = 'Email already in use — Sign in instead';
           }
         }
-        setError(data.message || 'Registration failed');
+
+        setFieldErrors(serverFieldErrors);
+        setError(Object.keys(serverFieldErrors).length > 0 ? null : data.message || 'Registration failed');
         setIsSubmitting(false);
         return;
       }
@@ -426,10 +490,10 @@ function TenantRegisterForm() {
             <p className="text-muted-foreground">
               No card required • Set up in minutes
             </p>
-            {/* Plan Selection */}
+            {/* Plan Selection - Required before account creation */}
             <div className="mt-4 space-y-2">
               <Label htmlFor="plan-select" className="text-sm font-medium">
-                Select Plan
+                Select Plan *
               </Label>
               {isLoadingPlans ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -441,9 +505,10 @@ function TenantRegisterForm() {
                   value={selectedPlanId || ''}
                   onValueChange={(value) => {
                     setSelectedPlanId(value || null);
+                    clearFieldError('plan');
                   }}
                 >
-                  <SelectTrigger id="plan-select" className="w-full">
+                  <SelectTrigger id="plan-select" className={`w-full ${fieldErrors.plan ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
                     <SelectValue placeholder="Select a plan" />
                   </SelectTrigger>
                   <SelectContent>
@@ -473,9 +538,13 @@ function TenantRegisterForm() {
                   </p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                You can change your plan later in your dashboard
-              </p>
+              {fieldErrors.plan ? (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.plan}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  You can change your plan later in your dashboard
+                </p>
+              )}
             </div>
           </div>
 
@@ -503,6 +572,7 @@ function TenantRegisterForm() {
                     setFormData({ ...formData, name: e.target.value });
                     clearFieldError('name');
                   }}
+                  onBlur={() => handleBlur('name')}
                   placeholder="My Awesome Store"
                   className={fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
@@ -523,6 +593,7 @@ function TenantRegisterForm() {
                       handleSubdomainChange(e.target.value);
                       clearFieldError('subdomain');
                     }}
+                    onBlur={() => handleBlur('subdomain')}
                     placeholder="mystore"
                     pattern="[a-z0-9\-]+"
                     className={`rounded-r-none ${fieldErrors.subdomain ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
@@ -551,6 +622,7 @@ function TenantRegisterForm() {
                     setFormData({ ...formData, adminName: e.target.value });
                     clearFieldError('adminName');
                   }}
+                  onBlur={() => handleBlur('adminName')}
                   placeholder="John Doe"
                   className={fieldErrors.adminName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
@@ -570,11 +642,23 @@ function TenantRegisterForm() {
                     setFormData({ ...formData, adminEmail: e.target.value });
                     clearFieldError('adminEmail');
                   }}
+                  onBlur={() => handleBlur('adminEmail')}
                   placeholder="admin@example.com"
                   className={fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
                 {fieldErrors.adminEmail ? (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>
+                  <p className="mt-1 text-xs text-red-600">
+                    {fieldErrors.adminEmail === 'Email already in use — Sign in instead' ? (
+                      <>
+                        Email already in use —{' '}
+                        <Link href="/login" className="underline font-medium hover:no-underline">
+                          Sign in instead
+                        </Link>
+                      </>
+                    ) : (
+                      fieldErrors.adminEmail
+                    )}
+                  </p>
                 ) : (
                   <p className="mt-1 text-xs text-muted-foreground">
                     This will be your login email for the admin dashboard
@@ -593,6 +677,7 @@ function TenantRegisterForm() {
                     setFormData({ ...formData, adminPassword: e.target.value });
                     clearFieldError('adminPassword');
                   }}
+                  onBlur={() => handleBlur('adminPassword')}
                   placeholder="••••••••"
                   minLength={8}
                   autoComplete="new-password"
@@ -702,6 +787,7 @@ function TenantRegisterForm() {
                 </div>
 
                 <div className="space-y-2">
+                  <p className="text-sm font-medium">Start with demo content (Recommended)</p>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="demo-content"
@@ -717,7 +803,7 @@ function TenantRegisterForm() {
                       htmlFor="demo-content"
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
-                      Install with demo content (products & categories)
+                      Add demo products & categories
                     </label>
                   </div>
                   {includeDemoContent && (
@@ -731,22 +817,23 @@ function TenantRegisterForm() {
                         htmlFor="demo-attributes"
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                       >
-                        Include demo attributes (Size, Color, etc.)
+                        Add demo attributes (size, color, etc.)
                       </label>
                     </div>
                   )}
-                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 mt-2">
-                    <p className="text-xs text-blue-800 dark:text-blue-200">
-                      <strong>Recommended:</strong> Demo content includes sample products, categories, and pages that will help you learn the system and see how everything works. You can easily remove it later from your dashboard.
-                    </p>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Helps you explore the dashboard faster. Remove anytime.
+                  </p>
                 </div>
               </div>
             </div>
 
+            <p className="text-xs text-muted-foreground text-center">
+              No card required. Cancel anytime.
+            </p>
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingPlans || isLoadingThemes || !selectedThemeId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
+              disabled={isSubmitting || isLoadingPlans || isLoadingThemes || !selectedPlanId || !selectedThemeId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
               className="w-full"
             >
               {isSubmitting ? (

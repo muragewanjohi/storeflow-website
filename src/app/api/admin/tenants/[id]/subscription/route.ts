@@ -109,8 +109,19 @@ export async function PUT(
       },
     });
 
-    // Log subscription change (you can create a payment_logs entry here)
-    // For now, we'll just return success
+    // Log subscription change for analytics
+    await prisma.subscription_changes.create({
+      data: {
+        tenant_id: id,
+        from_plan_id: tenant.plan_id ?? null,
+        to_plan_id: plan_id,
+        change_type: action === 'renew' ? 'renewal' : action === 'upgrade' ? 'upgrade' : 'downgrade',
+        effective_date: now,
+        prorated_amount: 0,
+        status: 'completed',
+        metadata: { source: 'admin' },
+      },
+    });
 
     // Send email notifications
     const oldPlan = tenant.price_plans;

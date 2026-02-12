@@ -45,6 +45,7 @@ export interface Tenant {
   status: string;
   plan_id?: string | null;
   expire_date?: Date | null;
+  start_date?: Date | null;
   user_id?: string | null;
   theme_slug?: string | null;
   settings?: Record<string, any>;

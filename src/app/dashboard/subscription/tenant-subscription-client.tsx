@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { Tenant } from '@/lib/tenant-context';
 import { getLocalizedPrice, formatPrice } from '@/lib/pricing/location';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
 interface PricePlan {
   id: string;
@@ -206,7 +207,14 @@ export default function TenantSubscriptionClient({
     }
     const success = searchParams.get('success');
     const errorParam = searchParams.get('error');
+    const subscriptionType = searchParams.get('subscription_type') || 'activation';
     if (success === '1') {
+      trackMetaPixelEvent('Subscribe', {
+        content_name: 'Subscription payment',
+        content_category: subscriptionType === 'renewal' ? 'subscription_renewal' : 'subscription',
+        subscription_type: subscriptionType,
+        status: 'completed',
+      });
       setUpgradeSuccess('Payment successful! Your subscription has been activated.');
       setActiveTab('plans');
       router.replace('/dashboard/subscription?tab=plans', { scroll: false });
@@ -372,6 +380,13 @@ export default function TenantSubscriptionClient({
         const data = await response.json();
 
         if (data.status === 'completed') {
+          const subType = data.subscription_type || 'activation';
+          trackMetaPixelEvent('Subscribe', {
+            content_name: 'Subscription payment',
+            content_category: subType === 'renewal' ? 'subscription_renewal' : 'subscription',
+            subscription_type: subType,
+            status: 'completed',
+          });
           setMpesaLoading(false);
           setShowMpesaPayment(false);
           setMpesaPhoneNumber('');

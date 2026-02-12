@@ -54,8 +54,10 @@ export async function GET(request: NextRequest) {
 
     // If already completed, return status immediately
     if (paymentLog.status === 'completed') {
+      const meta = (paymentLog.metadata ?? {}) as Record<string, unknown>;
       return NextResponse.json({
         status: 'completed',
+        subscription_type: (meta.subscription_type as string) || 'activation',
         payment_log: {
           id: paymentLog.id,
           amount: paymentLog.amount,
@@ -115,8 +117,12 @@ export async function GET(request: NextRequest) {
           where: { id: paymentLog.id },
         });
 
+        const meta = ((updatedPaymentLog ?? paymentLog).metadata ?? {}) as Record<string, unknown>;
+        const subscriptionType = (meta.subscription_type as string) || 'activation';
+
         return NextResponse.json({
           status: updatedPaymentLog?.status || paymentLog.status,
+          ...(updatedPaymentLog?.status === 'completed' && { subscription_type: subscriptionType }),
           mpesa_result: {
             result_code: queryResult.ResultCode,
             result_desc: queryResult.ResultDesc,

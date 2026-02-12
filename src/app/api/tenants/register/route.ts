@@ -139,7 +139,10 @@ export async function POST(request: NextRequest) {
 
     if (existingTenant) {
       return NextResponse.json(
-        { message: 'This subdomain is already taken. Please choose another.' },
+        {
+          message: 'This subdomain is already taken. Please choose another.',
+          errors: [{ field: 'subdomain', message: 'Subdomain taken — choose another' }],
+        },
         { status: 409 }
       );
     }
