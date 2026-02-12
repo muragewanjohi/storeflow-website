@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Mail, Phone, MessageSquare, Send, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
 interface FormData {
   name: string;
@@ -60,6 +61,10 @@ export default function ContactForm() {
 
       setIsSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
+      trackMetaPixelEvent('Contact', {
+        content_name: 'Contact Form',
+        content_category: 'support',
+      });
       toast.success('Message sent successfully! We\'ll get back to you within 24 hours.');
     } catch (error) {
       console.error('Error submitting contact form:', error);

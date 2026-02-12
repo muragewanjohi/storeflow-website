@@ -4,6 +4,7 @@ import { Check, Zap, Loader2, ArrowRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { getPlanFeatures } from '@/lib/pricing/features';
 
@@ -33,6 +34,13 @@ export function Pricing() {
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState<'Ksh' | '$'>('$');
+
+  useEffect(() => {
+    trackMetaPixelEvent('ViewContent', {
+      content_name: 'Pricing Section',
+      content_category: 'pricing',
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchPlans() {
@@ -86,6 +94,13 @@ export function Pricing() {
   }, []);
 
   const handleSelectPlan = (planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    trackMetaPixelEvent('Lead', {
+      content_name: 'Get Started',
+      content_category: 'pricing',
+      value: plan?.price,
+      currency: plan?.currencySymbol || currencySymbol,
+    });
     router.push(`/register?plan=${planId}`);
   };
 
@@ -227,6 +242,7 @@ export function Pricing() {
         <div className="text-center">
           <Link
             href="/pricing"
+            onClick={() => trackMetaPixelEvent('Lead', { content_name: 'View Full Feature Comparison', content_category: 'pricing' })}
             className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#0025cc] font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all hover:bg-[#0025cc] hover:text-white border-2 border-[#0025cc]"
           >
             View Full Feature Comparison

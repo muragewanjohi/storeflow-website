@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, ArrowRight, Loader2, Zap, X, Check } from 'lucide-react';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { getPlanFeatures } from '@/lib/pricing/features';
 
@@ -132,6 +133,13 @@ export default function PricingPage() {
   const [isKenya, setIsKenya] = useState(false);
 
   useEffect(() => {
+    trackMetaPixelEvent('ViewContent', {
+      content_name: 'Pricing Page',
+      content_category: 'pricing',
+    });
+  }, []);
+
+  useEffect(() => {
     async function fetchPlans() {
       try {
         let locationInfo = detectUserLocationClient();
@@ -176,6 +184,13 @@ export default function PricingPage() {
   }, []);
 
   const handleSelectPlan = (planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    trackMetaPixelEvent('Lead', {
+      content_name: 'Pricing CTA',
+      content_category: 'pricing',
+      value: plan?.price,
+      currency: plan?.currencySymbol || currencySymbol,
+    });
     router.push(`/register?plan=${planId}`);
   };
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { ImageWithFallback } from './image-with-fallback';
 
 export function Hero() {
@@ -59,6 +60,7 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               <Link 
                 href="/register" 
+                onClick={() => trackMetaPixelEvent('Lead', { content_name: 'Start Your Free Trial', content_category: 'hero' })}
                 className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all flex items-center gap-2 text-lg font-semibold"
               >
                 Start Your Free Trial
@@ -66,6 +68,7 @@ export function Hero() {
               </Link>
               <Link 
                 href="#pricing" 
+                onClick={() => trackMetaPixelEvent('Lead', { content_name: 'View Pricing Plans', content_category: 'hero' })}
                 className="bg-white text-[#0025cc] px-8 py-4 rounded-lg border-2 border-[#0025cc] hover:bg-[#0025cc] hover:text-white transition-all font-semibold"
               >
                 View Pricing Plans

@@ -323,6 +323,41 @@ This document outlines planned features and enhancements for DukaNest. Features 
 **Estimated Complexity:** High
 **Dependencies:** Facebook Graph API, Instagram Graph API, Catalog management system
 
+#### 6.5. Tenant Meta Pixel Integration
+
+**Status:** Planned - To be implemented later
+
+**Goal:** Allow each tenant to connect their own Meta (Facebook) Pixel to their storefront for conversion tracking, audience building, and ad optimization. Each tenant runs and manages their own store, so pixel data must be tenant-specific and isolated.
+
+**Key Features:**
+- [ ] Tenant settings field for Meta Pixel ID (Settings → Integrations / Marketing)
+- [ ] Dynamic pixel loading on tenant storefronts using tenant's configured pixel
+- [ ] Event tracking: Purchase, AddToCart, InitiateCheckout, ViewContent (product/category), CompleteRegistration, Contact
+- [ ] Purchase event params: value, currency, content_ids, content_type, num_items
+- [ ] Per-tenant data isolation (no cross-tenant pixel data)
+
+**Events to Implement:**
+| Event | Location | Priority |
+|-------|----------|----------|
+| Purchase | Order confirmation | High |
+| AddToCart | Add to cart action | High |
+| InitiateCheckout | Checkout start | High |
+| ViewContent | Product detail, category page | Medium |
+| CompleteRegistration | Customer registration | Medium |
+| Contact | Tenant contact form | Low |
+
+**Implementation Notes:**
+- Platform pixel (1220253003576515) remains for marketing site only
+- Tenant pixel loads only on tenant storefronts (subdomain/custom domain)
+- Tenants configure their pixel ID in dashboard; no pixel = no tracking
+- Use existing `trackMetaPixelEvent` pattern but with tenant-scoped pixel ID
+
+**Dependencies:** Tenant settings schema (add `meta_pixel_id` or similar), storefront layout/context for tenant config
+
+**Related code:** `src/components/analytics/meta-pixel.tsx`, `src/lib/analytics/meta-pixel.ts`; tenant settings APIs; storefront layout
+
+---
+
 #### 7. SEO Enhancements
 - [ ] Advanced SEO settings per product/page
 - [ ] XML sitemap generation
@@ -366,7 +401,7 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - [ ] Webhook system
 - [ ] Zapier integration
 - [ ] Google Analytics integration
-- [ ] Facebook Pixel integration
+- [ ] Facebook Pixel integration (see **6.5. Tenant Meta Pixel Integration** in Phase 2 for tenant storefront implementation)
 
 #### 13. Advanced Shipping
 - [ ] Multiple shipping providers
@@ -454,14 +489,15 @@ Full Instagram Shopping integration that allows tenants to tag products in Insta
 ### Medium Priority (3-6 Months)
 6. User Learning & Onboarding (Video tutorials, interactive tours, community forum)
 7. Instagram Shopping integration
-8. SEO enhancements
-9. Advanced content management
+8. Tenant Meta Pixel integration (per-tenant conversion tracking)
+9. SEO enhancements
+10. Advanced content management
 
 ### Low Priority (6+ Months)
-10. User Learning & Onboarding (Achievement badges, sample data, feature discovery)
-11. Mobile app development
-12. Advanced analytics features
-13. Third-party integrations
+11. User Learning & Onboarding (Achievement badges, sample data, feature discovery)
+12. Mobile app development
+13. Advanced analytics features
+14. Third-party integrations
 
 ---
 
@@ -496,4 +532,4 @@ If you'd like to contribute to any of these features:
 
 ---
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-12

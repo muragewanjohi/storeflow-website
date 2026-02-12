@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
 interface PricingPlan {
@@ -333,6 +334,10 @@ function TenantRegisterForm() {
       }
 
       setSuccess(true);
+      trackMetaPixelEvent('CompleteRegistration', {
+        content_name: 'Store Registration',
+        status: 'complete',
+      });
       if (data.loginUrl) {
         setLoginUrl(data.loginUrl);
       }
