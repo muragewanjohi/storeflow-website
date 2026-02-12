@@ -7,7 +7,7 @@
  */
 
 import { notFound } from 'next/navigation';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getStaticOption } from '@/lib/settings/static-options';
 import ProductDetailClient from './product-detail-client';
@@ -28,7 +28,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) return { title: 'Product' };
   const { slug } = await params;
 
   // Fetch minimal product data for metadata

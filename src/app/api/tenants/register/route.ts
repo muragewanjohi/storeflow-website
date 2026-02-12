@@ -80,7 +80,7 @@ const registerTenantSchema = z.object({
   adminEmail: z.string().email('Invalid email address'),
   adminPassword: z.string().min(8, 'Password must be at least 8 characters'),
   adminName: z.string().min(1, 'Admin name is required'),
-  contactEmail: z.string().email('Invalid contact email address'),
+  contactEmail: z.string().email('Invalid contact email address').optional(),
   planId: z.string().uuid().optional(),
   themeId: z.string().uuid().optional(),
   businessType: z.string().optional(),
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         subdomain: validatedData.subdomain,
-        contact_email: validatedData.contactEmail,
+        contact_email: validatedData.contactEmail ?? validatedData.adminEmail,
         status: 'active',
         start_date: new Date(),
         plan_id: validatedData.planId || null,

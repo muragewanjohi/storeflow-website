@@ -7,7 +7,7 @@
  */
 
 import type { Metadata } from 'next';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import { ErrorState } from '@/components/storefront/error-boundary';
@@ -28,7 +28,8 @@ import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) return { title: 'Products' };
   return generateStorefrontMetadata({
     tenant,
     title: 'Products',

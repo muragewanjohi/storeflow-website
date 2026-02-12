@@ -8,7 +8,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
@@ -25,7 +25,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) return { title: 'Sale' };
   const { slug } = await params;
 
   const sale = await prisma.sales.findFirst({

@@ -5,7 +5,7 @@
  */
 
 import { redirect } from 'next/navigation';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant } from '@/lib/tenant-context/server';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
 import AccountNav from './account-nav';
 import StorefrontHeader from '@/components/storefront/header-server';
@@ -16,7 +16,10 @@ export default async function AccountLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) {
+    redirect('/');
+  }
   
   // Check for customer-specific authentication (cookie-based)
   // NOT Supabase auth - only customers who registered and logged in can access

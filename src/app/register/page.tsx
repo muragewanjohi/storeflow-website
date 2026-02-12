@@ -62,7 +62,6 @@ function TenantRegisterForm() {
     adminEmail: '',
     adminPassword: '',
     adminName: '',
-    contactEmail: '',
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -74,6 +73,7 @@ function TenantRegisterForm() {
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
   const [includeDemoAttributes, setIncludeDemoAttributes] = useState(true); // Default to true to include Size, Color, etc.
+  const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
 
   // Business types for Kenya/Africa market
   const businessTypes = [
@@ -188,10 +188,30 @@ function TenantRegisterForm() {
     }
   }, [selectedPlanId, allPlans]);
 
+  // Auto-generate subdomain from store name (user can edit)
+  useEffect(() => {
+    if (!subdomainManuallyEdited && formData.name.trim()) {
+      const generated = generateSubdomainFromName(formData.name);
+      if (generated) {
+        setFormData((prev) => (prev.subdomain !== generated ? { ...prev, subdomain: generated } : prev));
+      }
+    }
+  }, [formData.name, subdomainManuallyEdited]);
+
   const handleSubdomainChange = (value: string) => {
+    setSubdomainManuallyEdited(true);
     // Convert to lowercase and remove invalid characters
     const cleaned = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
     setFormData({ ...formData, subdomain: cleaned });
+  };
+
+  // Auto-generate subdomain from store name when name changes (user can still edit)
+  const generateSubdomainFromName = (name: string) => {
+    if (!name.trim()) return '';
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   };
 
   const clearFieldError = (field: string) => {
@@ -227,12 +247,6 @@ function TenantRegisterForm() {
       errors.adminEmail = 'Admin email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) {
       errors.adminEmail = 'Please enter a valid email address';
-    }
-
-    if (!formData.contactEmail.trim()) {
-      errors.contactEmail = 'Contact email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
-      errors.contactEmail = 'Please enter a valid email address';
     }
 
     if (!formData.adminPassword) {
@@ -403,9 +417,9 @@ function TenantRegisterForm() {
       <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-2xl">
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold mb-2">Create Your Store</h1>
+            <h1 className="text-4xl font-bold mb-2">Create your store (Free 14-day trial)</h1>
             <p className="text-muted-foreground">
-              Get started with your eCommerce platform in minutes
+              No card required • Set up in minutes
             </p>
             {/* Plan Selection */}
             <div className="mt-4 space-y-2">
@@ -468,27 +482,9 @@ function TenantRegisterForm() {
             )}
 
             {/* 2FA Information Notice */}
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                    Two-Factor Authentication Required
-                  </h3>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                    For your security, <strong>two-factor authentication (2FA) is mandatory</strong> for all store admin accounts. 
-                    Each time you log in, you&apos;ll receive a 6-digit code via email to complete your login.
-                  </p>
-                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
-                    <li>Secure your store and customer data</li>
-                    <li>Protect against unauthorized access</li>
-                    <li>Quick and easy email-based verification</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              We&apos;ll email a verification code on login for security (2FA).
+            </p>
 
             <div className="space-y-4">
               <div>
@@ -577,29 +573,6 @@ function TenantRegisterForm() {
                 ) : (
                   <p className="mt-1 text-xs text-muted-foreground">
                     This will be your login email for the admin dashboard
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="contactEmail">Contact Email *</Label>
-                <Input
-                  id="contactEmail"
-                  type="email"
-                  required
-                  value={formData.contactEmail}
-                  onChange={(e) => {
-                    setFormData({ ...formData, contactEmail: e.target.value });
-                    clearFieldError('contactEmail');
-                  }}
-                  placeholder="contact@example.com"
-                  className={fieldErrors.contactEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                />
-                {fieldErrors.contactEmail ? (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.contactEmail}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    For store-related communications
                   </p>
                 )}
               </div>
@@ -774,15 +747,23 @@ function TenantRegisterForm() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Store...
+                  Starting trial...
                 </>
               ) : (
-                'Create Store'
+                'Start free trial'
               )}
             </Button>
 
-            <div className="text-center text-sm text-muted-foreground">
-              By creating a store, you agree to our Terms of Service and Privacy Policy
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                By creating a store, you agree to our Terms of Service and Privacy Policy
+              </p>
+              <p className="text-xs text-muted-foreground/80">
+                I already have an account — check your email for Dukanest or email{' '}
+                <a href="mailto:support@dukanest.com" className="underline hover:text-foreground">
+                  support@dukanest.com
+                </a>
+              </p>
             </div>
           </form>
         </div>
