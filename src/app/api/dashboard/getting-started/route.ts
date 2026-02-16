@@ -33,7 +33,7 @@ export async function GET() {
     // Fetch data in parallel
     const [productCount, deliveryZoneCount, settings] = await Promise.all([
       prisma.products.count({
-        where: { tenant_id: tenant.id, status: 'active' },
+        where: { tenant_id: tenant.id, status: 'active', created_by: { not: null } },
       }),
       prisma.delivery_zones.count({
         where: { tenant_id: tenant.id, is_active: true },

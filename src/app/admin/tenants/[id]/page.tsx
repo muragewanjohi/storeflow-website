@@ -52,6 +52,27 @@ export default async function TenantSettingsPage({ params }: PageProps) {
       : null,
   };
 
+  // Fetch countries for tenant country dropdown (global countries with ISO codes)
+  let countries: Array<{ id: string; name: string; code: string | null }> = [];
+  try {
+    countries = await prisma.countries.findMany({
+      where: {
+        tenant_id: null,
+        code: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching countries:', error);
+  }
+
   // Fetch all available price plans for plan selection
   const pricePlansData = await prisma.price_plans.findMany({
     where: {
@@ -96,7 +117,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
           Manage settings for {tenant.name}
         </p>
       </div>
-      <TenantSettingsClient tenant={tenantData as any} pricePlans={pricePlans} />
+      <TenantSettingsClient tenant={tenantData as any} pricePlans={pricePlans} countries={countries} />
     </div>
   );
 }

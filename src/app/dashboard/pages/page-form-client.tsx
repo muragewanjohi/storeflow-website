@@ -6,16 +6,15 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-// Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
 import PageBuilder from '@/components/content/page-builder/page-builder';
@@ -24,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 interface Page {
   id: string;
@@ -99,6 +98,40 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const initialFormRef = useRef(JSON.stringify({
+    title: page?.title || '',
+    slug: page?.slug || '',
+    content: page?.content || '',
+    banner_image: page?.banner_image || '',
+    meta_title: page?.meta_title || '',
+    meta_description: page?.meta_description || '',
+    meta_tags: page?.meta_tags || '',
+  }));
+
+  // Track dirty state
+  useEffect(() => {
+    const current = JSON.stringify({
+      title: formData.title,
+      slug: formData.slug,
+      content: formData.content,
+      banner_image: formData.banner_image,
+      meta_title: formData.meta_title,
+      meta_description: formData.meta_description,
+      meta_tags: formData.meta_tags,
+    });
+    setIsDirty(current !== initialFormRef.current);
+  }, [formData]);
+
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) { e.preventDefault(); }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   /** Preview open state; persisted in sessionStorage so it survives remounts/refreshes until user closes */
   const [pageBuilderPreviewOpen, setPageBuilderPreviewOpen] = useState(false);
 
@@ -130,6 +163,15 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
   const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
     detectContentMode(page?.content)
   );
+
+  const generateSlugFromTitle = useCallback(() => {
+    if (!formData.title.trim()) return;
+    const slug = formData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    setFormData((prev) => ({ ...prev, slug }));
+  }, [formData.title]);
   
   // Update use_banner when content changes
   const handleContentChange = (newContent: string) => {
@@ -262,6 +304,18 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
         throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} page`);
       }
 
+      // Reset dirty state after successful save
+      setIsDirty(false);
+      initialFormRef.current = JSON.stringify({
+        title: formData.title,
+        slug: formData.slug,
+        content: formData.content,
+        banner_image: formData.banner_image,
+        meta_title: formData.meta_title,
+        meta_description: formData.meta_description,
+        meta_tags: formData.meta_tags,
+      });
+
       // Save as draft: stay on edit page so user can click Preview (or go to new page's edit when creating)
       if (saveAsDraft) {
         setIsSubmitting(false);
@@ -376,12 +430,30 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
               <div className="space-y-2">
                 <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug || ''}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="page-slug (auto-generated if empty)"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="slug"
+                    value={formData.slug || ''}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder="page-slug (auto-generated if empty)"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Regenerate from title"
+                    onClick={generateSlugFromTitle}
+                    disabled={!formData.title.trim()}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+                {(formData.slug || page?.slug) && (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {baseUrl || 'https://example.com'}/page/{formData.slug || page?.slug}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   URL-friendly version of the title. Leave empty to auto-generate.
                 </p>
@@ -389,14 +461,13 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Header Image Type</Label>
+                  <Label>Header Style</Label>
                   <RadioGroup
                     value={formData.use_banner ? 'banner' : 'hero'}
                     onValueChange={(value) => {
                       setFormData((prev) => ({ 
                         ...prev, 
                         use_banner: value === 'banner',
-                        // Clear banner_image if switching to hero, or clear hero section if switching to banner
                         banner_image: value === 'banner' ? prev.banner_image : '',
                       }));
                     }}
@@ -405,18 +476,18 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="banner" id="banner" />
                       <Label htmlFor="banner" className="font-normal cursor-pointer">
-                        Use Banner Image
+                        Banner image
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="hero" id="hero" />
                       <Label htmlFor="hero" className="font-normal cursor-pointer">
-                        Use Hero Section (in Page Builder)
+                        Hero section
                       </Label>
                     </div>
                   </RadioGroup>
                   <p className="text-xs text-muted-foreground">
-                    Choose whether to use a simple banner image or a Hero Section from the Page Builder
+                    Banner image for simple pages, or a Hero section for richer headers
                   </p>
                 </div>
 
@@ -468,7 +539,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       value="rich-text"
                       className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
                     >
-                      Rich Text Editor
+                      Simple Editor
                     </TabsTrigger>
                     <TabsTrigger 
                       value="page-builder"
@@ -479,17 +550,20 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                   </TabsList>
                   
                   <TabsContent value="rich-text" className="mt-0">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Write freely with formatting tools -- best for simple text pages.
+                    </p>
                     <RichTextEditor
                       content={contentMode === 'rich-text' ? (formData.content || '') : ''}
                       onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
                       placeholder="Start writing your page content..."
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Use the toolbar to format text, add images, links, and more
-                    </p>
                   </TabsContent>
                   
                   <TabsContent value="page-builder" className="mt-0">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Build rich pages from reusable sections -- best for landing pages and homepages.
+                    </p>
                     <PageBuilder
                       value={contentMode === 'page-builder' ? (formData.content || '') : ''}
                       onChange={handleContentChange}
@@ -501,9 +575,6 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       previewOpen={pageBuilderPreviewOpen}
                       onPreviewOpenChange={handlePreviewOpenChange}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Build your page using pre-designed sections. Content is stored as JSON.
-                    </p>
                   </TabsContent>
                 </Tabs>
               </div>
@@ -611,57 +682,64 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
             )}
           </Card>
 
-          {/* Form Actions - Draft/Publish (best practice: explicit actions, preview before publish) */}
-          <Card>
-            <CardFooter className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                {isEditing && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    asChild
-                  >
-                    <a
-                      href={`/dashboard/pages/${page.id}/preview`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Preview
-                    </a>
-                  </Button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/dashboard/pages')}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onClick={handleSubmitDraft}
-                >
-                  {isSubmitting ? 'Saving...' : isEditing ? 'Save as draft' : 'Save draft'}
-                </Button>
-                <Button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleSubmitPublish}
-                >
-                  {isSubmitting ? 'Saving...' : isEditing ? 'Publish' : 'Create & Publish'}
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
         </div>
       </form>
 
+      {/* Sticky Action Bar */}
+      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 mt-6">
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  asChild
+                >
+                  <a
+                    href={`/dashboard/pages/${page.id}/preview`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Preview
+                  </a>
+                </Button>
+              )}
+              {isDirty && (
+                <span className="text-xs text-amber-600 font-medium">
+                  Unsaved changes
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dashboard/pages')}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={handleSubmitDraft}
+              >
+                {isSubmitting ? 'Saving...' : isEditing ? 'Save as draft' : 'Save draft'}
+              </Button>
+              <Button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSubmitPublish}
+              >
+                {isSubmitting ? 'Saving...' : isEditing ? 'Publish' : 'Create & Publish'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

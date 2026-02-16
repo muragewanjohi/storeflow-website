@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Download, Eye, Sparkles, Edit } from 'lucide-react';
-import Image from 'next/image';
+import { ImageWithFallback } from '@/components/marketing/image-with-fallback';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -362,7 +362,7 @@ export default function ThemesListClient() {
             <Card key={theme.id} className={isActive ? 'border-primary ring-2 ring-primary' : ''}>
               <div className="relative aspect-video w-full overflow-hidden rounded-t-lg bg-muted">
                 {theme.screenshot_url ? (
-                  <Image
+                  <ImageWithFallback
                     src={theme.screenshot_url}
                     alt={theme.title}
                     fill

@@ -11,7 +11,9 @@ import { ShoppingCartIcon, HeartIcon, UserIcon, MagnifyingGlassIcon, PhoneIcon, 
 import { usePreview } from '@/lib/themes/preview-context';
 
 export default function GroceryHeader() {
-  const { isPreview, onNavigate } = usePreview();
+  const { isPreview, onNavigate, previewBrandName } = usePreview();
+  const brandName = previewBrandName || 'Grocery';
+  const supportEmail = previewBrandName ? `support@${previewBrandName.toLowerCase()}.com` : 'support@grocery.com';
 
   const handleLink = (url: string, e: React.MouseEvent) => {
     if (isPreview && onNavigate) {
@@ -33,7 +35,7 @@ export default function GroceryHeader() {
               </div>
               <div className="flex items-center gap-2">
                 <EnvelopeIcon className="h-4 w-4" />
-                <span>support@grocery.com</span>
+                <span>{supportEmail}</span>
               </div>
             </div>
             <div className="hidden md:flex items-center gap-4">
@@ -78,14 +80,14 @@ export default function GroceryHeader() {
                   <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
                     <span className="text-white text-xl">🛒</span>
                   </div>
-                  <span>Grocery</span>
+                  <span>{brandName}</span>
                 </button>
               ) : (
                 <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-green-600 hover:text-green-700 transition-colors">
                   <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
                     <span className="text-white text-xl">🛒</span>
                   </div>
-                  <span>Grocery</span>
+                  <span>{brandName}</span>
                 </Link>
               )}
             </div>

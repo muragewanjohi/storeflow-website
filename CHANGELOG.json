@@ -1,6 +1,46 @@
 {
-  "version": "0.1.5",
+  "version": "0.1.7",
   "entries": [
+    {
+      "version": "0.1.7",
+      "date": "2026-02-16",
+      "features": [
+        "Page editor: replaced tab-based section navigation with split-panel layout (section list on left, editor on right) for better workflow",
+        "Page editor: added drag-and-drop section reordering using @dnd-kit with keyboard accessibility support",
+        "Page editor: grouped section picker with search filter organized into Hero & Headers, Products, Content, Social Proof, Conversion, and Other categories",
+        "Page editor: section list now shows summaries (e.g. product count, title preview, feature count) for quick overview",
+        "Page editor: added hide/show toggle per section with hidden badge indicator; hidden sections are excluded from preview and storefront",
+        "Page editor: added duplicate section functionality for quick content replication",
+        "Page editor: quick-add buttons between sections for inserting new sections at specific positions",
+        "Page editor: contextual empty states with helpful guidance for new users",
+        "Page editor: sticky bottom action bar with Preview, Save draft, and Publish buttons always visible",
+        "Page editor: unsaved changes warning with browser beforeunload prompt and 'Unsaved changes' indicator",
+        "Page editor: simplified 'Header Image Type' to 'Header Style' with clearer radio labels (Banner image / Hero section)",
+        "Page editor: renamed 'Rich Text Editor' tab to 'Simple Editor' with descriptive subtitles for each content mode",
+        "Page editor: slug field now shows full URL preview and has a Regenerate button to create slug from title",
+        "Hero section editor: reorganized ~19 flat fields into 4 collapsible groups (Content, Image & Background, Call to Action, Advanced Styling)",
+        "Hero section editor: moved font sizes and color pickers into collapsed Advanced Styling group to reduce initial complexity by ~60%",
+        "Hero section editor: color pickers now default to theme colors (primary, buttonBackground, buttonText) instead of hardcoded black",
+        "Hero section editor: replaced Background Type dropdown with clearer radio buttons (None / Color / Image) with conditional field display",
+        "Hero section editor: renamed 'Normal Image' to 'Foreground Image' with clearer description",
+        "All section editors: applied consistent 'Advanced Styling' collapsed accordion pattern for color pickers across Categories, Features, Products, Testimonials, Text, Blogs, Location, ProductTabs, Form, SalesTab, CTA, and Banners editors",
+        "Banners section: per-banner color pickers (Title, Subtitle, CTA Text, CTA Button, Background) now grouped in collapsible 'Banner Styling' sub-section within each banner card; improved subtitle placeholder to 'e.g. Limited time offer'"
+      ],
+      "bugfixes": []
+    },
+    {
+      "version": "0.1.6",
+      "date": "2026-02-16",
+      "features": [
+        "Landlord dashboard tenant settings: added Store Details and Tenant Details tabs for better organization",
+        "Landlord dashboard tenant settings: added Country and Contact Email fields to Tenant Details tab",
+        "Landlord dashboard: country field affects pricing and payment options (e.g. Kenya for M-Pesa, KES)",
+        "Updated beauty business type theme colors to stronger pink/purple palette (inspired by Sephora, Ulta)",
+        "Aligned all business type theme colors with industry standards: Fashion (black/white), Electronics (Amazon blue/orange), Pets (Petco/Chewy blue), Hardware (Home Depot orange), Shoes (Nike black/orange), and others",
+        "Added explicit background color to business type color schemes for consistency across themes"
+      ],
+      "bugfixes": []
+    },
     {
       "version": "0.1.5",
       "date": "2026-02-06",

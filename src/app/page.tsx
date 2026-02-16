@@ -120,6 +120,7 @@ export default async function HomePage() {
               <StorefrontHeader />
               <main className="flex-1">
                 {pageData.sections
+                  .filter((s: any) => !s.hidden)
                   .sort((a: any, b: any) => a.order - b.order)
                   .map((section: any) => (
                     <SectionRenderer key={section.id} section={section} isPreview={false} />

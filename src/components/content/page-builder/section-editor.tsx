@@ -19,10 +19,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-// Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
 import { IconEmojiPicker } from '@/components/content/icon-emoji-picker';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useQuery } from '@tanstack/react-query';
 
 interface SectionEditorProps {
@@ -131,47 +131,51 @@ function HeroSectionEditor({
   section: Extract<PageSection, { type: 'hero' }>;
   onUpdate: (updates: Partial<PageSection>) => void;
 }) {
-  // Track selected background type to show fields even when values are not set yet
   const [selectedBackgroundType, setSelectedBackgroundType] = useState<'none' | 'image' | 'color'>(() => {
     return section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
   });
   
-  // Track if user is actively selecting a type to prevent useEffect from overriding
   const isSelectingRef = useRef(false);
   const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update selected type when section values change externally (but not when user is actively selecting)
+  // Fetch current theme for smart color defaults
+  const { data: currentThemeData } = useQuery({
+    queryKey: ['current-theme'],
+    queryFn: async () => {
+      const response = await fetch('/api/themes/current');
+      if (!response.ok) return null;
+      return await response.json();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const themeColors = useMemo(() => {
+    const customColors = currentThemeData?.customizations?.custom_colors;
+    return {
+      primary: customColors?.primary || '#4CAF50',
+      buttonBackground: customColors?.buttonBackground || customColors?.primary || '#4CAF50',
+      buttonText: customColors?.buttonText || '#FFFFFF',
+      text: '#000000',
+      subtitleText: '#666666',
+    };
+  }, [currentThemeData]);
+
   useEffect(() => {
-    // Don't override if user is actively making a selection
-    if (isSelectingRef.current) {
-      return;
-    }
-    
+    if (isSelectingRef.current) return;
     const currentType = section.banner_image ? 'image' : section.background_color ? 'color' : 'none';
-    setSelectedBackgroundType((prev) => {
-      // Only update if it's different to avoid unnecessary re-renders
-      if (currentType !== prev) {
-        return currentType;
-      }
-      return prev;
-    });
+    setSelectedBackgroundType((prev) => (currentType !== prev ? currentType : prev));
   }, [section.banner_image, section.background_color]);
   
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (selectionTimeoutRef.current) {
-        clearTimeout(selectionTimeoutRef.current);
-      }
+      if (selectionTimeoutRef.current) clearTimeout(selectionTimeoutRef.current);
     };
   }, []);
 
-  // Helper function to handle color changes
   const handleColorChange = (colorKey: string, value: string) => {
     onUpdate({ [colorKey]: value });
   };
 
-  // Helper function to reset color
   const handleColorReset = (colorKey: string) => {
     onUpdate({ [colorKey]: undefined });
   };
@@ -180,204 +184,47 @@ function HeroSectionEditor({
     <Card>
       <CardHeader>
         <CardTitle>Edit Hero Section</CardTitle>
+        <CardDescription>Configure your hero banner content and appearance</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Title *</Label>
-          <Input
-            value={section.title || ''}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            placeholder="Hero title"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Title Font Size</Label>
-          <Select
-            value={(section as Extract<PageSection, { type: 'hero' }>).title_font_size || 'md'}
-            onValueChange={(value) => onUpdate({ title_font_size: value })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sm">Small</SelectItem>
-              <SelectItem value="md">Medium (default)</SelectItem>
-              <SelectItem value="lg">Large</SelectItem>
-              <SelectItem value="xl">Extra large</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the hero title text"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Hero subtitle"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Subtitle Font Size</Label>
-          <Select
-            value={(section as Extract<PageSection, { type: 'hero' }>).subtitle_font_size || 'md'}
-            onValueChange={(value) => onUpdate({ subtitle_font_size: value })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sm">Small</SelectItem>
-              <SelectItem value="md">Medium (default)</SelectItem>
-              <SelectItem value="lg">Large</SelectItem>
-              <SelectItem value="xl">Extra large</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the hero subtitle text"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        
-        <div className="space-y-2">
-          <Label>Description</Label>
-          <Textarea
-            value={section.description || ''}
-            onChange={(e) => onUpdate({ description: e.target.value })}
-            placeholder="Hero description"
-            rows={3}
-          />
-        </div>
-        <ColorPicker
-          label="Description Color"
-          colorKey="description_color"
-          defaultValue="#666666"
-          description="Color for the hero description text"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        
-        <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
-          <div className="space-y-2">
-            <Label>Background Type</Label>
-            <Select
-              value={selectedBackgroundType}
-              onValueChange={(value: 'none' | 'image' | 'color') => {
-                // Clear any existing timeout
-                if (selectionTimeoutRef.current) {
-                  clearTimeout(selectionTimeoutRef.current);
-                }
-                
-                // Set flag to prevent useEffect from overriding
-                isSelectingRef.current = true;
-                
-                // Update local state immediately
-                setSelectedBackgroundType(value);
-                
-                // Update section values
-                if (value === 'image') {
-                  // Clear background color when selecting image
-                  onUpdate({ background_color: undefined });
-                } else if (value === 'color') {
-                  // Clear banner image when selecting color
-                  onUpdate({ banner_image: undefined });
-                } else {
-                  // Clear both
-                  onUpdate({ banner_image: undefined, background_color: undefined });
-                }
-                
-                // Reset flag after a delay to allow state to settle
-                selectionTimeoutRef.current = setTimeout(() => {
-                  isSelectingRef.current = false;
-                }, 300);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="image">Background Image</SelectItem>
-                <SelectItem value="color">Background Color</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Choose either a background image or background color, not both.
-            </p>
-          </div>
-          
-          {/* Show ImageUploadField when 'image' is selected */}
-          {selectedBackgroundType === 'image' && (
-            <div className="space-y-2">
-              <Label>Banner Image (Background)</Label>
-              <ImageUploadField
-                label="banner image"
-                value={section.banner_image || ''}
-                onChange={(url) => {
-                  onUpdate({ 
-                    banner_image: url || undefined,
-                    background_color: undefined // Clear background color when setting image
-                  });
-                }}
-                enableCrop={true}
-                aspectRatio={16 / 9}
-                allowSkipCrop={true}
-                recommendedDimensions="1920×1080 or larger (16:9 ratio). Images under 1920px wide: use “Use full image (no crop)” to avoid width cropping."
-              />
-              <p className="text-xs text-muted-foreground">
-                Crop uses 16:9 ratio. The banner is shown as the hero background. To show the full image without cropping (e.g. 1890×945), click “Use full image (no crop)” in the crop dialog.
-              </p>
-            </div>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <Label>Normal Image</Label>
-          <ImageUploadField
-            label="normal image"
-            value={section.image || ''}
-            onChange={(url) => onUpdate({ image: url || undefined })}
-            enableCrop={section.image_crop !== false}
-            aspectRatio={4 / 3}
-            allowSkipCrop={true}
-            recommendedDimensions="800x600px or larger. Any aspect ratio. This image will be displayed as a separate element alongside the text."
-          />
-          {section.image && (
-            <>
-              <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border">
-                <Checkbox
-                  id="image-crop"
-                  checked={section.image_crop !== false}
-                  onCheckedChange={(checked) => onUpdate({ image_crop: checked === true })}
+      <CardContent className="space-y-0">
+        <Accordion type="multiple" defaultValue={['content', 'image-background', 'cta']} className="w-full">
+
+          {/* Content Group */}
+          <AccordionItem value="content" className="border-b">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+              Content
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <Label>Title *</Label>
+                <Input
+                  value={section.title || ''}
+                  onChange={(e) => onUpdate({ title: e.target.value })}
+                  placeholder="Hero title"
                 />
-                <Label htmlFor="image-crop" className="cursor-pointer flex-1">
-                  <div>
-                    <div className="font-medium text-sm">Crop image</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      When unchecked, the full image will be displayed without cropping.
-                    </div>
-                  </div>
-                </Label>
               </div>
               <div className="space-y-2">
-                <Label>Image alignment</Label>
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Hero subtitle"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={section.description || ''}
+                  onChange={(e) => onUpdate({ description: e.target.value })}
+                  placeholder="Hero description"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Text Alignment</Label>
                 <Select
-                  value={section.image_position || 'right'}
-                  onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ image_position: value })}
+                  value={section.text_alignment || 'center'}
+                  onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ text_alignment: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -388,88 +235,268 @@ function HeroSectionEditor({
                     <SelectItem value="right">Right</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Where the normal image appears: left, center (below/above text), or right. Used when the hero has a background image or background colour.
-                </p>
               </div>
-            </>
-          )}
-        </div>
+            </AccordionContent>
+          </AccordionItem>
 
-        {/* Background Color – next to Normal Image so colour picker relates to image/background */}
-        {selectedBackgroundType === 'color' && (
-          <ColorPicker
-            label="Background Color"
-            colorKey="background_color"
-            defaultValue="#FFFFFF"
-            description="Background color for the hero section (only when no banner image is set)"
-            section={section}
-            onColorChange={(colorKey, value) => {
-              onUpdate({
-                background_color: value,
-                banner_image: undefined,
-              });
-            }}
-            onColorReset={handleColorReset}
-          />
-        )}
-        
-        <div className="space-y-2">
-          <Label>Text Alignment</Label>
-          <Select
-            value={section.text_alignment || 'center'}
-            onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ text_alignment: value })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="left">Left</SelectItem>
-              <SelectItem value="center">Center</SelectItem>
-              <SelectItem value="right">Right</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Alignment for title and subtitle text
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>CTA Text</Label>
-            <Input
-              value={section.cta_text || ''}
-              onChange={(e) => onUpdate({ cta_text: e.target.value })}
-              placeholder="Button text"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>CTA Link</Label>
-            <Input
-              value={section.cta_link || ''}
-              onChange={(e) => onUpdate({ cta_link: e.target.value })}
-              placeholder="/products"
-            />
-          </div>
-        </div>
-        <ColorPicker
-          label="CTA Text Color"
-          colorKey="cta_text_color"
-          defaultValue="#FFFFFF"
-          description="Color for the CTA button text"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <ColorPicker
-          label="CTA Button Color"
-          colorKey="cta_button_color"
-          defaultValue="#4CAF50"
-          description="Background color for the CTA button"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+          {/* Image & Background Group */}
+          <AccordionItem value="image-background" className="border-b">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+              Image &amp; Background
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <Label>Background</Label>
+                <RadioGroup
+                  value={selectedBackgroundType}
+                  onValueChange={(value: string) => {
+                    const bgType = value as 'none' | 'image' | 'color';
+                    if (selectionTimeoutRef.current) clearTimeout(selectionTimeoutRef.current);
+                    isSelectingRef.current = true;
+                    setSelectedBackgroundType(bgType);
+                    if (bgType === 'image') {
+                      onUpdate({ background_color: undefined });
+                    } else if (bgType === 'color') {
+                      onUpdate({ banner_image: undefined });
+                    } else {
+                      onUpdate({ banner_image: undefined, background_color: undefined });
+                    }
+                    selectionTimeoutRef.current = setTimeout(() => { isSelectingRef.current = false; }, 300);
+                  }}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="none" id="bg-none" />
+                    <Label htmlFor="bg-none" className="font-normal cursor-pointer text-sm">None</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="color" id="bg-color" />
+                    <Label htmlFor="bg-color" className="font-normal cursor-pointer text-sm">Color</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="image" id="bg-image" />
+                    <Label htmlFor="bg-image" className="font-normal cursor-pointer text-sm">Image</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+          
+
+              {/* Conditional: color picker */}
+              {selectedBackgroundType === 'color' && (
+                <ColorPicker
+                  label="Background Color"
+                  colorKey="background_color"
+                  defaultValue="#FFFFFF"
+                  description="Background color for the hero section"
+                  section={section}
+                  onColorChange={(colorKey, value) => {
+                    onUpdate({ background_color: value, banner_image: undefined });
+                  }}
+                  onColorReset={handleColorReset}
+                />
+              )}
+
+              {/* Conditional: image upload */}
+              {selectedBackgroundType === 'image' && (
+                <div className="space-y-2">
+                  <ImageUploadField
+                    label="Background image"
+                    value={section.banner_image || ''}
+                    onChange={(url) => {
+                      onUpdate({ banner_image: url || undefined, background_color: undefined });
+                    }}
+                    enableCrop={true}
+                    aspectRatio={16 / 9}
+                    allowSkipCrop={true}
+                    recommendedDimensions="1920x1080 or larger (16:9). Use full image option to skip cropping."
+                  />
+                </div>
+              )}
+
+              {/* Foreground image */}
+              <div className="space-y-2 pt-2 border-t">
+                <Label>Foreground Image</Label>
+                <p className="text-xs text-muted-foreground">
+                  Optional image displayed alongside text (e.g. product photo, illustration)
+                </p>
+                <ImageUploadField
+                  label="foreground image"
+                  value={section.image || ''}
+                  onChange={(url) => onUpdate({ image: url || undefined })}
+                  enableCrop={section.image_crop !== false}
+                  aspectRatio={4 / 3}
+                  allowSkipCrop={true}
+                  recommendedDimensions="800x600px or larger. Displayed as a separate element alongside text."
+                />
+                {section.image && (
+                  <>
+                    <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border">
+                      <Checkbox
+                        id="image-crop"
+                        checked={section.image_crop !== false}
+                        onCheckedChange={(checked) => onUpdate({ image_crop: checked === true })}
+                      />
+                      <Label htmlFor="image-crop" className="cursor-pointer flex-1">
+                        <div>
+                          <div className="font-medium text-sm">Crop image</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            When unchecked, the full image will be displayed without cropping.
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Image position</Label>
+                      <Select
+                        value={section.image_position || 'right'}
+                        onValueChange={(value: 'left' | 'center' | 'right') => onUpdate({ image_position: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="left">Left</SelectItem>
+                          <SelectItem value="center">Center</SelectItem>
+                          <SelectItem value="right">Right</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Call to Action Group */}
+          <AccordionItem value="cta" className="border-b">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+              Call to Action
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Button Text</Label>
+                  <Input
+                    value={section.cta_text || ''}
+                    onChange={(e) => onUpdate({ cta_text: e.target.value })}
+                    placeholder="Shop Now"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Button Link</Label>
+                  <Input
+                    value={section.cta_link || ''}
+                    onChange={(e) => onUpdate({ cta_link: e.target.value })}
+                    placeholder="/products"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave empty to hide the button. Colors are inherited from your theme by default.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Advanced Styling Group (collapsed by default) */}
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors and sizes. Leave unchanged to use your theme&apos;s palette.
+              </p>
+
+              {/* Font sizes */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Title Size</Label>
+                  <Select
+                    value={section.title_font_size || 'md'}
+                    onValueChange={(value) => onUpdate({ title_font_size: value })}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sm">Small</SelectItem>
+                      <SelectItem value="md">Medium</SelectItem>
+                      <SelectItem value="lg">Large</SelectItem>
+                      <SelectItem value="xl">Extra large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Subtitle Size</Label>
+                  <Select
+                    value={section.subtitle_font_size || 'md'}
+                    onValueChange={(value) => onUpdate({ subtitle_font_size: value })}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sm">Small</SelectItem>
+                      <SelectItem value="md">Medium</SelectItem>
+                      <SelectItem value="lg">Large</SelectItem>
+                      <SelectItem value="xl">Extra large</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Text colors */}
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue={themeColors.text}
+                description="Override the theme's text color for the title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue={themeColors.subtitleText}
+                description="Override the theme's text color for the subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Description Color"
+                colorKey="description_color"
+                defaultValue={themeColors.subtitleText}
+                description="Override the theme's text color for the description"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+
+              {/* CTA colors */}
+              <ColorPicker
+                label="Button Color"
+                colorKey="cta_button_color"
+                defaultValue={themeColors.buttonBackground}
+                description="Override the theme's button background color"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Button Text Color"
+                colorKey="cta_text_color"
+                defaultValue={themeColors.buttonText}
+                description="Override the theme's button text color"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -524,117 +551,129 @@ function FeaturesSectionEditor({
             placeholder="Section title"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Section subtitle"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Columns</Label>
-          <Select
-            value={String(section.columns || 3)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="3">3 Columns</SelectItem>
-              <SelectItem value="4">4 Columns</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the features section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label>Features</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addFeature}>
-              <PlusIcon className="mr-2 h-4 w-4" />
-              Add Feature
-            </Button>
-          </div>
-          {section.features.map((feature: any, index: any) => (
-            <Card key={feature.id}>
-              <CardHeader>
-                <CardTitle className="text-sm">Feature {index + 1}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Title *</Label>
-                  <Input
-                    value={feature.title}
-                    onChange={(e) => updateFeature(feature.id, { title: e.target.value })}
-                    placeholder="Feature title"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={feature.description || ''}
-                    onChange={(e) => updateFeature(feature.id, { description: e.target.value })}
-                    placeholder="Feature description"
-                    rows={2}
-                  />
-                </div>
-                <IconEmojiPicker
-                  value={feature.icon || ''}
-                  onChange={(value) => updateFeature(feature.id, { icon: value })}
-                  label="Icon/Emoji"
-                  description="Select an emoji or icon for this feature"
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Section subtitle"
                 />
-                <div className="space-y-2">
-                  <Label>Image</Label>
-                  <ImageUploadField
-                    label="feature image"
-                    value={feature.image || ''}
-                    onChange={(url) => updateFeature(feature.id, { image: url || undefined })}
-                    enableCrop={false}
-                    recommendedDimensions="400x400px (1:1 square) or larger. Image will be displayed in full without cropping."
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => removeFeature(feature.id)}
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 3)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
                 >
-                  <TrashIcon className="mr-2 h-4 w-4" />
-                  Remove Feature
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                    <SelectItem value="4">4 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the features section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Features</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addFeature}>
+                    <PlusIcon className="mr-2 h-4 w-4" />
+                    Add Feature
+                  </Button>
+                </div>
+                {section.features.map((feature: any, index: any) => (
+                  <Card key={feature.id}>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Feature {index + 1}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Title *</Label>
+                        <Input
+                          value={feature.title}
+                          onChange={(e) => updateFeature(feature.id, { title: e.target.value })}
+                          placeholder="Feature title"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea
+                          value={feature.description || ''}
+                          onChange={(e) => updateFeature(feature.id, { description: e.target.value })}
+                          placeholder="Feature description"
+                          rows={2}
+                        />
+                      </div>
+                      <IconEmojiPicker
+                        value={feature.icon || ''}
+                        onChange={(value) => updateFeature(feature.id, { icon: value })}
+                        label="Icon/Emoji"
+                        description="Select an emoji or icon for this feature"
+                      />
+                      <div className="space-y-2">
+                        <Label>Image</Label>
+                        <ImageUploadField
+                          label="feature image"
+                          value={feature.image || ''}
+                          onChange={(url) => updateFeature(feature.id, { image: url || undefined })}
+                          enableCrop={false}
+                          recommendedDimensions="400x400px (1:1 square) or larger. Image will be displayed in full without cropping."
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeFeature(feature.id)}
+                      >
+                        <TrashIcon className="mr-2 h-4 w-4" />
+                        Remove Feature
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -669,81 +708,93 @@ function ProductsSectionEditor({
             placeholder="Section title"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Section subtitle"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Columns</Label>
-          <Select
-            value={String(section.columns || 4)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="3">3 Columns</SelectItem>
-              <SelectItem value="4">4 Columns</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Limit</Label>
-          <Input
-            type="number"
-            value={section.limit || 8}
-            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
-            min={1}
-            max={20}
-          />
-          <p className="text-xs text-muted-foreground">
-            Number of products to display
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Category ID (Optional)</Label>
-          <Input
-            value={section.category_id || ''}
-            onChange={(e) => onUpdate({ category_id: e.target.value || undefined })}
-            placeholder="Filter by category"
-          />
-          <p className="text-xs text-muted-foreground">
-            Leave empty to show all products
-          </p>
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the products section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Section subtitle"
+                />
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 4)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                    <SelectItem value="4">4 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Limit</Label>
+                <Input
+                  type="number"
+                  value={section.limit || 8}
+                  onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
+                  min={1}
+                  max={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of products to display
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Category ID (Optional)</Label>
+                <Input
+                  value={section.category_id || ''}
+                  onChange={(e) => onUpdate({ category_id: e.target.value || undefined })}
+                  placeholder="Filter by category"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to show all products
+                </p>
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the products section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -802,143 +853,155 @@ function TestimonialsSectionEditor({
             placeholder="Section title"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Section subtitle"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Columns</Label>
-          <Select
-            value={String(section.columns || 3)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 1 | 2 | 3 })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">1 Column</SelectItem>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="3">3 Columns</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label>Testimonials</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addTestimonial}>
-              <PlusIcon className="mr-2 h-4 w-4" />
-              Add Testimonial
-            </Button>
-          </div>
-          {section.testimonials.map((testimonial: any, index: any) => (
-            <Card key={testimonial.id}>
-              <CardHeader>
-                <CardTitle className="text-sm">Testimonial {index + 1}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Name *</Label>
-                  <Input
-                    value={testimonial.name}
-                    onChange={(e) => updateTestimonial(testimonial.id, { name: e.target.value })}
-                    placeholder="Customer name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Content *</Label>
-                  <Textarea
-                    value={testimonial.content}
-                    onChange={(e) => updateTestimonial(testimonial.id, { content: e.target.value })}
-                    placeholder="Testimonial content"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Input
-                      value={testimonial.role || ''}
-                      onChange={(e) => updateTestimonial(testimonial.id, { role: e.target.value })}
-                      placeholder="CEO"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Company</Label>
-                    <Input
-                      value={testimonial.company || ''}
-                      onChange={(e) => updateTestimonial(testimonial.id, { company: e.target.value })}
-                      placeholder="Company Name"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Rating (1-5)</Label>
-                  <Input
-                    type="number"
-                    value={testimonial.rating || 5}
-                    onChange={(e) =>
-                      updateTestimonial(testimonial.id, {
-                        rating: Math.min(5, Math.max(1, parseInt(e.target.value) || 5)),
-                      })
-                    }
-                    min={1}
-                    max={5}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Image</Label>
-                  <ImageUploadField
-                    label="testimonial image"
-                    value={testimonial.image || ''}
-                    onChange={(url) => updateTestimonial(testimonial.id, { image: url || undefined })}
-                    enableCrop={false}
-                    recommendedDimensions="200x200px (1:1 square) or larger. Image will be displayed in full without cropping."
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => removeTestimonial(testimonial.id)}
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Section subtitle"
+                />
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 3)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 1 | 2 | 3 })}
                 >
-                  <TrashIcon className="mr-2 h-4 w-4" />
-                  Remove Testimonial
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the testimonials section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Column</SelectItem>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Testimonials</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addTestimonial}>
+                    <PlusIcon className="mr-2 h-4 w-4" />
+                    Add Testimonial
+                  </Button>
+                </div>
+                {section.testimonials.map((testimonial: any, index: any) => (
+                  <Card key={testimonial.id}>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Testimonial {index + 1}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Name *</Label>
+                        <Input
+                          value={testimonial.name}
+                          onChange={(e) => updateTestimonial(testimonial.id, { name: e.target.value })}
+                          placeholder="Customer name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Content *</Label>
+                        <Textarea
+                          value={testimonial.content}
+                          onChange={(e) => updateTestimonial(testimonial.id, { content: e.target.value })}
+                          placeholder="Testimonial content"
+                          rows={3}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Role</Label>
+                          <Input
+                            value={testimonial.role || ''}
+                            onChange={(e) => updateTestimonial(testimonial.id, { role: e.target.value })}
+                            placeholder="CEO"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Company</Label>
+                          <Input
+                            value={testimonial.company || ''}
+                            onChange={(e) => updateTestimonial(testimonial.id, { company: e.target.value })}
+                            placeholder="Company Name"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Rating (1-5)</Label>
+                        <Input
+                          type="number"
+                          value={testimonial.rating || 5}
+                          onChange={(e) =>
+                            updateTestimonial(testimonial.id, {
+                              rating: Math.min(5, Math.max(1, parseInt(e.target.value) || 5)),
+                            })
+                          }
+                          min={1}
+                          max={5}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Image</Label>
+                        <ImageUploadField
+                          label="testimonial image"
+                          value={testimonial.image || ''}
+                          onChange={(url) => updateTestimonial(testimonial.id, { image: url || undefined })}
+                          enableCrop={false}
+                          recommendedDimensions="200x200px (1:1 square) or larger. Image will be displayed in full without cropping."
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeTestimonial(testimonial.id)}
+                      >
+                        <TrashIcon className="mr-2 h-4 w-4" />
+                        Remove Testimonial
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the testimonials section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -972,24 +1035,36 @@ function TextSectionEditor({
             onChange={(html) => onUpdate({ content: html })}
           />
         </div>
-        <ColorPicker
-          label="Text Color"
-          colorKey="text_color"
-          defaultValue="#000000"
-          description="Color for the text content"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the text section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Text Color"
+                colorKey="text_color"
+                defaultValue="#000000"
+                description="Color for the text content"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the text section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -1121,127 +1196,139 @@ function CategoriesSectionEditor({
             placeholder="Browse By Categories"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Section subtitle"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Section subtitle"
+                />
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
 
-        {/* Category Selection */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>Select Categories</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              disabled={isLoadingCategories || categories.length === 0}
-            >
-              {allSelected ? 'Deselect All' : 'Select All'}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {selectedCategoryIds.length === 0
-              ? 'No categories selected. All categories will be displayed (up to limit).'
-              : `${selectedCategoryIds.length} categor${selectedCategoryIds.length === 1 ? 'y' : 'ies'} selected.`}
-          </p>
-          
-          {isLoadingCategories ? (
-            <div className="text-sm text-muted-foreground py-4">Loading categories...</div>
-          ) : categories.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-4">No categories available. Create categories first.</div>
-          ) : (
-            <div className="border rounded-lg p-4 max-h-64 overflow-y-auto space-y-2">
-              {categories.map((category: any) => (
-                <div key={category.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`category-${category.id}`}
-                    checked={selectedCategoryIds.includes(category.id)}
-                    onCheckedChange={() => handleCategoryToggle(category.id)}
-                  />
-                  <Label
-                    htmlFor={`category-${category.id}`}
-                    className="cursor-pointer flex-1 text-sm font-normal"
+              {/* Category Selection */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Select Categories</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAll}
+                    disabled={isLoadingCategories || categories.length === 0}
                   >
-                    {category.name}
-                  </Label>
+                    {allSelected ? 'Deselect All' : 'Select All'}
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedCategoryIds.length === 0
+                    ? 'No categories selected. All categories will be displayed (up to limit).'
+                    : `${selectedCategoryIds.length} categor${selectedCategoryIds.length === 1 ? 'y' : 'ies'} selected.`}
+                </p>
 
-        <div className="space-y-2">
-          <Label>Limit</Label>
-          <Input
-            type="number"
-            value={section.limit || 8}
-            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
-            min={1}
-            max={20}
-          />
-          <p className="text-xs text-muted-foreground">
-            Maximum number of categories to display. Only applies if no specific categories are selected above.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Columns</Label>
-          <Select
-            value={String(section.columns || 8)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 4 | 6 | 8 })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="4">4 Columns</SelectItem>
-              <SelectItem value="6">6 Columns</SelectItem>
-              <SelectItem value="8">8 Columns</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="show-count"
-            checked={section.show_count || false}
-            onCheckedChange={(checked) => onUpdate({ show_count: checked as boolean })}
-          />
-          <Label htmlFor="show-count" className="cursor-pointer">
-            Show Item Count
-          </Label>
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the categories section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+                {isLoadingCategories ? (
+                  <div className="text-sm text-muted-foreground py-4">Loading categories...</div>
+                ) : categories.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-4">No categories available. Create categories first.</div>
+                ) : (
+                  <div className="border rounded-lg p-4 max-h-64 overflow-y-auto space-y-2">
+                    {categories.map((category: any) => (
+                      <div key={category.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`category-${category.id}`}
+                          checked={selectedCategoryIds.includes(category.id)}
+                          onCheckedChange={() => handleCategoryToggle(category.id)}
+                        />
+                        <Label
+                          htmlFor={`category-${category.id}`}
+                          className="cursor-pointer flex-1 text-sm font-normal"
+                        >
+                          {category.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Limit</Label>
+                <Input
+                  type="number"
+                  value={section.limit || 8}
+                  onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
+                  min={1}
+                  max={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of categories to display. Only applies if no specific categories are selected above.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 8)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 4 | 6 | 8 })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="4">4 Columns</SelectItem>
+                    <SelectItem value="6">6 Columns</SelectItem>
+                    <SelectItem value="8">8 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show-count"
+                  checked={section.show_count || false}
+                  onCheckedChange={(checked) => onUpdate({ show_count: checked as boolean })}
+                />
+                <Label htmlFor="show-count" className="cursor-pointer">
+                  Show Item Count
+                </Label>
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the categories section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -1377,15 +1464,6 @@ function BannersSectionEditor({
             placeholder="Banners section title (optional)"
           />
         </div>
-        <ColorPicker
-          label="Section Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for section-level title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
         <div className="space-y-2">
           <Label>Section Subtitle</Label>
           <Input
@@ -1394,24 +1472,45 @@ function BannersSectionEditor({
             placeholder="Banners section subtitle (optional)"
           />
         </div>
-        <ColorPicker
-          label="Section Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for section-level subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <ColorPicker
-          label="Section Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the banners section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Section Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for section-level title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Section Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for section-level subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Section Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the banners section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label>Banners</Label>
@@ -1434,32 +1533,14 @@ function BannersSectionEditor({
                     placeholder="Banner title"
                   />
                 </div>
-                <ColorPicker
-                  label="Title Color"
-                  colorKey="title_color"
-                  defaultValue="#000000"
-                  description="Color for this banner's title"
-                  section={banner}
-                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
-                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
-                />
                 <div className="space-y-2">
                   <Label>Subtitle</Label>
                   <Input
                     value={banner.subtitle || ''}
                     onChange={(e) => updateBanner(banner.id, { subtitle: e.target.value })}
-                    placeholder="Banner subtitle"
+                    placeholder="e.g. Limited time offer"
                   />
                 </div>
-                <ColorPicker
-                  label="Subtitle Color"
-                  colorKey="subtitle_color"
-                  defaultValue="#666666"
-                  description="Color for this banner's subtitle"
-                  section={banner}
-                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
-                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
-                />
                 <div className="space-y-2">
                   <Label>Image *</Label>
                   <ImageUploadField
@@ -1538,33 +1619,63 @@ function BannersSectionEditor({
                     )}
                   </div>
                 </div>
-                <ColorPicker
-                  label="CTA Text Color"
-                  colorKey="cta_text_color"
-                  defaultValue="#FFFFFF"
-                  description="Color for this banner's CTA button text"
-                  section={banner}
-                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
-                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
-                />
-                <ColorPicker
-                  label="CTA Button Color"
-                  colorKey="cta_button_color"
-                  defaultValue="#4CAF50"
-                  description="Background color for this banner's CTA button"
-                  section={banner}
-                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
-                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
-                />
-                <ColorPicker
-                  label="Background Color"
-                  colorKey="background_color"
-                  defaultValue="#F3F4F6"
-                  description="Background color for this banner"
-                  section={banner}
-                  onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
-                  onColorReset={(key) => handleBannerColorReset(banner.id, key)}
-                />
+                <Accordion type="multiple" className="w-full">
+                  <AccordionItem value="banner-styling" className="border-b-0">
+                    <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline text-muted-foreground">
+                      Banner Styling
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-4 pb-4">
+                      <p className="text-xs text-muted-foreground">
+                        Override colors for this banner. Leave unchanged to use theme defaults.
+                      </p>
+                      <ColorPicker
+                        label="Title Color"
+                        colorKey="title_color"
+                        defaultValue="#000000"
+                        description="Color for this banner's title"
+                        section={banner}
+                        onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                        onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                      />
+                      <ColorPicker
+                        label="Subtitle Color"
+                        colorKey="subtitle_color"
+                        defaultValue="#666666"
+                        description="Color for this banner's subtitle"
+                        section={banner}
+                        onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                        onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                      />
+                      <ColorPicker
+                        label="CTA Text Color"
+                        colorKey="cta_text_color"
+                        defaultValue="#FFFFFF"
+                        description="Color for this banner's CTA button text"
+                        section={banner}
+                        onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                        onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                      />
+                      <ColorPicker
+                        label="CTA Button Color"
+                        colorKey="cta_button_color"
+                        defaultValue="#4CAF50"
+                        description="Background color for this banner's CTA button"
+                        section={banner}
+                        onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                        onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                      />
+                      <ColorPicker
+                        label="Background Color"
+                        colorKey="background_color"
+                        defaultValue="#F3F4F6"
+                        description="Background color for this banner"
+                        section={banner}
+                        onColorChange={(key, value) => handleBannerColorChange(banner.id, key, value)}
+                        onColorReset={(key) => handleBannerColorReset(banner.id, key)}
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
                 <Button
                   type="button"
                   variant="destructive"
@@ -1806,215 +1917,227 @@ function SalesTabSectionEditor({
                 placeholder="Optional subtitle"
               />
             </div>
-            <ColorPicker
-              label="Title Color"
-              colorKey="title_color"
-              defaultValue="#000000"
-              description="Color for the section title"
-              section={section}
-              onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
-              onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
-            />
-            <ColorPicker
-              label="Subtitle Color"
-              colorKey="subtitle_color"
-              defaultValue="#666666"
-              description="Color for the section subtitle"
-              section={section}
-              onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
-              onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
-            />
-            <div className="space-y-2">
-              <Label>Product Limit</Label>
-              <Input
-                type="number"
-                value={section.limit || 8}
-                onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
-                min={1}
-                max={20}
-              />
-              <p className="text-xs text-muted-foreground">Number of products to show per sale</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Features */}
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold">Features</h3>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_countdown"
-                checked={section.show_countdown !== false}
-                onCheckedChange={(checked) => onUpdate({ show_countdown: !!checked })}
-              />
-              <Label htmlFor="show_countdown" className="font-normal cursor-pointer">
-                Show countdown timer
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_badge"
-                checked={section.show_badge !== false}
-                onCheckedChange={(checked) => onUpdate({ show_badge: !!checked })}
-              />
-              <Label htmlFor="show_badge" className="font-normal cursor-pointer">
-                Show sale badges on products
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_sale_name"
-                checked={section.show_sale_name !== false}
-                onCheckedChange={(checked) => onUpdate({ show_sale_name: !!checked })}
-              />
-              <Label htmlFor="show_sale_name" className="font-normal cursor-pointer">
-                Show sale name
-              </Label>
-            </div>
-            {section.show_badge && (
-              <div className="grid grid-cols-2 gap-4 pl-6">
-                <div className="space-y-2">
-                  <Label htmlFor="badge_text">Badge Text (Override)</Label>
-                  <Input
-                    id="badge_text"
-                    value={section.badge_text || ''}
-                    onChange={(e) => onUpdate({ badge_text: e.target.value })}
-                    placeholder="Leave empty to use sale badge"
-                    maxLength={50}
+            <Accordion type="multiple" className="w-full">
+              <AccordionItem value="advanced-styling" className="border-b-0">
+                <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+                  Advanced Styling
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pb-4">
+                  <p className="text-xs text-muted-foreground">
+                    Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+                  </p>
+                  <ColorPicker
+                    label="Title Color"
+                    colorKey="title_color"
+                    defaultValue="#000000"
+                    description="Color for the section title"
+                    section={section}
+                    onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
+                    onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="badge_color">Badge Color (Override)</Label>
-                  <div className="flex gap-2">
+                  <ColorPicker
+                    label="Subtitle Color"
+                    colorKey="subtitle_color"
+                    defaultValue="#666666"
+                    description="Color for the section subtitle"
+                    section={section}
+                    onColorChange={(colorKey, value) => onUpdate({ [colorKey]: value })}
+                    onColorReset={(colorKey) => onUpdate({ [colorKey]: undefined })}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+                  <div className="space-y-2">
+                    <Label>Product Limit</Label>
                     <Input
-                      id="badge_color"
-                      type="color"
-                      value={section.badge_color || '#EF4444'}
-                      onChange={(e) => onUpdate({ badge_color: e.target.value })}
-                      className="w-20 h-10"
+                      type="number"
+                      value={section.limit || 8}
+                      onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
+                      min={1}
+                      max={20}
                     />
-                    <Input
-                      value={section.badge_color || '#EF4444'}
-                      onChange={(e) => onUpdate({ badge_color: e.target.value })}
-                      placeholder="#EF4444"
-                      pattern="^#[0-9A-Fa-f]{6}$"
-                    />
+                    <p className="text-xs text-muted-foreground">Number of products to show per sale</p>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Styling */}
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold">Styling</h3>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="sales-hide-banner"
-              checked={bannerStyle === 'none'}
-              onCheckedChange={(checked) =>
-                onUpdate({ banner_style: checked ? 'none' : 'contained' })
-              }
-            />
-            <label
-              htmlFor="sales-hide-banner"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Hide sales banner
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            When enabled, the large sales banner image above the products is hidden on the homepage.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            {bannerStyle !== 'none' && (
-              <div className="space-y-2">
-                <Label>Banner Style</Label>
-                <Select
-                  value={bannerStyle}
-                  onValueChange={(value: 'full_width' | 'contained') =>
-                    onUpdate({ banner_style: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full_width">Full Width</SelectItem>
-                    <SelectItem value="contained">Contained</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Features */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold">Features</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_countdown"
+                      checked={section.show_countdown !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_countdown: !!checked })}
+                    />
+                    <Label htmlFor="show_countdown" className="font-normal cursor-pointer">
+                      Show countdown timer
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_badge"
+                      checked={section.show_badge !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_badge: !!checked })}
+                    />
+                    <Label htmlFor="show_badge" className="font-normal cursor-pointer">
+                      Show sale badges on products
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_sale_name"
+                      checked={section.show_sale_name !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_sale_name: !!checked })}
+                    />
+                    <Label htmlFor="show_sale_name" className="font-normal cursor-pointer">
+                      Show sale name
+                    </Label>
+                  </div>
+                  {section.show_badge && (
+                    <div className="grid grid-cols-2 gap-4 pl-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="badge_text">Badge Text (Override)</Label>
+                        <Input
+                          id="badge_text"
+                          value={section.badge_text || ''}
+                          onChange={(e) => onUpdate({ badge_text: e.target.value })}
+                          placeholder="Leave empty to use sale badge"
+                          maxLength={50}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="badge_color">Badge Color (Override)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="badge_color"
+                            type="color"
+                            value={section.badge_color || '#EF4444'}
+                            onChange={(e) => onUpdate({ badge_color: e.target.value })}
+                            className="w-20 h-10"
+                          />
+                          <Input
+                            value={section.badge_color || '#EF4444'}
+                            onChange={(e) => onUpdate({ badge_color: e.target.value })}
+                            placeholder="#EF4444"
+                            pattern="^#[0-9A-Fa-f]{6}$"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label>Product Card Style</Label>
-              <Select
-                value={productCardStyle}
-                onValueChange={(value: 'default' | 'compact' | 'detailed') =>
-                  onUpdate({ product_card_style: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="compact">Compact</SelectItem>
-                  <SelectItem value="detailed">Detailed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
 
-        {/* CTA */}
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold">Call-to-Action</h3>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>CTA Text</Label>
-                <Input
-                  value={section.cta_text || ''}
-                  onChange={(e) => onUpdate({ cta_text: e.target.value })}
-                  placeholder="Shop More"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>CTA Link</Label>
-                <Input
-                  value={section.cta_link || ''}
-                  onChange={(e) => onUpdate({ cta_link: e.target.value })}
-                  placeholder={displayMode === 'single_sale' ? '/sales/[slug]' : '/sales'}
-                />
+              {/* Styling */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold">Styling</h3>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="sales-hide-banner"
+                    checked={bannerStyle === 'none'}
+                    onCheckedChange={(checked) =>
+                      onUpdate({ banner_style: checked ? 'none' : 'contained' })
+                    }
+                  />
+                  <label
+                    htmlFor="sales-hide-banner"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Hide sales banner
+                  </label>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {displayMode === 'single_sale' && 'Auto-filled based on selected sale'}
-                  {displayMode === 'all_active' && 'Defaults to /sales'}
+                  When enabled, the large sales banner image above the products is hidden on the homepage.
                 </p>
+                <div className="grid grid-cols-2 gap-4">
+                  {bannerStyle !== 'none' && (
+                    <div className="space-y-2">
+                      <Label>Banner Style</Label>
+                      <Select
+                        value={bannerStyle}
+                        onValueChange={(value: 'full_width' | 'contained') =>
+                          onUpdate({ banner_style: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full_width">Full Width</SelectItem>
+                          <SelectItem value="contained">Contained</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label>Product Card Style</Label>
+                    <Select
+                      value={productCardStyle}
+                      onValueChange={(value: 'default' | 'compact' | 'detailed') =>
+                        onUpdate({ product_card_style: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="compact">Compact</SelectItem>
+                        <SelectItem value="detailed">Detailed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>CTA Position</Label>
-              <Select
-                value={ctaPosition}
-                onValueChange={(value: 'top_right' | 'bottom_center' | 'none') =>
-                  onUpdate({ cta_position: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="top_right">Top Right</SelectItem>
-                  <SelectItem value="bottom_center">Bottom Center</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
+
+              {/* CTA */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold">Call-to-Action</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>CTA Text</Label>
+                      <Input
+                        value={section.cta_text || ''}
+                        onChange={(e) => onUpdate({ cta_text: e.target.value })}
+                        placeholder="Shop More"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>CTA Link</Label>
+                      <Input
+                        value={section.cta_link || ''}
+                        onChange={(e) => onUpdate({ cta_link: e.target.value })}
+                        placeholder={displayMode === 'single_sale' ? '/sales/[slug]' : '/sales'}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {displayMode === 'single_sale' && 'Auto-filled based on selected sale'}
+                        {displayMode === 'all_active' && 'Defaults to /sales'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CTA Position</Label>
+                    <Select
+                      value={ctaPosition}
+                      onValueChange={(value: 'top_right' | 'bottom_center' | 'none') =>
+                        onUpdate({ cta_position: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="top_right">Top Right</SelectItem>
+                        <SelectItem value="bottom_center">Bottom Center</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
       </CardContent>
     </Card>
   );
@@ -3079,15 +3202,6 @@ function CTASectionEditor({
             placeholder="We Make Your Daily Life More Easy"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the CTA section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
         <div className="space-y-2">
           <Label>Subtitle</Label>
           <Input
@@ -3096,15 +3210,6 @@ function CTASectionEditor({
             placeholder="Fresh, Affordable, and Delivered to Your Door!"
           />
         </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the CTA section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>CTA Text *</Label>
@@ -3168,25 +3273,6 @@ function CTASectionEditor({
             )}
           </div>
         </div>
-        <ColorPicker
-          label="CTA Text Color"
-          colorKey="cta_text_color"
-          defaultValue="#FFFFFF"
-          description="Color for the CTA button text"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <ColorPicker
-          label="CTA Button Color"
-          colorKey="cta_button_color"
-          defaultValue="#4CAF50"
-          description="Background color for the CTA button"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        
         {/* Background Style Selection */}
         <div className="space-y-3 border-t pt-4">
           <div className="space-y-2">
@@ -3236,15 +3322,63 @@ function CTASectionEditor({
             </div>
           )}
         </div>
-        <ColorPicker
-          label="Text Color"
-          colorKey="text_color"
-          defaultValue="#FFFFFF"
-          description="General text color for the CTA section (fallback)"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the CTA section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the CTA section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="CTA Text Color"
+                colorKey="cta_text_color"
+                defaultValue="#FFFFFF"
+                description="Color for the CTA button text"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="CTA Button Color"
+                colorKey="cta_button_color"
+                defaultValue="#4CAF50"
+                description="Background color for the CTA button"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <ColorPicker
+                label="Text Color"
+                colorKey="text_color"
+                defaultValue="#FFFFFF"
+                description="General text color for the CTA section (fallback)"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -3299,112 +3433,124 @@ function ProductTabsSectionEditor({
             placeholder="Weekly Best Selling Organic Items"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Columns</Label>
-          <Select
-            value={String(section.columns || 4)}
-            onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Columns</SelectItem>
-              <SelectItem value="3">3 Columns</SelectItem>
-              <SelectItem value="4">4 Columns</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Limit</Label>
-          <Input
-            type="number"
-            value={section.limit || 8}
-            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
-            min={1}
-            max={20}
-          />
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label>Tabs</Label>
-            <Button type="button" variant="outline" size="sm" onClick={addTab}>
-              <PlusIcon className="mr-2 h-4 w-4" />
-              Add Tab
-            </Button>
-          </div>
-          {section.tabs.map((tab: any, index: any) => (
-            <Card key={tab.id}>
-              <CardHeader>
-                <CardTitle className="text-sm">Tab {index + 1}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label>Label *</Label>
-                  <Input
-                    value={tab.label}
-                    onChange={(e) => updateTab(tab.id, { label: e.target.value })}
-                    placeholder="Popular"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Filter Type</Label>
-                  <Select
-                    value={tab.filter}
-                    onValueChange={(value: any) => updateTab(tab.id, { filter: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="popular">Popular</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="low_price">Low Price</SelectItem>
-                      <SelectItem value="category">Category</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {tab.filter === 'category' && (
-                  <div className="space-y-2">
-                    <Label>Category ID</Label>
-                    <Input
-                      value={tab.category_id || ''}
-                      onChange={(e) => updateTab(tab.id, { category_id: e.target.value })}
-                      placeholder="Category ID"
-                    />
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => removeTab(tab.id)}
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Columns</Label>
+                <Select
+                  value={String(section.columns || 4)}
+                  onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
                 >
-                  <TrashIcon className="mr-2 h-4 w-4" />
-                  Remove Tab
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the product tabs section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 Columns</SelectItem>
+                    <SelectItem value="3">3 Columns</SelectItem>
+                    <SelectItem value="4">4 Columns</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Limit</Label>
+                <Input
+                  type="number"
+                  value={section.limit || 8}
+                  onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 8 })}
+                  min={1}
+                  max={20}
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Tabs</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addTab}>
+                    <PlusIcon className="mr-2 h-4 w-4" />
+                    Add Tab
+                  </Button>
+                </div>
+                {section.tabs.map((tab: any, index: any) => (
+                  <Card key={tab.id}>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Tab {index + 1}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Label *</Label>
+                        <Input
+                          value={tab.label}
+                          onChange={(e) => updateTab(tab.id, { label: e.target.value })}
+                          placeholder="Popular"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Filter Type</Label>
+                        <Select
+                          value={tab.filter}
+                          onValueChange={(value: any) => updateTab(tab.id, { filter: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="popular">Popular</SelectItem>
+                            <SelectItem value="new">New</SelectItem>
+                            <SelectItem value="low_price">Low Price</SelectItem>
+                            <SelectItem value="category">Category</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {tab.filter === 'category' && (
+                        <div className="space-y-2">
+                          <Label>Category ID</Label>
+                          <Input
+                            value={tab.category_id || ''}
+                            onChange={(e) => updateTab(tab.id, { category_id: e.target.value })}
+                            placeholder="Category ID"
+                          />
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeTab(tab.id)}
+                      >
+                        <TrashIcon className="mr-2 h-4 w-4" />
+                        Remove Tab
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the product tabs section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -3529,35 +3675,47 @@ function FormSectionEditor({
           </Select>
         </div>
 
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the form section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the form section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
 
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
 
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -3615,218 +3773,230 @@ function BlogsSectionEditor({
             placeholder="Latest Blog Posts"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Stay updated with our latest news"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Layout</Label>
-          <Select
-            value={section.layout || 'grid'}
-            onValueChange={(value: 'grid' | 'list' | 'carousel') =>
-              onUpdate({ layout: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="grid">Grid</SelectItem>
-              <SelectItem value="list">List</SelectItem>
-              <SelectItem value="carousel">Carousel</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {section.layout === 'grid' && (
-          <div className="space-y-2">
-            <Label>Columns</Label>
-            <Select
-              value={String(section.columns || 3)}
-              onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2">2 Columns</SelectItem>
-                <SelectItem value="3">3 Columns</SelectItem>
-                <SelectItem value="4">4 Columns</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="space-y-2">
-          <Label>Number of Posts</Label>
-          <Input
-            type="number"
-            value={section.limit || 6}
-            onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 6 })}
-            min={1}
-            max={20}
-          />
-          <p className="text-xs text-muted-foreground">
-            Number of blog posts to display
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Category (Optional)</Label>
-          <Select
-            value={section.category_id || '__all__'}
-            onValueChange={(value) => onUpdate({ category_id: value === '__all__' ? undefined : value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All Categories</SelectItem>
-              {categories.map((cat: any) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Filter posts by category
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Sort By</Label>
-          <Select
-            value={section.order_by || 'created_at'}
-            onValueChange={(value: 'created_at' | 'updated_at' | 'title') =>
-              onUpdate({ order_by: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_at">Date Created</SelectItem>
-              <SelectItem value="updated_at">Last Updated</SelectItem>
-              <SelectItem value="title">Title</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Sort Direction</Label>
-          <Select
-            value={section.order_direction || 'desc'}
-            onValueChange={(value: 'asc' | 'desc') =>
-              onUpdate({ order_direction: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="desc">Newest First</SelectItem>
-              <SelectItem value="asc">Oldest First</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold">Display Options</h3>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_excerpt"
-                checked={section.show_excerpt !== false}
-                onCheckedChange={(checked) => onUpdate({ show_excerpt: !!checked })}
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
               />
-              <Label htmlFor="show_excerpt" className="font-normal cursor-pointer">
-                Show excerpt
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_date"
-                checked={section.show_date !== false}
-                onCheckedChange={(checked) => onUpdate({ show_date: !!checked })}
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Stay updated with our latest news"
+                />
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
               />
-              <Label htmlFor="show_date" className="font-normal cursor-pointer">
-                Show publication date
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_author"
-                checked={section.show_author === true}
-                onCheckedChange={(checked) => onUpdate({ show_author: !!checked })}
+              <div className="space-y-2">
+                <Label>Layout</Label>
+                <Select
+                  value={section.layout || 'grid'}
+                  onValueChange={(value: 'grid' | 'list' | 'carousel') =>
+                    onUpdate({ layout: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grid">Grid</SelectItem>
+                    <SelectItem value="list">List</SelectItem>
+                    <SelectItem value="carousel">Carousel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {section.layout === 'grid' && (
+                <div className="space-y-2">
+                  <Label>Columns</Label>
+                  <Select
+                    value={String(section.columns || 3)}
+                    onValueChange={(value) => onUpdate({ columns: Number(value) as 2 | 3 | 4 })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 Columns</SelectItem>
+                      <SelectItem value="3">3 Columns</SelectItem>
+                      <SelectItem value="4">4 Columns</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Number of Posts</Label>
+                <Input
+                  type="number"
+                  value={section.limit || 6}
+                  onChange={(e) => onUpdate({ limit: parseInt(e.target.value) || 6 })}
+                  min={1}
+                  max={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of blog posts to display
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Category (Optional)</Label>
+                <Select
+                  value={section.category_id || '__all__'}
+                  onValueChange={(value) => onUpdate({ category_id: value === '__all__' ? undefined : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Categories</SelectItem>
+                    {categories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Filter posts by category
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Sort By</Label>
+                <Select
+                  value={section.order_by || 'created_at'}
+                  onValueChange={(value: 'created_at' | 'updated_at' | 'title') =>
+                    onUpdate({ order_by: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Date Created</SelectItem>
+                    <SelectItem value="updated_at">Last Updated</SelectItem>
+                    <SelectItem value="title">Title</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Sort Direction</Label>
+                <Select
+                  value={section.order_direction || 'desc'}
+                  onValueChange={(value: 'asc' | 'desc') =>
+                    onUpdate({ order_direction: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Newest First</SelectItem>
+                    <SelectItem value="asc">Oldest First</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-semibold">Display Options</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_excerpt"
+                      checked={section.show_excerpt !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_excerpt: !!checked })}
+                    />
+                    <Label htmlFor="show_excerpt" className="font-normal cursor-pointer">
+                      Show excerpt
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_date"
+                      checked={section.show_date !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_date: !!checked })}
+                    />
+                    <Label htmlFor="show_date" className="font-normal cursor-pointer">
+                      Show publication date
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_author"
+                      checked={section.show_author === true}
+                      onCheckedChange={(checked) => onUpdate({ show_author: !!checked })}
+                    />
+                    <Label htmlFor="show_author" className="font-normal cursor-pointer">
+                      Show author
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_category"
+                      checked={section.show_category !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_category: !!checked })}
+                    />
+                    <Label htmlFor="show_category" className="font-normal cursor-pointer">
+                      Show category badge
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="show_read_more"
+                      checked={section.show_read_more !== false}
+                      onCheckedChange={(checked) => onUpdate({ show_read_more: !!checked })}
+                    />
+                    <Label htmlFor="show_read_more" className="font-normal cursor-pointer">
+                      Show &quot;Read More&quot; link
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 border-t pt-4">
+                <Label>CTA Button Text</Label>
+                <Input
+                  value={section.cta_text || ''}
+                  onChange={(e) => onUpdate({ cta_text: e.target.value })}
+                  placeholder="View All Blogs"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CTA Button Link</Label>
+                <Input
+                  value={section.cta_link || ''}
+                  onChange={(e) => onUpdate({ cta_link: e.target.value })}
+                  placeholder="/blog"
+                />
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the blogs section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
               />
-              <Label htmlFor="show_author" className="font-normal cursor-pointer">
-                Show author
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_category"
-                checked={section.show_category !== false}
-                onCheckedChange={(checked) => onUpdate({ show_category: !!checked })}
-              />
-              <Label htmlFor="show_category" className="font-normal cursor-pointer">
-                Show category badge
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show_read_more"
-                checked={section.show_read_more !== false}
-                onCheckedChange={(checked) => onUpdate({ show_read_more: !!checked })}
-              />
-              <Label htmlFor="show_read_more" className="font-normal cursor-pointer">
-                Show &quot;Read More&quot; link
-              </Label>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-2 border-t pt-4">
-          <Label>CTA Button Text</Label>
-          <Input
-            value={section.cta_text || ''}
-            onChange={(e) => onUpdate({ cta_text: e.target.value })}
-            placeholder="View All Blogs"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>CTA Button Link</Label>
-          <Input
-            value={section.cta_link || ''}
-            onChange={(e) => onUpdate({ cta_link: e.target.value })}
-            placeholder="/blog"
-          />
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the blogs section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
@@ -3864,144 +4034,156 @@ function LocationSectionEditor({
             placeholder="Find Us"
           />
         </div>
-        <ColorPicker
-          label="Title Color"
-          colorKey="title_color"
-          defaultValue="#000000"
-          description="Color for the section title"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Subtitle</Label>
-          <Input
-            value={section.subtitle || ''}
-            onChange={(e) => onUpdate({ subtitle: e.target.value })}
-            placeholder="Visit our store location"
-          />
-        </div>
-        <ColorPicker
-          label="Subtitle Color"
-          colorKey="subtitle_color"
-          defaultValue="#666666"
-          description="Color for the section subtitle"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
-        <div className="space-y-2">
-          <Label>Address *</Label>
-          <Textarea
-            value={section.address || ''}
-            onChange={(e) => onUpdate({ address: e.target.value })}
-            placeholder="123 Main Street, City, State, ZIP Code"
-            rows={3}
-          />
-          <p className="text-xs text-muted-foreground">
-            Enter the full address. The map will be generated automatically.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Latitude (Optional)</Label>
-            <Input
-              type="number"
-              step="any"
-              value={section.latitude || ''}
-              onChange={(e) => onUpdate({ latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
-              placeholder="40.7128"
-            />
-            <p className="text-xs text-muted-foreground">
-              For precise location pinning
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label>Longitude (Optional)</Label>
-            <Input
-              type="number"
-              step="any"
-              value={section.longitude || ''}
-              onChange={(e) => onUpdate({ longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
-              placeholder="-74.0060"
-            />
-            <p className="text-xs text-muted-foreground">
-              For precise location pinning
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Map Type</Label>
-          <Select
-            value={section.map_type || 'roadmap'}
-            onValueChange={(value: 'roadmap' | 'satellite' | 'hybrid' | 'terrain') =>
-              onUpdate({ map_type: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="roadmap">Roadmap</SelectItem>
-              <SelectItem value="satellite">Satellite</SelectItem>
-              <SelectItem value="hybrid">Hybrid</SelectItem>
-              <SelectItem value="terrain">Terrain</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Zoom Level ({section.zoom || 15})</Label>
-          <input
-            type="range"
-            min="1"
-            max="20"
-            value={section.zoom || 15}
-            onChange={(e) => onUpdate({ zoom: parseInt(e.target.value) })}
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">
-            Adjust the zoom level (1 = world view, 20 = street level)
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label>Map Height (px)</Label>
-          <Input
-            type="number"
-            value={section.height || 400}
-            onChange={(e) => onUpdate({ height: parseInt(e.target.value) || 400 })}
-            min="200"
-            max="800"
-          />
-        </div>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="full-width"
-            checked={section.full_width || false}
-            onCheckedChange={(checked) => onUpdate({ full_width: checked as boolean })}
-          />
-          <Label htmlFor="full-width" className="cursor-pointer">
-            Full Width Map
-          </Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="show-info-window"
-            checked={section.show_info_window || false}
-            onCheckedChange={(checked) => onUpdate({ show_info_window: checked as boolean })}
-          />
-          <Label htmlFor="show-info-window" className="cursor-pointer">
-            Show &quot;Open in Google Maps&quot; Link
-          </Label>
-        </div>
-        <ColorPicker
-          label="Background Color"
-          colorKey="background_color"
-          defaultValue="#FFFFFF"
-          description="Background color for the location section"
-          section={section}
-          onColorChange={handleColorChange}
-          onColorReset={handleColorReset}
-        />
+        <Accordion type="multiple" className="w-full">
+          <AccordionItem value="advanced-styling" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline text-muted-foreground">
+              Advanced Styling
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Override the default theme colors. Leave unchanged to use your theme&apos;s palette.
+              </p>
+              <ColorPicker
+                label="Title Color"
+                colorKey="title_color"
+                defaultValue="#000000"
+                description="Color for the section title"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Subtitle</Label>
+                <Input
+                  value={section.subtitle || ''}
+                  onChange={(e) => onUpdate({ subtitle: e.target.value })}
+                  placeholder="Visit our store location"
+                />
+              </div>
+              <ColorPicker
+                label="Subtitle Color"
+                colorKey="subtitle_color"
+                defaultValue="#666666"
+                description="Color for the section subtitle"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+              <div className="space-y-2">
+                <Label>Address *</Label>
+                <Textarea
+                  value={section.address || ''}
+                  onChange={(e) => onUpdate({ address: e.target.value })}
+                  placeholder="123 Main Street, City, State, ZIP Code"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the full address. The map will be generated automatically.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Latitude (Optional)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={section.latitude || ''}
+                    onChange={(e) => onUpdate({ latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="40.7128"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    For precise location pinning
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Longitude (Optional)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={section.longitude || ''}
+                    onChange={(e) => onUpdate({ longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="-74.0060"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    For precise location pinning
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Map Type</Label>
+                <Select
+                  value={section.map_type || 'roadmap'}
+                  onValueChange={(value: 'roadmap' | 'satellite' | 'hybrid' | 'terrain') =>
+                    onUpdate({ map_type: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="roadmap">Roadmap</SelectItem>
+                    <SelectItem value="satellite">Satellite</SelectItem>
+                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                    <SelectItem value="terrain">Terrain</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Zoom Level ({section.zoom || 15})</Label>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={section.zoom || 15}
+                  onChange={(e) => onUpdate({ zoom: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Adjust the zoom level (1 = world view, 20 = street level)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Map Height (px)</Label>
+                <Input
+                  type="number"
+                  value={section.height || 400}
+                  onChange={(e) => onUpdate({ height: parseInt(e.target.value) || 400 })}
+                  min="200"
+                  max="800"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="full-width"
+                  checked={section.full_width || false}
+                  onCheckedChange={(checked) => onUpdate({ full_width: checked as boolean })}
+                />
+                <Label htmlFor="full-width" className="cursor-pointer">
+                  Full Width Map
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show-info-window"
+                  checked={section.show_info_window || false}
+                  onCheckedChange={(checked) => onUpdate({ show_info_window: checked as boolean })}
+                />
+                <Label htmlFor="show-info-window" className="cursor-pointer">
+                  Show &quot;Open in Google Maps&quot; Link
+                </Label>
+              </div>
+              <ColorPicker
+                label="Background Color"
+                colorKey="background_color"
+                defaultValue="#FFFFFF"
+                description="Background color for the location section"
+                section={section}
+                onColorChange={handleColorChange}
+                onColorReset={handleColorReset}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );

@@ -17,6 +17,8 @@ const updateTenantSchema = z.object({
   status: z.enum(['active', 'suspended', 'expired']).optional(),
   plan_id: z.string().uuid().nullable().optional(),
   expire_date: z.string().nullable().optional(),
+  country: z.string().max(2).nullable().optional(),
+  contact_email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
 });
 
 interface RouteParams {
@@ -157,6 +159,14 @@ export async function PUT(
       updateData.expire_date = validatedData.expire_date 
         ? new Date(validatedData.expire_date) 
         : null;
+    }
+    
+    if (validatedData.country !== undefined) {
+      updateData.country = validatedData.country || null;
+    }
+    
+    if (validatedData.contact_email !== undefined) {
+      updateData.contact_email = validatedData.contact_email === '' ? null : validatedData.contact_email;
     }
 
     // Update tenant

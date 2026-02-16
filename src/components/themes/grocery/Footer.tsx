@@ -10,7 +10,8 @@ import Link from 'next/link';
 import { usePreview } from '@/lib/themes/preview-context';
 
 export default function GroceryFooter() {
-  const { isPreview, onNavigate } = usePreview();
+  const { isPreview, onNavigate, previewBrandName } = usePreview();
+  const storeName = previewBrandName ? `${previewBrandName} Store` : 'Grocery Store';
 
   const handleLinkClick = (url: string, e: React.MouseEvent) => {
     if (isPreview && onNavigate) {
@@ -25,9 +26,11 @@ export default function GroceryFooter() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <h3 className="text-white font-bold text-lg mb-4">Grocery Store</h3>
+            <h3 className="text-white font-bold text-lg mb-4">{storeName}</h3>
             <p className="text-sm leading-relaxed">
-              Fresh, organic, and high-quality groceries delivered to your door. Enjoy the best local produce, everyday essentials, and specialty items with ease!
+              {previewBrandName 
+                ? 'Discover the latest fashion trends, quality apparel, and stylish accessories. Your one-stop shop for modern, affordable fashion.'
+                : 'Fresh, organic, and high-quality groceries delivered to your door. Enjoy the best local produce, everyday essentials, and specialty items with ease!'}
             </p>
           </div>
 

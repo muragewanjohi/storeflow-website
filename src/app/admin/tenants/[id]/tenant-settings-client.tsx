@@ -13,13 +13,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 // Note: Alert component may need to be created if it doesn't exist
 // For now, using inline divs for alerts
 import { 
   CheckCircleIcon, 
   XCircleIcon, 
-  ExclamationTriangleIcon,
   TrashIcon,
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
@@ -35,6 +35,8 @@ interface Tenant {
   expire_date: Date | null;
   plan_id: string | null;
   data: any;
+  country: string | null;
+  contact_email: string | null;
   price_plans: {
     id: string;
     name: string;
@@ -42,6 +44,24 @@ interface Tenant {
     duration_months: number;
   } | null;
 }
+
+interface Country {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+// Fallback when no countries in DB (e.g. Kenya, US for pricing)
+const FALLBACK_COUNTRIES: Country[] = [
+  { id: 'KE', name: 'Kenya', code: 'KE' },
+  { id: 'US', name: 'United States', code: 'US' },
+  { id: 'GB', name: 'United Kingdom', code: 'GB' },
+  { id: 'CA', name: 'Canada', code: 'CA' },
+  { id: 'NG', name: 'Nigeria', code: 'NG' },
+  { id: 'ZA', name: 'South Africa', code: 'ZA' },
+  { id: 'TZ', name: 'Tanzania', code: 'TZ' },
+  { id: 'UG', name: 'Uganda', code: 'UG' },
+];
 
 interface PricePlan {
   id: string;
@@ -54,9 +74,11 @@ interface PricePlan {
 interface TenantSettingsClientProps {
   tenant: Tenant;
   pricePlans: PricePlan[];
+  countries: Country[];
 }
 
-export default function TenantSettingsClient({ tenant, pricePlans }: TenantSettingsClientProps) {
+export default function TenantSettingsClient({ tenant, pricePlans, countries }: TenantSettingsClientProps) {
+  const countryOptions = countries.length > 0 ? countries : FALLBACK_COUNTRIES;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +93,8 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
   const [expireDate, setExpireDate] = useState(
     tenant.expire_date ? new Date(tenant.expire_date).toISOString().split('T')[0] : ''
   );
+  const [country, setCountry] = useState(tenant.country || '');
+  const [contactEmail, setContactEmail] = useState(tenant.contact_email || '');
 
   // Subdomain change state
   const [newSubdomain, setNewSubdomain] = useState('');
@@ -109,6 +133,8 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
           status,
           plan_id: planId || null,
           expire_date: expireDate || null,
+          country: country || null,
+          contact_email: contactEmail || null,
         }),
       });
 
@@ -344,6 +370,13 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
         </div>
       )}
 
+      <Tabs defaultValue="store-details" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="store-details">Store Details</TabsTrigger>
+          <TabsTrigger value="tenant-details">Tenant Details</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="store-details" className="space-y-6">
       {/* Basic Information */}
       <Card>
         <CardHeader>
@@ -780,6 +813,59 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="tenant-details" className="space-y-6">
+      {/* Tenant Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenant Details</CardTitle>
+          <CardDescription>Manage tenant contact and location information</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Select value={country || 'none'} onValueChange={(value) => setCountry(value === 'none' ? '' : value)}>
+                <SelectTrigger id="country">
+                  <SelectValue placeholder="Select a country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No country selected</SelectItem>
+                  {countryOptions.filter((c) => c.code).map((c) => (
+                    <SelectItem key={c.id} value={c.code!}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Country affects pricing and payment options (e.g. Kenya for M-Pesa, KES)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact_email">Contact Email</Label>
+              <Input
+                id="contact_email"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="contact@example.com"
+              />
+              <p className="text-sm text-muted-foreground">
+                Primary contact email for this tenant
+              </p>
+            </div>
+
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

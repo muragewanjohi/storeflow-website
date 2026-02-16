@@ -157,14 +157,18 @@ export default function ThemePreviewClient({
   
   // Fetch demo content with timeout and error handling
   // Increased timeout to account for API compilation on first request
+  // For multipurpose (grocery) theme preview, use fashion industry to show clothes
+  const demoIndustryOverride = theme.slug === 'grocery' ? 'fashion' : undefined;
+  
   const { data: demoContent, isLoading: isLoadingDemo, error: demoError } = useQuery({
-    queryKey: ['theme-demo-content', theme.id],
+    queryKey: ['theme-demo-content', theme.id, demoIndustryOverride],
     queryFn: async () => {
       try {
-        // Use a longer timeout to account for Next.js API route compilation on first request
-        const response = await fetch(`/api/themes/${theme.id}/demo-content`, {
+        const url = demoIndustryOverride
+          ? `/api/themes/${theme.id}/demo-content?industry=${demoIndustryOverride}`
+          : `/api/themes/${theme.id}/demo-content`;
+        const response = await fetch(url, {
           cache: 'no-store', // Always fetch fresh in preview
-          // Don't use AbortController here - let React Query handle timeouts
         });
         
         if (!response.ok) {
@@ -247,7 +251,7 @@ export default function ThemePreviewClient({
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="font-semibold">Preview: {theme.title}</h1>
+              <h1 className="font-semibold">Preview: {theme.slug === 'grocery' ? 'Multipurpose Theme' : theme.title}</h1>
               <p className="text-sm text-muted-foreground">
                 This is how your storefront will look with this theme
               </p>
@@ -291,6 +295,8 @@ export default function ThemePreviewClient({
       {/* Preview Content - Full Site with Theme Components */}
       <PreviewProvider
         isPreview={true}
+        previewBrandName={theme.slug === 'grocery' ? 'Multipurpose' : undefined}
+        previewIndustry={demoIndustryOverride}
         onNavigate={useCallback((path: string) => {
           // Handle navigation within preview
           if (path === '/') {

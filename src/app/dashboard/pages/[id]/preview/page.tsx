@@ -125,6 +125,7 @@ export default async function PagePreviewPage({
             {isPageBuilder && pageData?.sections && pageData.sections.length > 0 ? (
               <div className="space-y-0">
                 {pageData.sections
+                  .filter((s: any) => !s.hidden)
                   .sort((a: any, b: any) => a.order - b.order)
                   .map((section: any) => (
                     <SectionRenderer key={section.id} section={section} isPreview={false} />

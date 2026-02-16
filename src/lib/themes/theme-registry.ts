@@ -173,7 +173,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'grocery',
     industry: 'grocery',
     description: 'Fresh and organic grocery theme perfect for food stores, farmers markets, and organic food retailers',
-    screenshotUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/clothes_multipurpose.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',

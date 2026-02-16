@@ -12,6 +12,7 @@ export interface BaseSection {
   id: string;
   type: SectionType;
   order: number;
+  hidden?: boolean;
 }
 
 export interface HeroSection extends BaseSection {

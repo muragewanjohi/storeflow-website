@@ -335,7 +335,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                 <p className="px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Store Dashboard</p>
               </div>
               <ul role="list" className="space-y-6">
-                {orderedGroupedNavigation.map(({ groupName, items }) => {
+                {orderedGroupedNavigation.map(({ groupName, items }, index) => {
                   const isProductsGroup = groupName === 'Products';
                   const isMarketingGroup = groupName === 'Marketing';
                   const isContentGroup = groupName === 'Content';
@@ -344,7 +344,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                   const isMainGroup = groupName === 'Main';
                   
                   return (
-                    <li key={groupName}>
+                    <li key={`${groupName}-${index}`}>
                       {!isMainGroup && (
                         <button
                           type="button"
@@ -473,7 +473,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
               </div>
             )}
             <ul role="list" className="flex flex-1 flex-col gap-y-4">
-              {orderedGroupedNavigation.map(({ groupName, items }) => {
+              {orderedGroupedNavigation.map(({ groupName, items }, index) => {
                 const isProductsGroup = groupName === 'Products';
                 const isMarketingGroup = groupName === 'Marketing';
                 const isContentGroup = groupName === 'Content';
@@ -482,7 +482,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                 const isMainGroup = groupName === 'Main';
                 
                 return (
-                  <li key={groupName}>
+                  <li key={`${groupName}-${index}`}>
                     {!collapsed && !isMainGroup && (
                       <button
                         type="button"
