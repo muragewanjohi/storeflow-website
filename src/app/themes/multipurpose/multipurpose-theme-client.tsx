@@ -53,7 +53,7 @@ const BUSINESS_TYPE_DEMOS: BusinessTypeDemo[] = [
     id: 'fashion',
     businessType: 'fashion',
     title: 'Fashion',
-    image: '/images/themes/clothes.png',
+    image: '/images/themes/clothes_multipurpose.png',
     demoUrl: null,
     description: 'Apparel and accessories',
   },

@@ -6,7 +6,7 @@
  * Public page where users can register a new tenant/store
  */
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
@@ -37,6 +37,134 @@ interface PricingResponse {
   };
 }
 
+interface ProgressStep {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  status: 'pending' | 'active' | 'complete';
+}
+
+function getProgressSteps(storeName: string, hasDemoContent: boolean): ProgressStep[] {
+  const steps: ProgressStep[] = [
+    { id: 'account', label: 'Creating your account', icon: <Settings className="w-5 h-5" />, status: 'pending' },
+    { id: 'store', label: `Setting up ${storeName || 'your store'}`, icon: <Store className="w-5 h-5" />, status: 'pending' },
+    { id: 'theme', label: 'Configuring your theme', icon: <Palette className="w-5 h-5" />, status: 'pending' },
+  ];
+  if (hasDemoContent) {
+    steps.push({ id: 'demo', label: 'Adding sample products', icon: <Package className="w-5 h-5" />, status: 'pending' });
+  }
+  steps.push({ id: 'finalize', label: 'Finalizing everything', icon: <Sparkles className="w-5 h-5" />, status: 'pending' });
+  return steps;
+}
+
+function StoreCreationProgress({
+  steps,
+  storeName,
+}: Readonly<{
+  steps: ProgressStep[];
+  storeName: string;
+}>) {
+  const completedCount = steps.filter((s) => s.status === 'complete').length;
+  const progress = Math.round((completedCount / steps.length) * 100);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background px-4">
+      <div className="w-full max-w-md">
+        {/* Animated store icon */}
+        <div className="flex justify-center mb-8">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
+              <Store className="w-10 h-10 text-primary" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center">
+              <Loader2 className="w-4 h-4 text-white animate-spin" />
+            </div>
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold mb-1">Building your store</h2>
+          <p className="text-muted-foreground text-sm">
+            Setting up <span className="font-medium text-foreground">{storeName || 'your store'}</span> — this only takes a moment
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground">Progress</span>
+            <span className="text-xs font-medium text-primary">{progress}%</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div className="space-y-1">
+          {steps.map((step, i) => (
+            <div
+              key={step.id}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-500 ${
+                step.status === 'active'
+                  ? 'bg-primary/5'
+                  : step.status === 'complete'
+                    ? 'bg-transparent'
+                    : 'bg-transparent opacity-50'
+              }`}
+              style={{
+                transitionDelay: `${i * 50}ms`,
+              }}
+            >
+              {/* Status indicator */}
+              <div className="flex-shrink-0">
+                {step.status === 'complete' ? (
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <Check className="w-4 h-4 text-green-600" />
+                  </div>
+                ) : step.status === 'active' ? (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                    {step.icon}
+                  </div>
+                )}
+              </div>
+
+              {/* Label */}
+              <span
+                className={`text-sm font-medium transition-colors duration-300 ${
+                  step.status === 'complete'
+                    ? 'text-green-600'
+                    : step.status === 'active'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground'
+                }`}
+              >
+                {step.label}
+                {step.status === 'complete' && (
+                  <span className="text-xs text-green-500 ml-2">Done</span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Reassurance */}
+        <p className="text-center text-xs text-muted-foreground mt-8">
+          Please don&apos;t close this page. We&apos;re almost done.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function TenantRegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +176,10 @@ function TenantRegisterForm() {
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState<'Ksh' | '$'>('$');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
+  const progressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentStepIndexRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
@@ -326,6 +458,77 @@ function TenantRegisterForm() {
     return Object.keys(errors).length === 0;
   };
 
+  // Start the progress sequence: set the first step to active and schedule timed advancement
+  const startProgress = useCallback((steps: ProgressStep[]) => {
+    currentStepIndexRef.current = 0;
+    const updated = steps.map((s, i) => ({
+      ...s,
+      status: i === 0 ? 'active' as const : 'pending' as const,
+    }));
+    setProgressSteps(updated);
+    setShowProgress(true);
+
+    // Advance one step at a time on a timer (1.8s per step feels natural)
+    const advanceStep = (currentIndex: number, currentSteps: ProgressStep[]) => {
+      // Don't advance past the second-to-last step; final step completes on API success
+      if (currentIndex >= currentSteps.length - 2) return;
+
+      progressTimerRef.current = setTimeout(() => {
+        const nextIndex = currentIndex + 1;
+        currentStepIndexRef.current = nextIndex;
+        setProgressSteps((prev) =>
+          prev.map((s, i) => ({
+            ...s,
+            status: i < nextIndex ? 'complete' : i === nextIndex ? 'active' : 'pending',
+          })),
+        );
+        advanceStep(nextIndex, currentSteps);
+      }, 1800);
+    };
+
+    advanceStep(0, updated);
+  }, []);
+
+  // Rapidly complete all remaining steps (called on API success)
+  const completeAllSteps = useCallback(async () => {
+    if (progressTimerRef.current) {
+      clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    const totalSteps = progressSteps.length || 5;
+    for (let i = 0; i < totalSteps; i++) {
+      await new Promise((r) => setTimeout(r, 300));
+      setProgressSteps((prev) =>
+        prev.map((s, idx) => ({
+          ...s,
+          status: idx <= i ? 'complete' : idx === i + 1 ? 'active' : s.status,
+        })),
+      );
+    }
+    // Brief pause at 100% before showing success
+    await new Promise((r) => setTimeout(r, 600));
+  }, [progressSteps.length]);
+
+  // Cancel progress and return to form (called on API error)
+  const cancelProgress = useCallback(() => {
+    if (progressTimerRef.current) {
+      clearTimeout(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setShowProgress(false);
+    setProgressSteps([]);
+    currentStepIndexRef.current = 0;
+  }, []);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) {
+        clearTimeout(progressTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -344,6 +547,10 @@ function TenantRegisterForm() {
       setIsSubmitting(false);
       return;
     }
+
+    // Start the animated progress screen
+    const steps = getProgressSteps(formData.name, includeDemoContent);
+    startProgress(steps);
 
     try {
       // Detect location before submitting
@@ -379,6 +586,9 @@ function TenantRegisterForm() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Cancel progress and return to form
+        cancelProgress();
+
         // Map server errors to specific field messages; preserve user inputs (never clear fields)
         const serverFieldErrors: Record<string, string> = {};
 
@@ -405,7 +615,11 @@ function TenantRegisterForm() {
         return;
       }
 
+      // API succeeded — rapidly complete all remaining steps, then show success
+      await completeAllSteps();
+
       setSuccess(true);
+      setShowProgress(false);
       trackMetaPixelEvent('CompleteRegistration', {
         content_name: 'Store Registration',
         status: 'complete',
@@ -421,10 +635,21 @@ function TenantRegisterForm() {
         });
       }
     } catch (err) {
+      cancelProgress();
       setError('An error occurred. Please try again.');
       setIsSubmitting(false);
     }
   };
+
+  // Show animated progress screen while store is being created
+  if (showProgress && !success) {
+    return (
+      <StoreCreationProgress
+        steps={progressSteps}
+        storeName={formData.name}
+      />
+    );
+  }
 
   if (success) {
     return (

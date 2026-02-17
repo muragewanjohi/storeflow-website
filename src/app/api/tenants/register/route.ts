@@ -12,6 +12,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendEmail } from '@/lib/email/sendgrid';
 import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
+import { getCurrencyForCountry } from '@/lib/pricing/country-currency-map';
+import { setStaticOptions } from '@/lib/settings/static-options';
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { clearCachedTenant } from '@/lib/tenant-context/cache';
 import { z } from 'zod';
@@ -302,6 +304,23 @@ export async function POST(request: NextRequest) {
           user_id: userId,
         },
       });
+    }
+
+    // Initialize store currency settings based on detected country
+    try {
+      const currencyInfo = getCurrencyForCountry(countryCode);
+      await setStaticOptions(tenant.id, {
+        currency_code: currencyInfo.code,
+        currency_symbol: currencyInfo.symbol,
+        currency_symbol_position: currencyInfo.symbolPosition,
+        currency_thousand_separator: currencyInfo.thousandSeparator,
+        currency_decimal_separator: currencyInfo.decimalSeparator,
+        currency_decimal_places: String(currencyInfo.decimalPlaces),
+      });
+      console.log(`[Registration] ✅ Initialized currency settings: ${currencyInfo.code} (${currencyInfo.symbol}) for country ${countryCode}`);
+    } catch (currencyError) {
+      console.error(`[Registration] ⚠️ Failed to initialize currency settings:`, currencyError);
+      // Non-critical - store can still function with default USD
     }
 
     // Generate login URL with subdomain format
