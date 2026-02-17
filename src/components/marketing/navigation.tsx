@@ -44,17 +44,11 @@ export function Navigation() {
             <Link href="/#home" className="text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
               Home
             </Link>
-            <Link href="/#shops" className="text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Shops
-            </Link>
             <Link href="/#pricing" className="text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
               Pricing
             </Link>
             <Link href="/#themes" className="text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Templates
-            </Link>
-            <Link href="/#blog" className="text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Blog
+              Themes
             </Link>
             
             {/* Resources Dropdown */}
@@ -106,17 +100,11 @@ export function Navigation() {
             <Link href="/#home" className="block text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
               Home
             </Link>
-            <Link href="/#shops" className="block text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Shops
-            </Link>
             <Link href="/#pricing" className="block text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
               Pricing
             </Link>
             <Link href="/#themes" className="block text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Templates
-            </Link>
-            <Link href="/#blog" className="block text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors">
-              Blog
+              Themes
             </Link>
             
             {/* Resources Mobile */}
