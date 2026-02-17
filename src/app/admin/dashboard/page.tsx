@@ -18,11 +18,20 @@ export default async function AdminDashboardPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');
 
-  // Fetch tenant statistics
+  // Fetch tenant statistics (exclude demo stores)
+  const demoStoreFilter = {
+    NOT: {
+      OR: [
+        { data: { path: ['isDemo'], equals: true } },
+        { data: { path: ['is_demo'], equals: true } },
+      ],
+    },
+  };
+
   const [totalTenants, activeTenants] = await Promise.all([
-    prisma.tenants.count(),
+    prisma.tenants.count({ where: demoStoreFilter }),
     prisma.tenants.count({
-      where: { status: 'active' },
+      where: { status: 'active', ...demoStoreFilter },
     }),
   ]);
 

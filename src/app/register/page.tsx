@@ -161,12 +161,20 @@ function TenantRegisterForm() {
         }
         
         // If planId from URL exists, set it as selected
+        // Otherwise, default to the Basic plan so it's not left empty
         if (planIdFromUrl) {
           const plan = data.plans.find((p: PricingPlan) => p.id === planIdFromUrl);
           if (plan) {
             setSelectedPlan(plan);
             setSelectedPlanId(planIdFromUrl);
           }
+        } else if (data.plans.length > 0) {
+          const basicPlan = data.plans.find((p: PricingPlan) =>
+            p.name.toLowerCase().includes('basic')
+          );
+          const defaultPlan = basicPlan || data.plans[0];
+          setSelectedPlan(defaultPlan);
+          setSelectedPlanId(defaultPlan.id);
         }
       } catch (err) {
         console.error('Error fetching plans:', err);

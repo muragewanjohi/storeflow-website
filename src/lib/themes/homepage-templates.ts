@@ -190,6 +190,8 @@ function getBusinessTypeContent(businessType: string): {
   productTabsTitle: string;
   ctaTitle: string;
   ctaSubtitle: string;
+  heroBackgroundColor?: string;
+  ctaGradient?: string;
 } {
   const type = businessType?.toLowerCase() || '';
   
@@ -238,6 +240,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Weekly Best Selling Organic Items',
       ctaTitle: 'We Make Your Daily Life More Easy',
       ctaSubtitle: 'Fresh, Affordable, and Delivered to Your Door!',
+      heroBackgroundColor: '#F0FFF4',
+      ctaGradient: 'linear-gradient(to right, #4CAF50, #2E7D32)',
     };
   }
   
@@ -264,7 +268,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Personal Care Essentials',
-          image: 'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=400&fit=crop',
           cta_link: '/products?category=personal-care',
           background_color: '#fef3c7',
         },
@@ -286,6 +290,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Popular Health & Wellness Products',
       ctaTitle: 'Take Control of Your Health',
       ctaSubtitle: 'Quality Products, Expert Care, Delivered to You!',
+      heroBackgroundColor: '#E0F2F1',
+      ctaGradient: 'linear-gradient(to right, #009688, #00695C)',
     };
   }
   
@@ -334,6 +340,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Trending Fashion Collections',
       ctaTitle: 'Elevate Your Wardrobe',
       ctaSubtitle: 'Style, Quality, and Affordability Combined!',
+      heroBackgroundColor: '#F5F5F5',
+      ctaGradient: 'linear-gradient(to right, #000000, #424242)',
     };
   }
   
@@ -382,6 +390,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Best Selling Electronics',
       ctaTitle: 'Experience Innovation',
       ctaSubtitle: 'Premium Tech, Best Prices, Expert Service!',
+      heroBackgroundColor: '#EFF6FF',
+      ctaGradient: 'linear-gradient(to right, #146EB4, #232F3E)',
     };
   }
   
@@ -391,26 +401,27 @@ function getBusinessTypeContent(businessType: string): {
       hero: {
         title: 'Beauty That Radiates From Within',
         subtitle: 'Premium beauty and personal care products for your daily routine.',
-        image: 'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=1200&h=600&fit=crop',
+        image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&h=600&fit=crop',
       },
+      heroBackgroundColor: '#FDF2F8',
       banners: [
         {
           title: 'Skincare Essentials - 20% Off',
-          image: 'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=600&h=400&fit=crop',
           cta_link: '/products?category=skincare',
-          background_color: '#fce7f3',
+          background_color: '#FDF2F8',
         },
         {
-          title: 'Makeup Collection',
-          image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=400&fit=crop',
+          title: 'Makeup Must-Haves',
+          image: 'https://images.unsplash.com/photo-1583241800698-e8ab01830a07?w=600&h=400&fit=crop',
           cta_link: '/products?category=makeup',
-          background_color: '#fef3c7',
+          background_color: '#FEF3C7',
         },
         {
-          title: 'Hair Care Products',
-          image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600&h=400&fit=crop',
+          title: 'Hair Care Favourites',
+          image: 'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=600&h=400&fit=crop',
           cta_link: '/products?category=hair-care',
-          background_color: '#e0e7ff',
+          background_color: '#EDE9FE',
         },
       ],
       features: [
@@ -423,13 +434,14 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Discover Your Perfect Beauty Routine',
-        image: 'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1487412912498-0447578fcca8?w=800&h=800&fit=crop',
         cta_link: '/products?category=skincare',
-        background_color: '#fce7f3',
+        background_color: '#FDF2F8',
       },
       productTabsTitle: 'Popular Beauty Products',
       ctaTitle: 'Unleash Your Natural Beauty',
       ctaSubtitle: 'Quality Products, Expert Care, Beautiful Results!',
+      ctaGradient: 'linear-gradient(to right, #E91E63, #9C27B0)',
     };
   }
   
@@ -478,6 +490,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Best Selling Home & Kitchen Items',
       ctaTitle: 'Make Your House a Home',
       ctaSubtitle: 'Quality, Style, and Functionality Combined!',
+      heroBackgroundColor: '#FBE9E7',
+      ctaGradient: 'linear-gradient(to right, #6D4C41, #8D6E63)',
     };
   }
   
@@ -526,6 +540,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Popular Baby & Kids Products',
       ctaTitle: 'Caring for Your Family',
       ctaSubtitle: 'Safe, Quality Products for Your Little Ones!',
+      heroBackgroundColor: '#FCE4EC',
+      ctaGradient: 'linear-gradient(to right, #F48FB1, #CE93D8)',
     };
   }
   
@@ -574,6 +590,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Popular Food & Beverages',
       ctaTitle: 'Taste the Difference',
       ctaSubtitle: 'Fresh, Delicious, and Delivered to Your Door!',
+      heroBackgroundColor: '#FFF3E0',
+      ctaGradient: 'linear-gradient(to right, #E53935, #FF6F00)',
     };
   }
   
@@ -622,6 +640,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Popular Convenience Items',
       ctaTitle: 'Shop Local, Shop Convenient',
       ctaSubtitle: 'Quality Products, Great Prices, Always Open!',
+      heroBackgroundColor: '#E8EAF6',
+      ctaGradient: 'linear-gradient(to right, #1C49C2, #4CAF50)',
     };
   }
   
@@ -642,7 +662,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Bedroom Furniture',
-          image: 'https://images.unsplash.com/photo-1631889993954-48049a3e7d64?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&h=400&fit=crop',
           cta_link: '/products?category=bedroom',
           background_color: '#d1fae5',
         },
@@ -670,6 +690,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Trending Furniture Collections',
       ctaTitle: 'Create Your Dream Home',
       ctaSubtitle: 'Style, Comfort, and Quality Combined!',
+      heroBackgroundColor: '#EFEBE9',
+      ctaGradient: 'linear-gradient(to right, #5D4037, #8D6E63)',
     };
   }
   
@@ -718,6 +740,8 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Popular Pet Products',
       ctaTitle: 'Show Your Pet Some Love',
       ctaSubtitle: 'Quality Products for Your Furry Family Members!',
+      heroBackgroundColor: '#E3F2FD',
+      ctaGradient: 'linear-gradient(to right, #1C49C2, #4CAF50)',
     };
   }
   
@@ -766,32 +790,85 @@ function getBusinessTypeContent(businessType: string): {
       productTabsTitle: 'Best Selling Tools & Hardware',
       ctaTitle: 'Get the Job Done Right',
       ctaSubtitle: 'Quality Tools, Expert Service, Best Prices!',
+      heroBackgroundColor: '#FFF3E0',
+      ctaGradient: 'linear-gradient(to right, #F77000, #37474F)',
     };
   }
   
-  // Default (fallback to grocery)
+  // Shoes / Footwear
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return {
+      hero: {
+        title: 'Step Into Style',
+        subtitle: 'Premium footwear for every occasion. Comfort meets fashion.',
+        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1200&h=600&fit=crop',
+      },
+      heroBackgroundColor: '#F5F5F5',
+      banners: [
+        {
+          title: 'Sneakers Collection - 25% Off',
+          image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&h=400&fit=crop',
+          cta_link: '/products?category=sneakers',
+          background_color: '#F5F5F5',
+        },
+        {
+          title: 'Running Shoes',
+          image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=600&h=400&fit=crop',
+          cta_link: '/products?category=running-shoes',
+          background_color: '#E8EAF6',
+        },
+        {
+          title: 'Boots & Formal',
+          image: 'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=600&h=400&fit=crop',
+          cta_link: '/products?category=boots',
+          background_color: '#EFEBE9',
+        },
+      ],
+      features: [
+        { title: 'Perfect Fit', description: 'Precise sizing for ultimate comfort.', icon: '👟' },
+        { title: 'Premium Quality', description: 'Handcrafted with the finest materials.', icon: '✨' },
+        { title: 'All Styles', description: 'From casual to formal, we have it all.', icon: '👞' },
+        { title: 'Free Returns', description: 'Easy returns if the fit isn\'t right.', icon: '↩️' },
+        { title: 'Fast Delivery', description: 'Quick shipping on all orders.', icon: '🚚' },
+        { title: 'Brand Selection', description: 'Top brands you know and trust.', icon: '🏷️' },
+      ],
+      splitLayout: {
+        title: 'Find Your Perfect Pair',
+        image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=800&fit=crop',
+        cta_link: '/products?category=running-shoes',
+        background_color: '#F5F5F5',
+      },
+      productTabsTitle: 'Trending Footwear',
+      ctaTitle: 'Walk Your Way',
+      ctaSubtitle: 'Comfort, Style, and Performance in Every Step!',
+      ctaGradient: 'linear-gradient(to right, #000000, #424242)',
+    };
+  }
+  
+  // Default (fallback)
   return {
     hero: {
       title: 'Welcome to Our Store',
       subtitle: 'Discover amazing products and great deals.',
       image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=600&fit=crop',
     },
+    heroBackgroundColor: '#EFF6FF',
     banners: [
       {
         title: 'Special Offers',
         image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop',
         cta_link: '/products',
-        background_color: '#fef3c7',
+        background_color: '#EFF6FF',
       },
       {
         title: 'New Arrivals',
-        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop',
+        image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&h=400&fit=crop',
         cta_link: '/products',
         background_color: '#d1fae5',
       },
       {
         title: 'Best Sellers',
-        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop',
+        image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&h=400&fit=crop',
         cta_link: '/products',
         background_color: '#e0e7ff',
       },
@@ -808,11 +885,12 @@ function getBusinessTypeContent(businessType: string): {
       title: 'Shop With Confidence',
       image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop',
       cta_link: '/products',
-      background_color: '#fef3c7',
+      background_color: '#EFF6FF',
     },
     productTabsTitle: 'Featured Products',
     ctaTitle: 'Start Shopping Today',
     ctaSubtitle: 'Quality, Value, and Service You Can Trust!',
+    ctaGradient: 'linear-gradient(to right, #0066CC, #00A8E8)',
   };
 }
 
@@ -834,7 +912,7 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
         image: content.hero.image,
         cta_text: 'Order Now',
         cta_link: '/products',
-        background_color: '#fef3c7',
+        background_color: content.heroBackgroundColor || '#fef3c7',
       },
       {
         id: 'categories-1',
@@ -962,7 +1040,7 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
         subtitle: content.ctaSubtitle,
         cta_text: 'Continue Your Shopping',
         cta_link: '/products',
-        background_gradient: 'linear-gradient(to right, #16a34a, #059669)',
+        background_gradient: content.ctaGradient || 'linear-gradient(to right, #16a34a, #059669)',
         text_color: '#ffffff',
       },
     ] as PageSection[],

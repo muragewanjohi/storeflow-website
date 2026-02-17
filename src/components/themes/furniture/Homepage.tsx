@@ -36,7 +36,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
   const categoryImages = [
     'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=800&fit=crop',
     'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
-    'https://images.unsplash.com/photo-1631889993954-22e7ef0e7d73?w=800&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
   ];
 
   const inspirations = [
@@ -44,7 +44,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
       number: '01',
       category: 'Bed Room',
       title: 'Inner Peace',
-      image: 'https://images.unsplash.com/photo-1631889993954-22e7ef0e7d73?w=800&h=800&fit=crop',
+      image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
     },
   ];
 

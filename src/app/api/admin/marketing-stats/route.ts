@@ -51,10 +51,19 @@ export async function GET(request: NextRequest) {
     if (from) start = new Date(from);
     if (to) end = new Date(to);
 
-    // Registrations (new tenants) and subscription changes
+    // Registrations (new tenants, excluding demo stores) and subscription changes
+    const demoStoreFilter = {
+      NOT: {
+        OR: [
+          { data: { path: ['isDemo'], equals: true } },
+          { data: { path: ['is_demo'], equals: true } },
+        ],
+      },
+    };
+
     const [registrationsCount, renewalsCount, activationsCount, upgradesCount, registrationsByDate, renewalsByDate] =
       await Promise.all([
-        prisma.tenants.count({ where: { created_at: { gte: start, lte: end } } }),
+        prisma.tenants.count({ where: { created_at: { gte: start, lte: end }, ...demoStoreFilter } }),
         prisma.subscription_changes.count({
           where: {
             change_type: 'renewal',
@@ -80,6 +89,8 @@ export async function GET(request: NextRequest) {
           SELECT DATE(created_at)::text as date, COUNT(*)::bigint as count
           FROM tenants
           WHERE created_at >= ${start} AND created_at <= ${end}
+            AND COALESCE((data->>'isDemo')::boolean, false) != true
+            AND COALESCE((data->>'is_demo')::boolean, false) != true
           GROUP BY DATE(created_at)
           ORDER BY date ASC
         `,

@@ -13,6 +13,11 @@ import { sendWelcomeEmail } from '@/lib/email/sendgrid';
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { z } from 'zod';
 import { handleApiError, handleValidationError, handleConflictError, createErrorResponse, ErrorCode } from '@/lib/errors/api-error-handler';
+import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
+import { createDefaultHomepageTemplate } from '@/lib/themes/homepage-templates';
+import { createDemoContent } from '@/lib/themes/demo-content';
+import { createDemoCustomers, createDemoOrders } from '@/lib/themes/demo-store-seed';
+import { setStaticOption } from '@/lib/settings/static-options';
 
 // Validation schema for tenant creation
 const createTenantSchema = z.object({
@@ -152,29 +157,116 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // If this is a demo store, seed it with full demo content (50 products, 10 categories, etc.)
+    // If this is a demo store, set up with full demo content using the same process as normal store registration
     if (validatedData.isDemo) {
-      // Import and run full demo store seeding (non-blocking)
-      // This creates: 50 products, 10 categories, 5 customers, 10 orders, 2 pages, 2 sales, 2 blogs, 2 blog categories, 1 form
-      // Plus complete homepage with 8 sections
       const businessType = validatedData.businessType || 'Grocery Store / Supermarket';
-      console.log(`[Tenant Creation] 🚀 Starting demo store seeding for tenant ${tenant.id} with business type: ${businessType}`);
-      
-      import('@/lib/themes/demo-store-seed').then(({ seedExistingDemoStore }) => {
-        console.log(`[Tenant Creation] ✅ Successfully imported seedExistingDemoStore function`);
-        seedExistingDemoStore(tenant.id, businessType)
-          .then(() => {
-            console.log(`[Tenant Creation] ✅ Successfully completed seeding for tenant ${tenant.id}`);
-          })
-          .catch((error) => {
-            console.error(`[Tenant Creation] ❌ Failed to seed demo store data for tenant ${tenant.id}:`, error);
-            console.error(`[Tenant Creation] Error stack:`, error?.stack);
-            // Don't fail tenant creation if seeding fails, but log the error
+      console.log(`[Tenant Creation] Starting demo store setup for tenant ${tenant.id} with business type: ${businessType}`);
+
+      try {
+        // Step 1: Install theme (same as registration flow)
+        const theme = await prisma.themes.findFirst({
+          where: { slug: 'grocery' },
+        });
+
+        if (theme) {
+          const existingTheme = await prisma.tenant_themes.findFirst({
+            where: { tenant_id: tenant.id, theme_id: theme.id },
           });
-      }).catch((error) => {
-        console.error(`[Tenant Creation] ❌ Failed to import demo data seeder:`, error);
-        console.error(`[Tenant Creation] Import error stack:`, error?.stack);
-      });
+
+          if (!existingTheme) {
+            const themeDefaults = getThemeDefaults(theme.slug);
+            const businessColors = getBusinessTypeColorScheme(businessType);
+            const finalColors = businessColors
+              ? { ...themeDefaults?.colors, ...businessColors }
+              : themeDefaults?.colors;
+
+            await prisma.tenant_themes.create({
+              data: {
+                tenant_id: tenant.id,
+                theme_id: theme.id,
+                is_active: true,
+                custom_colors: finalColors || {},
+                custom_fonts: themeDefaults?.fonts || {},
+              },
+            });
+            console.log(`[Tenant Creation] Installed theme: ${theme.slug}`);
+          }
+
+          // Step 2: Create homepage (same as registration flow)
+          const existingHomepage = await prisma.pages.findFirst({
+            where: { tenant_id: tenant.id, slug: 'home' },
+          });
+
+          if (!existingHomepage) {
+            const pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, businessType);
+            await prisma.pages.create({
+              data: {
+                tenant_id: tenant.id,
+                title: 'Home',
+                slug: 'home',
+                content: JSON.stringify(pageBuilderData),
+                status: 'published',
+                meta_title: `${tenant.name} - Home`,
+                meta_description: `Welcome to ${tenant.name}. Shop our amazing products and discover great deals.`,
+              },
+            });
+            console.log(`[Tenant Creation] Created homepage with ${pageBuilderData.sections?.length || 0} sections`);
+          }
+        } else {
+          console.warn(`[Tenant Creation] Grocery theme not found, skipping theme installation`);
+        }
+
+        // Step 3: Set store logo
+        try {
+          await setStaticOption(tenant.id, 'store_logo', '/logo.png');
+          console.log(`[Tenant Creation] Set store logo`);
+        } catch (logoError: any) {
+          console.error(`[Tenant Creation] Error setting store logo:`, logoError.message);
+        }
+
+        // Step 4: Create demo content (same createDemoContent function used by registration)
+        // This creates: categories, products, attributes, pages (about/contact), sales, blog categories, blogs, forms
+        const demoResult = await createDemoContent(
+          prisma,
+          tenant.id,
+          businessType,
+          true, // includeAttributes
+        );
+        console.log(`[Tenant Creation] Demo content created:`, demoResult);
+
+        // Step 5: Create demo customers (demo-store specific)
+        let customerIds: string[] = [];
+        try {
+          customerIds = await createDemoCustomers(tenant.id);
+          console.log(`[Tenant Creation] Created ${customerIds.length} demo customers`);
+        } catch (customerError: any) {
+          console.error(`[Tenant Creation] Error creating demo customers:`, customerError.message);
+        }
+
+        // Step 6: Create demo orders (demo-store specific)
+        if (customerIds.length > 0) {
+          const products = await prisma.products.findMany({
+            where: { tenant_id: tenant.id, status: 'active' },
+            select: { id: true },
+          });
+          const productIds = products.map(p => p.id);
+
+          if (productIds.length > 0) {
+            try {
+              await createDemoOrders(tenant.id, customerIds, productIds);
+              console.log(`[Tenant Creation] Created demo orders`);
+            } catch (orderError: any) {
+              console.error(`[Tenant Creation] Error creating demo orders:`, orderError.message);
+            }
+          }
+        }
+
+        console.log(`[Tenant Creation] Demo store setup completed for tenant ${tenant.id}`);
+      } catch (demoError: any) {
+        console.error(`[Tenant Creation] Error setting up demo store for tenant ${tenant.id}:`, demoError.message);
+        console.error(`[Tenant Creation] Error stack:`, demoError?.stack);
+        // Don't fail tenant creation if demo setup fails
+      }
     }
 
     // Check if user with this email already exists

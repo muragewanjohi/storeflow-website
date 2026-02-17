@@ -115,7 +115,7 @@ async function createExtendedDemoContent(
         'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop', // Vitamins
         'https://images.unsplash.com/photo-1550572017-edd951b55104?w=400&h=400&fit=crop', // OTC
         'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=400&fit=crop', // Prescription
-        'https://images.unsplash.com/photo-1522338249292-0c8e97e0beb7?w=400&h=400&fit=crop', // Personal Care
+        'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&h=400&fit=crop', // Personal Care
         'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=400&fit=crop', // Baby Care
       ],
       fashion: [
@@ -218,7 +218,7 @@ async function createExtendedDemoContent(
 /**
  * Create demo customers (5 customers)
  */
-async function createDemoCustomers(
+export async function createDemoCustomers(
   tenantId: string
 ): Promise<string[]> {
   const customerData = [
@@ -265,7 +265,7 @@ async function createDemoCustomers(
 /**
  * Create demo orders (10 orders)
  */
-async function createDemoOrders(
+export async function createDemoOrders(
   tenantId: string,
   customerIds: string[],
   productIds: string[]

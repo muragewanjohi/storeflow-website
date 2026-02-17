@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch tenant registrations grouped by date
+    // Fetch tenant registrations grouped by date (excluding demo stores)
     const tenantRegistrations = await prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
       SELECT 
         DATE(created_at)::text as date,
@@ -134,11 +134,13 @@ export async function GET(request: NextRequest) {
       FROM tenants
       WHERE created_at >= ${startDate}
         AND created_at <= ${endDate}
+        AND COALESCE((data->>'isDemo')::boolean, false) != true
+        AND COALESCE((data->>'is_demo')::boolean, false) != true
       GROUP BY DATE(created_at)
       ORDER BY date ASC
     `;
 
-    // Fetch tenants by country
+    // Fetch tenants by country (excluding demo stores)
     // Use country field directly, fallback to 'Unknown'
     const tenantsByCountry = await prisma.$queryRaw<Array<{ country_name: string; count: bigint }>>`
       SELECT 
@@ -147,13 +149,24 @@ export async function GET(request: NextRequest) {
       FROM tenants
       WHERE created_at >= ${startDate}
         AND created_at <= ${endDate}
+        AND COALESCE((data->>'isDemo')::boolean, false) != true
+        AND COALESCE((data->>'is_demo')::boolean, false) != true
       GROUP BY country
       ORDER BY count DESC
       LIMIT 10
     `;
 
-    // Fetch total tenant count
-    const totalTenants = await prisma.tenants.count();
+    // Fetch total tenant count (excluding demo stores)
+    const totalTenants = await prisma.tenants.count({
+      where: {
+        NOT: {
+          OR: [
+            { data: { path: ['isDemo'], equals: true } },
+            { data: { path: ['is_demo'], equals: true } },
+          ],
+        },
+      },
+    });
 
     // Fetch total stats
     const totalStats = await prisma.$queryRaw<Array<{ total_views: bigint; total_events: bigint; unique_users: bigint }>>`
