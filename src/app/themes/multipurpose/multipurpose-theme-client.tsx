@@ -54,7 +54,7 @@ const BUSINESS_TYPE_DEMOS: BusinessTypeDemo[] = [
     businessType: 'fashion',
     title: 'Fashion',
     image: '/images/themes/clothes_multipurpose.png',
-    demoUrl: null,
+    demoUrl: 'https://clothes.dukanest.com/',
     description: 'Apparel and accessories',
   },
   {

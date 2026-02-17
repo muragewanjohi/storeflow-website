@@ -53,18 +53,12 @@ export default function MarketingHeader() {
             <Link href="/#home" className="text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
               Home
             </Link>
-            {/* <Link href="/#shops" className="text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Shops
-            </Link> */}
             <Link href="/pricing" className="text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
               Pricing
             </Link>
             <Link href="/#themes" className="text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Templates
+              Themes
             </Link>
-            {/* <Link href="/#blog" className="text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Blog
-            </Link> */}
             
             {/* Resources Dropdown */}
             <div className="relative" ref={resourcesRef}>
@@ -115,17 +109,11 @@ export default function MarketingHeader() {
             <Link href="/#home" className="block text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
               Home
             </Link>
-            <Link href="/#shops" className="block text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Shops
-            </Link>
             <Link href="/pricing" className="block text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
               Pricing
             </Link>
             <Link href="/#themes" className="block text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Templates
-            </Link>
-            <Link href="/#blog" className="block text-[#0c0528] hover:text-[#0025cc] transition-colors font-medium">
-              Blog
+              Themes
             </Link>
             
             {/* Resources Mobile */}
