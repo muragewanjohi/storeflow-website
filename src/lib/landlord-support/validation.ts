@@ -25,6 +25,7 @@ export const createLandlordTicketSchema = z.object({
   description: z.string().min(1, 'Description is required').max(5000, 'Description must be less than 5000 characters'),
   priority: landlordTicketPrioritySchema.default('medium'),
   category: z.enum(['billing', 'technical', 'feature_request', 'bug_report', 'account', 'account_recovery', 'other']).optional(),
+  tenant_id: z.string().uuid('Invalid tenant ID').optional(),
 });
 
 /**

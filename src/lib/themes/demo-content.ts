@@ -255,7 +255,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Premium omega-3 fish oil',
           price: 16.99,
           category_index: 2,
-          image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1550572017-edd951b55104?w=400&h=400&fit=crop',
           sku: 'PHA-OMG-001',
         },
         {
@@ -264,7 +264,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Daily moisturizing lotion',
           price: 7.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=400&fit=crop',
           sku: 'PHA-LOT-001',
         },
         {
@@ -274,7 +274,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 11.99,
           sale_price: 9.49,
           category_index: 1,
-          image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1468495244123-6c6c332eeece?w=400&h=400&fit=crop',
           sku: 'PHA-ALR-001',
         },
       ],
@@ -366,7 +366,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 69.99,
           sale_price: 54.99,
           category_index: 2,
-          image: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1507680434567-5739c80be1ac?w=400&h=400&fit=crop',
           sku: 'FAS-SCF-001',
         },
         {
@@ -375,7 +375,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Classic slim fit polo shirt',
           price: 34.99,
           category_index: 1,
-          image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1479064555552-3ef4979f8908?w=400&h=400&fit=crop',
           sku: 'FAS-POL-001',
         },
         {
@@ -384,7 +384,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Delicate gold chain necklace',
           price: 49.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=400&h=400&fit=crop',
           sku: 'FAS-NKL-001',
         },
       ],
@@ -485,7 +485,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: '20000mAh portable power bank',
           price: 39.99,
           category_index: 4,
-          image: 'https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&h=400&fit=crop',
           sku: 'ELC-CHG-001',
         },
         {
@@ -494,7 +494,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Wireless gaming controller',
           price: 69.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&h=400&fit=crop',
           sku: 'ELC-CTR-001',
         },
       ],
@@ -677,7 +677,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Professional chef knife set',
           price: 79.99,
           category_index: 5,
-          image: 'https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1600585152220-90363fe7e115?w=400&h=400&fit=crop',
           sku: 'HOM-KNF-001',
         },
         {
@@ -696,7 +696,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Pre-seasoned cast iron skillet',
           price: 44.99,
           category_index: 0,
-          image: 'https://images.unsplash.com/photo-1583845112239-97ef1341b271?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=400&h=400&fit=crop',
           sku: 'HOM-SKI-001',
         },
         {
@@ -714,7 +714,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Handwoven cotton table runner',
           price: 19.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1565538810643-b5bdb714032a?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&h=400&fit=crop',
           sku: 'HOM-TBR-001',
         },
       ],
@@ -777,7 +777,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Gentle tear-free baby wash',
           price: 8.99,
           category_index: 4,
-          image: 'https://images.unsplash.com/photo-1519689373023-dd07c7988603?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1540479859555-17af45c78602?w=400&h=400&fit=crop',
           sku: 'BAB-WSH-001',
         },
         {
@@ -787,7 +787,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 149.99,
           sale_price: 119.99,
           category_index: 5,
-          image: 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1602407294553-6ac9170b3ed0?w=400&h=400&fit=crop',
           sku: 'BAB-STR-001',
         },
         {
@@ -796,7 +796,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Interactive story book set',
           price: 22.99,
           category_index: 6,
-          image: 'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1560343776-97e7d202ff0e?w=400&h=400&fit=crop',
           sku: 'BAB-BKS-001',
         },
         {
@@ -805,7 +805,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Ultra-soft plush teddy bear',
           price: 14.99,
           category_index: 1,
-          image: 'https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=400&h=400&fit=crop',
           sku: 'BAB-TED-001',
         },
         {
@@ -815,7 +815,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 79.99,
           sale_price: 64.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1519689373023-dd07c7988603?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1604869515882-4d10fa4b0492?w=400&h=400&fit=crop',
           sku: 'BAB-MON-001',
         },
         {
@@ -824,7 +824,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Warm padded kids winter jacket',
           price: 39.99,
           category_index: 0,
-          image: 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1509281373149-e957c6296406?w=400&h=400&fit=crop',
           sku: 'BAB-JKT-001',
         },
       ],
@@ -878,7 +878,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Freshly squeezed fruit juice',
           price: 4.99,
           category_index: 3,
-          image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop',
           sku: 'FOD-JUI-001',
         },
         {
@@ -888,7 +888,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 12.99,
           sale_price: 10.99,
           category_index: 5,
-          image: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=400&h=400&fit=crop',
           sku: 'FOD-PIZ-001',
         },
         {
@@ -897,7 +897,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Classic bruschetta appetizer',
           price: 6.99,
           category_index: 1,
-          image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1540914124281-342587941389?w=400&h=400&fit=crop',
           sku: 'FOD-BRU-001',
         },
         {
@@ -906,7 +906,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Avocado toast with poached eggs',
           price: 11.99,
           category_index: 6,
-          image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop',
           sku: 'FOD-AVT-001',
         },
         {
@@ -915,7 +915,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Rich artisan cappuccino',
           price: 4.49,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400&h=400&fit=crop',
           sku: 'FOD-CAP-001',
         },
         {
@@ -934,7 +934,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 6.49,
           sale_price: 4.99,
           category_index: 2,
-          image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1506354666786-959d6d497f1a?w=400&h=400&fit=crop',
           sku: 'FOD-TIR-001',
         },
       ],
@@ -1006,7 +1006,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Canned baked beans',
           price: 1.49,
           category_index: 5,
-          image: 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1601599561213-832382fd07ba?w=400&h=400&fit=crop',
           sku: 'DUK-BNS-001',
         },
         {
@@ -1016,7 +1016,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 2.49,
           sale_price: 1.99,
           category_index: 1,
-          image: 'https://images.unsplash.com/photo-1581605405669-fcdf81165afa?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=400&h=400&fit=crop',
           sku: 'DUK-WTR-001',
         },
         {
@@ -1025,7 +1025,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Whitening toothpaste',
           price: 2.99,
           category_index: 2,
-          image: 'https://images.unsplash.com/photo-1612103198005-b238154f4590?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400&h=400&fit=crop',
           sku: 'DUK-TPT-001',
         },
         {
@@ -1044,7 +1044,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 2.99,
           sale_price: 2.49,
           category_index: 0,
-          image: 'https://images.unsplash.com/photo-1573821663912-569905455b1c?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=400&h=400&fit=crop',
           sku: 'DUK-CHO-001',
         },
       ],
@@ -1145,7 +1145,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 189.99,
           sale_price: 159.99,
           category_index: 3,
-          image: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1503602642458-232111445657?w=400&h=400&fit=crop',
           sku: 'FUR-BKS-001',
         },
         {
@@ -1154,7 +1154,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Hand-woven area rug',
           price: 129.99,
           category_index: 6,
-          image: 'https://images.unsplash.com/photo-1586105251261-72a756497a11?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=400&h=400&fit=crop',
           sku: 'FUR-RUG-001',
         },
       ],
@@ -1236,7 +1236,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'No-pull adjustable dog harness',
           price: 24.99,
           category_index: 6,
-          image: 'https://images.unsplash.com/photo-1535930749574-1399327ce78f?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400&h=400&fit=crop',
           sku: 'PET-HRN-001',
         },
         {
@@ -1245,7 +1245,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'All-natural beef jerky treats',
           price: 9.99,
           category_index: 7,
-          image: 'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?w=400&h=400&fit=crop',
           sku: 'PET-TRT-001',
         },
         {
@@ -1255,7 +1255,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           price: 34.99,
           sale_price: 27.99,
           category_index: 2,
-          image: 'https://images.unsplash.com/photo-1522276498395-f4f68f7f8454?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=400&h=400&fit=crop',
           sku: 'PET-SCR-001',
         },
         {
@@ -1264,7 +1264,7 @@ export function getDemoContentConfig(businessType: string): DemoContentConfig {
           short_description: 'Retractable dog leash 5m',
           price: 16.99,
           category_index: 6,
-          image: 'https://images.unsplash.com/photo-1591946614720-90a587da4a36?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400&h=400&fit=crop',
           sku: 'PET-LSH-001',
         },
       ],
@@ -2637,8 +2637,8 @@ function getBlogFeaturedImagesByBusinessType(businessType: string): string[] {
   }
   if (type.includes('baby') || type.includes('kids')) {
     return [
-      'https://images.unsplash.com/photo-1504185945330-7a3ca1380535?w=800&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&h=600&fit=crop',
+      'https://images.unsplash.com/photo-1472162072942-cd5147eb3902?w=800&h=600&fit=crop',
     ];
   }
   if (type.includes('convenience') || type.includes('duka')) {
@@ -2696,7 +2696,7 @@ function getSalesBannerImageByBusinessType(businessType: string): string {
     return 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=1200&h=400&fit=crop';
   }
   if (type.includes('baby') || type.includes('kids')) {
-    return 'https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=1200&h=400&fit=crop';
+    return 'https://images.unsplash.com/photo-1555009393-f20bdb245c4d?w=1200&h=400&fit=crop';
   }
   if (type.includes('convenience') || type.includes('duka')) {
     return 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?w=1200&h=400&fit=crop';

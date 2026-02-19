@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { EyeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { Loader2 } from 'lucide-react';
 
 interface Ticket {
@@ -188,11 +188,19 @@ export default function LandlordTicketsListClient({
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Support Tickets from Tenants</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage support tickets created by tenants
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Support Tickets from Tenants</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage support tickets created by tenants
+          </p>
+        </div>
+        <Link href="/admin/support/tickets/new">
+          <Button>
+            <PlusIcon className="mr-2 h-4 w-4" />
+            Create Ticket
+          </Button>
+        </Link>
       </div>
 
       <Card>
