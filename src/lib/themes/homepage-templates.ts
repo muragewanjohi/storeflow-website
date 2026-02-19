@@ -212,7 +212,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Pure Vegetables For Health',
-          image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=600&h=400&fit=crop',
           cta_link: '/products?category=vegetables',
           background_color: '#d1fae5',
         },
@@ -233,7 +233,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Enjoy Our Organic Vegetables',
-        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=800&fit=crop',
         cta_link: '/products?category=vegetables',
         background_color: '#d1fae5',
       },
@@ -262,7 +262,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Prescription Medications',
-          image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=600&h=400&fit=crop',
           cta_link: '/products?category=prescription-medications',
           background_color: '#fce7f3',
         },
@@ -283,7 +283,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Your Wellness Journey Starts Here',
-        image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=800&h=800&fit=crop',
         cta_link: '/products?category=vitamins-supplements',
         background_color: '#dbeafe',
       },
@@ -306,7 +306,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'New Collection - 30% Off',
-          image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=600&h=400&fit=crop',
           cta_link: '/products?category=new-arrivals',
           background_color: '#fce7f3',
         },
@@ -333,7 +333,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Express Your Unique Style',
-        image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&h=800&fit=crop',
         cta_link: '/products?category=new-arrivals',
         background_color: '#fce7f3',
       },
@@ -356,7 +356,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Smartphones - Up to 25% Off',
-          image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=600&h=400&fit=crop',
           cta_link: '/products?category=smartphones',
           background_color: '#e0e7ff',
         },
@@ -383,7 +383,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Upgrade to the Latest Technology',
-        image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800&h=800&fit=crop',
         cta_link: '/products?category=smartphones',
         background_color: '#e0e7ff',
       },
@@ -456,7 +456,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Kitchen Essentials - 25% Off',
-          image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop',
           cta_link: '/products?category=kitchen-essentials',
           background_color: '#fef3c7',
         },
@@ -483,7 +483,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Create Your Dream Kitchen',
-        image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=800&h=800&fit=crop',
         cta_link: '/products?category=kitchen-essentials',
         background_color: '#fef3c7',
       },
@@ -506,7 +506,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Baby Essentials - 20% Off',
-          image: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=600&h=400&fit=crop',
           cta_link: '/products?category=baby-essentials',
           background_color: '#fce7f3',
         },
@@ -518,7 +518,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Children\'s Clothing',
-          image: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=600&h=400&fit=crop',
           cta_link: '/products?category=children-clothing',
           background_color: '#dbeafe',
         },
@@ -533,7 +533,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Nurturing Your Little Ones',
-        image: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1504185945330-7a3ca1380535?w=800&h=800&fit=crop',
         cta_link: '/products?category=baby-essentials',
         background_color: '#fce7f3',
       },
@@ -556,7 +556,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Fresh Meals - 15% Off',
-          image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&h=400&fit=crop',
           cta_link: '/products?category=fresh-meals',
           background_color: '#fef3c7',
         },
@@ -583,7 +583,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Savor Every Bite',
-        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=800&h=800&fit=crop',
         cta_link: '/products?category=fresh-meals',
         background_color: '#fef3c7',
       },
@@ -606,7 +606,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Daily Essentials - 10% Off',
-          image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=600&h=400&fit=crop',
           cta_link: '/products?category=daily-essentials',
           background_color: '#fef3c7',
         },
@@ -633,7 +633,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Your One-Stop Shop',
-        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1556742393-d75f468bfcb0?w=800&h=800&fit=crop',
         cta_link: '/products?category=daily-essentials',
         background_color: '#fef3c7',
       },
@@ -651,12 +651,12 @@ function getBusinessTypeContent(businessType: string): {
       hero: {
         title: 'Furnish Your Dream Home',
         subtitle: 'Beautiful furniture and decor to transform your living space.',
-        image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&h=600&fit=crop',
+        image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&h=600&fit=crop',
       },
       banners: [
         {
           title: 'Living Room Sets - 30% Off',
-          image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=600&h=400&fit=crop',
           cta_link: '/products?category=living-room',
           background_color: '#fef3c7',
         },
@@ -668,7 +668,7 @@ function getBusinessTypeContent(businessType: string): {
         },
         {
           title: 'Home Decor Accessories',
-          image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=600&h=400&fit=crop',
           cta_link: '/products?category=decor',
           background_color: '#e0e7ff',
         },
@@ -683,7 +683,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Design Your Perfect Space',
-        image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1586105251261-72a756497a11?w=800&h=800&fit=crop',
         cta_link: '/products?category=living-room',
         background_color: '#fef3c7',
       },
@@ -706,19 +706,19 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Pet Food - 20% Off',
-          image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600&h=400&fit=crop',
           cta_link: '/products?category=pet-food',
           background_color: '#fef3c7',
         },
         {
           title: 'Pet Toys & Accessories',
-          image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?w=600&h=400&fit=crop',
           cta_link: '/products?category=pet-toys',
           background_color: '#d1fae5',
         },
         {
           title: 'Pet Care Products',
-          image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=600&h=400&fit=crop',
           cta_link: '/products?category=pet-care',
           background_color: '#fce7f3',
         },
@@ -733,7 +733,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Happy Pets, Happy Home',
-        image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&h=800&fit=crop',
         cta_link: '/products?category=pet-food',
         background_color: '#fef3c7',
       },
@@ -751,24 +751,24 @@ function getBusinessTypeContent(businessType: string): {
       hero: {
         title: 'Tools & Hardware for Every Project',
         subtitle: 'Quality tools and hardware supplies for professionals and DIY enthusiasts.',
-        image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=1200&h=600&fit=crop',
+        image: 'https://images.unsplash.com/photo-1590479773265-7464e5d48118?w=1200&h=600&fit=crop',
       },
       banners: [
         {
           title: 'Power Tools - 15% Off',
-          image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1605152276897-4f618f831968?w=600&h=400&fit=crop',
           cta_link: '/products?category=power-tools',
           background_color: '#fef3c7',
         },
         {
           title: 'Hand Tools Collection',
-          image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop',
           cta_link: '/products?category=hand-tools',
           background_color: '#d1fae5',
         },
         {
           title: 'Hardware Supplies',
-          image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1597262975002-c5c3b14bbd62?w=600&h=400&fit=crop',
           cta_link: '/products?category=hardware-supplies',
           background_color: '#e0e7ff',
         },
@@ -783,7 +783,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Build Anything You Imagine',
-        image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1601058268499-e52658b8bb88?w=800&h=800&fit=crop',
         cta_link: '/products?category=power-tools',
         background_color: '#fef3c7',
       },
@@ -807,7 +807,7 @@ function getBusinessTypeContent(businessType: string): {
       banners: [
         {
           title: 'Sneakers Collection - 25% Off',
-          image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600&h=400&fit=crop',
           cta_link: '/products?category=sneakers',
           background_color: '#F5F5F5',
         },
@@ -834,7 +834,7 @@ function getBusinessTypeContent(businessType: string): {
       ],
       splitLayout: {
         title: 'Find Your Perfect Pair',
-        image: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=800&fit=crop',
+        image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800&h=800&fit=crop',
         cta_link: '/products?category=running-shoes',
         background_color: '#F5F5F5',
       },
@@ -856,7 +856,7 @@ function getBusinessTypeContent(businessType: string): {
     banners: [
       {
         title: 'Special Offers',
-        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=400&fit=crop',
+        image: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=600&h=400&fit=crop',
         cta_link: '/products',
         background_color: '#EFF6FF',
       },
@@ -883,7 +883,7 @@ function getBusinessTypeContent(businessType: string): {
     ],
     splitLayout: {
       title: 'Shop With Confidence',
-      image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop',
+      image: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&h=800&fit=crop',
       cta_link: '/products',
       background_color: '#EFF6FF',
     },

@@ -132,6 +132,78 @@ async function createExtendedDemoContent(
         'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', // Watches
         'https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400&h=400&fit=crop', // Accessories
       ],
+      hardware: [
+        'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=400&fit=crop', // Hand Tools
+        'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=400&h=400&fit=crop', // Electrical
+        'https://images.unsplash.com/photo-1585399000684-d2f72660f092?w=400&h=400&fit=crop', // Plumbing
+        'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop', // Paint & Supplies
+        'https://images.unsplash.com/photo-1590959651373-a3db0f38a961?w=400&h=400&fit=crop', // Power Tools
+        'https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=400&h=400&fit=crop', // Fasteners
+        'https://images.unsplash.com/photo-1617791160536-598cf32026fb?w=400&h=400&fit=crop', // Safety Equipment
+        'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=400&fit=crop', // Garden & Outdoor
+      ],
+      beauty: [
+        'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=400&fit=crop', // Makeup
+        'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=400&h=400&fit=crop', // Skincare
+        'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=400&h=400&fit=crop', // Hair Care
+        'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=400&fit=crop', // Fragrances
+        'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=400&h=400&fit=crop', // Body Care
+      ],
+      home: [
+        'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=400&h=400&fit=crop', // Cookware
+        'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop', // Appliances
+        'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=400&fit=crop', // Dining
+        'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop', // Storage
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop', // Bakeware
+      ],
+      baby: [
+        'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&h=400&fit=crop', // Clothing
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop', // Toys
+        'https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=400&h=400&fit=crop', // Feeding
+        'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=400&h=400&fit=crop', // Nursery
+        'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=400&fit=crop', // Bath
+      ],
+      food: [
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop', // Main Dishes
+        'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop', // Appetizers
+        'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=400&fit=crop', // Desserts
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=400&fit=crop', // Beverages
+        'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop', // Salads
+        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop', // Pizza
+        'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=400&h=400&fit=crop', // Breakfast
+        'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop', // Coffee
+      ],
+      convenience: [
+        'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=400&h=400&fit=crop', // Snacks
+        'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=400&fit=crop', // Beverages
+        'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400&h=400&fit=crop', // Personal Care
+        'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop', // Household
+        'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=400&fit=crop', // Dairy
+        'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=400&h=400&fit=crop', // Canned
+      ],
+      furniture: [
+        'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=400&fit=crop', // Living Room
+        'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&h=400&fit=crop', // Bedroom
+        'https://images.unsplash.com/photo-1617104678098-de229db51175?w=400&h=400&fit=crop', // Dining
+        'https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=400&fit=crop', // Office
+        'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&h=400&fit=crop', // Lighting
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=400&fit=crop', // Rugs
+      ],
+      pets: [
+        'https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=400&h=400&fit=crop', // Dog Food
+        'https://images.unsplash.com/photo-1573461160327-b450ce3d8e7f?w=400&h=400&fit=crop', // Cat Toys
+        'https://images.unsplash.com/photo-1551717743-49959800b1f6?w=400&h=400&fit=crop', // Accessories
+        'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=400&fit=crop', // Grooming
+        'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&h=400&fit=crop', // Dog Leash
+      ],
+      shoes: [
+        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', // Sneakers
+        'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=400&fit=crop', // Running
+        'https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=400&h=400&fit=crop', // Formal
+        'https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=400&h=400&fit=crop', // Boots
+        'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=400&h=400&fit=crop', // Sandals
+        'https://images.unsplash.com/photo-1555274175-6cbf6f3b137b?w=400&h=400&fit=crop', // Kids
+      ],
     };
     
     // Determine which image set to use
@@ -142,6 +214,24 @@ async function createExtendedDemoContent(
       imageSet = categoryImages.fashion;
     } else if (type.includes('electronic') || type.includes('mobile')) {
       imageSet = categoryImages.electronics;
+    } else if (type.includes('hardware')) {
+      imageSet = categoryImages.hardware;
+    } else if (type.includes('beauty') || type.includes('personal care')) {
+      imageSet = categoryImages.beauty;
+    } else if (type.includes('home') || type.includes('kitchen')) {
+      imageSet = categoryImages.home;
+    } else if (type.includes('baby') || type.includes('kids')) {
+      imageSet = categoryImages.baby;
+    } else if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+      imageSet = categoryImages.food;
+    } else if (type.includes('convenience') || type.includes('duka')) {
+      imageSet = categoryImages.convenience;
+    } else if (type.includes('furniture') || type.includes('home decor')) {
+      imageSet = categoryImages.furniture;
+    } else if (type.includes('pet')) {
+      imageSet = categoryImages.pets;
+    } else if (type.includes('shoes') || type.includes('footwear')) {
+      imageSet = categoryImages.shoes;
     }
     
     // Use category-specific image or cycle through available images
