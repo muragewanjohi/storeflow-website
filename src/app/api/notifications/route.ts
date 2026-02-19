@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
       lowStockVariants,
       newSupportTickets,
       landlordTickets,
+      landlordTicketMessages,
+      landlordUserIds,
       approvedDeliveryFees,
       rejectedDeliveryFees,
     ] = await Promise.all([
@@ -125,9 +127,42 @@ export async function GET(request: NextRequest) {
           subject: true,
           status: true,
           updated_at: true,
+          user_id: true,
         },
         orderBy: { updated_at: 'desc' },
         take: 5,
+      }),
+
+      // 4b. Recent landlord ticket messages (replies from landlord in last 7 days)
+      prisma.landlord_support_ticket_messages.findMany({
+        where: {
+          created_at: { gte: sevenDaysAgo },
+          landlord_support_tickets: {
+            tenant_id: tenant.id,
+            status: { not: 'closed' },
+          },
+        },
+        select: {
+          id: true,
+          ticket_id: true,
+          user_id: true,
+          message: true,
+          created_at: true,
+          landlord_support_tickets: {
+            select: {
+              id: true,
+              subject: true,
+              user_id: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      }),
+
+      // 4c. Landlord user IDs (to distinguish landlord replies from tenant replies)
+      prisma.landlord_users.findMany({
+        select: { id: true },
       }),
 
       // 5. Recently approved delivery fee quotes (last 24 hours)
@@ -268,6 +303,31 @@ export async function GET(request: NextRequest) {
           status: ticket.status,
         },
       });
+    }
+
+    // Process landlord ticket reply messages (only from landlord, not tenant's own messages)
+    const landlordUserIdSet = new Set(landlordUserIds.map((u: { id: string }) => u.id));
+    for (const msg of landlordTicketMessages) {
+      if (!msg.user_id || !landlordUserIdSet.has(msg.user_id)) continue;
+
+      const existingNotification = notifications.find(
+        (n) => n.id === `landlord-reply-${msg.ticket_id}`
+      );
+      if (!existingNotification) {
+        notifications.push({
+          id: `landlord-reply-${msg.ticket_id}`,
+          type: 'support_ticket_reply',
+          title: 'New Reply from Platform',
+          message: `${msg.landlord_support_tickets.subject} - New reply received`,
+          link: `/dashboard/support/landlord-tickets/${msg.ticket_id}`,
+          created_at: msg.created_at || new Date(),
+          read: false,
+          metadata: {
+            ticket_id: msg.ticket_id,
+            message_id: msg.id,
+          },
+        });
+      }
     }
 
     // Process approved delivery fee quotes
