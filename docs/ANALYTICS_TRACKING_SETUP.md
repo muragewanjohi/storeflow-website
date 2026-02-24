@@ -147,6 +147,73 @@ Access advanced analytics in the dashboard:
 
 Reports will be automatically sent at the scheduled time.
 
+## Ad Funnel QA Checklist (GA4 + Meta Pixel)
+
+Use this checklist whenever you launch or update paid ad landing pages (for example `/ads/whatsapp`).
+
+### Expected Event Flow
+
+For a successful ad signup journey, you should see this sequence:
+
+1. `page_view` on `/ads/whatsapp`
+2. `ad_landing_page_view`
+3. `ad_cta_click`
+4. `page_view` on `/register?...utm_source=...`
+5. `sign_up_started` (after client validation passes)
+6. `sign_up_completed` (after registration success)
+7. `CompleteRegistration` (Meta Pixel event)
+
+For failed signups, you should see:
+
+- `sign_up_failed` with one of:
+  - `client_validation_failed`
+  - `server_validation_failed`
+  - `registration_failed`
+  - `network_or_unexpected_error`
+
+### GA4 Verification Steps
+
+1. Open **GA4 Admin > DebugView**
+2. In a fresh browser session, visit `/ads/whatsapp`
+3. Click any CTA and continue to `/register`
+4. Submit the form
+5. Confirm `ad_landing_page_view`, `ad_cta_click`, `sign_up_started`, and either `sign_up_completed` or `sign_up_failed` are visible
+6. Confirm event params include:
+   - `utm_source`
+   - `utm_medium`
+   - `utm_campaign`
+   - `plan_id`
+
+### GA4 Conversion Setup
+
+Mark this event as a Key Event in GA4:
+
+- `sign_up_completed`
+
+Optional (diagnostic only, not primary conversion):
+
+- `sign_up_started`
+
+### Meta Pixel Verification Steps
+
+1. Open Meta Pixel Helper (browser extension)
+2. Visit `/ads/whatsapp`
+3. Click CTA to `/register`
+4. Confirm Pixel events:
+   - `ViewContent` (landing page load)
+   - `Lead` (CTA click and/or submit intent)
+   - `CompleteRegistration` (successful registration)
+
+### Quick UTM Sanity Check
+
+Ensure all CTA links from the ad landing page pass UTM params to register:
+
+- `utm_source=facebook`
+- `utm_medium=paid`
+- `utm_campaign=whatsapp_sellers`
+
+If UTM params are missing on `/register`, attribution and campaign reporting will be incomplete.
+
 ## Troubleshooting
 
 ### No Data Showing

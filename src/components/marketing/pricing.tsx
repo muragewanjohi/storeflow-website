@@ -104,9 +104,47 @@ export function Pricing() {
     router.push(`/register?plan=${planId}`);
   };
 
-  // Use original hardcoded features instead of formatting from API
   const getFeatures = (planName: string): string[] => {
     return getPlanFeatures(planName);
+  };
+
+  const getPlanSubtitle = (planName: string): string => {
+    switch (planName.toLowerCase()) {
+      case 'basic':
+        return 'For Solo Business Owners';
+      case 'pro':
+        return 'For Growing Stores With Staff';
+      case 'premium':
+        return 'For High-Volume Businesses';
+      default:
+        return '';
+    }
+  };
+
+  const getPlanDetails = (planName: string): { perfectFor: string[]; includes: string[] } => {
+    switch (planName.toLowerCase()) {
+      case 'basic':
+        return {
+          perfectFor: ['Entrepreneurs', 'Small shops', 'Solo retailers'],
+          includes: ['Online store', 'Product management', 'Order tracking', 'One admin account'],
+        };
+      case 'pro':
+        return {
+          perfectFor: ['Growing small shops', 'Product sellers with 2-5 staff', 'Stores handling more weekly orders'],
+          includes: [
+            'Everything in Basic',
+            'Multiple staff accounts',
+            'Staff permissions',
+            'Advanced order management',
+            'Priority support',
+          ],
+        };
+      default:
+        return {
+          perfectFor: [],
+          includes: getFeatures(planName).slice(0, 5),
+        };
+    }
   };
 
   if (isLoading) {
@@ -125,27 +163,34 @@ export function Pricing() {
     return null; // Don't show pricing section if no plans available
   }
 
+  const visiblePlans = plans.filter((plan) => {
+    const name = plan.name.toLowerCase();
+    return name === 'basic' || name === 'pro';
+  });
+
+  if (visiblePlans.length === 0) {
+    return null;
+  }
+
   return (
     <section id="pricing" className="py-20 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <p className="text-[#0025cc] font-medium mb-2">Pricing Plan</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
-            Choose Your Perfect Business Plan
+          <p className="text-[#0025cc] font-medium mb-2">Affordable for Every Small Business</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-[#0c0528] mb-4">
+            A Full Online Store for Less Than You&rsquo;d Pay a Developer
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with a 14-day free trial. No credit card required.
+            Try free for 14 days. No credit card required. Cancel anytime.
           </p>
         </div>
 
         {/* Pricing Cards - Condensed Version */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
-          {plans.map((plan, index) => {
-            const features = getFeatures(plan.name);
-            const isPopular = index === Math.floor(plans.length / 2); // Middle plan is popular
-            // Show only first 5 features on landing page
-            const displayedFeatures = features.slice(0, 5);
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
+          {visiblePlans.map((plan) => {
+            const details = getPlanDetails(plan.name);
+            const isPopular = plan.name.toLowerCase() === 'basic';
             
             return (
               <div
@@ -168,9 +213,14 @@ export function Pricing() {
 
                 {/* Plan Name */}
                 <div className="text-center mb-6">
-                  <h3 className={`text-2xl font-bold mb-2 ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
+                  <h3 className={`text-2xl font-bold mb-1 ${isPopular ? 'text-[#5B8AC4]' : 'text-[#0c0528]'}`}>
                     {plan.name}
                   </h3>
+                  {getPlanSubtitle(plan.name) && (
+                    <p className={`text-sm ${isPopular ? 'text-[#5B8AC4]/70' : 'text-[#8d8d8d]'}`}>
+                      {getPlanSubtitle(plan.name)}
+                    </p>
+                  )}
                 </div>
 
                 {/* Price */}
@@ -193,15 +243,23 @@ export function Pricing() {
                   )}
                 </div>
 
-                {/* What's Included */}
-                <div className={`mb-6 ${isPopular ? 'text-[#0025cc]/90' : 'text-[#0c0528]'}`}>
-                  <p className="font-semibold text-lg mb-4">{`What's Included`}</p>
+                {/* Perfect For */}
+                <div className={`mb-5 ${isPopular ? 'text-[#0025cc]/90' : 'text-[#0c0528]'}`}>
+                  <p className="font-semibold text-base mb-2">Perfect for:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {details.perfectFor.map((audience) => (
+                      <li key={audience} className={`text-sm ${isPopular ? 'text-[#0025cc]/90' : 'text-[#8d8d8d]'}`}>
+                        {audience}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                {/* Features List - Limited to 5 */}
+                {/* Includes */}
                 <div className="space-y-3 mb-6">
-                  {displayedFeatures.map((feature, featureIndex) => (
-                    <div key={featureIndex} className="flex items-start gap-3">
+                  <p className={`font-semibold text-base ${isPopular ? 'text-[#0025cc]/90' : 'text-[#0c0528]'}`}>Includes:</p>
+                  {details.includes.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3">
                       <div className={`rounded-full p-1 mt-0.5 ${
                         isPopular ? 'bg-[#0025cc]/20' : 'bg-[#0025cc]'
                       }`}>
@@ -212,26 +270,18 @@ export function Pricing() {
                       </span>
                     </div>
                   ))}
-                  {features.length > 5 && (
-                    <div className="text-sm text-muted-foreground italic pt-2">
-                      + {features.length - 5} more features
-                    </div>
-                  )}
                 </div>
 
                 {/* CTA Button */}
                 <button
-                  onClick={() => plan.name.toLowerCase() !== 'premium' && handleSelectPlan(plan.id)}
-                  disabled={plan.name.toLowerCase() === 'premium'}
+                  onClick={() => handleSelectPlan(plan.id)}
                   className={`w-full py-4 rounded-lg font-medium transition-all ${
-                    plan.name.toLowerCase() === 'premium'
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : isPopular
+                    isPopular
                       ? 'bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white hover:shadow-xl transform hover:-translate-y-1'
                       : 'bg-gray-100 text-[#0025cc] hover:bg-[#0025cc] hover:text-white'
                   }`}
                 >
-                  {plan.name.toLowerCase() === 'premium' ? 'Coming Soon' : 'Get Started'}
+                  Get Started
                 </button>
               </div>
             );

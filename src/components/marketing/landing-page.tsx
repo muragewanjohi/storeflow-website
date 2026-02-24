@@ -17,7 +17,6 @@ import { Stats } from './stats';
 import { WhyEcommerce } from './why-ecommerce';
 import { Pricing } from './pricing';
 import { Testimonials } from './testimonials';
-import { Blog } from './blog';
 import { FAQ } from './faq';
 import { Newsletter } from './newsletter';
 import { Footer } from './footer';
@@ -59,15 +58,14 @@ export default function MarketingLandingPage() {
       <Navigation />
       <Hero />
       <Stats />
-      <HowItWorks />
       <MoreFeatures />
+      <HowItWorks />
       <Themes />
       <Pricing />
       <Testimonials />
       <WhyEcommerce />
       <FAQ />
       <Newsletter />
-      <Blog />
       <Footer />
     </div>
   );

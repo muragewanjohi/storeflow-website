@@ -24,20 +24,20 @@ export function Hero() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0025cc] opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0025cc]"></span>
               </span>
-              14-Day Free Trial &mdash; No Credit Card Required
+              For Small Businesses Selling Products Online
             </div>
 
             {/* Main Heading */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#0c0528] leading-tight">
-              Launch Your Online Store in{' '}
+              Your Own Online Store{' '}
               <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-                Minutes, Not Months
+                From Ksh 1,000/mo
               </span>
             </h1>
 
             {/* Value Proposition */}
             <p className="text-lg text-[#555] leading-relaxed max-w-xl">
-              The all-in-one ecommerce platform built for diverse businesses. Get your own branded store with payments, inventory, and analytics &mdash; everything you need to sell online, without writing a single line of code.
+              Built for small businesses and entrepreneurs already selling products through social media or chat. Get a professional online store where customers see your products, prices, and delivery fees &mdash; and order themselves. No coding, no developer needed.
             </p>
 
             {/* Trust Signals */}
@@ -52,7 +52,7 @@ export function Hero() {
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
-                Cancel anytime
+                Set up in 5 minutes
               </span>
             </div>
 
@@ -60,10 +60,10 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               <Link 
                 href="/register" 
-                onClick={() => trackMetaPixelEvent('Lead', { content_name: 'Start Your Free Trial', content_category: 'hero' })}
+                onClick={() => trackMetaPixelEvent('Lead', { content_name: 'Create Your Store Free', content_category: 'hero' })}
                 className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all flex items-center gap-2 text-lg font-semibold"
               >
-                Start Your Free Trial
+                Create Your Store &mdash; Free for 14 Days
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link 

@@ -51,6 +51,30 @@ export default function AdminDashboardClient({
     stats: { registrations: number; renewals: number; activations: number; upgrades: number };
     chartData: Array<{ date: string; registrations: number; renewals: number }>;
   } | null>(null);
+  const [acquisitionFunnel, setAcquisitionFunnel] = useState<{
+    funnel: {
+      landingViews: number;
+      ctaClicks: number;
+      signUpStarted: number;
+      signUpFailed: number;
+      signUpCompleted: number;
+    };
+    rates: {
+      landingToCtaRate: number;
+      ctaToSignupStartRate: number;
+      signupStartToCompleteRate: number;
+      overallLandingToCompleteRate: number;
+    };
+    campaigns: Array<{
+      campaign: string;
+      landingViews: number;
+      ctaClicks: number;
+      signUpStarted: number;
+      signUpFailed: number;
+      signUpCompleted: number;
+      overallLandingToCompleteRate: number;
+    }>;
+  } | null>(null);
   const [loadingMarketing, setLoadingMarketing] = useState(false);
 
   useEffect(() => {
@@ -111,12 +135,25 @@ export default function AdminDashboardClient({
     const fetchMarketingStats = async () => {
       setLoadingMarketing(true);
       try {
-        const response = await fetch('/api/admin/marketing-stats?period=month');
-        if (response.ok) {
-          const data = await response.json();
+        const [marketingResponse, acquisitionResponse] = await Promise.all([
+          fetch('/api/admin/marketing-stats?period=month'),
+          fetch('/api/admin/analytics/acquisition-funnel?period=month'),
+        ]);
+
+        if (marketingResponse.ok) {
+          const data = await marketingResponse.json();
           setMarketingStats({
             stats: data.stats,
             chartData: data.chartData || [],
+          });
+        }
+
+        if (acquisitionResponse.ok) {
+          const data = await acquisitionResponse.json();
+          setAcquisitionFunnel({
+            funnel: data.funnel,
+            rates: data.rates,
+            campaigns: data.campaigns || [],
           });
         }
       } catch (error) {
@@ -295,6 +332,117 @@ export default function AdminDashboardClient({
         </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ads to Signup Funnel (Landlord View)</CardTitle>
+              <CardDescription>
+                Tracks acquisition flow from ad landing page to completed signup using internal funnel events.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingMarketing ? (
+                <div className="h-[180px] flex items-center justify-center text-muted-foreground">
+                  Loading...
+                </div>
+              ) : acquisitionFunnel ? (
+                <div className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Landing Views</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.funnel.landingViews}</div>
+                        <p className="text-xs text-muted-foreground">ad_landing_page_view</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">CTA Clicks</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.funnel.ctaClicks}</div>
+                        <p className="text-xs text-muted-foreground">
+                          {acquisitionFunnel.rates.landingToCtaRate}% from landing views
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Signup Started</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.funnel.signUpStarted}</div>
+                        <p className="text-xs text-muted-foreground">
+                          {acquisitionFunnel.rates.ctaToSignupStartRate}% from CTA clicks
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Signup Failed</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.funnel.signUpFailed}</div>
+                        <p className="text-xs text-muted-foreground">Validation/API failures</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Signup Completed</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.funnel.signUpCompleted}</div>
+                        <p className="text-xs text-muted-foreground">
+                          {acquisitionFunnel.rates.overallLandingToCompleteRate}% total conversion
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Start → Complete Rate</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">{acquisitionFunnel.rates.signupStartToCompleteRate}%</div>
+                        <p className="text-xs text-muted-foreground">
+                          Percentage of started signups that complete registration
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Campaign Breakdown</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {acquisitionFunnel.campaigns.length > 0 ? (
+                          <div className="space-y-2">
+                            {acquisitionFunnel.campaigns.slice(0, 5).map((campaign) => (
+                              <div key={campaign.campaign} className="flex items-center justify-between text-sm">
+                                <span className="truncate pr-2">{campaign.campaign}</span>
+                                <span className="font-medium">
+                                  {campaign.signUpCompleted}/{campaign.landingViews} ({campaign.overallLandingToCompleteRate}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No campaign data yet</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-[180px] flex items-center justify-center text-muted-foreground">
+                  No acquisition funnel data yet
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Conversion Funnel</CardTitle>

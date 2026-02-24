@@ -1,12 +1,12 @@
 'use client';
 
-import { Store, Package, CreditCard, HeadphonesIcon } from 'lucide-react';
+import { Clock, Zap, CreditCard, ShieldCheck } from 'lucide-react';
 
 const stats = [
-  { value: '50+', label: 'Stores Created', icon: Store },
-  { value: '500+', label: 'Products Listed', icon: Package },
-  { value: '99.9%', label: 'Uptime Guarantee', icon: CreditCard },
-  { value: '24/7', label: 'Support Available', icon: HeadphonesIcon },
+  { value: '5 min', label: 'To Set Up Your Store', icon: Clock },
+  { value: '0', label: 'Coding Required', icon: Zap },
+  { value: 'Online', label: 'Payments Ready', icon: CreditCard },
+  { value: '99.9%', label: 'Uptime Guarantee', icon: ShieldCheck },
 ];
 
 export function Stats() {
@@ -24,6 +24,14 @@ export function Stats() {
               </div>
             );
           })}
+        </div>
+
+        {/* Inline Social Proof Quote */}
+        <div className="mt-10 pt-8 border-t border-white/20 max-w-3xl mx-auto text-center">
+          <p className="text-white/90 text-lg italic leading-relaxed">
+            &ldquo;I wanted a professional website for years but every developer quoted Ksh 50,000+. With DukaNest I got a fully customized online store from just Ksh 1,000/month.&rdquo;
+          </p>
+          <p className="text-white/60 text-sm mt-3">&mdash; Kofi M., Electronics Retailer, Nairobi</p>
         </div>
       </div>
     </section>

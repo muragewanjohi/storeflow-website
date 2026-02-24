@@ -87,9 +87,9 @@ export function Blog() {
         {/* Blog Posts Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {blogPosts.map((post) => (
-            <Link
+            <a
               key={post.id}
-              href={post.slug ? `/blog/${post.slug}` : `/blog/${post.id}`}
+              href="/help"
               className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden"
             >
               {/* Post Image */}
@@ -139,17 +139,17 @@ export function Blog() {
                   Read More
                 </span>
               </div>
-            </Link>
+            </a>
           ))}
         </div>
 
         {/* View All Button */}
         <div className="text-center mt-12">
           <Link
-            href="/blog"
+            href="/help"
             className="inline-block bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-xl transform hover:-translate-y-1 transition-all"
           >
-            View All Posts
+            Visit Help Center
           </Link>
         </div>
       </div>

@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ArrowLeft, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 
 interface PricingPlan {
@@ -169,6 +170,9 @@ function TenantRegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const planIdFromUrl = searchParams.get('plan');
+  const utmSource = searchParams.get('utm_source');
+  const utmMedium = searchParams.get('utm_medium');
+  const utmCampaign = searchParams.get('utm_campaign');
 
   const [allPlans, setAllPlans] = useState<PricingPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(planIdFromUrl);
@@ -544,9 +548,27 @@ function TenantRegisterForm() {
 
     // Run client-side validation (preserves existing field errors for display)
     if (!validateForm()) {
+      trackMarketingFunnelEvent('sign_up_failed', {
+        reason: 'client_validation_failed',
+        plan_id: selectedPlanId,
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
+      });
       setIsSubmitting(false);
       return;
     }
+
+    // Track funnel start only after client-side validation succeeds.
+    trackMarketingFunnelEvent('sign_up_started', {
+      plan_id: selectedPlanId,
+      include_demo_content: includeDemoContent,
+      include_demo_attributes: includeDemoAttributes,
+      business_type_selected: Boolean(businessType),
+      utm_source: utmSource || undefined,
+      utm_medium: utmMedium || undefined,
+      utm_campaign: utmCampaign || undefined,
+    });
 
     // Start the animated progress screen
     const steps = getProgressSteps(formData.name, includeDemoContent);
@@ -611,6 +633,14 @@ function TenantRegisterForm() {
 
         setFieldErrors(serverFieldErrors);
         setError(Object.keys(serverFieldErrors).length > 0 ? null : data.message || 'Registration failed');
+        trackMarketingFunnelEvent('sign_up_failed', {
+          reason: Object.keys(serverFieldErrors).length > 0 ? 'server_validation_failed' : 'registration_failed',
+          plan_id: selectedPlanId,
+          has_field_errors: Object.keys(serverFieldErrors).length > 0,
+          utm_source: utmSource || undefined,
+          utm_medium: utmMedium || undefined,
+          utm_campaign: utmCampaign || undefined,
+        });
         setIsSubmitting(false);
         return;
       }
@@ -623,6 +653,15 @@ function TenantRegisterForm() {
       trackMetaPixelEvent('CompleteRegistration', {
         content_name: 'Store Registration',
         status: 'complete',
+      });
+      trackMarketingFunnelEvent('sign_up_completed', {
+        plan_id: selectedPlanId,
+        include_demo_content: includeDemoContent,
+        include_demo_attributes: includeDemoAttributes,
+        business_type: businessType || undefined,
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
       });
       if (data.loginUrl) {
         setLoginUrl(data.loginUrl);
@@ -637,6 +676,13 @@ function TenantRegisterForm() {
     } catch (err) {
       cancelProgress();
       setError('An error occurred. Please try again.');
+      trackMarketingFunnelEvent('sign_up_failed', {
+        reason: 'network_or_unexpected_error',
+        plan_id: selectedPlanId,
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
+      });
       setIsSubmitting(false);
     }
   };
