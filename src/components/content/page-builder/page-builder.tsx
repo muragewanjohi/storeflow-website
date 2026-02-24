@@ -21,6 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useQuery } from '@tanstack/react-query';
 import { Label } from '@/components/ui/label';
+import ContextualHelp from '@/components/dashboard/contextual-help';
+import ContextualHelpPanel from '@/components/dashboard/contextual-help-panel';
+import FeatureDiscoveryTooltip from '@/components/dashboard/feature-discovery-tooltip';
 import {
   DndContext,
   closestCenter,
@@ -67,6 +70,73 @@ const SECTION_GROUPS: { label: string; types: SectionType[] }[] = [
   { label: 'Conversion', types: ['cta', 'form'] },
   { label: 'Other', types: ['location'] },
 ];
+
+const SECTION_HELP_META: Record<SectionType, { description: string; learnMoreHref: string; tips?: string[] }> = {
+  hero: {
+    description: 'Best first section for landing pages. Use it for headline, subheadline, image, and primary CTA.',
+    learnMoreHref: '/help?article=page-builder-overview',
+    tips: ['Place Hero first for clarity', 'Use one clear CTA', 'Keep headline benefit-focused'],
+  },
+  features: {
+    description: 'Show key benefits or capabilities in cards. Keep copy short and outcome-focused.',
+    learnMoreHref: '/help?article=page-builder-overview',
+    tips: ['Use 3-6 features', 'Lead with customer outcomes', 'Keep each feature scannable'],
+  },
+  products: {
+    description: 'Display selected or recent products to drive browsing and purchases.',
+    learnMoreHref: '/help?article=managing-products',
+    tips: ['Feature best sellers first', 'Use clear prices', 'Avoid overwhelming with too many items'],
+  },
+  testimonials: {
+    description: 'Build trust with customer quotes, names, and optional ratings/photos.',
+    learnMoreHref: '/help?article=page-builder-overview',
+  },
+  text: {
+    description: 'Use for policy, about, or explanatory content where rich text is enough.',
+    learnMoreHref: '/help?article=creating-pages',
+  },
+  image: {
+    description: 'Use image sections for visual storytelling, promotions, or supporting content.',
+    learnMoreHref: '/help?article=creating-pages',
+  },
+  categories: {
+    description: 'Help customers browse by category and discover products faster.',
+    learnMoreHref: '/help?article=managing-categories',
+  },
+  banners: {
+    description: 'Use banners for promotions, announcements, and campaign highlights.',
+    learnMoreHref: '/help?article=page-builder-overview',
+  },
+  sales_tab: {
+    description: 'Feature sale campaigns and discounts in a dedicated section.',
+    learnMoreHref: '/help?article=page-builder-overview',
+  },
+  split_layout: {
+    description: 'Combine text and visuals side by side for balanced storytelling.',
+    learnMoreHref: '/help?article=page-builder-overview',
+  },
+  cta: {
+    description: 'Prompt users to take action (buy now, contact, subscribe, etc.).',
+    learnMoreHref: '/help?article=page-builder-overview',
+    tips: ['Use one primary action', 'Keep CTA text clear', 'Place CTA after proof sections'],
+  },
+  product_tabs: {
+    description: 'Organize product collections in tabs to reduce scrolling and improve discovery.',
+    learnMoreHref: '/help?article=managing-products',
+  },
+  form: {
+    description: 'Collect leads, inquiries, or requests directly from the page.',
+    learnMoreHref: '/help?article=contact-forms',
+  },
+  blogs: {
+    description: 'Show recent blog posts to improve content freshness and SEO.',
+    learnMoreHref: '/help?article=blog-management',
+  },
+  location: {
+    description: 'Display store location and directions for trust and offline discovery.',
+    learnMoreHref: '/help?article=store-settings',
+  },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -361,18 +431,25 @@ function SectionPicker({ onAddSection }: Readonly<SectionPickerProps>) {
                   <div className="grid grid-cols-2 gap-1">
                     {group.types.map((type) => {
                       const meta = SECTION_TYPE_META[type];
+                      const help = SECTION_HELP_META[type];
                       return (
-                        <Button
-                          key={type}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onAddSection(type)}
-                          className="flex items-center gap-1.5 h-auto py-1.5 px-2 justify-start text-xs"
-                        >
-                          <span className="text-base">{meta.icon}</span>
-                          <span>{meta.label}</span>
-                        </Button>
+                        <div key={type} className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onAddSection(type)}
+                            className="flex-1 flex items-center gap-1.5 h-auto py-1.5 px-2 justify-start text-xs"
+                          >
+                            <span className="text-base">{meta.icon}</span>
+                            <span>{meta.label}</span>
+                          </Button>
+                          <ContextualHelp
+                            title={meta.label}
+                            description={help.description}
+                            learnMoreHref={help.learnMoreHref}
+                          />
+                        </div>
                       );
                     })}
                   </div>
@@ -454,6 +531,49 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
     [data.sections],
   );
 
+  const builderGuidance = useMemo(() => {
+    const tips: Array<{ id: string; tone: 'warning' | 'info'; text: string }> = [];
+    const firstVisible = sortedSections.find((s) => !s.hidden);
+    const hasHero = sortedSections.some((s) => s.type === 'hero' && !s.hidden);
+    const hasCta = sortedSections.some((s) => s.type === 'cta' && !s.hidden);
+    const hiddenCount = sortedSections.filter((s) => s.hidden).length;
+    const visibleCount = sortedSections.filter((s) => !s.hidden).length;
+
+    if (hasHero && firstVisible && firstVisible.type !== 'hero') {
+      tips.push({
+        id: 'hero-order',
+        tone: 'warning',
+        text: 'Hero section works best at the top. Consider moving it to the first visible position.',
+      });
+    }
+
+    if (!hasCta && visibleCount >= 3) {
+      tips.push({
+        id: 'missing-cta',
+        tone: 'warning',
+        text: 'No CTA section found. Add a CTA section to improve conversions.',
+      });
+    }
+
+    if (visibleCount > 10) {
+      tips.push({
+        id: 'too-many-sections',
+        tone: 'info',
+        text: 'This page has many sections. Simplifying the page can improve readability and performance.',
+      });
+    }
+
+    if (hiddenCount > 0) {
+      tips.push({
+        id: 'hidden-sections',
+        tone: 'info',
+        text: `${hiddenCount} hidden section${hiddenCount > 1 ? 's are' : ' is'} excluded from storefront rendering.`,
+      });
+    }
+
+    return tips;
+  }, [sortedSections]);
+
   const selectedSection = data.sections.find((s) => s.id === selectedSectionId);
 
   // ─── Section CRUD ────────────────────────────────────────────────────────
@@ -534,7 +654,14 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Page Builder</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Page Builder</h3>
+            <FeatureDiscoveryTooltip
+              featureKey="page-builder-v2"
+              title="New Page Builder Experience"
+              description="Use grouped section picker, quick-add between sections, drag-and-drop ordering, and contextual section guidance."
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             Click a section to edit it. Drag to reorder.
           </p>
@@ -550,6 +677,29 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
           </Button>
         </div>
       </div>
+
+      {builderGuidance.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Builder Guidance</CardTitle>
+            <CardDescription>Recommendations to improve page structure and conversion flow</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {builderGuidance.map((tip) => (
+              <div
+                key={tip.id}
+                className={`rounded-md border px-3 py-2 text-sm ${
+                  tip.tone === 'warning'
+                    ? 'border-amber-300 bg-amber-50 text-amber-900'
+                    : 'border-blue-200 bg-blue-50 text-blue-900'
+                }`}
+              >
+                {tip.text}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {previewMode ? (
         <div className="space-y-4">
@@ -667,9 +817,23 @@ export default function PageBuilder({ value, onChange, pageSlug, pageId, pageSta
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h4 className="text-base font-semibold">
-                      Editing: {getSectionTypeLabel(selectedSection.type)} Section
-                    </h4>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-base font-semibold">
+                        Editing: {getSectionTypeLabel(selectedSection.type)} Section
+                      </h4>
+                      <ContextualHelp
+                        title={`${getSectionTypeLabel(selectedSection.type)} Section`}
+                        description={SECTION_HELP_META[selectedSection.type as SectionType]?.description ?? 'Configure this section to match your page goal.'}
+                        learnMoreHref={SECTION_HELP_META[selectedSection.type as SectionType]?.learnMoreHref ?? '/help'}
+                      />
+                      <ContextualHelpPanel
+                        title={`${getSectionTypeLabel(selectedSection.type)} Section Guide`}
+                        description={SECTION_HELP_META[selectedSection.type as SectionType]?.description ?? 'Configure this section to match your page goal.'}
+                        tips={SECTION_HELP_META[selectedSection.type as SectionType]?.tips ?? []}
+                        learnMoreHref={SECTION_HELP_META[selectedSection.type as SectionType]?.learnMoreHref ?? '/help'}
+                        triggerLabel="Open panel"
+                      />
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Configure the content and settings for this section below
                     </p>

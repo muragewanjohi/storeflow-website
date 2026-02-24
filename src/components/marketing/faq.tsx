@@ -11,48 +11,57 @@ import {
 
 const faqs = [
   {
+    question: 'Who is DukaNest for?',
+    answer: 'DukaNest is built for small businesses and entrepreneurs selling physical products online without their own website. It is ideal for sellers using channels like WhatsApp, Instagram, Facebook, Jiji, and Jumia.',
+  },
+  {
+    question: 'Do I need coding skills to create my store?',
+    answer: 'No. You can create and manage your store without writing code. DukaNest is designed for business owners who are comfortable using phones and social media, not developers.',
+  },
+  {
     question: 'What is included in the 14-day free trial?',
-    answer: 'The 14-day free trial includes full access to all features of your chosen plan. You can build your store, add products, configure payment methods, customize themes, and test all functionality. No credit card required to start. After 14 days, you can choose to continue with a paid subscription or your trial will end.',
-  },
-  
-  {
-    question: 'Can I use my own domain name?',
-    answer: 'Custom domain support is not currently available, but it\'s a feature we\'re actively working on. For now, your store will use a DukaNest subdomain. We\'ll notify all users when custom domain support becomes available. This feature will allow you to connect your existing domain or purchase a new one through our platform.',
-  },
-
-  {
-    question: 'Do you support multiple languages and currencies?',
-    answer: 'Yes! Basic plans support 2 languages, Pro plans support 4 languages, and Premium plans offer unlimited languages. You can also configure multiple currencies, set up currency conversion, and provide localized shopping experiences for customers in different regions.',
+    answer: 'The free trial gives you access to core store setup features so you can test your storefront, add products, and experience order flow before choosing a paid plan. No credit card is required to start.',
   },
   {
-    question: 'How do I manage orders and inventory?',
-    answer: 'DukaNest includes comprehensive order management with status tracking (Pending, Processing, Shipped, Delivered), order history, and customer communication. Inventory management features include stock tracking, low stock alerts, bulk inventory updates, and inventory history. All plans include these core features.',
+    question: 'How much does DukaNest cost?',
+    answer: 'DukaNest has affordable plans for small businesses, starting from Ksh 1,000 per month. You can begin with a free trial and upgrade to the plan that matches your stage.',
   },
   {
-    question: 'What analytics and reporting features are available?',
-    answer: 'Basic plans include essential analytics (sales, orders, customers). Pro and Premium plans include advanced analytics with conversion funnel tracking, geographic analytics, product performance insights, real-time analytics, period comparisons, and scheduled reports. You can export data for further analysis.',
+    question: 'Can I use DukaNest if I currently sell on WhatsApp or Instagram?',
+    answer: 'Yes. DukaNest is designed for sellers already taking orders on social and chat channels. It helps you move to a more professional and organized online store experience.',
   },
   {
-    question: 'Can I add staff members to manage my store?',
-    answer: 'Yes! You can add staff users with different roles and permissions. Basic plans allow 1 staff user, Pro plans allow 5 staff users, and Premium plans allow 10 staff users. Each staff member can have customized access levels to products, orders, customers, and settings.',
+    question: 'Can I manage products, inventory, and orders in one place?',
+    answer: 'Yes. DukaNest provides a single dashboard for managing products, tracking inventory, and handling customer orders.',
   },
   {
-    question: 'Do you offer shipping and delivery zone management?',
-    answer: 'Yes! All plans include delivery zone configuration, allowing you to set up shipping rates for different regions. You can configure multiple delivery zones, set shipping costs, and manage fulfillment. Order tracking and customer notifications are included.',
+    question: 'Does DukaNest support delivery zones and delivery fees?',
+    answer: 'Yes. You can set delivery zones and clear fees so customers know delivery charges upfront during checkout.',
   },
   {
-    question: 'Can I create custom pages and blog posts?',
-    answer: 'Absolutely! All plans include custom page creation (Basic: 10 pages, Pro: 50 pages, Premium: Unlimited). Blog functionality is available on all plans, with Basic offering unlimited blog posts. You can create About pages, Terms & Conditions, Privacy Policy, and more.',
+    question: 'Can I add staff accounts?',
+    answer: 'Yes. Pro is built for growing stores with staff and supports team access and role-based permissions. Basic is better for solo business owners.',
   },
   {
-    question: 'What happens if I exceed my plan limits?',
-    answer: 'If you approach your plan limits, you\'ll receive notifications. For products and orders, you can upgrade to a higher plan. Storage limits can be increased by upgrading. We make it easy to upgrade your plan at any time to accommodate your growing business.',
+    question: 'Can I move from Basic to Pro later?',
+    answer: 'Yes. You can upgrade as your business grows and you need more team and operational capabilities.',
   },
   {
-    question: 'Is there a mobile app for managing my store?',
-    answer: 'DukaNest is fully responsive and works seamlessly on mobile devices. You can manage your store, view orders, add products, and access all features from any smartphone or tablet through your web browser. Native mobile apps are planned for future releases.',
+    question: 'Is DukaNest mobile-friendly?',
+    answer: 'Yes. Your storefront and dashboard are mobile-friendly, so both you and your customers can use DukaNest from phones.',
   },
- 
+  {
+    question: 'Can I connect my own domain?',
+    answer: 'Custom domain support is not currently available. For now, your store uses a DukaNest subdomain while custom domain functionality is being prepared.',
+  },
+  {
+    question: 'What support do I get if I need help?',
+    answer: 'You can use our Help Center guides and contact support for assistance. We are continuously improving onboarding resources to help you launch and grow faster.',
+  },
+  {
+    question: 'What happens if I cancel?',
+    answer: 'Cancellation stops future billing. Access and data handling follow your current billing terms and platform policy.',
+  },
 ];
 
 export function FAQ() {

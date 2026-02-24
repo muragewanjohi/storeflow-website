@@ -24,6 +24,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import ContextualHelp from '@/components/dashboard/contextual-help';
+import ContextualHelpPanel from '@/components/dashboard/contextual-help-panel';
+import FeatureDiscoveryTooltip from '@/components/dashboard/feature-discovery-tooltip';
 
 interface Page {
   id: string;
@@ -418,7 +421,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="title">Title *</Label>
+                  <ContextualHelp
+                    title="Page Title"
+                    description="Use a clear, specific title. This helps customers and search engines understand the page."
+                    learnMoreHref="/help?article=creating-pages"
+                  />
+                </div>
                 <Input
                   id="title"
                   value={formData.title || ''}
@@ -429,7 +439,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="slug">Slug</Label>
+                  <ContextualHelp
+                    title="Slug"
+                    description="The slug is the page URL path. Keep it short, lowercase, and descriptive. Leave empty to auto-generate from title."
+                    learnMoreHref="/help?article=creating-pages"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Input
                     id="slug"
@@ -461,7 +478,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Header Style</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label>Header Style</Label>
+                    <ContextualHelp
+                      title="Header Style"
+                      description="Use Banner image for simple pages. Use Hero section when building richer pages with title, subtitle, and call-to-action content."
+                      learnMoreHref="/help?article=creating-pages"
+                    />
+                  </div>
                   <RadioGroup
                     value={formData.use_banner ? 'banner' : 'hero'}
                     onValueChange={(value) => {
@@ -532,7 +556,30 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="content">Content</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="content">Content</Label>
+                  <ContextualHelp
+                    title="Content Mode"
+                    description="Simple Editor is best for basic text pages. Page Builder is best for structured pages made of reusable sections."
+                    learnMoreHref="/help?article=page-builder-overview"
+                  />
+                  <FeatureDiscoveryTooltip
+                    featureKey="page-content-mode-tabs"
+                    title="Page Builder is available"
+                    description="You can now build pages using reusable sections with drag-and-drop ordering and live preview."
+                  />
+                  <ContextualHelpPanel
+                    title="Page Content Help"
+                    description="Choose the content mode based on your page goal. Use Simple Editor for straightforward pages and Page Builder for modular, conversion-focused pages."
+                    tips={[
+                      'Use Hero as your first section for landing pages.',
+                      'Add a CTA section when the page has a conversion goal.',
+                      'Keep sections focused and avoid overly long pages.',
+                    ]}
+                    learnMoreHref="/help?article=page-builder-overview"
+                    triggerLabel="Open guide"
+                  />
+                </div>
                 <Tabs value={contentMode} onValueChange={(value) => setContentMode(value as 'rich-text' | 'page-builder')}>
                   <TabsList className="mb-4 bg-muted/50 border border-border">
                     <TabsTrigger 
@@ -614,7 +661,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
             {seoSettingsOpen && (
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="meta_title">Meta Title</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_title">Meta Title</Label>
+                    <ContextualHelp
+                      title="Meta Title"
+                      description="The SEO title shown in search results. Aim for under 60 characters and include the main keyword."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
                   <Input
                     id="meta_title"
                     value={formData.meta_title || ''}
@@ -625,7 +679,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="meta_description">Meta Description</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_description">Meta Description</Label>
+                    <ContextualHelp
+                      title="Meta Description"
+                      description="A short summary for search results. Keep it under 160 characters and include a clear value proposition."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
                   <Textarea
                     id="meta_description"
                     value={formData.meta_description || ''}
@@ -637,7 +698,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="meta_tags">Meta Tags</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_tags">Meta Tags</Label>
+                    <ContextualHelp
+                      title="Meta Tags"
+                      description="Optional comma-separated keywords. Focus on a few relevant terms instead of long keyword lists."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
                   <Input
                     id="meta_tags"
                     value={formData.meta_tags || ''}

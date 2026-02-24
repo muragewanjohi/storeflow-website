@@ -20,6 +20,7 @@ import { PhotoIcon } from '@heroicons/react/24/solid';
 import { generateVariantName } from '@/lib/products/variant-helpers';
 import ProductSalesSection from './product-sales-section';
 import RichTextEditor from '@/components/content/rich-text-editor';
+import ContextualHelp from '@/components/dashboard/contextual-help';
 
 interface Product {
   id: string;
@@ -581,7 +582,14 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="sku">SKU</Label>
+                    <ContextualHelp
+                      title="SKU (Stock Keeping Unit)"
+                      description="Use a unique code to quickly identify this product in your catalog and orders. If left blank, DukaNest will auto-generate one."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <Input
                     id="sku"
                     value={formData.sku}
@@ -606,7 +614,14 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Full Description</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="description">Full Description</Label>
+                    <ContextualHelp
+                      title="Full Description"
+                      description="A detailed description helps customers trust your product and improves SEO. Include key features, sizing, materials, and usage details."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <RichTextEditor
                     content={formData.description}
                     onChange={(content) => {
@@ -658,7 +673,14 @@ export default function ProductFormClient({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="sale_price">Sale Price</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="sale_price">Sale Price</Label>
+                      <ContextualHelp
+                        title="Sale Price"
+                        description="Optional discounted price shown to customers. It must be lower than the regular price."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
                     <Input
                       id="sale_price"
                       type="number"
@@ -675,10 +697,17 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="stock_quantity">
-                    Stock Quantity
-                    {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
-                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="stock_quantity">
+                      Stock Quantity
+                      {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
+                    </Label>
+                    <ContextualHelp
+                      title="Stock Quantity"
+                      description="If your product has no variants, set stock here. If variants exist, stock is calculated from variant stock values."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <Input
                     id="stock_quantity"
                     type="number"
@@ -742,7 +771,14 @@ export default function ProductFormClient({
                     </div>
                     {/* Variant Attributes */}
                     <div className="space-y-3">
-                      <Label>Attributes (e.g., Size, Color, Weight)</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label>Attributes (e.g., Size, Color, Weight)</Label>
+                        <ContextualHelp
+                          title="Variant Attributes"
+                          description="Use attributes to create product options like Size or Color. Each unique combination creates a variant with its own SKU, stock, and optional image."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
                       {variant.attributes.map((attr: any, attrIndex: any) => {
                         const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
                         return (
@@ -1100,7 +1136,14 @@ export default function ProductFormClient({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="status">Status</Label>
+                    <ContextualHelp
+                      title="Product Status"
+                      description="Draft keeps the product hidden while you prepare it. Active makes it visible to customers. Inactive and Archived remove it from active selling."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <Select
                     value={formData.status}
                     onValueChange={(value: any) =>
@@ -1120,7 +1163,14 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="estimated_delivery_days">Estimated Delivery (Days)</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="estimated_delivery_days">Estimated Delivery (Days)</Label>
+                    <ContextualHelp
+                      title="Estimated Delivery"
+                      description="Set a product-specific delivery estimate in days. Leave this empty to use your store default delivery setting."
+                      learnMoreHref="/help?article=managing-delivery"
+                    />
+                  </div>
                   <Input
                     id="estimated_delivery_days"
                     type="number"
@@ -1136,7 +1186,14 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category_id">Category</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="category_id">Category</Label>
+                    <ContextualHelp
+                      title="Category"
+                      description="Choose the main category to help customers browse your products faster. If available, add a subcategory for better organization."
+                      learnMoreHref="/help?article=managing-categories"
+                    />
+                  </div>
                   <Select
                     value={parentCategoryId || 'none'}
                     onValueChange={(value) => {

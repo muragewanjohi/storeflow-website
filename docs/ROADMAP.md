@@ -195,17 +195,65 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - [x] Article categories (Getting Started, Products, Orders, Settings, Payments, etc.)
    - [ ] Video tutorials embedded in articles
    - [ ] PDF guides for download
-   - [ ] FAQ section with common questions
+   - [x] FAQ section with common questions
+     - **Starter FAQ set (targeted to small product sellers):**
+       1. What is DukaNest and who is it for?
+       2. Do I need coding skills to create my store?
+       3. How long does it take to set up my store?
+       4. Can I use DukaNest if I currently sell on WhatsApp, Instagram, Facebook, Jiji, or Jumia?
+       5. How much does DukaNest cost and is there a free trial?
+       6. Can I manage products, stock, and orders in one dashboard?
+       7. Can I add my own branding (logo, colors, business name)?
+       8. Does DukaNest support delivery zones and delivery fees?
+       9. Can customers pay online, and what payment options are supported?
+       10. Can I add staff accounts and permissions?
+       11. Is DukaNest mobile-friendly for both me and my customers?
+       12. Can I move from Basic to Pro later as my business grows?
+       13. How do I connect a custom domain to my store?
+       14. What support do I get if I need help?
+       15. What happens if I cancel my plan?
+     - **Draft answers (ready for Help Center):**
+       - **What is DukaNest and who is it for?**  
+         DukaNest is an ecommerce platform for small businesses and entrepreneurs selling physical products online who want their own professional website. It is ideal for sellers already using channels like WhatsApp, Instagram, Facebook, Jiji, or Jumia.
+       - **Do I need coding skills to create my store?**  
+         No. DukaNest is built for non-technical users. You can set up products, pricing, delivery, and branding without writing code.
+       - **How long does it take to set up my store?**  
+         Most sellers can complete a basic setup in minutes. Full setup time depends on how many products and settings you add.
+       - **Can I use DukaNest if I currently sell on WhatsApp, Instagram, Facebook, Jiji, or Jumia?**  
+         Yes. DukaNest is designed for exactly that use case. You can keep using those channels for discovery while directing customers to your own store for organized ordering.
+       - **How much does DukaNest cost and is there a free trial?**  
+         Pricing depends on your selected plan. DukaNest includes a free trial period so you can test the platform before committing.
+       - **Can I manage products, stock, and orders in one dashboard?**  
+         Yes. DukaNest provides one dashboard where you can manage products, track inventory, and monitor orders.
+       - **Can I add my own branding (logo, colors, business name)?**  
+         Yes. You can customize your storefront branding to match your business identity.
+       - **Does DukaNest support delivery zones and delivery fees?**  
+         Yes. You can configure delivery zones and set clear delivery fees for customers during checkout.
+       - **Can customers pay online, and what payment options are supported?**  
+         DukaNest supports online payment workflows. Exact options may vary by setup and enabled integrations in your store settings.
+       - **Can I add staff accounts and permissions?**  
+         Yes. Higher plans support adding team members and assigning permissions based on roles.
+       - **Is DukaNest mobile-friendly for both me and my customers?**  
+         Yes. Storefront pages and management workflows are designed to work well on mobile devices.
+       - **Can I move from Basic to Pro later as my business grows?**  
+         Yes. You can upgrade your plan as your business grows and needs more advanced features.
+       - **How do I connect a custom domain to my store?**  
+         You can connect your domain from the store settings by following the domain setup instructions. Help articles should provide step-by-step DNS guidance.
+       - **What support do I get if I need help?**  
+         You can use the Help Center for guides and troubleshooting. Support level may depend on your plan.
+       - **What happens if I cancel my plan?**  
+         Cancellation stops future billing. Access and data retention behavior should follow your billing policy and terms.
    - [x] Search functionality with autocomplete
    - **Status:** Implemented - Available at `/dashboard/help` with searchable articles and categories
 
 2. **Contextual Help Tooltips**
-   - [ ] Help icon (?) buttons next to complex features
-   - [ ] Inline help text explaining what each field does
-   - [ ] Contextual help panels that slide in
-   - [ ] "Learn more" links to relevant documentation
-   - [ ] Feature discovery tooltips for new features
+   - [x] Help icon (?) buttons next to complex features
+   - [x] Inline help text explaining what each field does
+   - [x] Contextual help panels that slide in
+   - [x] "Learn more" links to relevant documentation
+   - [x] Feature discovery tooltips for new features
    - **Implementation:** Add help tooltip component and integrate into dashboard forms
+   - **Status:** Implemented - Help icon tooltips, inline field help, slide-in help panels, and one-time feature discovery tooltips are active in product/page workflows and Page Builder
 
 3. **Setup Checklist Widget**
    - [ ] Dashboard checklist widget ("Complete your store setup")
