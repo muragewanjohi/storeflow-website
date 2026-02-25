@@ -256,19 +256,19 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - **Status:** Implemented - Help icon tooltips, inline field help, slide-in help panels, and one-time feature discovery tooltips are active in product/page workflows and Page Builder
 
 3. **Setup Checklist Widget**
-   - [ ] Dashboard checklist widget ("Complete your store setup")
-   - [ ] Progress bars showing store completion percentage
-   - [ ] Suggested next steps based on current progress
-   - [ ] Completion tracking (products added, payment configured, etc.)
-   - **Implementation:** Create checklist component for dashboard with progress tracking
+   - [x] Dashboard checklist widget ("Complete your store setup")
+   - [x] Progress bars showing store completion percentage
+   - [x] Suggested next steps based on current progress
+   - [x] Completion tracking (products added, payment configured, etc.)
+   - **Implementation:** Checklist API computes completion + prioritized next actions; dashboard shows a "Suggested Next Step" card with direct CTA
 
 4. **Welcome Email Series**
-   - [ ] Welcome email on signup (Day 1)
-   - [ ] Follow-up emails (Day 3, 7, 14)
-   - [ ] Tips and tricks emails
+   - [x] Welcome email on signup (Day 1)
+   - [x] Follow-up emails (Day 3, 7, 14)
+   - [x] Tips and tricks emails
    - [ ] Feature announcement emails
-   - [ ] Best practices newsletter
-   - **Implementation:** Email templates and automated email sending system
+   - [x] Best practices newsletter
+   - **Implementation:** Day 1 email is sent on tenant registration; automated Day 3/7/14 follow-ups run via cron endpoint `/api/admin/onboarding/welcome-series` with send-tracking in `tenants.data.onboarding_emails`
 
 **Medium Priority (User Engagement):**
 

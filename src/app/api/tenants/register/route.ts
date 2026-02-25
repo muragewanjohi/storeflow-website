@@ -1107,17 +1107,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send welcome email (non-blocking - can be delayed)
-    const { sendWelcomeEmail } = await import('@/lib/email/sendgrid');
-    sendWelcomeEmail({
+    // Send Day 1 onboarding email (non-blocking)
+    const { sendTenantOnboardingEmail } = await import('@/lib/onboarding/emails');
+    void sendTenantOnboardingEmail({
       to: validatedData.adminEmail,
-      tenantName: tenant.name,
-      subdomain: tenant.subdomain,
-      adminName: validatedData.adminName,
-      loginUrl,
-    }).catch((error) => {
-      console.error('Failed to send welcome email:', error);
-    });
+      tenantId: tenant.id,
+      tenant: {
+        name: tenant.name,
+        subdomain: tenant.subdomain,
+        custom_domain: tenant.custom_domain,
+      },
+      stage: 'day1',
+    })
+      .then(async () => {
+        try {
+          const tenantData = (tenant.data as any) || {};
+          const onboardingEmails = tenantData.onboarding_emails || {};
+          await prisma.tenants.update({
+            where: { id: tenant.id },
+            data: {
+              data: {
+                ...tenantData,
+                onboarding_emails: {
+                  ...onboardingEmails,
+                  onboarding_started_at: onboardingEmails.onboarding_started_at || new Date().toISOString(),
+                  day1_sent_at: new Date().toISOString(),
+                },
+              },
+            },
+          });
+        } catch (updateError) {
+          console.error('[Registration] Failed to persist onboarding email metadata:', updateError);
+        }
+      })
+      .catch((error) => {
+        console.error('[Registration] Failed to send Day 1 onboarding email:', error);
+      });
 
     // Return success response
     // Final verification: Ensure all required pages exist before returning success

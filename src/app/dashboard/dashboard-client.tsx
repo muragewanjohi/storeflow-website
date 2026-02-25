@@ -116,6 +116,26 @@ interface LowStockVariant {
   stockQuantity: number;
 }
 
+interface GettingStartedItem {
+  id: string;
+  label: string;
+  description: string;
+  completed: boolean;
+  href: string;
+  cta?: string;
+}
+
+interface GettingStartedData {
+  items: GettingStartedItem[];
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  allComplete: boolean;
+  storeUrl: string;
+  nextAction?: GettingStartedItem | null;
+  nextSteps?: GettingStartedItem[];
+}
+
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -219,7 +239,7 @@ export default function DashboardClient({
       const response = await fetch('/api/dashboard/getting-started');
       if (!response.ok) return null;
       const json = await response.json();
-      return json.data;
+      return json.data as GettingStartedData;
     },
   });
 
@@ -354,50 +374,83 @@ export default function DashboardClient({
                 </div>
               </div>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {gettingStarted.items.map((item: { id: string; label: string; description: string; completed: boolean; href: string; cta?: string }) => (
-                  <div
-                    key={item.id}
-                    className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      item.completed
-                        ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-900/10'
-                        : 'border-border hover:bg-muted/50'
-                    }`}
-                  >
-                    <div className="mt-0.5">
-                      {item.completed ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : ''}`}>
-                        {item.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
-                      {!item.completed && item.cta && (
-                        <div className="mt-2">
-                          {item.id === 'share' ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCopyStoreLink}
-                              className="h-7 text-xs"
-                            >
-                              <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
-                              {item.cta}
-                            </Button>
-                          ) : (
-                            <Button variant="outline" size="sm" asChild className="h-7 text-xs">
-                              <Link href={item.href}>{item.cta}</Link>
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+              <div className="space-y-3">
+                {gettingStarted.nextAction && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
+                      Suggested Next Step
+                    </p>
+                    <p className="text-sm font-medium">{gettingStarted.nextAction.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {gettingStarted.nextAction.description}
+                    </p>
+                    {gettingStarted.nextAction.cta && (
+                      <div className="mt-2">
+                        {gettingStarted.nextAction.id === 'share' ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleCopyStoreLink}
+                            className="h-7 text-xs"
+                          >
+                            <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                            {gettingStarted.nextAction.cta}
+                          </Button>
+                        ) : (
+                          <Button variant="default" size="sm" asChild className="h-7 text-xs">
+                            <Link href={gettingStarted.nextAction.href}>{gettingStarted.nextAction.cta}</Link>
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {gettingStarted.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        item.completed
+                          ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-900/10'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {item.completed ? (
+                          <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : ''}`}>
+                          {item.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                        {!item.completed && item.cta && (
+                          <div className="mt-2">
+                            {item.id === 'share' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCopyStoreLink}
+                                className="h-7 text-xs"
+                              >
+                                <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                                {item.cta}
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm" asChild className="h-7 text-xs">
+                                <Link href={item.href}>{item.cta}</Link>
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>

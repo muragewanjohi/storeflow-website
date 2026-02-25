@@ -20,6 +20,7 @@ export interface GettingStartedItem {
   completed: boolean;
   href: string;
   cta?: string;
+  priority?: number;
 }
 
 export async function GET() {
@@ -97,6 +98,7 @@ export async function GET() {
         completed: productCount > 0,
         href: '/dashboard/products/new',
         cta: 'Add product',
+        priority: 1,
       },
       {
         id: 'delivery',
@@ -108,6 +110,7 @@ export async function GET() {
             ? '/dashboard/settings/delivery-zones'
             : '/dashboard/settings',
         cta: 'Configure shipping',
+        priority: 3,
       },
       {
         id: 'logo',
@@ -116,6 +119,7 @@ export async function GET() {
         completed: hasLogo,
         href: '/dashboard/settings',
         cta: 'Add logo',
+        priority: 4,
       },
       {
         id: 'payment',
@@ -124,6 +128,7 @@ export async function GET() {
         completed: hasPayment,
         href: '/dashboard/settings',
         cta: 'Set up payments',
+        priority: 2,
       },
       {
         id: 'currency',
@@ -132,6 +137,7 @@ export async function GET() {
         completed: hasCurrency,
         href: '/dashboard/settings',
         cta: 'Set currency',
+        priority: 5,
       },
       {
         id: 'share',
@@ -140,6 +146,7 @@ export async function GET() {
         completed: settings.getting_started_shared_link === 'true',
         href: storeUrl,
         cta: 'Copy link',
+        priority: 6,
       },
     ];
 
@@ -147,6 +154,11 @@ export async function GET() {
     const totalCount = items.length;
     const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
     const allComplete = completedCount === totalCount;
+    const nextSteps = items
+      .filter((item) => !item.completed)
+      .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
+      .slice(0, 3);
+    const nextAction = nextSteps[0] ?? null;
 
     return NextResponse.json({
       success: true,
@@ -156,6 +168,8 @@ export async function GET() {
         totalCount,
         progressPercent,
         allComplete,
+        nextSteps,
+        nextAction,
         storeUrl,
       },
     });
