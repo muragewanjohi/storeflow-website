@@ -17,16 +17,28 @@ import { createServerClient } from '@supabase/ssr';
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
+  const code = request.nextUrl.searchParams.get('code');
+  const oauthNextCookie = request.cookies.get('dukanest_oauth_next')?.value;
 
-  // Skip middleware for:
-  // - API routes (they handle tenant resolution themselves)
-  // - Static files
-  // - Next.js internal routes
+  if ((pathname === '/' || pathname === '/index') && code && oauthNextCookie) {
+    const safeNextPath =
+      oauthNextCookie.startsWith('/') && !oauthNextCookie.startsWith('//')
+        ? oauthNextCookie
+        : '/';
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = '/auth/callback';
+    callbackUrl.search = '';
+    callbackUrl.searchParams.set('code', code);
+    callbackUrl.searchParams.set('next', safeNextPath);
+    return NextResponse.redirect(callbackUrl);
+  }
+
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/static/') ||
-    pathname.startsWith('/favicon.ico')
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/auth/callback')
   ) {
     return NextResponse.next();
   }

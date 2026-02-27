@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 export default function TenantLoginForm() {
   const router = useRouter();
@@ -25,6 +26,31 @@ export default function TenantLoginForm() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const supabase = createSupabaseClient();
+      document.cookie = 'dukanest_oauth_next=/dashboard; Path=/; Max-Age=900; SameSite=Lax';
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+      if (oauthError) {
+        setError(oauthError.message || 'Google sign-in failed');
+        setIsLoading(false);
+      }
+    } catch {
+      setError('Unable to start Google sign-in. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   // Fetch tenant name on mount
   useEffect(() => {
@@ -147,6 +173,23 @@ export default function TenantLoginForm() {
           </p>
         </CardHeader>
         <CardContent>
+          {!requiresMFA && (
+            <div className="space-y-3 mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+              >
+                Continue with Google
+              </Button>
+              <div className="relative text-center text-xs uppercase text-muted-foreground">
+                <span className="bg-background px-2 relative z-10">or</span>
+                <div className="absolute left-0 right-0 top-1/2 h-px bg-border -z-0" />
+              </div>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="rounded-md bg-red-50 p-4 border border-red-200">

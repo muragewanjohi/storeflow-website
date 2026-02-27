@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Loader2, ArrowLeft, CheckCircle2, Check, Store, Palette, Package, Setti
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
+import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 interface PricingPlan {
   id: string;
@@ -167,7 +168,7 @@ function StoreCreationProgress({
 }
 
 function TenantRegisterForm() {
-  const router = useRouter();
+  const GOOGLE_SIGNUP_STORAGE_KEY = 'dukanest:google-signup-pending';
   const searchParams = useSearchParams();
   const planIdFromUrl = searchParams.get('plan');
   const utmSource = searchParams.get('utm_source');
@@ -196,21 +197,16 @@ function TenantRegisterForm() {
   const [formData, setFormData] = useState({
     name: '',
     subdomain: '',
-    adminEmail: '',
-    adminPassword: '',
-    adminName: '',
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const [themes, setThemes] = useState<any[]>([]);
-  const [isLoadingThemes, setIsLoadingThemes] = useState(true);
-  const [themesError, setThemesError] = useState<string | null>(null);
-  const [selectedThemeId, setSelectedThemeId] = useState<string>('');
+  const [useEmailSignup, setUseEmailSignup] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [businessType, setBusinessType] = useState<string>('');
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
-  const [includeDemoAttributes, setIncludeDemoAttributes] = useState(true); // Default to true to include Size, Color, etc.
   const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
+  const isHandlingGoogleCallback = useRef(false);
 
   // Business types for Kenya/Africa market
   const businessTypes = [
@@ -229,36 +225,6 @@ function TenantRegisterForm() {
     'Other',
   ];
 
-  // Fetch all themes on component mount
-  useEffect(() => {
-    async function fetchThemes() {
-      try {
-        // For registration, we need a public endpoint or we'll fetch themes after tenant creation
-        // For now, we'll create a simple endpoint or use a default theme
-        // Let's fetch from a public endpoint if available, otherwise use default
-        const response = await fetch('/api/public/themes');
-        if (response.ok) {
-          const data = await response.json();
-          setThemes(data.themes || []);
-          // Set default theme if available (Multipurpose theme, previously Grocery)
-          const defaultTheme = data.themes?.find((t: any) => 
-            t.slug?.toLowerCase() === 'grocery' || t.title?.toLowerCase().includes('multipurpose')
-          );
-          if (defaultTheme) {
-            setSelectedThemeId(defaultTheme.id);
-          }
-        } else {
-          setThemesError('Failed to load themes. Please refresh the page.');
-        }
-      } catch (err) {
-        console.error('Error fetching themes:', err);
-        setThemesError('Failed to load themes. Please refresh the page.');
-      } finally {
-        setIsLoadingThemes(false);
-      }
-    }
-    fetchThemes();
-  }, []);
 
   // Fetch all plans on component mount
   useEffect(() => {
@@ -378,20 +344,16 @@ function TenantRegisterForm() {
         if (formData.subdomain.length > 63) return 'Subdomain must be at most 63 characters';
         if (!/^[a-z0-9-]+$/.test(formData.subdomain)) return 'Subdomain can only contain lowercase letters, numbers, and hyphens';
         return null;
-      case 'adminName':
-        return !formData.adminName.trim() ? 'Your name is required' : null;
       case 'adminEmail':
-        if (!formData.adminEmail.trim()) return 'Admin email is required';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) return 'Please enter a valid email address';
+        if (!adminEmail.trim()) return 'Admin email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) return 'Please enter a valid email address';
         return null;
       case 'adminPassword':
-        if (!formData.adminPassword) return 'Password is required';
-        if (formData.adminPassword.length < 8) return 'Password must be at least 8 characters';
+        if (!adminPassword) return 'Password is required';
+        if (adminPassword.length < 8) return 'Password must be at least 8 characters';
         return null;
       case 'plan':
         return !selectedPlanId ? 'Please select a plan' : null;
-      case 'theme':
-        return !selectedThemeId ? 'Please select a theme' : null;
       case 'businessType':
         if (!businessType) return 'Please select a business type';
         if (businessType === 'Other' && !otherBusinessType.trim()) return 'Please enter your business type';
@@ -432,24 +394,18 @@ function TenantRegisterForm() {
       errors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
     }
 
-    if (!formData.adminName.trim()) {
-      errors.adminName = 'Your name is required';
-    }
+    if (useEmailSignup) {
+      if (!adminEmail.trim()) {
+        errors.adminEmail = 'Admin email is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+        errors.adminEmail = 'Please enter a valid email address';
+      }
 
-    if (!formData.adminEmail.trim()) {
-      errors.adminEmail = 'Admin email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail)) {
-      errors.adminEmail = 'Please enter a valid email address';
-    }
-
-    if (!formData.adminPassword) {
-      errors.adminPassword = 'Password is required';
-    } else if (formData.adminPassword.length < 8) {
-      errors.adminPassword = 'Password must be at least 8 characters';
-    }
-
-    if (!selectedThemeId) {
-      errors.theme = 'Please select a theme';
+      if (!adminPassword) {
+        errors.adminPassword = 'Password is required';
+      } else if (adminPassword.length < 8) {
+        errors.adminPassword = 'Password must be at least 8 characters';
+      }
     }
 
     if (!businessType) {
@@ -533,159 +489,298 @@ function TenantRegisterForm() {
     };
   }, []);
 
+  const submitRegistration = async (options: {
+    authProvider: 'google' | 'email';
+    email: string;
+    password?: string;
+    name?: string;
+    accessToken?: string;
+    overrides?: {
+      formData?: { name: string; subdomain: string };
+      selectedPlanId?: string | null;
+      businessType?: string;
+      otherBusinessType?: string;
+      includeDemoContent?: boolean;
+    };
+  }) => {
+    const effectiveFormData = options.overrides?.formData ?? formData;
+    const effectivePlanId = options.overrides?.selectedPlanId ?? selectedPlanId;
+    const effectiveBusinessType = options.overrides?.businessType ?? businessType;
+    const effectiveOtherBusinessType = options.overrides?.otherBusinessType ?? otherBusinessType;
+    const effectiveIncludeDemoContent = options.overrides?.includeDemoContent ?? includeDemoContent;
+
+    // Start the animated progress screen
+    const steps = getProgressSteps(effectiveFormData.name, effectiveIncludeDemoContent);
+    startProgress(steps);
+
+    // Detect location before submitting
+    let locationInfo = detectUserLocationClient();
+    if (!locationInfo.isKenya) {
+      try {
+        locationInfo = await detectLocationByIP();
+      } catch {
+        // Use browser detection result
+      }
+    }
+
+    const finalBusinessType = effectiveBusinessType === 'Other' ? effectiveOtherBusinessType : effectiveBusinessType;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-User-Country': locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
+      'X-User-Currency': locationInfo.currency,
+    };
+    if (options.accessToken) {
+      headers.Authorization = `Bearer ${options.accessToken}`;
+    }
+
+    const response = await fetch('/api/tenants/register', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: effectiveFormData.name,
+        subdomain: effectiveFormData.subdomain,
+        adminEmail: options.email,
+        adminPassword: options.password,
+        adminName: options.name,
+        authProvider: options.authProvider,
+        planId: effectivePlanId || undefined,
+        businessType: finalBusinessType || undefined,
+        includeDemoContent: effectiveIncludeDemoContent,
+        includeDemoAttributes: effectiveIncludeDemoContent,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      cancelProgress();
+      const serverFieldErrors: Record<string, string> = {};
+      if (data.errors && Array.isArray(data.errors)) {
+        data.errors.forEach((err: { field: string; message: string }) => {
+          if (err.field) serverFieldErrors[err.field] = err.message;
+        });
+      }
+
+      const msg = (data.message || '').toLowerCase();
+      if (Object.keys(serverFieldErrors).length === 0) {
+        if (msg.includes('subdomain') && (msg.includes('taken') || msg.includes('already'))) {
+          serverFieldErrors.subdomain = 'Subdomain taken — choose another';
+        } else if (msg.includes('email') && (msg.includes('already') || msg.includes('exists') || msg.includes('use'))) {
+          serverFieldErrors.adminEmail = 'Email already in use — Sign in instead';
+        }
+      }
+
+      setFieldErrors(serverFieldErrors);
+      setError(Object.keys(serverFieldErrors).length > 0 ? null : data.message || 'Registration failed');
+      trackMarketingFunnelEvent('sign_up_failed', {
+        reason: Object.keys(serverFieldErrors).length > 0 ? 'server_validation_failed' : 'registration_failed',
+        plan_id: selectedPlanId,
+        has_field_errors: Object.keys(serverFieldErrors).length > 0,
+        auth_method: options.authProvider,
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
+      });
+      return false;
+    }
+
+    await completeAllSteps();
+    setSuccess(true);
+    setShowProgress(false);
+    trackMetaPixelEvent('CompleteRegistration', {
+      content_name: 'Store Registration',
+      status: 'complete',
+    });
+    trackMarketingFunnelEvent('sign_up_completed', {
+      plan_id: selectedPlanId,
+      include_demo_content: includeDemoContent,
+      business_type: businessType || undefined,
+      auth_method: options.authProvider,
+      utm_source: utmSource || undefined,
+      utm_medium: utmMedium || undefined,
+      utm_campaign: utmCampaign || undefined,
+    });
+    if (data.loginUrl) setLoginUrl(data.loginUrl);
+    if (data.demoContentCreated) {
+      setDemoContentInfo({
+        created: true,
+        products: data.demoProductsCreated || 0,
+        categories: data.demoCategoriesCreated || 0,
+      });
+    }
+    return true;
+  };
+
+  const handleGoogleSignup = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    if (!validateForm()) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const supabase = createSupabaseClient();
+      const pendingPayload = {
+        formData,
+        selectedPlanId,
+        businessType,
+        otherBusinessType,
+        includeDemoContent,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+      };
+      window.localStorage.setItem(GOOGLE_SIGNUP_STORAGE_KEY, JSON.stringify(pendingPayload));
+      document.cookie = 'dukanest_oauth_next=/register; Path=/; Max-Age=900; SameSite=Lax';
+      const redirectTo = `${window.location.origin}/auth/callback`;
+
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message || 'Google sign-in failed. Please try again.');
+        setIsSubmitting(false);
+      }
+    } catch {
+      setError('Unable to start Google sign-in. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Track click intent (fires on every attempt, including validation failures)
+    setError(null);
     trackMetaPixelEvent('Lead', {
       content_name: 'Start free trial',
       content_category: 'registration',
       status: 'attempted',
     });
 
-    setIsSubmitting(true);
-    setError(null);
+    if (!useEmailSignup) {
+      await handleGoogleSignup();
+      return;
+    }
 
-    // Run client-side validation (preserves existing field errors for display)
+    setIsSubmitting(true);
     if (!validateForm()) {
-      trackMarketingFunnelEvent('sign_up_failed', {
-        reason: 'client_validation_failed',
-        plan_id: selectedPlanId,
-        utm_source: utmSource || undefined,
-        utm_medium: utmMedium || undefined,
-        utm_campaign: utmCampaign || undefined,
-      });
       setIsSubmitting(false);
       return;
     }
 
-    // Track funnel start only after client-side validation succeeds.
     trackMarketingFunnelEvent('sign_up_started', {
       plan_id: selectedPlanId,
       include_demo_content: includeDemoContent,
-      include_demo_attributes: includeDemoAttributes,
       business_type_selected: Boolean(businessType),
+      auth_method: 'email',
       utm_source: utmSource || undefined,
       utm_medium: utmMedium || undefined,
       utm_campaign: utmCampaign || undefined,
     });
 
-    // Start the animated progress screen
-    const steps = getProgressSteps(formData.name, includeDemoContent);
-    startProgress(steps);
-
     try {
-      // Detect location before submitting
-      let locationInfo = detectUserLocationClient();
-      if (!locationInfo.isKenya) {
-        try {
-          locationInfo = await detectLocationByIP();
-        } catch (ipError) {
-          // Use browser detection result
-        }
-      }
-
-      // Determine final business type (use "Other" text if "Other" is selected)
-      const finalBusinessType = businessType === 'Other' ? otherBusinessType : businessType;
-
-      const response = await fetch('/api/tenants/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Country': locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
-          'X-User-Currency': locationInfo.currency,
-        },
-        body: JSON.stringify({
-          ...formData,
-          planId: selectedPlanId || undefined,
-          themeId: selectedThemeId || undefined,
-          businessType: finalBusinessType || undefined,
-          includeDemoContent: includeDemoContent,
-          includeDemoAttributes: includeDemoAttributes,
-        }),
+      await submitRegistration({
+        authProvider: 'email',
+        email: adminEmail,
+        password: adminPassword,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Cancel progress and return to form
-        cancelProgress();
-
-        // Map server errors to specific field messages; preserve user inputs (never clear fields)
-        const serverFieldErrors: Record<string, string> = {};
-
-        if (data.errors && Array.isArray(data.errors)) {
-          data.errors.forEach((err: { field: string; message: string }) => {
-            if (err.field) {
-              serverFieldErrors[err.field] = err.message;
-            }
-          });
-        }
-
-        const msg = (data.message || '').toLowerCase();
-        if (Object.keys(serverFieldErrors).length === 0) {
-          if (msg.includes('subdomain') && (msg.includes('taken') || msg.includes('already'))) {
-            serverFieldErrors.subdomain = 'Subdomain taken — choose another';
-          } else if (msg.includes('email') && (msg.includes('already') || msg.includes('exists') || msg.includes('use'))) {
-            serverFieldErrors.adminEmail = 'Email already in use — Sign in instead';
-          }
-        }
-
-        setFieldErrors(serverFieldErrors);
-        setError(Object.keys(serverFieldErrors).length > 0 ? null : data.message || 'Registration failed');
-        trackMarketingFunnelEvent('sign_up_failed', {
-          reason: Object.keys(serverFieldErrors).length > 0 ? 'server_validation_failed' : 'registration_failed',
-          plan_id: selectedPlanId,
-          has_field_errors: Object.keys(serverFieldErrors).length > 0,
-          utm_source: utmSource || undefined,
-          utm_medium: utmMedium || undefined,
-          utm_campaign: utmCampaign || undefined,
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      // API succeeded — rapidly complete all remaining steps, then show success
-      await completeAllSteps();
-
-      setSuccess(true);
-      setShowProgress(false);
-      trackMetaPixelEvent('CompleteRegistration', {
-        content_name: 'Store Registration',
-        status: 'complete',
-      });
-      trackMarketingFunnelEvent('sign_up_completed', {
-        plan_id: selectedPlanId,
-        include_demo_content: includeDemoContent,
-        include_demo_attributes: includeDemoAttributes,
-        business_type: businessType || undefined,
-        utm_source: utmSource || undefined,
-        utm_medium: utmMedium || undefined,
-        utm_campaign: utmCampaign || undefined,
-      });
-      if (data.loginUrl) {
-        setLoginUrl(data.loginUrl);
-      }
-      if (data.demoContentCreated) {
-        setDemoContentInfo({
-          created: true,
-          products: data.demoProductsCreated || 0,
-          categories: data.demoCategoriesCreated || 0,
-        });
-      }
-    } catch (err) {
+    } catch {
       cancelProgress();
       setError('An error occurred. Please try again.');
       trackMarketingFunnelEvent('sign_up_failed', {
         reason: 'network_or_unexpected_error',
         plan_id: selectedPlanId,
+        auth_method: 'email',
         utm_source: utmSource || undefined,
         utm_medium: utmMedium || undefined,
         utm_campaign: utmCampaign || undefined,
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (isHandlingGoogleCallback.current) return;
+
+    const pendingRaw = window.localStorage.getItem(GOOGLE_SIGNUP_STORAGE_KEY);
+    if (!pendingRaw) return;
+
+    isHandlingGoogleCallback.current = true;
+    setIsSubmitting(true);
+    setError(null);
+
+    const runGoogleRegistration = async () => {
+      try {
+        const pending = JSON.parse(pendingRaw);
+
+        setFormData(pending.formData ?? formData);
+        setSelectedPlanId(pending.selectedPlanId ?? selectedPlanId);
+        setBusinessType(pending.businessType ?? businessType);
+        setOtherBusinessType(pending.otherBusinessType ?? otherBusinessType);
+        setIncludeDemoContent(Boolean(pending.includeDemoContent));
+
+        const supabase = createSupabaseClient();
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !sessionData.session) {
+          setIsSubmitting(false);
+          isHandlingGoogleCallback.current = false;
+          return;
+        }
+
+        const user = sessionData.session.user;
+        if (!user?.email) {
+          setError('Google account did not return an email address.');
+          return;
+        }
+
+        trackMarketingFunnelEvent('sign_up_started', {
+          plan_id: pending.selectedPlanId || undefined,
+          include_demo_content: Boolean(pending.includeDemoContent),
+          business_type_selected: Boolean(pending.businessType),
+          auth_method: 'google',
+          utm_source: pending.utmSource || undefined,
+          utm_medium: pending.utmMedium || undefined,
+          utm_campaign: pending.utmCampaign || undefined,
+        });
+
+        setFormData(pending.formData);
+        setSelectedPlanId(pending.selectedPlanId);
+        setBusinessType(pending.businessType);
+        setOtherBusinessType(pending.otherBusinessType || '');
+
+        await submitRegistration({
+          authProvider: 'google',
+          email: user.email,
+          name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
+          accessToken: sessionData.session.access_token,
+          overrides: {
+            formData: pending.formData,
+            selectedPlanId: pending.selectedPlanId,
+            businessType: pending.businessType,
+            otherBusinessType: pending.otherBusinessType || '',
+            includeDemoContent: Boolean(pending.includeDemoContent),
+          },
+        });
+        window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
+      } catch {
+        cancelProgress();
+        setError('Google sign-up could not be completed. Please try again.');
+        window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    runGoogleRegistration();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show animated progress screen while store is being created
   if (showProgress && !success) {
@@ -833,10 +928,8 @@ function TenantRegisterForm() {
                 <p className="text-sm text-red-800">{error}</p>
               </div>
             )}
-
-            {/* 2FA Information Notice */}
             <p className="text-sm text-muted-foreground">
-              We&apos;ll email a verification code on login for security (2FA).
+              Continue with Google for faster setup. Email/password signup is still available.
             </p>
 
             <div className="space-y-4">
@@ -890,132 +983,10 @@ function TenantRegisterForm() {
                 )}
               </div>
 
-              <div>
-                <Label htmlFor="adminName">Your Name *</Label>
-                <Input
-                  id="adminName"
-                  type="text"
-                  required
-                  value={formData.adminName}
-                  onChange={(e) => {
-                    setFormData({ ...formData, adminName: e.target.value });
-                    clearFieldError('adminName');
-                  }}
-                  onBlur={() => handleBlur('adminName')}
-                  placeholder="John Doe"
-                  className={fieldErrors.adminName ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                />
-                {fieldErrors.adminName && (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminName}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="adminEmail">Admin Email *</Label>
-                <Input
-                  id="adminEmail"
-                  type="email"
-                  required
-                  value={formData.adminEmail}
-                  onChange={(e) => {
-                    setFormData({ ...formData, adminEmail: e.target.value });
-                    clearFieldError('adminEmail');
-                  }}
-                  onBlur={() => handleBlur('adminEmail')}
-                  placeholder="admin@example.com"
-                  className={fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                />
-                {fieldErrors.adminEmail ? (
-                  <p className="mt-1 text-xs text-red-600">
-                    {fieldErrors.adminEmail === 'Email already in use — Sign in instead' ? (
-                      <>
-                        Email already in use —{' '}
-                        <Link href="/login" className="underline font-medium hover:no-underline">
-                          Sign in instead
-                        </Link>
-                      </>
-                    ) : (
-                      fieldErrors.adminEmail
-                    )}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    This will be your login email for the admin dashboard
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="adminPassword">Password *</Label>
-                <Input
-                  id="adminPassword"
-                  type="password"
-                  required
-                  value={formData.adminPassword}
-                  onChange={(e) => {
-                    setFormData({ ...formData, adminPassword: e.target.value });
-                    clearFieldError('adminPassword');
-                  }}
-                  onBlur={() => handleBlur('adminPassword')}
-                  placeholder="••••••••"
-                  minLength={8}
-                  autoComplete="new-password"
-                  className={fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                />
-                {fieldErrors.adminPassword ? (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Must be at least 8 characters. After registration, you&apos;ll need to verify your email with a code each time you log in.
-                  </p>
-                )}
-              </div>
-
               <div className="space-y-4 pt-4 border-t">
-                <div>
-                  <Label htmlFor="theme-select">Theme *</Label>
-                  {isLoadingThemes ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading themes...
-                    </div>
-                  ) : themesError ? (
-                    <div className="rounded-md bg-red-50 p-3 mt-2">
-                      <p className="text-sm text-red-800">{themesError}</p>
-                    </div>
-                  ) : themes.length === 0 ? (
-                    <div className="rounded-md bg-yellow-50 p-3 mt-2">
-                      <p className="text-sm text-yellow-800">No themes available. Please contact support.</p>
-                    </div>
-                  ) : (
-                    <Select
-                      value={selectedThemeId}
-                      onValueChange={(value) => {
-                        setSelectedThemeId(value);
-                        clearFieldError('theme');
-                      }}
-                      required
-                    >
-                      <SelectTrigger id="theme-select" className={`w-full mt-2 ${fieldErrors.theme ? 'border-red-500 ring-red-500' : ''}`}>
-                        <SelectValue placeholder="Select a theme" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {themes.map((theme) => (
-                          <SelectItem key={theme.id} value={theme.id}>
-                            {theme.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {fieldErrors.theme ? (
-                    <p className="mt-1 text-xs text-red-600">{fieldErrors.theme}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Choose a theme for your storefront. You can customize it later.
-                    </p>
-                  )}
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your store will start with the Multipurpose theme. You can change it later in your dashboard.
+                </p>
 
                 <div>
                   <Label htmlFor="business-type">Business Type *</Label>
@@ -1071,12 +1042,7 @@ function TenantRegisterForm() {
                     <Checkbox
                       id="demo-content"
                       checked={includeDemoContent}
-                      onCheckedChange={(checked) => {
-                        setIncludeDemoContent(checked === true);
-                        if (!checked) {
-                          setIncludeDemoAttributes(false);
-                        }
-                      }}
+                      onCheckedChange={(checked) => setIncludeDemoContent(checked === true)}
                     />
                     <label
                       htmlFor="demo-content"
@@ -1085,45 +1051,105 @@ function TenantRegisterForm() {
                       Add demo products & categories
                     </label>
                   </div>
-                  {includeDemoContent && (
-                    <div className="flex items-center space-x-2 pl-6">
-                      <Checkbox
-                        id="demo-attributes"
-                        checked={includeDemoAttributes}
-                        onCheckedChange={(checked) => setIncludeDemoAttributes(checked === true)}
-                      />
-                      <label
-                        htmlFor="demo-attributes"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        Add demo attributes (size, color, etc.)
-                      </label>
-                    </div>
-                  )}
                   <p className="text-xs text-muted-foreground">
                     Helps you explore the dashboard faster. Remove anytime.
                   </p>
                 </div>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  onClick={handleGoogleSignup}
+                  disabled={isSubmitting || isLoadingPlans || !selectedPlanId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
+                  className="w-full"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting to Google...
+                    </>
+                  ) : (
+                    'Continue with Google'
+                  )}
+                </Button>
+
+                <button
+                  type="button"
+                  className="w-full text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  onClick={() => setUseEmailSignup((prev) => !prev)}
+                >
+                  {useEmailSignup ? 'Hide email signup' : 'Continue with email instead'}
+                </button>
+
+                {useEmailSignup && (
+                  <div className="space-y-4 rounded-md border p-4">
+                    <div>
+                      <Label htmlFor="adminEmail">Admin Email *</Label>
+                      <Input
+                        id="adminEmail"
+                        type="email"
+                        required={useEmailSignup}
+                        value={adminEmail}
+                        onChange={(e) => {
+                          setAdminEmail(e.target.value);
+                          clearFieldError('adminEmail');
+                        }}
+                        onBlur={() => handleBlur('adminEmail')}
+                        placeholder="admin@example.com"
+                        className={fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                      />
+                      {fieldErrors.adminEmail ? (
+                        <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          This email will be used for dashboard login.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="adminPassword">Password *</Label>
+                      <Input
+                        id="adminPassword"
+                        type="password"
+                        required={useEmailSignup}
+                        value={adminPassword}
+                        onChange={(e) => {
+                          setAdminPassword(e.target.value);
+                          clearFieldError('adminPassword');
+                        }}
+                        onBlur={() => handleBlur('adminPassword')}
+                        placeholder="••••••••"
+                        minLength={8}
+                        autoComplete="new-password"
+                        className={fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                      />
+                      {fieldErrors.adminPassword ? (
+                        <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Must be at least 8 characters.
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      disabled={isSubmitting || isLoadingPlans || !selectedPlanId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
+                      className="w-full"
+                    >
+                      {isSubmitting ? 'Starting trial...' : 'Start free trial with email'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
             <p className="text-xs text-muted-foreground text-center">
               No card required. Cancel anytime.
             </p>
-            <Button
-              type="submit"
-              disabled={isSubmitting || isLoadingPlans || isLoadingThemes || !selectedPlanId || !selectedThemeId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
-              className="w-full"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Starting trial...
-                </>
-              ) : (
-                'Start free trial'
-              )}
-            </Button>
 
             <div className="text-center space-y-2">
               <p className="text-sm text-muted-foreground">

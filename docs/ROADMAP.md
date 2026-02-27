@@ -432,10 +432,11 @@ This document outlines planned features and enhancements for DukaNest. Features 
 ### Phase 3: Advanced Features (Lower Priority)
 
 #### 10. Mobile App
-- [ ] React Native mobile app
+- [ ] Flutter mobile apps (Shop Owner + Customer)
 - [ ] Push notifications
 - [ ] Mobile-specific features
 - [ ] App store listings
+- [ ] Deferred priority: configure branded Supabase auth domain (e.g. `auth.dukanest.com`) after moving off free plan
 
 #### 11. Advanced Analytics
 - [ ] Predictive analytics
@@ -546,6 +547,7 @@ Full Instagram Shopping integration that allows tenants to tag products in Insta
 12. Mobile app development
 13. Advanced analytics features
 14. Third-party integrations
+15. Branded Supabase auth domain (post-free-plan) for improved OAuth branding
 
 ---
 

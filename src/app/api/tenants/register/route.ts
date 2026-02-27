@@ -26,6 +26,7 @@ import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoContent } from '@/lib/themes/demo-content';
 import { generateSlug } from '@/lib/content/validation';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Remove blob URLs from page builder content
@@ -80,8 +81,9 @@ const registerTenantSchema = z.object({
     .max(63, 'Subdomain must be at most 63 characters')
     .regex(/^[a-z0-9-]+$/, 'Subdomain can only contain lowercase letters, numbers, and hyphens'),
   adminEmail: z.string().email('Invalid email address'),
-  adminPassword: z.string().min(8, 'Password must be at least 8 characters'),
-  adminName: z.string().min(1, 'Admin name is required'),
+  adminPassword: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  adminName: z.string().min(1, 'Admin name is required').optional(),
+  authProvider: z.enum(['google', 'email']).default('email'),
   contactEmail: z.string().email('Invalid contact email address').optional(),
   planId: z.string().uuid().optional(),
   themeId: z.string().uuid().optional(),
@@ -175,37 +177,81 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if user with this email already exists in Supabase Auth
-    // If user exists, use existing user_id; if not, create new user
     const adminClient = createAdminClient();
-    let existingUser = null;
+    let existingUser: {
+      id: string;
+      email?: string;
+      user_metadata?: Record<string, any>;
+    } | null = null;
     const maxPagesToSearch = 5;
     const perPage = 1000;
-    
-    for (let page = 1; page <= maxPagesToSearch; page++) {
-      const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-      
-      if (listError) {
-        console.error('Error listing users:', listError);
-        // Continue with user creation if listing fails
-        break;
+
+    if (validatedData.authProvider === 'google') {
+      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+      const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+      if (!token) {
+        return NextResponse.json(
+          { message: 'Missing Google auth token' },
+          { status: 401 }
+        );
       }
-      
-      // Find user by email (case-insensitive)
-      existingUser = users.find(user => 
-        user.email?.toLowerCase() === validatedData.adminEmail.toLowerCase()
-      );
-      
-      if (existingUser) {
-        break;
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return NextResponse.json(
+          { message: 'Supabase client configuration missing' },
+          { status: 500 }
+        );
       }
-      
-      // If no more users, user doesn't exist
-      if (users.length === 0 || users.length < perPage) {
-        break;
+
+      const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey);
+      const { data: authData, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !authData.user) {
+        return NextResponse.json(
+          { message: 'Google session is invalid or expired' },
+          { status: 401 }
+        );
+      }
+
+      if (authData.user.email?.toLowerCase() !== validatedData.adminEmail.toLowerCase()) {
+        return NextResponse.json(
+          { message: 'Authenticated Google user does not match registration email' },
+          { status: 403 }
+        );
+      }
+
+      existingUser = {
+        id: authData.user.id,
+        email: authData.user.email,
+        user_metadata: authData.user.user_metadata ?? {},
+      };
+    } else {
+      for (let page = 1; page <= maxPagesToSearch; page++) {
+        const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+
+        if (listError) {
+          console.error('Error listing users:', listError);
+          // Continue with user creation if listing fails
+          break;
+        }
+
+        // Find user by email (case-insensitive)
+        existingUser = users.find((user) =>
+          user.email?.toLowerCase() === validatedData.adminEmail.toLowerCase()
+        ) ?? null;
+
+        if (existingUser) {
+          break;
+        }
+
+        // If no more users, user doesn't exist
+        if (users.length === 0 || users.length < perPage) {
+          break;
+        }
       }
     }
 
@@ -219,6 +265,34 @@ export async function POST(request: NextRequest) {
       subscriptionPrice = getLocalizedPrice(plan.name, locationInfo.isKenya);
       subscriptionCurrency = locationInfo.currency;
       subscriptionCurrencySymbol = locationInfo.currencySymbol;
+    }
+
+    if (validatedData.authProvider === 'email' && !validatedData.adminPassword) {
+      return NextResponse.json(
+        { message: 'Password is required for email signup' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedAdminName =
+      validatedData.adminName?.trim() ||
+      existingUser?.user_metadata?.full_name ||
+      existingUser?.user_metadata?.name ||
+      validatedData.name;
+
+    let effectiveThemeId = validatedData.themeId;
+    if (!effectiveThemeId) {
+      const defaultTheme = await prisma.themes.findFirst({
+        where: {
+          status: true,
+          OR: [
+            { slug: { equals: 'multipurpose', mode: 'insensitive' } },
+            { slug: { equals: 'grocery', mode: 'insensitive' } },
+            { title: { contains: 'multipurpose', mode: 'insensitive' } },
+          ],
+        },
+      });
+      effectiveThemeId = defaultTheme?.id;
     }
 
     // Create tenant in database
@@ -264,7 +338,7 @@ export async function POST(request: NextRequest) {
         user_metadata: {
           ...existingUser.user_metadata,
           tenant_id: tenant.id,
-          name: validatedData.adminName,
+          name: resolvedAdminName,
           role: 'tenant_admin',
         },
       }).catch((error) => {
@@ -274,12 +348,12 @@ export async function POST(request: NextRequest) {
       // Create new user in Supabase Auth
       const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
         email: validatedData.adminEmail,
-        password: validatedData.adminPassword,
+        password: validatedData.adminPassword!,
         email_confirm: true,
         user_metadata: {
           role: 'tenant_admin',
           tenant_id: tenant.id,
-          name: validatedData.adminName,
+          name: resolvedAdminName,
         },
       });
 
@@ -373,22 +447,22 @@ export async function POST(request: NextRequest) {
     let demoProductsCreated = 0;
     let demoCategoriesCreated = 0;
 
-    // Install theme if provided
-    if (validatedData.themeId) {
+    // Install default or selected theme
+    if (effectiveThemeId) {
       try {
         console.log(`[Registration] Starting theme installation for tenant ${tenant.subdomain}`, {
-          themeId: validatedData.themeId,
+          themeId: effectiveThemeId,
           businessType: validatedData.businessType,
           includeDemoContent: validatedData.includeDemoContent,
         });
 
         const theme = await prisma.themes.findUnique({
-          where: { id: validatedData.themeId },
+          where: { id: effectiveThemeId },
         });
 
         if (!theme) {
-          console.error(`[Registration] Theme not found: ${validatedData.themeId}`);
-          throw new Error(`Theme not found: ${validatedData.themeId}`);
+          console.error(`[Registration] Theme not found: ${effectiveThemeId}`);
+          throw new Error(`Theme not found: ${effectiveThemeId}`);
         }
 
         console.log(`[Registration] Found theme: ${theme.slug} (${theme.title})`);
@@ -798,7 +872,7 @@ export async function POST(request: NextRequest) {
         console.error(`[Registration] Theme installation error details:`, {
           message: themeError.message,
           stack: themeError.stack,
-          themeId: validatedData.themeId,
+          themeId: effectiveThemeId,
         });
         // Non-critical - theme installation failure shouldn't block registration
         // But try to create default pages anyway
@@ -1234,10 +1308,10 @@ export async function POST(request: NextRequest) {
             if (slug === 'home') {
               // Create homepage with business-specific content
               let themeSlug = 'grocery'; // Default to grocery theme
-              if (validatedData.themeId) {
+              if (effectiveThemeId) {
                 try {
                   const theme = await prisma.themes.findUnique({ 
-                    where: { id: validatedData.themeId }, 
+                    where: { id: effectiveThemeId }, 
                     select: { slug: true } 
                   });
                   if (theme) {
