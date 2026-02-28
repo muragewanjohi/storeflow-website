@@ -620,6 +620,12 @@ function TenantRegisterForm() {
 
     try {
       const supabase = createSupabaseClient();
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isTenantLocalHost = hostname.endsWith('.localhost');
+      const isDukanestHost = hostname === 'dukanest.com' || hostname.endsWith('.dukanest.com');
+      const isStoreflowHost = hostname === 'storeflow.com' || hostname.endsWith('.storeflow.com');
       const pendingPayload = {
         formData,
         selectedPlanId,
@@ -631,8 +637,26 @@ function TenantRegisterForm() {
         utmCampaign,
       };
       window.localStorage.setItem(GOOGLE_SIGNUP_STORAGE_KEY, JSON.stringify(pendingPayload));
-      document.cookie = 'dukanest_oauth_next=/register; Path=/; Max-Age=900; SameSite=Lax';
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const returnUrl = `${window.location.origin}/register`;
+      const cookieDomain = isRootLocalHost
+        ? ''
+        : isDukanestHost
+          ? '; Domain=.dukanest.com'
+          : isStoreflowHost
+            ? '; Domain=.storeflow.com'
+            : '';
+      document.cookie = `dukanest_oauth_next=${encodeURIComponent(returnUrl)}; Path=/; Max-Age=900; SameSite=Lax${cookieDomain}`;
+
+      // Use a stable callback host for registrable domains; keep tenant localhost on its own origin.
+      const redirectTo = isRootLocalHost
+        ? `http://localhost:${window.location.port || '3000'}/auth/callback`
+        : isTenantLocalHost
+          ? `${window.location.origin}/auth/callback`
+          : isDukanestHost
+            ? `${protocol}//dukanest.com/auth/callback`
+            : isStoreflowHost
+              ? `${protocol}//storeflow.com/auth/callback`
+              : `${window.location.origin}/auth/callback`;
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -648,8 +672,10 @@ function TenantRegisterForm() {
         setError(oauthError.message || 'Google sign-in failed. Please try again.');
         setIsSubmitting(false);
       }
-    } catch {
-      setError('Unable to start Google sign-in. Please try again.');
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Unable to start Google sign-in. Please try again.';
+      setError(message);
       setIsSubmitting(false);
     }
   };
