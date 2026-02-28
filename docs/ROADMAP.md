@@ -260,6 +260,7 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - [x] Progress bars showing store completion percentage
    - [x] Suggested next steps based on current progress
    - [x] Completion tracking (products added, payment configured, etc.)
+   - [ ] "Complete your profile" prompt for new Google signups (collect display name on first dashboard visit)
    - **Implementation:** Checklist API computes completion + prioritized next actions; dashboard shows a "Suggested Next Step" card with direct CTA
 
 4. **Welcome Email Series**

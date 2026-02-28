@@ -15,11 +15,14 @@ import DashboardHeader from './header';
 import { AccessRestrictionBanner } from './access-restriction-banner';
 import { UpdateNotificationBanner } from './update-notification-banner';
 import { CurrencyProvider } from '@/lib/currency/currency-context';
+import CompleteProfilePrompt from './complete-profile-prompt';
 
 interface LayoutClientProps {
   user: AuthUser;
   tenant: Tenant;
   accessRestriction: TenantAccessRestriction;
+  shouldShowProfilePrompt: boolean;
+  profileName?: string;
   children: React.ReactNode;
 }
 
@@ -27,6 +30,8 @@ export default function DashboardLayoutClient({
   user, 
   tenant, 
   accessRestriction,
+  shouldShowProfilePrompt,
+  profileName,
   children 
 }: Readonly<LayoutClientProps>) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -54,6 +59,10 @@ export default function DashboardLayoutClient({
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <AccessRestrictionBanner restriction={accessRestriction} />
               <UpdateNotificationBanner />
+              <CompleteProfilePrompt
+                openByDefault={shouldShowProfilePrompt}
+                initialName={profileName}
+              />
               {children}
             </div>
           </main>

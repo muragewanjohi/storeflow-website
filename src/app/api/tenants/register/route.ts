@@ -279,6 +279,10 @@ export async function POST(request: NextRequest) {
       existingUser?.user_metadata?.full_name ||
       existingUser?.user_metadata?.name ||
       validatedData.name;
+    const existingProfileCompleted =
+      existingUser?.user_metadata?.profile_completed === true;
+    const shouldMarkProfileCompleted =
+      validatedData.authProvider === 'email' ? true : existingProfileCompleted;
 
     let effectiveThemeId = validatedData.themeId;
     if (!effectiveThemeId) {
@@ -340,6 +344,7 @@ export async function POST(request: NextRequest) {
           tenant_id: tenant.id,
           name: resolvedAdminName,
           role: 'tenant_admin',
+          profile_completed: shouldMarkProfileCompleted,
         },
       }).catch((error) => {
         console.error('Failed to update user metadata:', error);
@@ -354,6 +359,7 @@ export async function POST(request: NextRequest) {
           role: 'tenant_admin',
           tenant_id: tenant.id,
           name: resolvedAdminName,
+          profile_completed: validatedData.authProvider === 'email',
         },
       });
 

@@ -26,17 +26,39 @@ export default function TenantLoginForm() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
 
   const handleGoogleLogin = async () => {
     setError(null);
     setIsLoading(true);
     try {
       const supabase = createSupabaseClient();
-      document.cookie = 'dukanest_oauth_next=/dashboard; Path=/; Max-Age=900; SameSite=Lax';
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+
+      const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+      // Store the full return URL so the callback can redirect back to the correct tenant.
+      const returnUrl = `${window.location.origin}/dashboard`;
+      const cookieDomain = isRootLocalHost
+        ? ''
+        : hostname.endsWith('.dukanest.com')
+          ? '; Domain=.dukanest.com'
+          : hostname.endsWith('.storeflow.com')
+            ? '; Domain=.storeflow.com'
+            : '';
+      document.cookie = `dukanest_oauth_next=${encodeURIComponent(returnUrl)}; Path=/; Max-Age=900; SameSite=Lax${cookieDomain}`;
+
+      // Root localhost should use root callback allowlist entry.
+      // Tenant-like hosts (.localhost, .dukanest.com) should use their own origin callback.
+      const redirectTo = isRootLocalHost
+        ? `http://localhost:${port || '3000'}/auth/callback`
+        : `${window.location.origin}/auth/callback`;
+
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo,
           queryParams: {
             prompt: 'select_account',
           },
@@ -177,17 +199,45 @@ export default function TenantLoginForm() {
             <div className="space-y-3 mb-4">
               <Button
                 type="button"
-                variant="outline"
-                className="w-full"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
               >
+                <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.46a5.52 5.52 0 01-2.4 3.63v3h3.88c2.27-2.09 3.55-5.17 3.55-8.66z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 01-10.72-3.78h-4V17.4A12 12 0 0012 24z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.34 14.31a7.2 7.2 0 010-4.62v-3h-4a12 12 0 000 10.62l4-3z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.43-3.43A12 12 0 001.34 6.69l4 3A7.2 7.2 0 0112 4.77z"
+                    fill="#EA4335"
+                  />
+                </svg>
                 Continue with Google
               </Button>
               <div className="relative text-center text-xs uppercase text-muted-foreground">
                 <span className="bg-background px-2 relative z-10">or</span>
                 <div className="absolute left-0 right-0 top-1/2 h-px bg-border -z-0" />
               </div>
+              {!showEmailLogin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowEmailLogin(true)}
+                  disabled={isLoading}
+                >
+                  Continue with email and password
+                </Button>
+              )}
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -197,7 +247,7 @@ export default function TenantLoginForm() {
               </div>
             )}
 
-            {!requiresMFA ? (
+            {!requiresMFA && showEmailLogin ? (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email address</Label>
@@ -234,9 +284,16 @@ export default function TenantLoginForm() {
                   >
                     Forgot password?
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailLogin(false)}
+                    className="text-sm text-muted-foreground hover:underline"
+                  >
+                    Back
+                  </button>
                 </div>
               </>
-            ) : (
+            ) : requiresMFA ? (
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start">
@@ -319,18 +376,20 @@ export default function TenantLoginForm() {
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
 
-            <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
-              disabled={isLoading}
-            >
-              {isLoading && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-transparent mr-2" />
-              )}
-              {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
-            </Button>
+            {(showEmailLogin || requiresMFA) && (
+              <Button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
+                disabled={isLoading}
+              >
+                {isLoading && (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-transparent mr-2" />
+                )}
+                {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
+              </Button>
+            )}
           </form>
 
           <div className="mt-6 pt-6 border-t space-y-4">

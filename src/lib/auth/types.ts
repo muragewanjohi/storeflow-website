@@ -8,6 +8,10 @@ export interface UserMetadata {
   role: UserRole;
   tenant_id?: string;
   permissions?: string[];
+  name?: string;
+  full_name?: string;
+  profile_completed?: boolean;
+  [key: string]: unknown;
 }
 
 export interface AuthUser {

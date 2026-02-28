@@ -69,6 +69,14 @@ export default async function DashboardLayout({
 
   // Check tenant access restrictions
   const accessRestriction = getTenantAccessRestriction(tenant);
+  const userMetadata = (user.metadata ?? {}) as Record<string, unknown>;
+  const metadataName =
+    typeof userMetadata.name === 'string'
+      ? userMetadata.name
+      : typeof userMetadata.full_name === 'string'
+        ? userMetadata.full_name
+        : '';
+  const shouldShowProfilePrompt = userMetadata.profile_completed === false || metadataName.trim().length === 0;
 
   // Block access if completely restricted (suspended or deleted)
   // Allow read-only access during grace period
@@ -85,6 +93,8 @@ export default async function DashboardLayout({
       user={user} 
       tenant={tenant}
       accessRestriction={accessRestriction}
+      shouldShowProfilePrompt={shouldShowProfilePrompt}
+      profileName={metadataName}
     >
       {children}
     </DashboardLayoutClient>
