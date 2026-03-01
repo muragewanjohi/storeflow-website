@@ -621,9 +621,7 @@ function TenantRegisterForm() {
     try {
       const supabase = createSupabaseClient();
       const hostname = window.location.hostname;
-      const protocol = window.location.protocol;
       const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
-      const isTenantLocalHost = hostname.endsWith('.localhost');
       const isDukanestHost = hostname === 'dukanest.com' || hostname.endsWith('.dukanest.com');
       const isStoreflowHost = hostname === 'storeflow.com' || hostname.endsWith('.storeflow.com');
       const pendingPayload = {
@@ -647,16 +645,11 @@ function TenantRegisterForm() {
             : '';
       document.cookie = `dukanest_oauth_next=${encodeURIComponent(returnUrl)}; Path=/; Max-Age=900; SameSite=Lax${cookieDomain}`;
 
-      // Use a stable callback host for registrable domains; keep tenant localhost on its own origin.
+      // Root localhost should use root callback allowlist entry.
+      // Other hosts should callback on their own origin.
       const redirectTo = isRootLocalHost
         ? `http://localhost:${window.location.port || '3000'}/auth/callback`
-        : isTenantLocalHost
-          ? `${window.location.origin}/auth/callback`
-          : isDukanestHost
-            ? `${protocol}//dukanest.com/auth/callback`
-            : isStoreflowHost
-              ? `${protocol}//storeflow.com/auth/callback`
-              : `${window.location.origin}/auth/callback`;
+        : `${window.location.origin}/auth/callback`;
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',

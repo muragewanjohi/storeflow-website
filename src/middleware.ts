@@ -21,15 +21,10 @@ export async function middleware(request: NextRequest) {
   const oauthNextCookie = request.cookies.get('dukanest_oauth_next')?.value;
 
   if ((pathname === '/' || pathname === '/index') && code && oauthNextCookie) {
-    const safeNextPath =
-      oauthNextCookie.startsWith('/') && !oauthNextCookie.startsWith('//')
-        ? oauthNextCookie
-        : '/';
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = '/auth/callback';
     callbackUrl.search = '';
     callbackUrl.searchParams.set('code', code);
-    callbackUrl.searchParams.set('next', safeNextPath);
     return NextResponse.redirect(callbackUrl);
   }
 
