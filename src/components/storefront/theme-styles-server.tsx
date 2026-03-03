@@ -80,7 +80,9 @@ export default async function ThemeStylesServer() {
     const cssVariables: string[] = [];
 
     // Apply color CSS variables
-    Object.entries(colors).forEach(([key, value]) => {
+    Object.entries(colors)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([key, value]) => {
       if (value && typeof value === 'string' && value.trim()) {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         cssVariables.push(`--color-${cssKey}: ${value};`);
@@ -177,6 +179,7 @@ export default async function ThemeStylesServer() {
     return (
       <style
         id="theme-styles-server"
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: cssString }}
       />
     );

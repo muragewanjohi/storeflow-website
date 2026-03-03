@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerAddressSchema } from '@/lib/customers/validation';
+import { parseStoredAddress, serializeStoredAddress } from '@/lib/customers/address-storage';
 
 /**
  * GET /api/customers/[id]/addresses - List customer addresses
@@ -51,20 +52,26 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      addresses: addresses.map((address: any) => ({
-        id: address.id,
-        name: address.name,
-        email: address.email,
-        phone: address.phone,
-        address: address.address,
-        city: address.city,
-        state_id: address.state_id,
-        country_id: address.country_id,
-        postal_code: address.postal_code,
-        is_default: address.is_default,
-        created_at: address.created_at,
-        updated_at: address.updated_at,
-      })),
+      addresses: addresses.map((address: any) => {
+        const parsedAddress = parseStoredAddress(address.address);
+        return {
+          id: address.id,
+          name: address.name,
+          email: address.email,
+          phone: address.phone,
+          address: parsedAddress.address,
+          city: address.city || '',
+          state_id: address.state_id,
+          state: parsedAddress.state || '',
+          country_id: address.country_id,
+          country: parsedAddress.country || '',
+          postal_code: address.postal_code || '',
+          address_label: parsedAddress.addressLabel,
+          is_default: address.is_default,
+          created_at: address.created_at,
+          updated_at: address.updated_at,
+        };
+      }),
     });
   } catch (error: any) {
     console.error('Error fetching customer addresses:', error);
@@ -118,6 +125,12 @@ export async function POST(
     }
 
     // Create address
+    const addressField = serializeStoredAddress(validatedData.address, {
+      state: validatedData.state,
+      country: validatedData.country,
+      addressLabel: validatedData.address_label,
+    });
+
     const address = await prisma.user_delivery_addresses.create({
       data: {
         tenant_id: tenant.id,
@@ -125,8 +138,8 @@ export async function POST(
         name: validatedData.name,
         email: validatedData.email,
         phone: validatedData.phone,
-        address: validatedData.address,
-        city: validatedData.city,
+        address: addressField,
+        city: validatedData.city || null,
         state_id: validatedData.state_id,
         country_id: validatedData.country_id,
         postal_code: validatedData.postal_code,
@@ -137,19 +150,25 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        address: {
-          id: address.id,
-          name: address.name,
-          email: address.email,
-          phone: address.phone,
-          address: address.address,
-          city: address.city,
-          state_id: address.state_id,
-          country_id: address.country_id,
-          postal_code: address.postal_code,
-          is_default: address.is_default,
-          created_at: address.created_at,
-        },
+        address: (() => {
+          const parsedAddress = parseStoredAddress(address.address);
+          return {
+            address: parsedAddress.address,
+            state: parsedAddress.state || '',
+            country: parsedAddress.country || '',
+            address_label: parsedAddress.addressLabel,
+            id: address.id,
+            name: address.name,
+            email: address.email,
+            phone: address.phone,
+            city: address.city || '',
+            state_id: address.state_id,
+            country_id: address.country_id,
+            postal_code: address.postal_code || '',
+            is_default: address.is_default,
+            created_at: address.created_at,
+          };
+        })(),
       },
       { status: 201 }
     );

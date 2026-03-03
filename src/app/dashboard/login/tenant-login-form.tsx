@@ -37,10 +37,11 @@ export default function TenantLoginForm() {
       const port = window.location.port;
 
       const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isLocalSubdomainHost = hostname.endsWith('.localhost');
 
       // Store the full return URL so the callback can redirect back to the correct tenant.
       const returnUrl = `${window.location.origin}/dashboard`;
-      const cookieDomain = isRootLocalHost
+      const cookieDomain = (isRootLocalHost || isLocalSubdomainHost)
         ? ''
         : hostname.endsWith('.dukanest.com')
           ? '; Domain=.dukanest.com'

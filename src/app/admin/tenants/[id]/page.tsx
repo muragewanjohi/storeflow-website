@@ -41,6 +41,18 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     redirect('/admin/tenants');
   }
 
+  const contactPhoneOption = await prisma.static_options.findUnique({
+    where: {
+      tenant_id_option_name: {
+        tenant_id: tenant.id,
+        option_name: 'store_phone',
+      },
+    },
+    select: {
+      option_value: true,
+    },
+  });
+
   // Include data field for reminder tracking
   const tenantData = {
     ...tenant,
@@ -117,7 +129,12 @@ export default async function TenantSettingsPage({ params }: PageProps) {
           Manage settings for {tenant.name}
         </p>
       </div>
-      <TenantSettingsClient tenant={tenantData as any} pricePlans={pricePlans} countries={countries} />
+      <TenantSettingsClient
+        tenant={tenantData as any}
+        pricePlans={pricePlans}
+        countries={countries}
+        contactPhone={contactPhoneOption?.option_value || ''}
+      />
     </div>
   );
 }

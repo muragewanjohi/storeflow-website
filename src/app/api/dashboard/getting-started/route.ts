@@ -41,6 +41,7 @@ export async function GET() {
       }),
       getStaticOptions(tenant.id, [
         'getting_started_shared_link',
+        'store_phone',
         'store_logo',
         'shipping_enabled',
         'shipping_method_type',
@@ -58,6 +59,10 @@ export async function GET() {
     const hasLogo = !!(
       settings.store_logo &&
       String(settings.store_logo).trim().length > 0
+    );
+    const hasContactPhone = !!(
+      settings.store_phone &&
+      String(settings.store_phone).trim().length > 0
     );
 
     const flatRateSet =
@@ -101,6 +106,15 @@ export async function GET() {
         priority: 1,
       },
       {
+        id: 'contact_phone',
+        label: 'Add contact phone number',
+        description: 'Add a phone number so customers and your landlord can reach you',
+        completed: hasContactPhone,
+        href: '/dashboard/settings',
+        cta: 'Add phone',
+        priority: 2,
+      },
+      {
         id: 'delivery',
         label: 'Configure delivery & shipping',
         description: 'Set up flat rate or delivery zones for orders',
@@ -110,7 +124,7 @@ export async function GET() {
             ? '/dashboard/settings/delivery-zones'
             : '/dashboard/settings',
         cta: 'Configure shipping',
-        priority: 3,
+        priority: 4,
       },
       {
         id: 'logo',
@@ -119,7 +133,7 @@ export async function GET() {
         completed: hasLogo,
         href: '/dashboard/settings',
         cta: 'Add logo',
-        priority: 4,
+        priority: 5,
       },
       {
         id: 'payment',
@@ -128,7 +142,7 @@ export async function GET() {
         completed: hasPayment,
         href: '/dashboard/settings',
         cta: 'Set up payments',
-        priority: 2,
+        priority: 3,
       },
       {
         id: 'currency',
@@ -137,7 +151,7 @@ export async function GET() {
         completed: hasCurrency,
         href: '/dashboard/settings',
         cta: 'Set currency',
-        priority: 5,
+        priority: 6,
       },
       {
         id: 'share',
@@ -146,7 +160,7 @@ export async function GET() {
         completed: settings.getting_started_shared_link === 'true',
         href: storeUrl,
         cta: 'Copy link',
-        priority: 6,
+        priority: 7,
       },
     ];
 

@@ -17,7 +17,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, ExclamationTriangleIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import Image from 'next/image';
@@ -49,9 +48,9 @@ interface ShippingAddress {
   phone: string;
   address_line_1: string;
   address_line_2?: string | null;
-  city: string;
-  state: string;
-  postal_code: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
   country: string;
   formatted_address?: string;
   place_id?: string;
@@ -59,6 +58,30 @@ interface ShippingAddress {
     lat: number;
     lng: number;
   };
+}
+
+interface SavedAddress {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+  address_label?: string | null;
+  is_default: boolean;
+}
+
+function getSavedAddressTitle(address: SavedAddress): string {
+  const primary = address.address_label?.trim() || address.name?.trim() || 'Saved address';
+  const location = [address.city, address.state].filter(Boolean).join(', ');
+  return location ? `${primary} - ${location}` : primary;
+}
+
+function getSavedAddressLine(address: SavedAddress): string {
+  return [address.address, address.country].filter(Boolean).join(', ');
 }
 
 type PaymentMethod = 'cash' | 'mpesa';
@@ -162,10 +185,11 @@ export default function CheckoutClient({
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   
   // Saved addresses state
-  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [saveAddressLabel, setSaveAddressLabel] = useState('');
   
   // Address autocomplete state
   const [addressInputValue, setAddressInputValue] = useState<string>('');
@@ -246,7 +270,7 @@ export default function CheckoutClient({
           setSavedAddresses(data.addresses);
           
           // Find default address or use first one
-          const defaultAddress = data.addresses.find((addr: any) => addr.is_default) || data.addresses[0];
+          const defaultAddress = data.addresses.find((addr: SavedAddress) => addr.is_default) || data.addresses[0];
           
           if (defaultAddress) {
             // Pre-select default address
@@ -310,6 +334,7 @@ export default function CheckoutClient({
     if (addressId === 'new') {
       setUseNewAddress(true);
       setSelectedAddressId(null);
+      setSaveAddressLabel('');
       // Clear form
       setShippingAddress({
         name: '',
@@ -326,10 +351,11 @@ export default function CheckoutClient({
       return;
     }
     
-    const selectedAddress = savedAddresses.find((addr: any) => addr.id === addressId);
+    const selectedAddress = savedAddresses.find((addr) => addr.id === addressId);
     if (selectedAddress) {
       setSelectedAddressId(addressId);
       setUseNewAddress(false);
+      setSaveNewAddress(false);
       
       // Extract state and country (they might be stored in address field or returned as strings)
       const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -607,16 +633,8 @@ export default function CheckoutClient({
       toast.error('Address is required');
       return false;
     }
-    if (!shippingAddress.city.trim()) {
+    if (!shippingAddress.formatted_address && !shippingAddress.city?.trim()) {
       toast.error('City is required');
-      return false;
-    }
-    if (!shippingAddress.state.trim()) {
-      toast.error('State/Province is required');
-      return false;
-    }
-    if (!shippingAddress.postal_code.trim()) {
-      toast.error('Postal code is required');
       return false;
     }
     if (!shippingAddress.country.trim()) {
@@ -648,12 +666,13 @@ export default function CheckoutClient({
               email: shippingAddress.email,
               phone: shippingAddress.phone,
               address: shippingAddress.address_line_1,
-              city: shippingAddress.city,
+              city: shippingAddress.city || null,
               state_id: null, // Will be looked up by API if state name is provided
               country_id: null, // Will be looked up by API if country name is provided
               state: shippingAddress.state || null, // Send state name for lookup
               country: shippingAddress.country || null, // Send country name for lookup
-              postal_code: shippingAddress.postal_code,
+              postal_code: shippingAddress.postal_code || null,
+              address_label: saveAddressLabel.trim() || null,
               is_default: savedAddresses.length === 0, // Set as default if it's the first address
             }),
           });
@@ -749,12 +768,13 @@ export default function CheckoutClient({
               email: shippingAddress.email,
               phone: shippingAddress.phone,
               address: shippingAddress.address_line_1,
-              city: shippingAddress.city,
+              city: shippingAddress.city || null,
               state_id: null, // Will be looked up by API if state name is provided
               country_id: null, // Will be looked up by API if country name is provided
               state: shippingAddress.state || null, // Send state name for lookup
               country: shippingAddress.country || null, // Send country name for lookup
-              postal_code: shippingAddress.postal_code,
+              postal_code: shippingAddress.postal_code || null,
+              address_label: saveAddressLabel.trim() || null,
               is_default: savedAddresses.length === 0, // Set as default if it's the first address
             }),
           });
@@ -1167,13 +1187,11 @@ export default function CheckoutClient({
                           <SelectValue placeholder="Choose an address" />
                         </SelectTrigger>
                         <SelectContent>
-                          {savedAddresses.map((address: any) => (
+                          {savedAddresses.map((address) => (
                             <SelectItem key={address.id} value={address.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{address.name}</span>
-                                {address.is_default && (
-                                  <Badge variant="secondary" className="text-xs">Default</Badge>
-                                )}
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">{getSavedAddressTitle(address)}</span>
+                                <span className="text-xs text-muted-foreground">{getSavedAddressLine(address)}</span>
                               </div>
                             </SelectItem>
                           ))}
@@ -1188,12 +1206,15 @@ export default function CheckoutClient({
                             Using saved address:
                           </p>
                           {(() => {
-                            const selected = savedAddresses.find((a: any) => a.id === selectedAddressId);
+                            const selected = savedAddresses.find((a) => a.id === selectedAddressId);
                             if (!selected) return null;
                             return (
                               <div className="text-xs space-y-0.5 text-blue-700 dark:text-blue-300">
+                                {selected.address_label && (
+                                  <p className="font-medium">{selected.address_label}</p>
+                                )}
                                 <p>{selected.name}</p>
-                                <p>{selected.address || selected.address_line_1}</p>
+                                <p>{selected.address}</p>
                                 <p>
                                   {selected.city}{selected.state ? `, ${selected.state}` : ''} {selected.postal_code || ''}
                                 </p>
@@ -1385,35 +1406,32 @@ export default function CheckoutClient({
                       <>
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <Label htmlFor="city">City *</Label>
+                            <Label htmlFor="city">City</Label>
                             <Input
                               id="city"
                               value={shippingAddress.city}
                               onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
                               placeholder="City"
-                              required
                             />
                           </div>
                           
                           <div>
-                            <Label htmlFor="state">State/Province *</Label>
+                            <Label htmlFor="state">State/Province</Label>
                             <Input
                               id="state"
                               value={shippingAddress.state}
                               onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
                               placeholder="State/Province"
-                              required
                             />
                           </div>
                           
                           <div>
-                            <Label htmlFor="postal_code">Postal Code *</Label>
+                            <Label htmlFor="postal_code">Postal Code</Label>
                             <Input
                               id="postal_code"
                               value={shippingAddress.postal_code}
                               onChange={(e) => setShippingAddress({ ...shippingAddress, postal_code: e.target.value })}
                               placeholder="Postal Code"
-                              required
                             />
                           </div>
                         </div>
@@ -1444,15 +1462,35 @@ export default function CheckoutClient({
                   
                   {/* Option to save new address (only for authenticated users) */}
                   {isAuthenticated && useNewAddress && (
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="save_address"
-                        checked={saveNewAddress}
-                        onCheckedChange={(checked) => setSaveNewAddress(checked === true)}
-                      />
-                      <Label htmlFor="save_address" className="cursor-pointer text-sm">
-                        Save this address for future orders
-                      </Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="save_address"
+                          checked={saveNewAddress}
+                          onCheckedChange={(checked) => {
+                            const shouldSave = checked === true;
+                            setSaveNewAddress(shouldSave);
+                            if (!shouldSave) {
+                              setSaveAddressLabel('');
+                            }
+                          }}
+                        />
+                        <Label htmlFor="save_address" className="cursor-pointer text-sm">
+                          Save this address for future orders
+                        </Label>
+                      </div>
+                      {saveNewAddress && (
+                        <div className="max-w-sm">
+                          <Label htmlFor="address_label">Address name (optional)</Label>
+                          <Input
+                            id="address_label"
+                            value={saveAddressLabel}
+                            onChange={(e) => setSaveAddressLabel(e.target.value)}
+                            placeholder="e.g. Home, Work"
+                            maxLength={50}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                     </>
@@ -1787,7 +1825,12 @@ export default function CheckoutClient({
                           <p>{shippingAddress.phone}</p>
                           <p>{shippingAddress.address_line_1}</p>
                           {shippingAddress.address_line_2 && <p>{shippingAddress.address_line_2}</p>}
-                          <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+                          {(shippingAddress.city || shippingAddress.state || shippingAddress.postal_code) && (
+                            <p>
+                              {[shippingAddress.city, shippingAddress.state].filter(Boolean).join(', ')}
+                              {shippingAddress.postal_code ? ` ${shippingAddress.postal_code}` : ''}
+                            </p>
+                          )}
                           <p>{shippingAddress.country}</p>
                         </>
                       )}

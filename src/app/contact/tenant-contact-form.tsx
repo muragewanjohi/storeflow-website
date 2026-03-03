@@ -25,9 +25,14 @@ interface FormData {
 interface TenantContactFormProps {
   tenantName: string;
   tenantContactEmail: string;
+  tenantContactPhone?: string | null;
 }
 
-export default function TenantContactForm({ tenantName, tenantContactEmail }: TenantContactFormProps) {
+export default function TenantContactForm({
+  tenantName,
+  tenantContactEmail,
+  tenantContactPhone,
+}: Readonly<TenantContactFormProps>) {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -148,6 +153,23 @@ export default function TenantContactForm({ tenantName, tenantContactEmail }: Te
                   </a>
                 </div>
               </div>
+
+              {tenantContactPhone && (
+                <div className="flex items-start gap-4">
+                  <div className="rounded-lg bg-primary/10 p-3">
+                    <Phone className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
+                    <a
+                      href={`tel:${tenantContactPhone.replace(/\s+/g, '')}`}
+                      className="text-primary hover:underline"
+                    >
+                      {tenantContactPhone}
+                    </a>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-start gap-4">
                 <div className="rounded-lg bg-primary/10 p-3">

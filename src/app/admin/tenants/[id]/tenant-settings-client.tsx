@@ -75,9 +75,10 @@ interface TenantSettingsClientProps {
   tenant: Tenant;
   pricePlans: PricePlan[];
   countries: Country[];
+  contactPhone: string;
 }
 
-export default function TenantSettingsClient({ tenant, pricePlans, countries }: TenantSettingsClientProps) {
+export default function TenantSettingsClient({ tenant, pricePlans, countries, contactPhone }: TenantSettingsClientProps) {
   const countryOptions = countries.length > 0 ? countries : FALLBACK_COUNTRIES;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -855,6 +856,19 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries }: 
               />
               <p className="text-sm text-muted-foreground">
                 Primary contact email for this tenant
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact_phone">Contact Phone Number</Label>
+              <Input
+                id="contact_phone"
+                type="text"
+                value={contactPhone || 'Not provided yet'}
+                disabled
+              />
+              <p className="text-sm text-muted-foreground">
+                Set by tenant in dashboard settings and used for follow-up contact
               </p>
             </div>
 

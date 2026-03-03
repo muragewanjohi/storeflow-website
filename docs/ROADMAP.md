@@ -271,6 +271,17 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - [x] Best practices newsletter
    - **Implementation:** Day 1 email is sent on tenant registration; automated Day 3/7/14 follow-ups run via cron endpoint `/api/admin/onboarding/welcome-series` with send-tracking in `tenants.data.onboarding_emails`
 
+4.5 **Onboarding Drop-off Reduction (Preview-first)**
+   - [ ] Add hybrid onboarding business selection (`business_type` + optional free-text `business_subtype`)
+   - [ ] Render instant storefront preview from template + cached assets in onboarding
+   - [ ] Implement image resolution order: exact match -> similar cached -> fallback image -> async AI generation
+   - [ ] Route merchants to simplified "update prices only" flow after preview confirmation
+   - [ ] Add image source/license metadata and enforce approved source policy
+   - [ ] Add funnel + preview analytics (time-to-first-preview, preview acceptance, step conversion, drop-off)
+   - [ ] Add cache hit rate + AI spend tracking dashboard
+   - **Status:** Planned - High Priority (drop-off reduction initiative)
+   - **Reference:** `docs/ONBOARDING_PREVIEW_AND_IMAGE_STRATEGY.md`
+
 **Medium Priority (User Engagement):**
 
 5. **Video Tutorials**
@@ -342,6 +353,7 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - Email template designs
 - Video tutorial scripts
 - Onboarding flow diagrams
+- Onboarding preview and image strategy: `docs/ONBOARDING_PREVIEW_AND_IMAGE_STRATEGY.md`
 
 ---
 

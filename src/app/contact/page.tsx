@@ -20,8 +20,54 @@ import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper
 import ContactForm from './contact-form';
 import TenantContactForm from './tenant-contact-form';
 import Image from 'next/image';
+import { getStaticOptions } from '@/lib/settings/static-options';
 
 export const dynamic = 'force-dynamic';
+
+function injectPhoneIntoContactSections(
+  pageData: PageBuilderData,
+  contactPhone: string | null
+): PageBuilderData {
+  const trimmedPhone = contactPhone?.trim();
+  if (!trimmedPhone) {
+    return pageData;
+  }
+
+  const telPhone = trimmedPhone.replace(/\s+/g, '');
+  const phoneHtml = `<p style="margin-top: 12px;"><strong>Phone:</strong> <a href="tel:${telPhone}" style="color: #14b8a6; text-decoration: none;">${trimmedPhone}</a></p>`;
+
+  const updatedSections = (pageData.sections || []).map((section: any) => {
+    if (
+      section?.type === 'split_layout' &&
+      section?.left_side?.type === 'text' &&
+      typeof section?.left_side?.content === 'string' &&
+      !section.left_side.content.includes('href="tel:')
+    ) {
+      const marker = '</p>';
+      const firstParagraphEnd = section.left_side.content.indexOf(marker);
+
+      if (firstParagraphEnd !== -1) {
+        return {
+          ...section,
+          left_side: {
+            ...section.left_side,
+            content:
+              section.left_side.content.slice(0, firstParagraphEnd + marker.length) +
+              phoneHtml +
+              section.left_side.content.slice(firstParagraphEnd + marker.length),
+          },
+        };
+      }
+    }
+
+    return section;
+  });
+
+  return {
+    ...pageData,
+    sections: updatedSections,
+  };
+}
 
 export async function generateMetadata() {
   const tenant = await getTenant();
@@ -94,6 +140,9 @@ export default async function ContactPage() {
   const tenant = await getTenant();
   
   if (tenant) {
+    const tenantSettings = await getStaticOptions(tenant.id, ['store_phone']);
+    const tenantContactPhone = tenantSettings.store_phone || null;
+
     // Check for custom contact page in the database
     const customPage = await prisma.pages.findFirst({
       where: {
@@ -108,8 +157,9 @@ export default async function ContactPage() {
       try {
         const pageData: PageBuilderData = JSON.parse(customPage.content);
         if (pageData.sections && pageData.sections.length > 0) {
+          const pageDataWithPhone = injectPhoneIntoContactSections(pageData, tenantContactPhone);
           // Check if first section is a hero section
-          const firstSection = pageData.sections.sort((a: any, b: any) => a.order - b.order)[0];
+          const firstSection = pageDataWithPhone.sections.sort((a: any, b: any) => a.order - b.order)[0];
           const hasHeroSectionFirst = firstSection?.type === 'hero';
           const shouldShowBanner = customPage.banner_image && !hasHeroSectionFirst;
           
@@ -150,7 +200,7 @@ export default async function ContactPage() {
                       </div>
                     )}
                     <div className="space-y-0">
-                      {pageData.sections
+                      {pageDataWithPhone.sections
                         .filter((s: any) => !s.hidden)
                         .sort((a: any, b: any) => a.order - b.order)
                         .map((section: any) => (
@@ -199,6 +249,7 @@ export default async function ContactPage() {
             <TenantContactForm 
               tenantName={tenant.name || tenant.subdomain}
               tenantContactEmail={tenantContactEmail}
+              tenantContactPhone={tenantContactPhone}
             />
           </main>
           <StorefrontFooter />

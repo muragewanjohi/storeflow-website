@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerAddressSchema } from '@/lib/customers/validation';
+import { parseStoredAddress, serializeStoredAddress } from '@/lib/customers/address-storage';
 
 /**
  * GET /api/customers/profile/addresses - Get customer's addresses
@@ -43,35 +44,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       addresses: addresses.map((address: any) => {
-        // Extract state and country from address field if stored there
-        let addressValue = address.address || '';
-        let stateName = null;
-        let countryName = null;
-        
-        if (addressValue.includes('|state:') || addressValue.includes('|country:')) {
-          const parts = addressValue.split('|');
-          addressValue = parts[0]; // The actual address
-          parts.slice(1).forEach((part: string) => {
-            if (part.startsWith('state:')) {
-              stateName = part.replace('state:', '');
-            } else if (part.startsWith('country:')) {
-              countryName = part.replace('country:', '');
-            }
-          });
-        }
+        const parsedAddress = parseStoredAddress(address.address);
         
         return {
           id: address.id,
           name: address.name,
           email: address.email,
           phone: address.phone,
-          address: addressValue,
-          city: address.city,
+          address: parsedAddress.address,
+          city: address.city || '',
           state_id: address.state_id,
-          state: stateName || address.state_id || '', // Return state name if available
+          state: parsedAddress.state || address.state_id || '', // Return state name if available
           country_id: address.country_id,
-          country: countryName || address.country_id || '', // Return country name if available
-          postal_code: address.postal_code,
+          country: parsedAddress.country || address.country_id || '', // Return country name if available
+          postal_code: address.postal_code || '',
+          address_label: parsedAddress.addressLabel,
           is_default: address.is_default,
           created_at: address.created_at,
           updated_at: address.updated_at,
@@ -149,19 +136,13 @@ export async function POST(request: NextRequest) {
       countryId = existingCountry?.id || null;
     }
 
-    // Store state and country names in address field if IDs are not available
-    // Format: "address|state:STATE_NAME|country:COUNTRY_NAME" if state/country provided but IDs not found
-    let addressField = validatedData.address;
-    if ((validatedData.state && !stateId) || (validatedData.country && !countryId)) {
-      const parts = [addressField];
-      if (validatedData.state && !stateId) {
-        parts.push(`state:${validatedData.state}`);
-      }
-      if (validatedData.country && !countryId) {
-        parts.push(`country:${validatedData.country}`);
-      }
-      addressField = parts.join('|');
-    }
+    const shouldStoreStateName = Boolean(validatedData.state && !stateId);
+    const shouldStoreCountryName = Boolean(validatedData.country && !countryId);
+    const addressField = serializeStoredAddress(validatedData.address, {
+      state: shouldStoreStateName ? validatedData.state : null,
+      country: shouldStoreCountryName ? validatedData.country : null,
+      addressLabel: validatedData.address_label,
+    });
 
     // Create address
     const address = await prisma.user_delivery_addresses.create({
@@ -172,7 +153,7 @@ export async function POST(request: NextRequest) {
         email: validatedData.email,
         phone: validatedData.phone,
         address: addressField,
-        city: validatedData.city,
+        city: validatedData.city || null,
         state_id: stateId,
         country_id: countryId,
         postal_code: validatedData.postal_code,
@@ -183,19 +164,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        address: {
-          id: address.id,
-          name: address.name,
-          email: address.email,
-          phone: address.phone,
-          address: address.address,
-          city: address.city,
-          state_id: address.state_id,
-          country_id: address.country_id,
-          postal_code: address.postal_code,
-          is_default: address.is_default,
-          created_at: address.created_at,
-        },
+        address: (() => {
+          const parsedAddress = parseStoredAddress(address.address);
+          return {
+            address: parsedAddress.address,
+            state: parsedAddress.state || '',
+            country: parsedAddress.country || '',
+            address_label: parsedAddress.addressLabel,
+            id: address.id,
+            name: address.name,
+            email: address.email,
+            phone: address.phone,
+            city: address.city || '',
+            state_id: address.state_id,
+            country_id: address.country_id,
+            postal_code: address.postal_code || '',
+            is_default: address.is_default,
+            created_at: address.created_at,
+          };
+        })(),
       },
       { status: 201 }
     );

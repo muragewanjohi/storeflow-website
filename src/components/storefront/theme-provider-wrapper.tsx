@@ -90,7 +90,9 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
     // But we can skip the initial flash since server-side styles are already there
 
     // Apply color CSS variables
-    Object.entries(colors).forEach(([key, value]) => {
+    Object.entries(colors)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([key, value]) => {
       if (value) {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         root.style.setProperty(`--color-${cssKey}`, value);

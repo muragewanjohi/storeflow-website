@@ -176,6 +176,7 @@ const CURRENCIES = [
 ];
 
 export default function TenantSettingsClient({ tenant, initialSettings, countries }: Readonly<TenantSettingsClientProps>) {
+  const GOOGLE_LINK_PENDING_STORAGE_KEY = 'dukanest:tenant-google-link-pending';
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -185,6 +186,14 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const [contactEmailError, setContactEmailError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [linkedAuthProviders, setLinkedAuthProviders] = useState<string[]>([]);
+  const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+
+  const getSupabaseClient = async () => {
+    const { createClient } = await import('@/lib/supabase/client');
+    return createClient();
+  };
   
   const [formData, setFormData] = useState({
     // Contact Email
@@ -248,6 +257,109 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       setFormData(prev => ({ ...prev, currency_symbol: currency.symbol }));
     }
   }, [formData.currency_code]);
+
+  const loadLinkedAuthProviders = async (): Promise<string[]> => {
+    const supabase = await getSupabaseClient();
+    const { data, error: userError } = await supabase.auth.getUser();
+    if (userError || !data.user) {
+      return [];
+    }
+
+    const identities = ((data.user as any).identities ?? []) as Array<{ provider?: string }>;
+    return Array.from(
+      new Set(
+        identities
+          .map((identity) => identity.provider)
+          .filter((provider): provider is string => Boolean(provider)),
+      ),
+    );
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const initLinkedProviders = async () => {
+      try {
+        const providers = await loadLinkedAuthProviders();
+        if (isCancelled) return;
+
+        setLinkedAuthProviders(providers);
+        const hadPendingLink = window.localStorage.getItem(GOOGLE_LINK_PENDING_STORAGE_KEY) === '1';
+        if (hadPendingLink) {
+          window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+          if (providers.includes('google')) {
+            setSuccess('Google sign-in linked successfully. You can now log in with email/password or Google.');
+          } else {
+            setError('Google linking was cancelled or failed. Please try again.');
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setError('Unable to load linked sign-in methods.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingAuthProviders(false);
+        }
+      }
+    };
+
+    initLinkedProviders();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const handleLinkGoogleAccount = async () => {
+    setError(null);
+    setSuccess(null);
+    setIsLinkingGoogle(true);
+
+    try {
+      const supabase = await getSupabaseClient();
+      const hostname = window.location.hostname;
+      const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+      const returnUrl = `${window.location.origin}/dashboard/settings`;
+      const cookieDomain = isRootLocalHost
+        ? ''
+        : hostname.endsWith('.dukanest.com')
+          ? '; Domain=.dukanest.com'
+          : hostname.endsWith('.storeflow.com')
+            ? '; Domain=.storeflow.com'
+            : '';
+      document.cookie = `dukanest_oauth_next=${encodeURIComponent(returnUrl)}; Path=/; Max-Age=900; SameSite=Lax${cookieDomain}`;
+      window.localStorage.setItem(GOOGLE_LINK_PENDING_STORAGE_KEY, '1');
+
+      const redirectTo = isRootLocalHost
+        ? `http://localhost:${window.location.port || '3000'}/auth/callback`
+        : `${window.location.origin}/auth/callback`;
+      const authClient = supabase.auth as any;
+
+      if (typeof authClient.linkIdentity !== 'function') {
+        window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+        throw new Error('Google account linking is not supported by the current auth client.');
+      }
+
+      const { error: linkError } = await authClient.linkIdentity({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (linkError) {
+        window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+        throw new Error(linkError.message || 'Failed to start Google account linking.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to link Google account.');
+      setIsLinkingGoogle(false);
+    }
+  };
 
   const handleContactEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -458,6 +570,48 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign-in Methods</CardTitle>
+              <CardDescription>
+                Link Google to this admin account so you can sign in with either email/password or Google.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-md border border-transparent bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+                  Email &amp; Password
+                </span>
+                <span
+                  className={
+                    linkedAuthProviders.includes('google')
+                      ? 'inline-flex items-center rounded-md border border-transparent bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground'
+                      : 'inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold text-foreground'
+                  }
+                >
+                  {linkedAuthProviders.includes('google') ? 'Google Linked' : 'Google Not Linked'}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant={linkedAuthProviders.includes('google') ? 'outline' : 'default'}
+                onClick={handleLinkGoogleAccount}
+                disabled={isLoadingAuthProviders || isLinkingGoogle || linkedAuthProviders.includes('google')}
+              >
+                {isLoadingAuthProviders
+                  ? 'Checking...'
+                  : linkedAuthProviders.includes('google')
+                    ? 'Google account linked'
+                    : isLinkingGoogle
+                      ? 'Redirecting to Google...'
+                      : 'Link Google account'}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Tip: use the same Google email as your existing tenant admin account for the cleanest experience.
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Store Details */}
           <Card>
         <form onSubmit={handleSettingsSubmit}>
