@@ -9,6 +9,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { MetaPixel } from "@/components/analytics/meta-pixel";
+import { TikTokPixel } from "@/components/analytics/tiktok-pixel";
 import ThemeStylesServer from "@/components/storefront/theme-styles-server";
 import DemoStorefrontExtras from "@/components/storefront/demo-storefront-extras";
 
@@ -44,6 +45,9 @@ export default function RootLayout({
         </Suspense>
         <Suspense fallback={null}>
           <MetaPixel />
+        </Suspense>
+        <Suspense fallback={null}>
+          <TikTokPixel />
         </Suspense>
         <QueryProvider>
           <ThemeProvider

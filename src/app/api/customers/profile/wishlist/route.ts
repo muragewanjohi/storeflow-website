@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
 
 const addToWishlistSchema = z.object({
   product_id: z.string().uuid('Product ID must be a valid UUID'),
@@ -171,6 +172,32 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    const wishlistEventId = `wishlist_${wishlistItem.id}`;
+    sendTikTokServerEvent({
+      request,
+      event: 'AddToWishlist',
+      eventId: wishlistEventId,
+      email: customer.email || null,
+      phoneNumber: (customer as any).mobile || null,
+      externalId: customer.id,
+      properties: {
+        content_type: 'product',
+        value: Number(wishlistItem.products.sale_price || wishlistItem.products.price),
+        currency: ((tenant as any).currency || 'KES').toUpperCase(),
+        contents: [
+          {
+            content_id: wishlistItem.products.id,
+            content_type: 'product',
+            content_name: wishlistItem.products.name,
+            quantity: 1,
+            price: Number(wishlistItem.products.sale_price || wishlistItem.products.price),
+          },
+        ],
+      },
+    }).catch((error) => {
+      console.error('Error sending TikTok AddToWishlist event:', error);
     });
 
     return NextResponse.json(

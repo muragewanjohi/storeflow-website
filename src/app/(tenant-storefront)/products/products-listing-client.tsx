@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, memo, useCallback } from 'react';
+import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { loadThemeProductCard } from '@/lib/themes/theme-loader';
@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { useCurrency } from '@/lib/currency/currency-context';
 
 interface Product {
   id: string;
@@ -49,6 +51,7 @@ function ProductsListingClient({
 }: Readonly<ProductsListingClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { currency } = useCurrency();
   
   // Get pagination and sort params from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
@@ -77,6 +80,7 @@ function ProductsListingClient({
   // Selected filters state - derived from URL on mount, updated when checkboxes change
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, Set<string>>>({});
+  const lastTrackedSearchKeyRef = useRef<string | null>(null);
 
   // Load theme-specific product card - memoize to prevent re-creation
   const ThemeProductCard = useMemo(() => {
@@ -229,6 +233,27 @@ function ProductsListingClient({
 
     fetchFilters();
   }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const search = (searchParams.get('search') || '').trim();
+    if (!search) return;
+
+    const searchKey = `${search.toLowerCase()}::${total}`;
+    if (lastTrackedSearchKeyRef.current === searchKey) return;
+    lastTrackedSearchKeyRef.current = searchKey;
+
+    trackMetaPixelEvent('Search', {
+      search_string: search,
+      value: 0,
+      currency: currency.code,
+      contents: products.slice(0, 5).map((product) => ({
+        content_id: product.id,
+        content_type: 'product',
+        content_name: product.name,
+      })),
+    });
+  }, [isLoading, products, total, searchParams, currency.code]);
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / currentLimit);

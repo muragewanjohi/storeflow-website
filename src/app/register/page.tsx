@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { identifyTikTokPixelUser } from '@/lib/analytics/tiktok-pixel';
 import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
@@ -503,6 +504,27 @@ function TenantRegisterForm() {
     }
 
     setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('Please fill in all required fields highlighted below.');
+      const firstFieldOrder = useEmailSignup
+        ? ['adminEmail', 'adminPassword', 'name', 'subdomain', 'businessType', 'otherBusinessType']
+        : ['name', 'subdomain', 'businessType', 'otherBusinessType'];
+      const firstInvalidKey = firstFieldOrder.find((field) => errors[field]);
+      const firstInvalidIdMap: Record<string, string> = {
+        adminEmail: 'adminEmail',
+        adminPassword: 'adminPassword',
+        name: 'name',
+        subdomain: 'subdomain',
+        businessType: 'business-type',
+        otherBusinessType: 'otherBusinessType',
+      };
+      const firstInvalidId = firstInvalidKey ? firstInvalidIdMap[firstInvalidKey] : null;
+      if (firstInvalidId && typeof window !== 'undefined') {
+        window.requestAnimationFrame(() => {
+          document.getElementById(firstInvalidId)?.focus();
+        });
+      }
+    }
     return Object.keys(errors).length === 0;
   };
 
@@ -677,9 +699,16 @@ function TenantRegisterForm() {
     await completeAllSteps();
     setSuccess(true);
     setShowProgress(false);
+    identifyTikTokPixelUser({
+      email: options.email,
+      externalId: options.email,
+    });
     trackMetaPixelEvent('CompleteRegistration', {
       content_name: 'Store Registration',
+      content_type: 'registration',
       status: 'complete',
+      value: 0,
+      currency: 'USD',
     });
     trackMarketingFunnelEvent('sign_up_completed', {
       plan_id: selectedPlanId,
@@ -989,15 +1018,6 @@ function TenantRegisterForm() {
     Boolean(businessType) && (businessType !== 'Other' || Boolean(otherBusinessType.trim()));
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim());
   const isPasswordValid = adminPassword.length >= 8;
-  const isCreateEnabled =
-    !isSubmitting &&
-    !isLoadingPlans &&
-    isStoreNameValid &&
-    isSubdomainValid &&
-    hasConfirmedSubdomainAvailability &&
-    isBusinessTypeValid &&
-    (useEmailSignup ? isEmailValid && isPasswordValid : isGoogleConnected);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 pb-8 pt-8 md:px-6 md:py-10">
       <div className="mx-auto w-full max-w-[408px] md:max-w-2xl">
@@ -1051,20 +1071,23 @@ function TenantRegisterForm() {
               </>
             )}
           </Button>
-          <p className={`mt-2 text-center text-xs ${isGoogleConnected ? 'text-[#00a63e]' : 'text-[#6a7282]'}`}>
-            {isGoogleConnected
-              ? `Google connected${googleAccountEmail ? `: ${googleAccountEmail}` : ''}`
-              : 'Google not connected yet. Connect above to continue with Google.'}
-          </p>
+          {isGoogleConnected && (
+            <p className="mt-2 text-center text-xs text-[#00a63e]">
+              {`Google connected${googleAccountEmail ? `: ${googleAccountEmail}` : ''}`}
+            </p>
+          )}
 
           <button
             type="button"
-            onClick={() => setUseEmailSignup((prev) => !prev)}
-            className="mt-6 flex w-full items-center gap-4 text-sm text-[#6a7282]"
+            onClick={() => {
+              setError(null);
+              setUseEmailSignup((prev) => !prev);
+            }}
+            className="mt-6 w-full text-center text-base font-semibold text-[#6a7282]"
           >
-            <span className="h-px flex-1 bg-[#e5e7eb]" />
-            <span>{useEmailSignup ? 'hide email fields' : 'or create with email'}</span>
-            <span className="h-px flex-1 bg-[#e5e7eb]" />
+            {useEmailSignup
+              ? 'Use Google instead'
+              : 'Or continue with email and password'}
           </button>
 
           <form onSubmit={handleSubmit} className="mt-3 space-y-4">
@@ -1083,9 +1106,11 @@ function TenantRegisterForm() {
                     }}
                     onBlur={() => handleBlur('adminEmail')}
                     placeholder="admin@example.com"
+                    aria-invalid={Boolean(fieldErrors.adminEmail)}
+                    aria-describedby={fieldErrors.adminEmail ? 'adminEmail-error' : undefined}
                     className={`mt-2 h-[56px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
-                  {fieldErrors.adminEmail && <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>}
+                  {fieldErrors.adminEmail && <p id="adminEmail-error" className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>}
                 </div>
                 <div>
                   <Label htmlFor="adminPassword" className="text-sm font-bold text-[#101828]">Password</Label>
@@ -1102,9 +1127,11 @@ function TenantRegisterForm() {
                     placeholder="••••••••"
                     minLength={8}
                     autoComplete="new-password"
+                    aria-invalid={Boolean(fieldErrors.adminPassword)}
+                    aria-describedby={fieldErrors.adminPassword ? 'adminPassword-error' : undefined}
                     className={`mt-2 h-[56px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
-                  {fieldErrors.adminPassword && <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>}
+                  {fieldErrors.adminPassword && <p id="adminPassword-error" className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>}
                 </div>
               </div>
             )}
@@ -1122,9 +1149,11 @@ function TenantRegisterForm() {
                 }}
                 onBlur={() => handleBlur('name')}
                 placeholder="My Store"
+                aria-invalid={Boolean(fieldErrors.name)}
+                aria-describedby={fieldErrors.name ? 'name-error' : undefined}
                 className={`mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af] ${fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
-              {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
+              {fieldErrors.name && <p id="name-error" className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
             </div>
 
             <div>
@@ -1143,6 +1172,8 @@ function TenantRegisterForm() {
                   onBlur={() => handleBlur('subdomain')}
                   placeholder="my-store"
                   pattern="[a-z0-9\-]+"
+                  aria-invalid={Boolean(fieldErrors.subdomain)}
+                  aria-describedby={fieldErrors.subdomain ? 'subdomain-error' : undefined}
                   className={`h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pr-12 text-base placeholder:text-[#99a1af] ${fieldErrors.subdomain ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                 />
                 {formData.subdomain.trim() && !fieldErrors.subdomain && isSubdomainAvailable === true && (
@@ -1156,7 +1187,7 @@ function TenantRegisterForm() {
                 <span className="font-semibold text-[#355cad]">{formData.subdomain || 'my-store'}</span>
               </p>
               {fieldErrors.subdomain ? (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.subdomain}</p>
+                <p id="subdomain-error" className="mt-1 text-xs text-red-600">{fieldErrors.subdomain}</p>
               ) : isCheckingSubdomain ? (
                 <p className="mt-1 text-xs text-[#6a7282]">Checking availability...</p>
               ) : isSubdomainAvailable === true ? (
@@ -1183,7 +1214,14 @@ function TenantRegisterForm() {
                   clearFieldError('otherBusinessType');
                 }}
               >
-                <SelectTrigger id="business-type" className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb]">
+                <SelectTrigger
+                  id="business-type"
+                  aria-invalid={Boolean(fieldErrors.businessType)}
+                  aria-describedby={fieldErrors.businessType ? 'businessType-error' : undefined}
+                  className={`mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${
+                    fieldErrors.businessType ? 'border-red-500 focus-visible:ring-red-500' : ''
+                  }`}
+                >
                   <SelectValue placeholder="Select your business type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1197,6 +1235,7 @@ function TenantRegisterForm() {
               {businessType === 'Other' && (
                 <div className="mt-2">
                   <Input
+                    id="otherBusinessType"
                     placeholder="Enter your business type"
                     value={otherBusinessType}
                     onChange={(e) => {
@@ -1204,15 +1243,17 @@ function TenantRegisterForm() {
                       clearFieldError('otherBusinessType');
                     }}
                     required={businessType === 'Other'}
+                    aria-invalid={Boolean(fieldErrors.otherBusinessType)}
+                    aria-describedby={fieldErrors.otherBusinessType ? 'otherBusinessType-error' : undefined}
                     className={`h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.otherBusinessType ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                   {fieldErrors.otherBusinessType && (
-                    <p className="mt-1 text-xs text-red-600">{fieldErrors.otherBusinessType}</p>
+                    <p id="otherBusinessType-error" className="mt-1 text-xs text-red-600">{fieldErrors.otherBusinessType}</p>
                   )}
                 </div>
               )}
               {fieldErrors.businessType && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.businessType}</p>
+                <p id="businessType-error" className="mt-1 text-xs text-red-600">{fieldErrors.businessType}</p>
               )}
             </div>
 
@@ -1243,9 +1284,8 @@ function TenantRegisterForm() {
             </p>
 
             <Button
-              type={useEmailSignup ? 'submit' : 'button'}
-              onClick={!useEmailSignup ? createWithConnectedGoogle : undefined}
-              disabled={!isCreateEnabled}
+              type="submit"
+              disabled={isSubmitting || isLoadingPlans}
               className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
             >
               {isSubmitting ? (

@@ -23,6 +23,8 @@ import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { AddressAutocomplete } from '@/components/address/address-autocomplete';
 import { useAnalytics } from '@/lib/analytics/use-analytics';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { identifyTikTokPixelUser, trackTikTokPixelEvent } from '@/lib/analytics/tiktok-pixel';
 
 interface CartItem {
   product_id: string;
@@ -108,7 +110,7 @@ export default function CheckoutClient({
   defaultEstimatedDeliveryDays,
 }: Readonly<CheckoutClientProps>) {
   const router = useRouter();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currency } = useCurrency();
   const { track } = useAnalytics();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
@@ -703,6 +705,20 @@ export default function CheckoutClient({
       }
       
       setCurrentStep('payment');
+      identifyTikTokPixelUser({
+        email: shippingAddress.email,
+        phoneNumber: shippingAddress.phone,
+        externalId: shippingAddress.email || shippingAddress.phone || undefined,
+      });
+      trackMetaPixelEvent('InitiateCheckout', {
+        contents: (cart?.items || []).map((item) => ({
+          content_id: item.product_id,
+          content_type: 'product',
+          content_name: item.name,
+        })),
+        value: cart?.total || 0,
+        currency: currency.code,
+      });
       // Track checkout start
       await track('checkout_start', {
         eventCategory: 'checkout',
@@ -717,6 +733,20 @@ export default function CheckoutClient({
       }
       
       setCurrentStep('review');
+      identifyTikTokPixelUser({
+        email: shippingAddress.email,
+        phoneNumber: shippingAddress.phone,
+        externalId: shippingAddress.email || shippingAddress.phone || undefined,
+      });
+      trackMetaPixelEvent('AddPaymentInfo', {
+        contents: (cart?.items || []).map((item) => ({
+          content_id: item.product_id,
+          content_type: 'product',
+          content_name: item.name,
+        })),
+        value: cart?.total || 0,
+        currency: currency.code,
+      });
     }
   };
 
@@ -837,6 +867,32 @@ export default function CheckoutClient({
       const data = await response.json();
 
       if (response.ok && data.success) {
+        identifyTikTokPixelUser({
+          email: shippingAddress.email,
+          phoneNumber: shippingAddress.phone,
+          externalId: shippingAddress.email || shippingAddress.phone || undefined,
+        });
+        trackTikTokPixelEvent('PlaceAnOrder', {
+          contents: cart.items.map((item) => ({
+            content_id: item.product_id,
+            content_type: 'product',
+            content_name: item.name,
+          })),
+          value: data.order.total_amount ?? cart.total,
+          currency: currency.code,
+        });
+        if (data.order.payment_status === 'paid') {
+          trackMetaPixelEvent('Purchase', {
+            contents: cart.items.map((item) => ({
+              content_id: item.product_id,
+              content_type: 'product',
+              content_name: item.name,
+            })),
+            value: data.order.total_amount ?? cart.total,
+            currency: currency.code,
+          });
+        }
+
         // Track checkout completion
         await track('checkout_complete', {
           eventCategory: 'checkout',

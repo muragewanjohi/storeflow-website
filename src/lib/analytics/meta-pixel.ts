@@ -4,6 +4,8 @@
  * Provides type declarations and helper for Meta (Facebook) Pixel tracking.
  */
 
+import { trackTikTokPixelEvent } from './tiktok-pixel';
+
 declare global {
   interface Window {
     fbq: (...args: unknown[]) => void;
@@ -17,16 +19,17 @@ export function trackMetaPixelEvent(
   eventName: string,
   params?: Record<string, unknown>
 ): void {
-  if (typeof window === 'undefined' || !window.fbq) return;
-
   try {
-    window.fbq('track', eventName, params);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Meta Pixel] Event tracked:', eventName, params);
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', eventName, params);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Meta Pixel] Event tracked:', eventName, params);
+      }
     }
+    trackTikTokPixelEvent(eventName, params);
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.error('[Meta Pixel] Error tracking event:', error);
+      console.error('[Meta/TikTok Pixel] Error tracking event:', error);
     }
   }
 }

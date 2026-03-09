@@ -78,3 +78,33 @@ You can test tracking by:
 
 In development mode, all tracking calls are logged to the console. In production, these logs are disabled for performance.
 
+---
+
+## TikTok Pixel + Events API Setup
+
+### Environment Variables
+
+Add these variables in `.env.local` (and in production env settings):
+
+- `NEXT_PUBLIC_TIKTOK_PIXEL_ID=...`
+- `TIKTOK_ACCESS_TOKEN=...`
+- `TIKTOK_EVENTS_API_URL=https://business-api.tiktok.com/open_api/v1.3/pixel/track/` (optional override)
+- `TIKTOK_EVENTS_API_DEBUG=true` (optional, development only)
+
+### What Is Tracked
+
+- **Browser (TikTok Pixel)**: page views and frontend conversion events that mirror current Meta Pixel calls
+- **Server (Events API)**:
+  - `AddToCart` from cart API
+  - `PlaceAnOrder` or `CompletePayment` from checkout API
+
+### Verification Checklist
+
+1. Open TikTok Events Manager test view.
+2. Set `TIKTOK_EVENTS_API_DEBUG=true` locally.
+3. Add a product to cart and place an order.
+4. Confirm:
+   - Browser event appears from pixel.
+   - Server event appears from Events API.
+   - Event deduplication is possible through `event_id`.
+

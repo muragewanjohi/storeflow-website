@@ -18,6 +18,7 @@ import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 import { getSessionId } from '@/lib/cart/session';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
+import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -416,6 +417,48 @@ export async function POST(request: NextRequest) {
         console.error('Error sending notification email:', error);
       }
     })();
+
+    const checkoutEventId = `order_${order.id}`;
+    const checkoutProperties = {
+      value: Number(order.total_amount),
+      currency: ((tenant as any).currency || 'KES').toUpperCase(),
+      content_type: 'product',
+      contents: orderItems.map((item) => ({
+        content_id: item.product_id,
+        content_type: 'product',
+        content_name:
+          (order as any).order_products?.find((p: any) => p.product_id === item.product_id)?.products?.name ||
+          item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    };
+
+    sendTikTokServerEvent({
+      request,
+      event: 'PlaceAnOrder',
+      eventId: checkoutEventId,
+      email: customerInfo.email || null,
+      phoneNumber: customerInfo.phone || null,
+      externalId: customerId ?? sessionId ?? order.id,
+      properties: checkoutProperties,
+    }).catch((error) => {
+      console.error('Error sending TikTok checkout event:', error);
+    });
+
+    if (order.payment_status === 'paid') {
+      sendTikTokServerEvent({
+        request,
+        event: 'Purchase',
+        eventId: `${checkoutEventId}_purchase`,
+        email: customerInfo.email || null,
+        phoneNumber: customerInfo.phone || null,
+        externalId: customerId ?? sessionId ?? order.id,
+        properties: checkoutProperties,
+      }).catch((error) => {
+        console.error('Error sending TikTok purchase event:', error);
+      });
+    }
 
     return NextResponse.json({
       success: true,

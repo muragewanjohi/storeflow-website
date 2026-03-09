@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ import { useCurrency } from '@/lib/currency/currency-context';
 import ProductReviewsSection from '@/components/storefront/product-reviews-section';
 import { RatingDisplay } from '@/components/storefront/rating-display';
 import ProductShareButtons from '@/components/storefront/product-share-buttons';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
 interface ProductVariant {
   id: string;
@@ -125,6 +126,20 @@ export default function ProductDetailClient({
   const router = useRouter();
   const [addingToCart, setAddingToCart] = useState(false);
 
+  useEffect(() => {
+    trackMetaPixelEvent('ViewContent', {
+      contents: [
+        {
+          content_id: product.id,
+          content_type: 'product',
+          content_name: product.name,
+        },
+      ],
+      value: displayPrice,
+      currency: currency.code,
+    });
+  }, [product.id, product.name, displayPrice, currency.code]);
+
   const handleAddToCart = async () => {
     setAddingToCart(true);
     try {
@@ -139,6 +154,17 @@ export default function ProductDetailClient({
       });
 
       if (response.ok) {
+        trackMetaPixelEvent('AddToCart', {
+          contents: [
+            {
+              content_id: product.id,
+              content_type: 'product',
+              content_name: product.name,
+            },
+          ],
+          value: displayPrice * quantity,
+          currency: currency.code,
+        });
         // Notify header to update cart count
         window.dispatchEvent(new Event('cartUpdated'));
         

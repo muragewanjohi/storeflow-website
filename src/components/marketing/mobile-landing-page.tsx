@@ -105,6 +105,19 @@ export function MobileLandingPage() {
           <ArrowRight className="h-5 w-5" />
         </Link>
 
+        <Link
+          href="/register"
+          onClick={() =>
+            trackMetaPixelEvent('Lead', {
+              content_name: 'Create with email',
+              content_category: 'mobile_hero',
+            })
+          }
+          className="mt-3 flex h-12 items-center justify-center rounded-2xl border border-[#d1d5db] bg-white text-sm font-bold text-[#355cad]"
+        >
+          Create with email
+        </Link>
+
         <p className="mt-5 text-center text-sm text-[#6a7282]">
           {trustPills.join(' • ')}
         </p>

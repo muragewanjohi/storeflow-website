@@ -15,6 +15,7 @@ import { addToCartSchema, updateCartItemSchema } from '@/lib/orders/validation';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import { getOrCreateSessionId, getSessionId } from '@/lib/cart/session';
 import { trackAddToCart } from '@/lib/analytics/server-tracking';
+import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
 
 /**
  * GET /api/cart - Get cart items
@@ -279,6 +280,32 @@ export async function POST(request: NextRequest) {
         console.error('Error tracking add to cart:', error);
       });
     }
+
+    const addToCartEventId = `cart_${product_id}_${Date.now()}`;
+    sendTikTokServerEvent({
+      request,
+      event: 'AddToCart',
+      eventId: addToCartEventId,
+      email: user?.email ?? null,
+      externalId: customerId ?? sessionId,
+      properties: {
+        content_type: 'product',
+        quantity,
+        value: finalPrice * quantity,
+        currency: ((tenant as any).currency || 'KES').toUpperCase(),
+        contents: [
+          {
+            content_id: product_id,
+            content_type: 'product',
+            content_name: product.name,
+            quantity,
+            price: finalPrice,
+          },
+        ],
+      },
+    }).catch((error) => {
+      console.error('Error sending TikTok AddToCart event:', error);
+    });
 
     // Fetch updated cart
     const cartItems = await prisma.cart_items.findMany({
