@@ -23,6 +23,17 @@ const loginSchema = z.object({
   trustDevice: z.boolean().optional().default(false),
 });
 
+function setTenantSubdomainCookie(response: NextResponse, subdomain?: string | null): void {
+  if (!subdomain) return;
+
+  response.cookies.set('tenant-subdomain', subdomain.toLowerCase(), {
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
@@ -230,6 +241,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      setTenantSubdomainCookie(response, tenant.subdomain);
       // Set auth cookies (Supabase handles this automatically via middleware)
       return response;
     }
@@ -269,6 +281,7 @@ export async function POST(request: NextRequest) {
         },
       });
       
+      setTenantSubdomainCookie(response, tenant.subdomain);
       console.log('[Login API] Login completed with 2FA bypass (temporary flag enabled)');
       return response;
     }
@@ -334,6 +347,7 @@ export async function POST(request: NextRequest) {
         },
         message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
       });
+      setTenantSubdomainCookie(response, tenant.subdomain);
       console.log('[Login API] Login flow completed successfully', {
         duration: Date.now() - startTime,
         userId: authData.user.id,
@@ -370,6 +384,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        setTenantSubdomainCookie(response, tenant.subdomain);
         console.log('[Login API] Login completed with 2FA bypass due to SendGrid credits');
         return response;
       }

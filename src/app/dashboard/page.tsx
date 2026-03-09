@@ -19,9 +19,33 @@ export default async function TenantDashboardPage() {
   await requireAnyRoleOrRedirect(user, ['tenant_admin', 'tenant_staff'], '/dashboard/login');
 
   // Verify user belongs to current tenant
-  const tenant = await requireTenant();
+  let tenant = await requireTenant();
   if (user.tenant_id !== tenant.id && user.role !== 'landlord') {
-    redirect('/dashboard/login');
+    if (!user.tenant_id) {
+      redirect('/dashboard/login');
+    }
+
+    const userTenant = await prisma.tenants.findUnique({
+      where: { id: user.tenant_id },
+    });
+
+    if (!userTenant) {
+      redirect('/dashboard/login');
+    }
+
+    console.warn('[Dashboard Page] Tenant mismatch recovered', {
+      resolvedTenantId: tenant.id,
+      userTenantId: user.tenant_id,
+      userId: user.id,
+    });
+
+    tenant = {
+      ...userTenant,
+      status: userTenant.status ?? 'active',
+      created_at: userTenant.created_at ?? new Date(),
+      updated_at: userTenant.updated_at ?? new Date(),
+      data: (userTenant.data as Record<string, unknown> | null) ?? null,
+    } as typeof tenant;
   }
 
   // Check if tenant is newly created (within last 24 hours)

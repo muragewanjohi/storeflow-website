@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { prisma } from '@/lib/prisma/client';
 
 const ALLOWED_DOMAINS = [
   'dukanest.com',
@@ -54,10 +55,34 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const nextParam = requestUrl.searchParams.get('next');
   const nextCookie = request.cookies.get('dukanest_oauth_next')?.value ?? null;
+  let tenantSubdomainForCookie: string | null = null;
 
   if (code) {
     const supabase = await createClient();
     await supabase.auth.exchangeCodeForSession(code);
+
+    // Ensure tenant context cookie is aligned with the authenticated tenant user.
+    // This prevents localhost/root-domain OAuth flows from redirecting back to login.
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    const tenantIdFromMetadata =
+      typeof user?.user_metadata?.tenant_id === 'string'
+        ? user.user_metadata.tenant_id
+        : null;
+
+    if (tenantIdFromMetadata) {
+      const tenant = await prisma.tenants.findUnique({
+        where: { id: tenantIdFromMetadata },
+        select: { subdomain: true },
+      });
+      tenantSubdomainForCookie = tenant?.subdomain ?? null;
+    } else if (user?.id) {
+      const tenant = await prisma.tenants.findFirst({
+        where: { user_id: user.id, deleted_at: null },
+        select: { subdomain: true },
+      });
+      tenantSubdomainForCookie = tenant?.subdomain ?? null;
+    }
   }
 
   const redirectTarget = resolveRedirectTarget(
@@ -67,6 +92,14 @@ export async function GET(request: NextRequest) {
   );
 
   const response = NextResponse.redirect(redirectTarget);
+  if (tenantSubdomainForCookie) {
+    response.cookies.set('tenant-subdomain', tenantSubdomainForCookie, {
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+  }
   response.cookies.set('dukanest_oauth_next', '', {
     path: '/',
     maxAge: 0,

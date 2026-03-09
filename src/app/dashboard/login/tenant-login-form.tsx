@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Loader2 } from 'lucide-react';
 
 export default function TenantLoginForm() {
   const router = useRouter();
@@ -21,11 +21,13 @@ export default function TenantLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requiresMFA, setRequiresMFA] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
+  const isBusy = isLoading || isRedirecting;
 
   const handleGoogleLogin = async () => {
     setError(null);
@@ -67,10 +69,12 @@ export default function TenantLoginForm() {
       if (oauthError) {
         setError(oauthError.message || 'Google sign-in failed');
         setIsLoading(false);
+        setIsRedirecting(false);
       }
     } catch {
       setError('Unable to start Google sign-in. Please try again.');
       setIsLoading(false);
+      setIsRedirecting(false);
     }
   };
 
@@ -115,7 +119,7 @@ export default function TenantLoginForm() {
         if (response.ok && data.success) {
           await new Promise(resolve => setTimeout(resolve, 200));
           const redirectTo = data.redirectTo || '/dashboard';
-          setIsLoading(false);
+          setIsRedirecting(true);
           window.location.href = redirectTo;
           return;
         }
@@ -160,8 +164,9 @@ export default function TenantLoginForm() {
       }
 
       // No 2FA - direct login
-      router.push('/dashboard');
-      router.refresh();
+      setIsRedirecting(true);
+      window.location.href = '/dashboard';
+      return;
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {
@@ -171,6 +176,16 @@ export default function TenantLoginForm() {
 
   return (
     <main className="flex-1 bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 py-8">
+      {isBusy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+          <div className="flex items-center gap-3 rounded-xl border border-[#e5e7eb] bg-white px-4 py-3 shadow-lg">
+            <Loader2 className="h-5 w-5 animate-spin text-[#355cad]" />
+            <p className="text-sm font-semibold text-[#101828]">
+              Signing you in...
+            </p>
+          </div>
+        </div>
+      )}
       <div className="mx-auto w-full max-w-[408px]">
         <div className="mb-8 flex justify-center">
           <Link href="/" className="relative flex h-10 w-[170px] items-center justify-center">
@@ -211,7 +226,7 @@ export default function TenantLoginForm() {
               <Button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={isLoading}
+                disabled={isBusy}
                 variant="outline"
                 className="mt-8 h-[59px] w-full rounded-2xl border-[1.7px] border-[#d1d5dc] bg-white text-base font-semibold text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] hover:bg-white"
               >
@@ -351,7 +366,7 @@ export default function TenantLoginForm() {
               className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
               disabled={isLoading}
             >
-              {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
+              {isBusy ? 'Signing in...' : 'Sign in to Dashboard'}
             </Button>
           </form>
         </div>
