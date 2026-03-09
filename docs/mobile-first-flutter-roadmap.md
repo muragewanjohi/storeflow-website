@@ -1196,7 +1196,7 @@ The current form at `/register` (`src/app/register/page.tsx`) requires:
 
 This is **too many fields** for a mobile-first flow. Industry benchmarks show every additional form field reduces conversion by ~7-10%.
 
-### Proposed Simplified Flow (4 fields + Google button)
+### Proposed Simplified Flow (with optional "What are you selling?")
 
 | Field | Change | Rationale |
 |-------|--------|-----------|
@@ -1208,8 +1208,14 @@ This is **too many fields** for a mobile-first flow. Industry benchmarks show ev
 | Password | **Replaced by Google Sign-In** | No password to create or remember. |
 | Theme | **Remove → auto-install Multipurpose** | Default to Multipurpose theme silently. Can change in dashboard later. |
 | Business Type | **Keep** | Determines color scheme and demo content. Important for personalization. |
-| Demo content | **Keep** (default: checked, collapsed) | Keep as a single "Start with sample products" toggle, hide attributes sub-option. |
+| What are you selling? | **Add (optional)** | Captures the specific offering within a business type (e.g., business type: Fashion/Clothing, selling: Bags). If empty during store creation, auto-fill with selected `business_type`. |
+| Demo content | **Keep enabled by default** | Demo content remains on by default in store creation. Current UI presents this as an informational helper card (no explicit checkbox). |
 | Demo attributes | **Remove as separate option → always include with demo content** | Simplify — if demo content is on, include attributes too. |
+
+**Why this field matters**:
+
+- Improves analytics segmentation: track both broad `business_type` and specific `selling` category; expose this breakdown on landlord analytics views.
+- Enables dynamic content generation: better demo products/images/copy for niche categories (e.g., ornamental fishes) instead of generic business-type-only defaults.
 
 **Resulting form (what the user sees)**:
 
@@ -1234,7 +1240,12 @@ This is **too many fields** for a mobile-first flow. Industry benchmarks show ev
 │   │  │ Select your business     │ ▼  │   │
 │   │  └──────────────────────────┘    │   │
 │   │                                  │   │
-│   │  ☑ Start with sample products    │   │
+│   │  What are you selling?           │   │
+│   │  ┌──────────────────────────┐    │   │
+│   │  │ e.g. Bags (optional)     │    │   │
+│   │  └──────────────────────────┘    │   │
+│   │                                  │   │
+│   │  We customize your store setup   │   │
 │   │                                  │   │
 │   │  ┌──────────────────────────┐    │   │
 │   │  │  🔵 Continue with Google │    │   │
@@ -1290,7 +1301,7 @@ This is **too many fields** for a mobile-first flow. Industry benchmarks show ev
 - [x] Step 1: Enable Google OAuth in Supabase
 - [x] Step 2: Update registration page (`src/app/register/page.tsx`)
 - [x] Step 3: Update registration API (`src/app/api/tenants/register/route.ts`)
-- [ ] Step 4: Add "Complete your profile" prompt
+- [x] Step 4: Add profile completion nudges (onboarding checklist + settings fields for `business_type`/`selling`)
 - [x] Step 5: Update dashboard login page (`src/app/dashboard/login/tenant-login-form.tsx`)
 - [x] Step 6: Google OAuth login compatibility via Supabase session flow
 - [x] Customer auth strategy added to roadmap (Google primary + email fallback)
@@ -1325,14 +1336,17 @@ This is **too many fields** for a mobile-first flow. Industry benchmarks show ev
 - Simplify demo content to a single checkbox
 - Show subdomain as preview text, not a separate input field
 
-**Google Sign-In flow**:
-1. User fills in: Store Name, Business Type
+**Google Sign-In flow (implemented)**:
+1. User fills in: Store Name, Business Type, and optionally `selling`
 2. Clicks "Continue with Google"
-3. Before redirecting to Google, save form data to `sessionStorage`
+3. Before redirecting to Google, save form data to `localStorage`
 4. Google auth completes → redirect back to registration page
-5. Page reads `sessionStorage`, detects authenticated user
-6. Auto-submits to `/api/tenants/register` with Google user info + stored form data
-7. Registration completes → redirect to dashboard
+5. Page restores saved state and validates active Google session
+6. User sees Google connection indicator, then taps "Create My Store"
+7. Submit to `/api/tenants/register` with Google user info + stored form data, then redirect to dashboard on success
+
+**Store creation fallback rule**:
+- If `selling` is empty, set `selling = business_type` before persisting tenant/store onboarding data.
 
 #### Step 3: Update Registration API (`src/app/api/tenants/register/route.ts`)
 
@@ -1360,15 +1374,15 @@ This is **too many fields** for a mobile-first flow. Industry benchmarks show ev
   ```
 - Always include demo attributes when demo content is enabled
 
-#### Step 4: Add "Complete Your Profile" Prompt
+#### Step 4: Add profile completion nudges
 
-For users who registered without providing a name:
-- On first dashboard visit, show a modal/banner: "Welcome! What should we call you?"
-- Single input field for name
-- "Skip for now" option
-- Store in user metadata via Supabase
+Implemented profile-completion nudges for missing business metadata:
+- Added a "Tell us what you are selling" checklist item in getting-started when `selling` is missing
+- Added editable `Business Type` and `What are you selling?` fields in Dashboard Settings
+- Persists these values into `tenants.data` for analytics + personalization
 
-**File**: Create `src/components/dashboard/complete-profile-prompt.tsx`
+Optional future enhancement:
+- Add a first-visit modal/banner for display name completion
 
 #### Step 5: Update Dashboard Login Page
 
@@ -1399,7 +1413,7 @@ The Supabase client SDK handles Google OAuth tokens automatically. The existing 
 The simplified registration flow is even more important for the Flutter app:
 
 1. **Native Google Sign-In** via `google_sign_in` Flutter package — one tap on Android
-2. Form is just: Store Name + Business Type + "Create Shop" button
+2. Form is: Store Name + Business Type + optional "What are you selling?" + "Create Shop" button
 3. On Android (785 of your users), Google Sign-In is literally one tap since they're already signed into Google
 4. This makes the "create a shop from your phone in under a minute" promise real
 

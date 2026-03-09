@@ -189,6 +189,9 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const [linkedAuthProviders, setLinkedAuthProviders] = useState<string[]>([]);
   const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const tenantData = tenant.data && typeof tenant.data === 'object' ? (tenant.data as Record<string, unknown>) : {};
+  const initialBusinessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : '';
+  const initialSelling = typeof tenantData.selling === 'string' ? tenantData.selling : '';
 
   const getSupabaseClient = async () => {
     const { createClient } = await import('@/lib/supabase/client');
@@ -208,6 +211,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     store_postal_code: initialSettings.store_postal_code || '',
     store_phone: initialSettings.store_phone || '',
     store_logo: initialSettings.store_logo || '',
+    business_type: initialBusinessType,
+    selling: initialSelling,
     
     // Currency Settings
     currency_code: initialSettings.currency_code || 'USD',
@@ -434,6 +439,8 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         store_postal_code: formData.store_postal_code || null,
         store_phone: formData.store_phone || null,
         store_logo: formData.store_logo || null,
+        business_type: formData.business_type?.trim() || null,
+        selling: formData.selling?.trim() || null,
         
         // Currency Settings
         currency_code: formData.currency_code,
@@ -764,6 +771,26 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                   id="store_phone"
                   value={formData.store_phone}
                   onChange={(e) => setFormData({ ...formData, store_phone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="business_type">Business Type</Label>
+                <Input
+                  id="business_type"
+                  value={formData.business_type}
+                  onChange={(e) => setFormData({ ...formData, business_type: e.target.value })}
+                  placeholder="e.g. Fashion / Clothing"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="selling">What are you selling?</Label>
+                <Input
+                  id="selling"
+                  value={formData.selling}
+                  onChange={(e) => setFormData({ ...formData, selling: e.target.value })}
+                  placeholder="e.g. Bags"
                 />
               </div>
             </div>

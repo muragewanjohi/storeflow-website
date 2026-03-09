@@ -156,6 +156,36 @@ export async function GET(request: NextRequest) {
       LIMIT 10
     `;
 
+    // Fetch tenants by business type (excluding demo stores)
+    const tenantsByBusinessType = await prisma.$queryRaw<Array<{ business_type: string; count: bigint }>>`
+      SELECT
+        COALESCE(NULLIF(data->>'business_type', ''), 'Unknown') as business_type,
+        COUNT(*)::bigint as count
+      FROM tenants
+      WHERE created_at >= ${startDate}
+        AND created_at <= ${endDate}
+        AND COALESCE((data->>'isDemo')::boolean, false) != true
+        AND COALESCE((data->>'is_demo')::boolean, false) != true
+      GROUP BY business_type
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    // Fetch tenants by selling category (excluding demo stores)
+    const tenantsBySelling = await prisma.$queryRaw<Array<{ selling: string; count: bigint }>>`
+      SELECT
+        COALESCE(NULLIF(data->>'selling', ''), 'Unknown') as selling,
+        COUNT(*)::bigint as count
+      FROM tenants
+      WHERE created_at >= ${startDate}
+        AND created_at <= ${endDate}
+        AND COALESCE((data->>'isDemo')::boolean, false) != true
+        AND COALESCE((data->>'is_demo')::boolean, false) != true
+      GROUP BY selling
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
     // Fetch total tenant count (excluding demo stores)
     const totalTenants = await prisma.tenants.count({
       where: {
@@ -262,6 +292,14 @@ export async function GET(request: NextRequest) {
       })),
       tenantsByCountry: tenantsByCountry.map((item) => ({
         country: item.country_name || 'Unknown',
+        count: Number(item.count),
+      })),
+      tenantsByBusinessType: tenantsByBusinessType.map((item) => ({
+        businessType: item.business_type || 'Unknown',
+        count: Number(item.count),
+      })),
+      tenantsBySelling: tenantsBySelling.map((item) => ({
+        selling: item.selling || 'Unknown',
         count: Number(item.count),
       })),
     });

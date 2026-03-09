@@ -33,6 +33,14 @@ interface TenantsData {
     country: string;
     count: number;
   }>;
+  tenantsByBusinessType: Array<{
+    businessType: string;
+    count: number;
+  }>;
+  tenantsBySelling: Array<{
+    selling: string;
+    count: number;
+  }>;
   totalTenants: number;
 }
 
@@ -53,6 +61,8 @@ export default function TenantsDashboard() {
         period: analyticsData.period,
         tenantChartData: analyticsData.tenantChartData,
         tenantsByCountry: analyticsData.tenantsByCountry,
+        tenantsByBusinessType: analyticsData.tenantsByBusinessType || [],
+        tenantsBySelling: analyticsData.tenantsBySelling || [],
         totalTenants: analyticsData.stats.totalTenants,
       });
     } catch (error) {
@@ -193,6 +203,66 @@ export default function TenantsDashboard() {
           ) : (
             <div className="flex items-center justify-center h-[400px] text-muted-foreground">
               No country data available for tenants
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tenants by Business Type */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenants by Business Type</CardTitle>
+          <CardDescription>Distribution of tenants by selected business type</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.tenantsByBusinessType.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={data.tenantsByBusinessType} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" style={{ fontSize: '12px' }} />
+                <YAxis
+                  dataKey="businessType"
+                  type="category"
+                  width={220}
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip formatter={(value: any) => typeof value === 'number' ? value.toLocaleString() : value} />
+                <Bar dataKey="count" fill="#0ea5e9" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+              No business type data available for tenants
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tenants by Selling Category */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenants by What They Sell</CardTitle>
+          <CardDescription>Distribution of tenants by specific selling category</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.tenantsBySelling.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={data.tenantsBySelling} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" style={{ fontSize: '12px' }} />
+                <YAxis
+                  dataKey="selling"
+                  type="category"
+                  width={220}
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip formatter={(value: any) => typeof value === 'number' ? value.toLocaleString() : value} />
+                <Bar dataKey="count" fill="#22c55e" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+              No selling category data available for tenants
             </div>
           )}
         </CardContent>

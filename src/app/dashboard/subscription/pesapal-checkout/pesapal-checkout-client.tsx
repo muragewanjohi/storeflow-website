@@ -29,6 +29,7 @@ function PesapalCheckoutContent() {
   const router = useRouter();
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
 
   useEffect(() => {
     const url = searchParams.get('redirect_url');
@@ -41,6 +42,7 @@ function PesapalCheckoutContent() {
       setError('Invalid payment URL. Please start the payment again from the subscription page.');
       return;
     }
+    setIsIframeLoading(true);
     setRedirectUrl(decoded);
   }, [searchParams]);
 
@@ -96,11 +98,23 @@ function PesapalCheckoutContent() {
           <Link href="/dashboard/subscription">Back to subscription</Link>
         </Button>
       </div>
-      <div className="flex-1 w-full min-h-[70vh]">
+      <div className="relative flex-1 w-full min-h-[70vh]">
+        {isIframeLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/95">
+            <div className="rounded-xl border bg-card p-6 text-center shadow-sm">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+              <p className="mt-4 text-sm font-medium">Loading secure checkout...</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Please wait while we connect to PesaPal.
+              </p>
+            </div>
+          </div>
+        )}
         <iframe
           src={redirectUrl}
           title="PesaPal payment"
           className="w-full h-full min-h-[70vh] border-0"
+          onLoad={() => setIsIframeLoading(false)}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
         />
       </div>

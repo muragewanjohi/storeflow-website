@@ -68,6 +68,14 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
     return 'Unknown';
   };
 
+  // Extract specific selling category, fallback to business type
+  const getSelling = (tenant: Tenant): string => {
+    if (tenant.data?.selling) {
+      return tenant.data.selling;
+    }
+    return getBusinessType(tenant);
+  };
+
   // Handle seed demo stores
   const handleSeedDemoStores = async () => {
     if (!confirm('This will create 12 demo stores (one for each business type) with 50 products, 10 categories, 5 customers, and 10 orders each. This may take a few minutes. Continue?')) {
@@ -191,10 +199,14 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
         const name = tenant.name?.toLowerCase() || '';
         const subdomain = tenant.subdomain?.toLowerCase() || '';
         const customDomain = tenant.custom_domain?.toLowerCase() || '';
+        const businessType = getBusinessType(tenant).toLowerCase();
+        const selling = getSelling(tenant).toLowerCase();
         return (
           name.includes(query) ||
           subdomain.includes(query) ||
-          customDomain.includes(query)
+          customDomain.includes(query) ||
+          businessType.includes(query) ||
+          selling.includes(query)
         );
       });
     }
@@ -212,10 +224,12 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
         const name = tenant.name?.toLowerCase() || '';
         const subdomain = tenant.subdomain?.toLowerCase() || '';
         const businessType = getBusinessType(tenant).toLowerCase();
+        const selling = getSelling(tenant).toLowerCase();
         return (
           name.includes(query) ||
           subdomain.includes(query) ||
-          businessType.includes(query)
+          businessType.includes(query) ||
+          selling.includes(query)
         );
       });
     }
@@ -519,7 +533,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search demo stores by name, business type, or subdomain..."
+                  placeholder="Search demo stores by name, business type, selling, or subdomain..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -556,6 +570,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredDemoStores.map((tenant: any) => {
                   const businessType = getBusinessType(tenant);
+                  const selling = getSelling(tenant);
                   const storeUrl = `https://${tenant.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`;
                   
                   return (
@@ -582,6 +597,12 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Selling:</span>
+                            <span className="font-medium text-right max-w-[60%] truncate" title={selling}>
+                              {selling}
+                            </span>
+                          </div>
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Subdomain:</span>
                             <code className="text-xs bg-muted px-2 py-1 rounded">{tenant.subdomain}</code>

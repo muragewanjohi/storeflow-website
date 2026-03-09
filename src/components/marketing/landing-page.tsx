@@ -20,6 +20,7 @@ import { Testimonials } from './testimonials';
 import { FAQ } from './faq';
 import { Newsletter } from './newsletter';
 import { Footer } from './footer';
+import { MobileLandingPage } from './mobile-landing-page';
 import { trackEvent } from '@/lib/analytics/google-analytics';
 
 export default function MarketingLandingPage() {
@@ -55,18 +56,24 @@ export default function MarketingLandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-      <Hero />
-      <Stats />
-      <MoreFeatures />
-      <HowItWorks />
-      <Themes />
-      <Pricing />
-      <Testimonials />
-      <WhyEcommerce />
-      <FAQ />
-      <Newsletter />
-      <Footer />
+      <div className="md:hidden">
+        <MobileLandingPage />
+      </div>
+
+      <div className="hidden md:block">
+        <Navigation />
+        <Hero />
+        <Stats />
+        <MoreFeatures />
+        <HowItWorks />
+        <Themes />
+        <Pricing />
+        <Testimonials />
+        <WhyEcommerce />
+        <FAQ />
+        <Newsletter />
+        <Footer />
+      </div>
     </div>
   );
 }

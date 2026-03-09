@@ -5,22 +5,19 @@
  */
 
 import { Suspense } from 'react';
-import StorefrontHeader from '@/components/storefront/header-server';
-import StorefrontFooter from '@/components/storefront/footer';
 import CustomerRegisterForm from './customer-register-form';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const dynamic = 'force-dynamic';
 
 export default function CustomerRegisterPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <StorefrontHeader />
+    <div className="min-h-screen">
       <Suspense fallback={
-        <main className="flex-1 flex items-center justify-center bg-gray-50 px-4 py-12">
+        <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 py-12">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-2xl text-center">Create Account</CardTitle>
+              <CardTitle className="text-2xl text-center">Customer Registration</CardTitle>
               <CardDescription className="text-center">
                 Loading...
               </CardDescription>
@@ -30,7 +27,6 @@ export default function CustomerRegisterPage() {
       }>
         <CustomerRegisterForm />
       </Suspense>
-      <StorefrontFooter />
     </div>
   );
 }

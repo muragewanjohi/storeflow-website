@@ -27,6 +27,11 @@ const navItems = [
     icon: HomeIcon,
   },
   {
+    name: 'Notifications',
+    href: '/account/notifications',
+    icon: BellIcon,
+  },
+  {
     name: 'Orders',
     href: '/account/orders',
     icon: ShoppingBagIcon,
@@ -91,8 +96,10 @@ export default function AccountNav() {
         const isActive = pathname === item.href || 
           (item.href !== '/account' && pathname?.startsWith(item.href));
         
-        // Show notification badge on Orders if there are pending quotes
-        const showBadge = item.href === '/account/orders' && notificationCount > 0;
+        // Show notification badge across account entry points if there are pending quotes
+        const showBadge =
+          notificationCount > 0 &&
+          (item.href === '/account' || item.href === '/account/orders' || item.href === '/account/notifications');
         
         return (
           <Link

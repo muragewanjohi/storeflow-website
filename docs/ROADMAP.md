@@ -272,10 +272,13 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - **Implementation:** Day 1 email is sent on tenant registration; automated Day 3/7/14 follow-ups run via cron endpoint `/api/admin/onboarding/welcome-series` with send-tracking in `tenants.data.onboarding_emails`
 
 4.5 **Onboarding Drop-off Reduction (Preview-first)**
-   - [ ] Add hybrid onboarding business selection (`business_type` + optional free-text `business_subtype`)
+  - [ ] Add onboarding business classification with optional `selling` field (`business_type` + optional free-text `selling`, e.g. Fashion/Clothing -> Bags)
+  - [ ] Store creation fallback rule: if `selling` is empty, auto-fill it with `business_type`
+  - [ ] Expose `business_type` + `selling` breakdown in landlord analytics for tenant/business distribution insights
    - [ ] Render instant storefront preview from template + cached assets in onboarding
    - [ ] Implement image resolution order: exact match -> similar cached -> fallback image -> async AI generation
    - [ ] Route merchants to simplified "update prices only" flow after preview confirmation
+  - [ ] Use `selling` to drive dynamic niche preview content generation (e.g. ornamental fishes) beyond broad business types
    - [ ] Add image source/license metadata and enforce approved source policy
    - [ ] Add funnel + preview analytics (time-to-first-preview, preview acceptance, step conversion, drop-off)
    - [ ] Add cache hit rate + AI spend tracking dashboard

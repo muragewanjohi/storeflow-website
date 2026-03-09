@@ -287,7 +287,7 @@ export default function StorefrontHeader({
                       fill
                       className="object-contain"
                       sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
-                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:') || storeLogo.startsWith('/')}
                       onError={(e) => {
                         // Hide the image on error, but keep the container for spacing
                         const target = e.target as HTMLImageElement;
@@ -310,7 +310,7 @@ export default function StorefrontHeader({
                       fill
                       className="object-contain"
                       sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
-                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:')}
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:') || storeLogo.startsWith('/')}
                       onError={(e) => {
                         // Hide the image on error, but keep the container for spacing
                         const target = e.target as HTMLImageElement;
@@ -394,9 +394,17 @@ export default function StorefrontHeader({
             {/* Account / Login */}
             {isAuthenticated ? (
               <Link href="/account">
-                <Button variant="ghost" size="sm" className="text-primary hover:text-accent transition-colors">
+                <Button variant="ghost" size="sm" className="relative text-primary hover:text-accent transition-colors">
                   <UserIcon className="h-5 w-5 mr-2" />
                   <span className="hidden sm:inline">Account</span>
+                  {notificationCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs"
+                    >
+                      {notificationCount > 9 ? '9+' : notificationCount}
+                    </Badge>
+                  )}
                 </Button>
               </Link>
             ) : (
@@ -547,9 +555,17 @@ export default function StorefrontHeader({
                   <Link
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
+                    className="flex items-center justify-between px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
-                    My Account
+                    <span>My Account</span>
+                    {notificationCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="h-5 min-w-5 items-center justify-center px-1.5 text-xs"
+                      >
+                        {notificationCount > 9 ? '9+' : notificationCount}
+                      </Badge>
+                    )}
                   </Link>
                 ) : (
                   <Link

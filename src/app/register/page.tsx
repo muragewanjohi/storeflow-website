@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ArrowLeft, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
@@ -199,14 +198,22 @@ function TenantRegisterForm() {
     subdomain: '',
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const [logoError, setLogoError] = useState(false);
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [googleAccountEmail, setGoogleAccountEmail] = useState<string | null>(null);
+  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+  const [isSubdomainAvailable, setIsSubdomainAvailable] = useState<boolean | null>(null);
   const [useEmailSignup, setUseEmailSignup] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [businessType, setBusinessType] = useState<string>('');
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
+  const [selling, setSelling] = useState<string>('');
   const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
   const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
   const isHandlingGoogleCallback = useRef(false);
+  const subdomainCheckCacheRef = useRef<Map<string, boolean>>(new Map());
 
   // Business types for Kenya/Africa market
   const businessTypes = [
@@ -333,17 +340,26 @@ function TenantRegisterForm() {
     });
   };
 
+  const markFieldTouched = (field: string) => {
+    setTouchedFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  };
+
+  const getSubdomainFormatError = (subdomain: string): string | null => {
+    const value = subdomain.trim();
+    if (!value) return 'Subdomain is required';
+    if (value.length < 3) return 'Subdomain must be at least 3 characters';
+    if (value.length > 63) return 'Subdomain must be at most 63 characters';
+    if (!/^[a-z0-9-]+$/.test(value)) return 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+    return null;
+  };
+
   // Inline validation - run on blur/change to give immediate feedback
   const validateField = (field: string): string | null => {
     switch (field) {
       case 'name':
         return !formData.name.trim() ? 'Store name is required' : null;
       case 'subdomain':
-        if (!formData.subdomain.trim()) return 'Subdomain is required';
-        if (formData.subdomain.length < 3) return 'Subdomain must be at least 3 characters';
-        if (formData.subdomain.length > 63) return 'Subdomain must be at most 63 characters';
-        if (!/^[a-z0-9-]+$/.test(formData.subdomain)) return 'Subdomain can only contain lowercase letters, numbers, and hyphens';
-        return null;
+        return getSubdomainFormatError(formData.subdomain);
       case 'adminEmail':
         if (!adminEmail.trim()) return 'Admin email is required';
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) return 'Please enter a valid email address';
@@ -353,7 +369,7 @@ function TenantRegisterForm() {
         if (adminPassword.length < 8) return 'Password must be at least 8 characters';
         return null;
       case 'plan':
-        return !selectedPlanId ? 'Please select a plan' : null;
+        return null;
       case 'businessType':
         if (!businessType) return 'Please select a business type';
         if (businessType === 'Other' && !otherBusinessType.trim()) return 'Please enter your business type';
@@ -364,6 +380,7 @@ function TenantRegisterForm() {
   };
 
   const handleBlur = (field: string) => {
+    markFieldTouched(field);
     const err = validateField(field);
     setFieldErrors((prev) => {
       const next = { ...prev };
@@ -373,25 +390,96 @@ function TenantRegisterForm() {
     });
   };
 
+  // Keep subdomain validation in sync with typing/autofill to avoid stale errors.
+  useEffect(() => {
+    if (!touchedFields.subdomain && !fieldErrors.subdomain) return;
+    const err = validateField('subdomain');
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) next.subdomain = err;
+      else delete next.subdomain;
+      return next;
+    });
+  }, [formData.subdomain, touchedFields.subdomain, fieldErrors.subdomain]);
+
+  useEffect(() => {
+    const subdomain = formData.subdomain.trim().toLowerCase();
+    const formatError = getSubdomainFormatError(subdomain);
+    if (formatError) {
+      setIsCheckingSubdomain(false);
+      setIsSubdomainAvailable(null);
+      return;
+    }
+
+    const cached = subdomainCheckCacheRef.current.get(subdomain);
+    if (cached !== undefined) {
+      setIsCheckingSubdomain(false);
+      setIsSubdomainAvailable(cached);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsCheckingSubdomain(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/tenants/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`);
+        const data = await response.json().catch(() => ({}));
+        if (isCancelled) return;
+
+        const available = response.ok && data.available === true;
+        subdomainCheckCacheRef.current.set(subdomain, available);
+        setIsSubdomainAvailable(available);
+      } catch {
+        if (!isCancelled) {
+          setIsSubdomainAvailable(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingSubdomain(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [formData.subdomain]);
+
+  useEffect(() => {
+    let active = true;
+    const hydrateGoogleConnection = async () => {
+      try {
+        const supabase = createSupabaseClient();
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        setIsGoogleConnected(Boolean(data.session));
+        setGoogleAccountEmail(data.session?.user?.email ?? null);
+      } catch {
+        if (!active) return;
+        setIsGoogleConnected(false);
+        setGoogleAccountEmail(null);
+      }
+    };
+
+    hydrateGoogleConnection();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-
-    if (!selectedPlanId) {
-      errors.plan = 'Please select a plan';
-    }
 
     if (!formData.name.trim()) {
       errors.name = 'Store name is required';
     }
 
-    if (!formData.subdomain.trim()) {
-      errors.subdomain = 'Subdomain is required';
-    } else if (formData.subdomain.length < 3) {
-      errors.subdomain = 'Subdomain must be at least 3 characters';
-    } else if (formData.subdomain.length > 63) {
-      errors.subdomain = 'Subdomain must be at most 63 characters';
-    } else if (!/^[a-z0-9-]+$/.test(formData.subdomain)) {
-      errors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+    const subdomainError = getSubdomainFormatError(formData.subdomain);
+    if (subdomainError) {
+      errors.subdomain = subdomainError;
+    } else if (isSubdomainAvailable === false) {
+      errors.subdomain = 'Subdomain taken — choose another';
     }
 
     if (useEmailSignup) {
@@ -500,6 +588,7 @@ function TenantRegisterForm() {
       selectedPlanId?: string | null;
       businessType?: string;
       otherBusinessType?: string;
+      selling?: string;
       includeDemoContent?: boolean;
     };
   }) => {
@@ -507,6 +596,7 @@ function TenantRegisterForm() {
     const effectivePlanId = options.overrides?.selectedPlanId ?? selectedPlanId;
     const effectiveBusinessType = options.overrides?.businessType ?? businessType;
     const effectiveOtherBusinessType = options.overrides?.otherBusinessType ?? otherBusinessType;
+    const effectiveSelling = options.overrides?.selling ?? selling;
     const effectiveIncludeDemoContent = options.overrides?.includeDemoContent ?? includeDemoContent;
 
     // Start the animated progress screen
@@ -545,6 +635,7 @@ function TenantRegisterForm() {
         authProvider: options.authProvider,
         planId: effectivePlanId || undefined,
         businessType: finalBusinessType || undefined,
+        selling: effectiveSelling.trim() || undefined,
         includeDemoContent: effectiveIncludeDemoContent,
         includeDemoAttributes: effectiveIncludeDemoContent,
       }),
@@ -613,10 +704,6 @@ function TenantRegisterForm() {
   const handleGoogleSignup = async () => {
     setIsSubmitting(true);
     setError(null);
-    if (!validateForm()) {
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
       const supabase = createSupabaseClient();
@@ -629,6 +716,7 @@ function TenantRegisterForm() {
         selectedPlanId,
         businessType,
         otherBusinessType,
+        selling,
         includeDemoContent,
         utmSource,
         utmMedium,
@@ -673,6 +761,67 @@ function TenantRegisterForm() {
     }
   };
 
+  const createWithConnectedGoogle = async () => {
+    setIsSubmitting(true);
+    setError(null);
+
+    if (!validateForm()) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const supabase = createSupabaseClient();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        setError('Please connect your Google account first, then create your store.');
+        setIsGoogleConnected(false);
+        setGoogleAccountEmail(null);
+        return;
+      }
+
+      const user = sessionData.session.user;
+      if (!user?.email) {
+        setError('Connected Google account did not return an email address.');
+        return;
+      }
+
+      setIsGoogleConnected(true);
+      setGoogleAccountEmail(user.email);
+
+      trackMarketingFunnelEvent('sign_up_started', {
+        plan_id: selectedPlanId,
+        include_demo_content: includeDemoContent,
+        business_type_selected: Boolean(businessType),
+        auth_method: 'google',
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
+      });
+
+      await submitRegistration({
+        authProvider: 'google',
+        email: user.email,
+        name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
+        accessToken: sessionData.session.access_token,
+      });
+    } catch {
+      cancelProgress();
+      setError('Google sign-up could not be completed. Please try again.');
+      trackMarketingFunnelEvent('sign_up_failed', {
+        reason: 'network_or_unexpected_error',
+        plan_id: selectedPlanId,
+        auth_method: 'google',
+        utm_source: utmSource || undefined,
+        utm_medium: utmMedium || undefined,
+        utm_campaign: utmCampaign || undefined,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -683,7 +832,7 @@ function TenantRegisterForm() {
     });
 
     if (!useEmailSignup) {
-      await handleGoogleSignup();
+      await createWithConnectedGoogle();
       return;
     }
 
@@ -743,58 +892,32 @@ function TenantRegisterForm() {
         setSelectedPlanId(pending.selectedPlanId ?? selectedPlanId);
         setBusinessType(pending.businessType ?? businessType);
         setOtherBusinessType(pending.otherBusinessType ?? otherBusinessType);
+        setSelling(pending.selling ?? '');
         setIncludeDemoContent(Boolean(pending.includeDemoContent));
 
         const supabase = createSupabaseClient();
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError || !sessionData.session) {
-          setIsSubmitting(false);
-          isHandlingGoogleCallback.current = false;
+          window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
           return;
         }
 
         const user = sessionData.session.user;
         if (!user?.email) {
           setError('Google account did not return an email address.');
+          window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
           return;
         }
-
-        trackMarketingFunnelEvent('sign_up_started', {
-          plan_id: pending.selectedPlanId || undefined,
-          include_demo_content: Boolean(pending.includeDemoContent),
-          business_type_selected: Boolean(pending.businessType),
-          auth_method: 'google',
-          utm_source: pending.utmSource || undefined,
-          utm_medium: pending.utmMedium || undefined,
-          utm_campaign: pending.utmCampaign || undefined,
-        });
-
-        setFormData(pending.formData);
-        setSelectedPlanId(pending.selectedPlanId);
-        setBusinessType(pending.businessType);
-        setOtherBusinessType(pending.otherBusinessType || '');
-
-        await submitRegistration({
-          authProvider: 'google',
-          email: user.email,
-          name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
-          accessToken: sessionData.session.access_token,
-          overrides: {
-            formData: pending.formData,
-            selectedPlanId: pending.selectedPlanId,
-            businessType: pending.businessType,
-            otherBusinessType: pending.otherBusinessType || '',
-            includeDemoContent: Boolean(pending.includeDemoContent),
-          },
-        });
+        setIsGoogleConnected(true);
+        setGoogleAccountEmail(user.email);
         window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
       } catch {
-        cancelProgress();
-        setError('Google sign-up could not be completed. Please try again.');
+        setError('Google connection could not be completed. Please try again.');
         window.localStorage.removeItem(GOOGLE_SIGNUP_STORAGE_KEY);
       } finally {
         setIsSubmitting(false);
+        isHandlingGoogleCallback.current = false;
       }
     };
 
@@ -856,334 +979,292 @@ function TenantRegisterForm() {
     );
   }
 
+  const isStoreNameValid = formData.name.trim().length > 0;
+  const isSubdomainValid =
+    formData.subdomain.trim().length >= 3 &&
+    formData.subdomain.trim().length <= 63 &&
+    /^[a-z0-9-]+$/.test(formData.subdomain.trim());
+  const hasConfirmedSubdomainAvailability = isSubdomainAvailable === true;
+  const isBusinessTypeValid =
+    Boolean(businessType) && (businessType !== 'Other' || Boolean(otherBusinessType.trim()));
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail.trim());
+  const isPasswordValid = adminPassword.length >= 8;
+  const isCreateEnabled =
+    !isSubmitting &&
+    !isLoadingPlans &&
+    isStoreNameValid &&
+    isSubdomainValid &&
+    hasConfirmedSubdomainAvailability &&
+    isBusinessTypeValid &&
+    (useEmailSignup ? isEmailValid && isPasswordValid : isGoogleConnected);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold text-primary">
-              Dukanest
-            </Link>
-            <Button asChild variant="outline">
-              <Link href="/pricing">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Pricing
-              </Link>
-            </Button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 pb-8 pt-8 md:px-6 md:py-10">
+      <div className="mx-auto w-full max-w-[408px] md:max-w-2xl">
+        <div className="mb-8 flex justify-center">
+          <Link href="/" className="relative flex h-10 w-[170px] items-center justify-center">
+            {!logoError ? (
+              <img
+                src="/logo_with_name.png"
+                alt="DukaNest"
+                className="h-10 w-auto object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className="text-3xl font-black leading-none text-[#355cad]">DukaNest</span>
+            )}
+          </Link>
         </div>
-      </header>
 
-      {/* Registration Form */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8">
-        <div className="container mx-auto max-w-2xl">
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold mb-2">Create your store (Free 14-day trial)</h1>
-            <p className="text-muted-foreground">
-              No card required • Set up in minutes
-            </p>
-            {/* Plan Selection - Required before account creation */}
-            <div className="mt-4 space-y-2">
-              <Label htmlFor="plan-select" className="text-sm font-medium">
-                Select Plan *
-              </Label>
-              {isLoadingPlans ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading plans...
-                </div>
-              ) : (
-                <Select
-                  value={selectedPlanId || ''}
-                  onValueChange={(value) => {
-                    setSelectedPlanId(value || null);
-                    clearFieldError('plan');
-                  }}
-                >
-                  <SelectTrigger id="plan-select" className={`w-full ${fieldErrors.plan ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
-                    <SelectValue placeholder="Select a plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allPlans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name} - {plan.currencySymbol || currencySymbol}
-                        {plan.currencySymbol === 'Ksh' 
-                          ? plan.price.toLocaleString('en-KE')
-                          : plan.price.toFixed(2)
-                        }
-                        {plan.duration_months > 0 && `/${plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}`}
-                        {plan.trial_days && plan.trial_days > 0 && ` (${plan.trial_days}-day trial)`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {selectedPlan && (
-                <div className="mt-2 p-3 bg-primary/10 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Selected: <span className="text-primary">{selectedPlan.name}</span>
-                    {selectedPlan.trial_days && selectedPlan.trial_days > 0 && (
-                      <span className="text-muted-foreground ml-2">
-                        ({selectedPlan.trial_days}-day trial)
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
-              {fieldErrors.plan ? (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.plan}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  You can change your plan later in your dashboard
-                </p>
-              )}
+        <div className="rounded-2xl border border-[#e5e7eb] bg-white px-6 py-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] md:px-8">
+          <h1 className="text-center text-[24px] font-black leading-8 tracking-[0.07px] text-[#101828]">
+            Start your 14-day free trial
+          </h1>
+
+          {error && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+              <p className="text-sm text-red-700">{error}</p>
             </div>
-          </div>
+          )}
 
-          <form onSubmit={handleSubmit} className="space-y-6 bg-background border rounded-lg p-8">
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{error}</p>
+          <Button
+            type="button"
+            onClick={handleGoogleSignup}
+            disabled={isSubmitting || isLoadingPlans}
+            variant="outline"
+            className="mt-6 h-[59px] w-full rounded-2xl border-[1.7px] border-[#d1d5dc] bg-white text-base font-semibold text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] hover:bg-white active:bg-white disabled:opacity-100 disabled:text-[#101828]"
+          >
+            {isSubmitting && !useEmailSignup ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecting to Google...
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" className="mr-2 h-5 w-5" aria-hidden="true">
+                  <path fill="#EA4335" d="M12 11.818v3.709h5.236c-.23 1.191-1.616 3.491-5.236 3.491-3.155 0-5.727-2.61-5.727-5.818s2.572-5.818 5.727-5.818c1.8 0 3.009.773 3.7 1.436l2.518-2.455C16.609 4.855 14.509 4 12 4 6.982 4 2.909 8.073 2.909 13.091S6.982 22.182 12 22.182c5.273 0 8.764-3.7 8.764-8.909 0-.6-.064-1.055-.145-1.455H12z" />
+                  <path fill="#34A853" d="M3.964 8.955l3.055 2.241C7.846 9.009 9.724 7.382 12 7.382c1.8 0 3.009.773 3.7 1.436l2.518-2.455C16.609 4.855 14.509 4 12 4 8.509 4 5.482 5.991 3.964 8.955z" />
+                  <path fill="#FBBC05" d="M12 22.182c2.455 0 4.518-.809 6.024-2.191l-2.782-2.282c-.773.536-1.764.909-3.242.909-3.591 0-6.636-2.427-7.727-5.691l-3.155 2.427C2.618 19.255 6.982 22.182 12 22.182z" />
+                  <path fill="#4285F4" d="M20.764 13.273c0-.6-.064-1.055-.145-1.455H12v3.709h5.236c-.255 1.273-1.018 2.327-2.176 3.036l2.782 2.282c1.618-1.491 2.922-3.7 2.922-7.572z" />
+                </svg>
+                Continue with Google
+              </>
+            )}
+          </Button>
+          <p className={`mt-2 text-center text-xs ${isGoogleConnected ? 'text-[#00a63e]' : 'text-[#6a7282]'}`}>
+            {isGoogleConnected
+              ? `Google connected${googleAccountEmail ? `: ${googleAccountEmail}` : ''}`
+              : 'Google not connected yet. Connect above to continue with Google.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setUseEmailSignup((prev) => !prev)}
+            className="mt-6 flex w-full items-center gap-4 text-sm text-[#6a7282]"
+          >
+            <span className="h-px flex-1 bg-[#e5e7eb]" />
+            <span>{useEmailSignup ? 'hide email fields' : 'or create with email'}</span>
+            <span className="h-px flex-1 bg-[#e5e7eb]" />
+          </button>
+
+          <form onSubmit={handleSubmit} className="mt-3 space-y-4">
+            {useEmailSignup && (
+              <div className="space-y-4 rounded-2xl border border-[#e5e7eb] bg-white p-4">
+                <div>
+                  <Label htmlFor="adminEmail" className="text-sm font-bold text-[#101828]">Admin Email</Label>
+                  <Input
+                    id="adminEmail"
+                    type="email"
+                    required={useEmailSignup}
+                    value={adminEmail}
+                    onChange={(e) => {
+                      setAdminEmail(e.target.value);
+                      clearFieldError('adminEmail');
+                    }}
+                    onBlur={() => handleBlur('adminEmail')}
+                    placeholder="admin@example.com"
+                    className={`mt-2 h-[56px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                  />
+                  {fieldErrors.adminEmail && <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="adminPassword" className="text-sm font-bold text-[#101828]">Password</Label>
+                  <Input
+                    id="adminPassword"
+                    type="password"
+                    required={useEmailSignup}
+                    value={adminPassword}
+                    onChange={(e) => {
+                      setAdminPassword(e.target.value);
+                      clearFieldError('adminPassword');
+                    }}
+                    onBlur={() => handleBlur('adminPassword')}
+                    placeholder="••••••••"
+                    minLength={8}
+                    autoComplete="new-password"
+                    className={`mt-2 h-[56px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                  />
+                  {fieldErrors.adminPassword && <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>}
+                </div>
               </div>
             )}
-            <p className="text-sm text-muted-foreground">
-              Continue with Google for faster setup. Email/password signup is still available.
-            </p>
 
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Store Name *</Label>
+            <div>
+              <Label htmlFor="name" className="text-sm font-bold text-[#101828]">Store Name</Label>
+              <Input
+                id="name"
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  clearFieldError('name');
+                }}
+                onBlur={() => handleBlur('name')}
+                placeholder="My Store"
+                className={`mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af] ${fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+              />
+              {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="subdomain" className="text-sm font-bold text-[#101828]">Store URL</Label>
+              <div className="relative mt-2">
                 <Input
-                  id="name"
+                  id="subdomain"
                   type="text"
                   required
-                  value={formData.name}
+                  value={formData.subdomain}
                   onChange={(e) => {
-                    setFormData({ ...formData, name: e.target.value });
-                    clearFieldError('name');
+                    markFieldTouched('subdomain');
+                    handleSubdomainChange(e.target.value);
+                    clearFieldError('subdomain');
                   }}
-                  onBlur={() => handleBlur('name')}
-                  placeholder="My Awesome Store"
-                  className={fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  onBlur={() => handleBlur('subdomain')}
+                  placeholder="my-store"
+                  pattern="[a-z0-9\-]+"
+                  className={`h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pr-12 text-base placeholder:text-[#99a1af] ${fieldErrors.subdomain ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                 />
-                {fieldErrors.name && (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="subdomain">Subdomain *</Label>
-                <div className="flex items-center">
-                  <Input
-                    id="subdomain"
-                    type="text"
-                    required
-                    value={formData.subdomain}
-                    onChange={(e) => {
-                      handleSubdomainChange(e.target.value);
-                      clearFieldError('subdomain');
-                    }}
-                    onBlur={() => handleBlur('subdomain')}
-                    placeholder="mystore"
-                    pattern="[a-z0-9\-]+"
-                    className={`rounded-r-none ${fieldErrors.subdomain ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                  />
-                  <span className="px-4 py-2 bg-muted border border-l-0 rounded-r-md text-muted-foreground">
-                    .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
+                {formData.subdomain.trim() && !fieldErrors.subdomain && isSubdomainAvailable === true && (
+                  <span className="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-[#dcfce7]">
+                    <Check className="h-4 w-4 text-[#00a63e]" />
                   </span>
-                </div>
-                {fieldErrors.subdomain ? (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.subdomain}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Only lowercase letters, numbers, and hyphens allowed
-                  </p>
                 )}
               </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Your store will start with the Multipurpose theme. You can change it later in your dashboard.
+              <p className="mt-2 text-sm text-[#6a7282]">
+                {(process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com').replace(/^\./, '')}/
+                <span className="font-semibold text-[#355cad]">{formData.subdomain || 'my-store'}</span>
+              </p>
+              {fieldErrors.subdomain ? (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.subdomain}</p>
+              ) : isCheckingSubdomain ? (
+                <p className="mt-1 text-xs text-[#6a7282]">Checking availability...</p>
+              ) : isSubdomainAvailable === true ? (
+                <p className="mt-1 flex items-center gap-1 text-sm font-medium text-[#00a63e]">
+                  <Check className="h-4 w-4" />
+                  Available
                 </p>
+              ) : isSubdomainAvailable === false ? (
+                <p className="mt-1 text-xs text-red-600">Subdomain taken — choose another</p>
+              ) : (
+                <p className="mt-1 text-xs text-[#6a7282]">Choose a unique subdomain</p>
+              )}
+            </div>
 
-                <div>
-                  <Label htmlFor="business-type">Business Type *</Label>
-                  <Select
-                    value={businessType}
-                    onValueChange={(value) => {
-                      setBusinessType(value);
-                      clearFieldError('businessType');
+            <div>
+              <Label htmlFor="business-type" className="text-sm font-bold text-[#101828]">
+                Business Type
+              </Label>
+              <Select
+                value={businessType}
+                onValueChange={(value) => {
+                  setBusinessType(value);
+                  clearFieldError('businessType');
+                  clearFieldError('otherBusinessType');
+                }}
+              >
+                <SelectTrigger id="business-type" className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb]">
+                  <SelectValue placeholder="Select your business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {businessTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {businessType === 'Other' && (
+                <div className="mt-2">
+                  <Input
+                    placeholder="Enter your business type"
+                    value={otherBusinessType}
+                    onChange={(e) => {
+                      setOtherBusinessType(e.target.value);
                       clearFieldError('otherBusinessType');
                     }}
-                    required
-                  >
-                    <SelectTrigger id="business-type" className={`w-full mt-2 ${fieldErrors.businessType ? 'border-red-500 ring-red-500' : ''}`}>
-                      <SelectValue placeholder="Select your business type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {businessTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {businessType === 'Other' && (
-                    <div className="mt-2">
-                      <Input
-                        placeholder="Enter your business type"
-                        value={otherBusinessType}
-                        onChange={(e) => {
-                          setOtherBusinessType(e.target.value);
-                          clearFieldError('otherBusinessType');
-                        }}
-                        required={businessType === 'Other'}
-                        className={fieldErrors.otherBusinessType ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                      />
-                      {fieldErrors.otherBusinessType && (
-                        <p className="mt-1 text-xs text-red-600">{fieldErrors.otherBusinessType}</p>
-                      )}
-                    </div>
-                  )}
-                  {fieldErrors.businessType ? (
-                    <p className="mt-1 text-xs text-red-600">{fieldErrors.businessType}</p>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      This helps us customize colors and settings for your business.
-                    </p>
+                    required={businessType === 'Other'}
+                    className={`h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${fieldErrors.otherBusinessType ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                  />
+                  {fieldErrors.otherBusinessType && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.otherBusinessType}</p>
                   )}
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Start with demo content (Recommended)</p>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="demo-content"
-                      checked={includeDemoContent}
-                      onCheckedChange={(checked) => setIncludeDemoContent(checked === true)}
-                    />
-                    <label
-                      htmlFor="demo-content"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Add demo products & categories
-                    </label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Helps you explore the dashboard faster. Remove anytime.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t">
-                <Button
-                  type="button"
-                  onClick={handleGoogleSignup}
-                  disabled={isSubmitting || isLoadingPlans || !selectedPlanId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
-                  className="w-full"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Redirecting to Google...
-                    </>
-                  ) : (
-                    'Continue with Google'
-                  )}
-                </Button>
-
-                <button
-                  type="button"
-                  className="w-full text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                  onClick={() => setUseEmailSignup((prev) => !prev)}
-                >
-                  {useEmailSignup ? 'Hide email signup' : 'Continue with email instead'}
-                </button>
-
-                {useEmailSignup && (
-                  <div className="space-y-4 rounded-md border p-4">
-                    <div>
-                      <Label htmlFor="adminEmail">Admin Email *</Label>
-                      <Input
-                        id="adminEmail"
-                        type="email"
-                        required={useEmailSignup}
-                        value={adminEmail}
-                        onChange={(e) => {
-                          setAdminEmail(e.target.value);
-                          clearFieldError('adminEmail');
-                        }}
-                        onBlur={() => handleBlur('adminEmail')}
-                        placeholder="admin@example.com"
-                        className={fieldErrors.adminEmail ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                      />
-                      {fieldErrors.adminEmail ? (
-                        <p className="mt-1 text-xs text-red-600">{fieldErrors.adminEmail}</p>
-                      ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          This email will be used for dashboard login.
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="adminPassword">Password *</Label>
-                      <Input
-                        id="adminPassword"
-                        type="password"
-                        required={useEmailSignup}
-                        value={adminPassword}
-                        onChange={(e) => {
-                          setAdminPassword(e.target.value);
-                          clearFieldError('adminPassword');
-                        }}
-                        onBlur={() => handleBlur('adminPassword')}
-                        placeholder="••••••••"
-                        minLength={8}
-                        autoComplete="new-password"
-                        className={fieldErrors.adminPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                      />
-                      {fieldErrors.adminPassword ? (
-                        <p className="mt-1 text-xs text-red-600">{fieldErrors.adminPassword}</p>
-                      ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Must be at least 8 characters.
-                        </p>
-                      )}
-                    </div>
-
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      disabled={isSubmitting || isLoadingPlans || !selectedPlanId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
-                      className="w-full"
-                    >
-                      {isSubmitting ? 'Starting trial...' : 'Start free trial with email'}
-                    </Button>
-                  </div>
-                )}
-              </div>
+              )}
+              {fieldErrors.businessType && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.businessType}</p>
+              )}
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">
-              No card required. Cancel anytime.
+            <div>
+              <Label htmlFor="selling" className="text-sm font-bold text-[#101828]">What are you selling?</Label>
+              <Input
+                id="selling"
+                type="text"
+                value={selling}
+                onChange={(e) => setSelling(e.target.value)}
+                placeholder="What are you selling"
+                className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af]"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
+              <p className="text-sm font-semibold text-[#101828]">We will customize your store based on what you are selling</p>
+              <p className="mt-1 text-sm text-[#4a5565]">
+                We&apos;ll add demo products so you can see how your store looks right away
+              </p>
+            </div>
+
+            <p className="px-2 text-center text-sm text-[#6a7282]">
+              By continuing, you agree to our{' '}
+              <Link href="/terms" className="font-semibold text-[#355cad]">Terms</Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="font-semibold text-[#355cad]">Privacy Policy</Link>
             </p>
 
-            <div className="text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                By creating a store, you agree to our Terms of Service and Privacy Policy
-              </p>
-              <p className="text-xs text-muted-foreground/80">
-                I already have an account — check your email for Dukanest or email{' '}
-                <a href="mailto:support@dukanest.com" className="underline hover:text-foreground">
-                  support@dukanest.com
-                </a>
-              </p>
-            </div>
+            <Button
+              type={useEmailSignup ? 'submit' : 'button'}
+              onClick={!useEmailSignup ? createWithConnectedGoogle : undefined}
+              disabled={!isCreateEnabled}
+              className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {useEmailSignup ? 'Creating store...' : 'Redirecting...'}
+                </>
+              ) : (
+                'Create My Store'
+              )}
+            </Button>
+
+            {isLoadingPlans && (
+              <p className="text-center text-xs text-[#6a7282]">Loading plan details...</p>
+            )}
           </form>
         </div>
-      </section>
+
+      </div>
     </div>
   );
 }

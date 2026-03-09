@@ -94,6 +94,12 @@ export async function GET() {
     const hasCurrency = !!(
       settings.currency_code && String(settings.currency_code).trim()
     );
+    const tenantData =
+      tenant.data && typeof tenant.data === 'object' && !Array.isArray(tenant.data)
+        ? (tenant.data as Record<string, unknown>)
+        : {};
+    const hasSellingProfile =
+      typeof tenantData.selling === 'string' && tenantData.selling.trim().length > 0;
 
     const items: GettingStartedItem[] = [
       {
@@ -115,6 +121,15 @@ export async function GET() {
         priority: 2,
       },
       {
+        id: 'selling_profile',
+        label: 'Tell us what you are selling',
+        description: 'Help us personalize your setup and recommendations',
+        completed: hasSellingProfile,
+        href: '/dashboard/settings',
+        cta: 'Update profile',
+        priority: 3,
+      },
+      {
         id: 'delivery',
         label: 'Configure delivery & shipping',
         description: 'Set up flat rate or delivery zones for orders',
@@ -124,7 +139,7 @@ export async function GET() {
             ? '/dashboard/settings/delivery-zones'
             : '/dashboard/settings',
         cta: 'Configure shipping',
-        priority: 4,
+        priority: 5,
       },
       {
         id: 'logo',
@@ -133,7 +148,7 @@ export async function GET() {
         completed: hasLogo,
         href: '/dashboard/settings',
         cta: 'Add logo',
-        priority: 5,
+        priority: 6,
       },
       {
         id: 'payment',
@@ -142,7 +157,7 @@ export async function GET() {
         completed: hasPayment,
         href: '/dashboard/settings',
         cta: 'Set up payments',
-        priority: 3,
+        priority: 4,
       },
       {
         id: 'currency',
@@ -151,7 +166,7 @@ export async function GET() {
         completed: hasCurrency,
         href: '/dashboard/settings',
         cta: 'Set currency',
-        priority: 6,
+        priority: 7,
       },
       {
         id: 'share',
@@ -160,7 +175,7 @@ export async function GET() {
         completed: settings.getting_started_shared_link === 'true',
         href: storeUrl,
         cta: 'Copy link',
-        priority: 7,
+        priority: 8,
       },
     ];
 

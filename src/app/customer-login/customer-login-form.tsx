@@ -10,11 +10,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { Lock, Mail } from 'lucide-react';
 
 interface CustomerLoginFormProps {
   redirect?: string;
@@ -30,8 +30,70 @@ export default function CustomerLoginForm({ redirect: initialRedirect }: Custome
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
   const isHandlingGoogleCallback = useRef(false);
+
+  const buildDefaultName = (value: string): string => {
+    const prefix = value.split('@')[0]?.trim() || 'Customer';
+    const cleaned = prefix.replace(/[._-]+/g, ' ').trim();
+    if (!cleaned) return 'Customer';
+    return cleaned
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+
+  const buildDefaultUsername = (value: string): string => {
+    const prefix = value.split('@')[0] || 'customer';
+    const normalized = prefix
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return normalized || 'customer';
+  };
+
+  const attemptAutoRegisterAndLogin = async (
+    customerEmail: string,
+    customerPassword: string,
+  ): Promise<boolean> => {
+    const registerResponse = await fetch('/api/customers/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: buildDefaultName(customerEmail),
+        email: customerEmail,
+        username: buildDefaultUsername(customerEmail),
+        password: customerPassword,
+        mobile: null,
+        company: null,
+      }),
+    });
+
+    if (!registerResponse.ok) {
+      return false;
+    }
+
+    const loginResponse = await fetch('/api/customers/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: customerEmail, password: customerPassword }),
+    });
+    const loginData = await loginResponse.json().catch(() => ({}));
+    if (!loginResponse.ok) {
+      setError(loginData.error || 'Account created, but sign-in failed. Please try again.');
+      return false;
+    }
+
+    toast.success('Account created and signed in successfully');
+    router.push(redirect);
+    router.refresh();
+    return true;
+  };
 
   const handleGoogleLogin = async () => {
     setError(null);
@@ -138,18 +200,24 @@ export default function CustomerLoginForm({ redirect: initialRedirect }: Custome
     setError(null);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const response = await fetch('/api/customers/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Login failed');
+        const canAutoRegister = response.status === 401 && data.code === 'CUSTOMER_NOT_FOUND';
+        if (canAutoRegister) {
+          const autoSignedIn = await attemptAutoRegisterAndLogin(normalizedEmail, password);
+          if (autoSignedIn) return;
+        }
+        setError('Invalid email or password');
         return;
       }
 
@@ -167,81 +235,67 @@ export default function CustomerLoginForm({ redirect: initialRedirect }: Custome
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-12">
-      <Card className="w-full max-w-md shadow-lg border-2 border-blue-100">
-        <CardHeader className="space-y-4">
-          {/* Customer Login Badge */}
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Customer Login
-            </div>
-          </div>
-          <CardTitle className="text-3xl text-center font-bold text-gray-900">Sign In</CardTitle>
-          <CardDescription className="text-center text-base">
-            Sign in to your <strong>customer account</strong> to access your orders, track shipments, and manage your profile
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 mb-4">
-            <Button
-              type="button"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-            >
-              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.46a5.52 5.52 0 01-2.4 3.63v3h3.88c2.27-2.09 3.55-5.17 3.55-8.66z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 01-10.72-3.78h-4V17.4A12 12 0 0012 24z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.34 14.31a7.2 7.2 0 010-4.62v-3h-4a12 12 0 000 10.62l4-3z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.43-3.43A12 12 0 001.34 6.69l4 3A7.2 7.2 0 0112 4.77z"
-                  fill="#EA4335"
-                />
-              </svg>
-              Continue with Google
-            </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              New or returning customer? Continue with Google.
-            </p>
-            <div className="relative text-center text-xs uppercase text-muted-foreground">
-              <span className="bg-background px-2 relative z-10">or</span>
-              <div className="absolute left-0 right-0 top-1/2 h-px bg-border -z-0" />
-            </div>
-            {!showEmailLogin && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowEmailLogin(true)}
-                disabled={isLoading}
+    <main className="flex-1 bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 py-8">
+      <div className="mx-auto w-full max-w-[408px]">
+        <div className="mb-8 flex justify-center">
+          <Link href="/" className="relative flex h-10 w-[170px] items-center justify-center">
+            <img src="/logo_with_name.png" alt="DukaNest" className="h-10 w-auto object-contain" />
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-[#e5e7eb] bg-white px-6 py-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]">
+          <div className="rounded-2xl bg-[#f3f4f6] p-1">
+            <div className="grid grid-cols-2 gap-1">
+              <Link
+                href="/dashboard/login"
+                className="flex h-11 items-center justify-center rounded-[14px] text-sm font-bold text-[#4a5565] transition-colors hover:text-[#101828]"
               >
-                Continue with email and password
-              </Button>
-            )}
+                Shop Owner
+              </Link>
+              <div className="flex h-11 items-center justify-center rounded-[14px] bg-white text-sm font-bold text-[#101828] shadow-[0_4px_6px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)]">
+                Customer
+              </div>
+            </div>
           </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 border border-red-200 mb-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
+          <div className="mt-8 text-center">
+            <h1 className="text-[24px] font-black leading-8 text-[#101828]">Welcome back, Customer</h1>
+            <p className="mt-2 text-base text-[#4a5565]">Sign in to track your orders and manage your profile</p>
+          </div>
 
-          {showEmailLogin && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+          <Button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            variant="outline"
+            className="mt-8 h-[59px] w-full rounded-2xl border-[1.7px] border-[#d1d5dc] bg-white text-base font-semibold text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] hover:bg-white"
+          >
+            <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.46a5.52 5.52 0 01-2.4 3.63v3h3.88c2.27-2.09 3.55-5.17 3.55-8.66z" fill="#4285F4" />
+              <path d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 01-10.72-3.78h-4V17.4A12 12 0 0012 24z" fill="#34A853" />
+              <path d="M5.34 14.31a7.2 7.2 0 010-4.62v-3h-4a12 12 0 000 10.62l4-3z" fill="#FBBC05" />
+              <path d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.43-3.43A12 12 0 001.34 6.69l4 3A7.2 7.2 0 0112 4.77z" fill="#EA4335" />
+            </svg>
+            Continue with Google
+          </Button>
+
+          <div className="my-6 flex items-center gap-4">
+            <span className="h-px flex-1 bg-[#e5e7eb]" />
+            <span className="text-sm text-[#6a7282]">or</span>
+            <span className="h-px flex-1 bg-[#e5e7eb]" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="email" className="text-sm font-bold text-[#101828]">Email</Label>
+              <div className="relative mt-2">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#99a1af]" />
                 <Input
                   id="email"
                   name="email"
@@ -250,71 +304,48 @@ export default function CustomerLoginForm({ redirect: initialRedirect }: Custome
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
+                  placeholder="you@example.com"
+                  className="h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pl-12 text-base placeholder:text-[#99a1af]"
                 />
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+            <div>
+              <Label htmlFor="password" className="text-sm font-bold text-[#101828]">Password</Label>
+              <div className="relative mt-2">
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#99a1af]" />
                 <Input
                   id="password"
                   name="password"
                   type="password"
                   autoComplete="current-password"
                   required
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="••••••••"
+                  className="h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pl-12 text-base placeholder:text-[#99a1af]"
                 />
               </div>
-
-              <div className="flex items-center justify-between">
-                <Link
-                  href="/customer-forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setShowEmailLogin(false)}
-                  className="text-sm text-muted-foreground hover:underline"
-                >
-                  Back
-                </button>
-              </div>
-
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base" disabled={isLoading}>
-                {isLoading ? 'Signing in...' : 'Sign In to My Account'}
-              </Button>
-            </form>
-          )}
-
-          <div className="mt-6 pt-6 border-t space-y-4">
-            <p className="text-sm text-center text-muted-foreground">
-              Don&apos;t have an account?{' '}
-              <Link
-                href={`/customer-register${redirect !== '/account' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`}
-                className="text-primary hover:underline font-medium"
-              >
-                Create an account
-              </Link>
-            </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-sm text-center text-amber-800">
-                <strong>Store Admin?</strong> Use the{' '}
-                <Link
-                  href="/dashboard/login"
-                  className="text-amber-700 hover:text-amber-900 underline font-semibold"
-                >
-                  Store Admin Login
-                </Link>
-                {' '}instead
-              </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            <div className="text-right">
+              <Link href="/customer-forgot-password" className="text-sm font-semibold text-[#355cad] hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
+            <Button
+              type="submit"
+              className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Signing in...' : 'Sign in to My Account'}
+            </Button>
+          </form>
+        </div>
+
+      </div>
     </main>
   );
 }

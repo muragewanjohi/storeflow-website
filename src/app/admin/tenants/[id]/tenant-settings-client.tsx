@@ -96,6 +96,8 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
   );
   const [country, setCountry] = useState(tenant.country || '');
   const [contactEmail, setContactEmail] = useState(tenant.contact_email || '');
+  const businessType = (tenant.data as any)?.business_type || 'Not provided';
+  const sellingCategory = (tenant.data as any)?.selling || businessType;
 
   // Subdomain change state
   const [newSubdomain, setNewSubdomain] = useState('');
@@ -869,6 +871,29 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
               />
               <p className="text-sm text-muted-foreground">
                 Set by tenant in dashboard settings and used for follow-up contact
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="business_type">Business Type</Label>
+              <Input
+                id="business_type"
+                type="text"
+                value={businessType}
+                disabled
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="selling_category">What They Sell</Label>
+              <Input
+                id="selling_category"
+                type="text"
+                value={sellingCategory}
+                disabled
+              />
+              <p className="text-sm text-muted-foreground">
+                Used for landlord analytics and niche content personalization.
               </p>
             </div>
 

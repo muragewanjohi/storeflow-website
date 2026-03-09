@@ -88,6 +88,7 @@ const registerTenantSchema = z.object({
   planId: z.string().uuid().optional(),
   themeId: z.string().uuid().optional(),
   businessType: z.string().optional(),
+  selling: z.string().optional(),
   includeDemoContent: z.boolean().optional(),
   includeDemoAttributes: z.boolean().optional(),
 });
@@ -299,6 +300,11 @@ export async function POST(request: NextRequest) {
       effectiveThemeId = defaultTheme?.id;
     }
 
+    const finalSelling =
+      validatedData.selling?.trim() ||
+      validatedData.businessType?.trim() ||
+      undefined;
+
     // Create tenant in database
     const tenant = await prisma.tenants.create({
       data: {
@@ -312,6 +318,8 @@ export async function POST(request: NextRequest) {
         country: countryCode, // Store country code
         data: {
           theme: 'light',
+          business_type: validatedData.businessType || undefined,
+          selling: finalSelling,
           // Store subscription pricing info for future payments
           subscription: validatedData.planId ? {
             currency: subscriptionCurrency,

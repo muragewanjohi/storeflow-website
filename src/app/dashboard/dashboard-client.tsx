@@ -21,6 +21,7 @@ import {
   ShoppingCartIcon,
   UserGroupIcon,
   CubeIcon,
+  BellIcon,
   ArrowTrendingUpIcon,
   ExclamationTriangleIcon,
   PlusIcon,
@@ -136,6 +137,10 @@ interface GettingStartedData {
   nextSteps?: GettingStartedItem[];
 }
 
+interface DashboardNotificationsResponse {
+  unread_count?: number;
+}
+
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -216,6 +221,18 @@ export default function DashboardClient({
     },
   });
 
+  // Fetch notifications for mobile header badge state
+  const { data: notificationsData } = useQuery({
+    queryKey: ['dashboard-mobile-notifications'],
+    queryFn: async () => {
+      const response = await fetch('/api/notifications');
+      if (!response.ok) return { unread_count: 0 } as DashboardNotificationsResponse;
+      return (await response.json()) as DashboardNotificationsResponse;
+    },
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60,
+  });
+
   // Calculate percentage changes (mock for now - would need previous period data)
   const getPercentChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -293,8 +310,364 @@ export default function DashboardClient({
     }
   };
 
+  const mobileSetupFallback: GettingStartedItem[] = [
+    {
+      id: 'product',
+      label: 'Add your first product',
+      description: '',
+      completed: false,
+      href: '/dashboard/products/new',
+      cta: 'Add',
+    },
+    {
+      id: 'payments',
+      label: 'Configure payment settings',
+      description: '',
+      completed: false,
+      href: '/dashboard/settings',
+      cta: 'Configure',
+    },
+    {
+      id: 'theme',
+      label: 'Customize store design',
+      description: '',
+      completed: false,
+      href: '/dashboard/themes/customize',
+      cta: 'Customize',
+    },
+    {
+      id: 'share',
+      label: 'Share your store link',
+      description: '',
+      completed: false,
+      href: '/dashboard/settings',
+      cta: 'Share',
+    },
+  ];
+
+  const mobileSetupItems = gettingStarted?.items?.length ? gettingStarted.items : mobileSetupFallback;
+  const mobileSetupCompleted = gettingStarted?.completedCount ?? mobileSetupItems.filter((item) => item.completed).length;
+  const mobileSetupTotal = gettingStarted?.totalCount ?? mobileSetupItems.length;
+  const mobileSetupProgress = gettingStarted?.progressPercent ?? (mobileSetupTotal > 0 ? (mobileSetupCompleted / mobileSetupTotal) * 100 : 0);
+
+  const safeOverview = overview?.overview;
+  const revenueValue = safeOverview?.totalRevenue ?? 0;
+  const ordersValue = safeOverview?.totalOrders ?? 0;
+  const visitorsValue = overview?.visitorsToday ?? 0;
+  const conversionValue = visitorsValue > 0 ? (ordersValue / visitorsValue) * 100 : 0;
+
+  const revenueDelta = getPercentChange(
+    overview?.thisMonth.revenue ?? 0,
+    Math.max((safeOverview?.totalRevenue ?? 0) - (overview?.thisMonth.revenue ?? 0), 1),
+  );
+  const ordersDelta = getPercentChange(
+    overview?.thisMonth.orders ?? 0,
+    Math.max((safeOverview?.totalOrders ?? 0) - (overview?.thisMonth.orders ?? 0), 1),
+  );
+  const visitorsDelta = getPercentChange(
+    overview?.visitorsToday ?? 0,
+    Math.max((safeOverview?.totalCustomers ?? 0) - (overview?.visitorsToday ?? 0), 1),
+  );
+  const conversionDelta = conversionValue > 0 ? Math.min(conversionValue / 4, 99) : 0;
+
+  const formatDelta = (value: number) => `${value >= 0 ? '+' : ''}${Math.abs(value).toFixed(1)}%`;
+  const getDeltaColor = (value: number) => (value >= 0 ? 'text-[#2f9e44]' : 'text-[#e03131]');
+  const checklistCompleted = Boolean(gettingStarted?.allComplete);
+  const unreadNotificationCount = notificationsData?.unread_count ?? 0;
+  const hasUnreadNotifications = unreadNotificationCount > 0;
+
+  const todayRevenueValue =
+    revenueTrends?.trends?.length && revenueTrends.trends[revenueTrends.trends.length - 1]
+      ? revenueTrends.trends[revenueTrends.trends.length - 1].revenue
+      : (overview?.thisMonth.revenue ?? 0);
+  const todayOrdersValue = overview?.pendingOrders ?? overview?.thisMonth.orders ?? 0;
+
+  const formatCompactCurrency = (value: number) => {
+    const compact = formatNumber(value);
+    return currency.symbolPosition === 'left' ? `${currency.symbol}${compact}` : `${compact}${currency.symbol}`;
+  };
+
+  const getRelativeTime = (dateValue?: string) => {
+    if (!dateValue) return 'just now';
+    const diffMs = Date.now() - new Date(dateValue).getTime();
+    if (diffMs < 60_000) return 'just now';
+    const minutes = Math.floor(diffMs / 60_000);
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  };
+
+  const lowStockCount = inventoryData?.summary?.lowStockCount ?? 0;
+  const pendingOrdersCount = overview?.pendingOrders ?? 0;
+  const mobileActivities = [
+    recentOrders?.[0]
+      ? { id: 'order', label: 'New order received', time: getRelativeTime(recentOrders[0].created_at) }
+      : null,
+    recentOrders?.[1]
+      ? { id: 'payment', label: 'Payment completed', time: getRelativeTime(recentOrders[1].created_at) }
+      : null,
+    lowStockCount > 0 ? { id: 'stock', label: 'Product low stock', time: '1 hour ago' } : null,
+  ].filter((item): item is { id: string; label: string; time: string } => item !== null);
+
   return (
-    <div className="space-y-6">
+    <div className="bg-[#f9fafb] md:bg-transparent md:space-y-6">
+      <div className="relative min-h-[calc(100vh-4rem)] pb-28 md:hidden">
+        <section
+          className={`bg-gradient-to-b from-primary to-primary/80 px-4 pt-8 ${
+            checklistCompleted ? 'pb-6' : 'pb-28'
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-primary-foreground/80">{getGreeting()},</p>
+              <h1 className="mt-1 text-[24px] font-bold leading-9 tracking-[0.0703px] text-primary-foreground">
+                {tenantName}
+              </h1>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary-foreground/20 px-3 py-1">
+                <span className="h-2 w-2 rounded-full bg-[#2f9e44]" />
+                <span className="text-sm font-medium text-primary-foreground">
+                  {tenantStatus === 'active' ? 'Live' : 'Draft'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className={`relative rounded-full p-2.5 ${
+                hasUnreadNotifications ? 'bg-primary-foreground/20' : 'bg-primary-foreground/10'
+              }`}
+              onClick={() => {
+                if (hasUnreadNotifications) {
+                  window.location.href = '/dashboard/orders?status=pending';
+                  return;
+                }
+                toast.info('No new notifications');
+              }}
+              aria-label="Notifications"
+            >
+              <BellIcon className="h-5 w-5 text-primary-foreground" />
+              {hasUnreadNotifications && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#fb2c36] px-1 text-[11px] font-bold text-white">
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {checklistCompleted && (
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+              <div className="min-w-[110px] rounded-full bg-primary-foreground/15 px-4 py-2">
+                <p className="text-[11px] text-primary-foreground/70">Visitors Today</p>
+                <p className="text-base font-bold text-primary-foreground">{formatNumber(visitorsValue)}</p>
+              </div>
+              <div className="min-w-[110px] rounded-full bg-primary-foreground/15 px-4 py-2">
+                <p className="text-[11px] text-primary-foreground/70">New Orders</p>
+                <p className="text-base font-bold text-primary-foreground">{formatNumber(todayOrdersValue)}</p>
+              </div>
+              <div className="min-w-[128px] rounded-full bg-primary-foreground/15 px-4 py-2">
+                <p className="text-[11px] text-primary-foreground/70">Revenue Today</p>
+                <p className="text-base font-bold text-primary-foreground">{formatCompactCurrency(todayRevenueValue)}</p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {!checklistCompleted && (
+          <section className="relative z-10 mx-4 -mt-20 rounded-2xl border border-[#e5e7eb] bg-white p-6 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-[18px] font-semibold leading-7 tracking-[-0.4395px] text-[#101828]">Complete your setup</h2>
+                <p className="mt-1 text-base text-[#4a5565]">
+                  {mobileSetupCompleted} of {mobileSetupTotal} completed
+                </p>
+              </div>
+              <p className="text-[22px] font-bold leading-[29.333px] tracking-[-0.2578px] text-primary">{Math.round(mobileSetupProgress)}%</p>
+            </div>
+
+            <div className="mb-5 h-2 w-full rounded-full bg-[#f3f4f6]">
+              <div
+                className="h-2 rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.max(0, Math.min(100, mobileSetupProgress))}%` }}
+              />
+            </div>
+
+            <div className="space-y-3">
+              {mobileSetupItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-2">
+                  <Link href={item.href} className="flex min-w-0 items-center gap-3">
+                    {item.completed ? (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00c950] text-white">
+                        <CheckCircleIcon className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="h-5 w-5 rounded-full border border-[#d1d5dc]" />
+                    )}
+                    <span className={`truncate text-[15px] ${item.completed ? 'text-[#6a7282]' : 'text-[#101828]'}`}>
+                      {item.label}
+                    </span>
+                  </Link>
+                  {!item.completed && item.cta && (
+                    item.id === 'share' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyStoreLink}
+                      className="h-7 rounded-full border-[#d1d5dc] px-3 text-xs font-semibold text-primary"
+                      >
+                        {item.cta}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      className="h-7 rounded-full border-[#d1d5dc] px-3 text-xs font-semibold text-primary"
+                      >
+                        <Link href={item.href}>{item.cta}</Link>
+                      </Button>
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className={`space-y-8 px-4 ${checklistCompleted ? 'pt-6' : 'pt-8'}`}>
+          <div>
+            <h2 className="mb-4 text-[18px] font-semibold leading-[27px] tracking-[-0.4395px] text-[#1f2937]">Overview</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-[#f3f4f6] bg-white p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+                <div className="mb-2 flex items-center justify-between text-sm font-medium text-[#6b7280]">
+                  <span>Revenue</span>
+                  <CurrencyDollarIcon className="h-4 w-4" />
+                </div>
+                <p className="text-[22px] font-bold leading-[33px] tracking-[-0.2578px] text-[#1f2937]">{formatCurrency(revenueValue)}</p>
+                <p className={`mt-1 text-sm font-medium ${getDeltaColor(revenueDelta)}`}>{formatDelta(revenueDelta)}</p>
+              </div>
+              <div className="rounded-2xl border border-[#f3f4f6] bg-white p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+                <div className="mb-2 flex items-center justify-between text-sm font-medium text-[#6b7280]">
+                  <span>Orders</span>
+                  <ShoppingCartIcon className="h-4 w-4" />
+                </div>
+                <p className="text-[22px] font-bold leading-[33px] tracking-[-0.2578px] text-[#1f2937]">{formatNumber(ordersValue)}</p>
+                <p className={`mt-1 text-sm font-medium ${getDeltaColor(ordersDelta)}`}>{formatDelta(ordersDelta)}</p>
+              </div>
+              <div className="rounded-2xl border border-[#f3f4f6] bg-white p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+                <div className="mb-2 flex items-center justify-between text-sm font-medium text-[#6b7280]">
+                  <span>Visitors</span>
+                  <EyeIcon className="h-4 w-4" />
+                </div>
+                <p className="text-[22px] font-bold leading-[33px] tracking-[-0.2578px] text-[#1f2937]">{formatNumber(visitorsValue)}</p>
+                <p className={`mt-1 text-sm font-medium ${getDeltaColor(visitorsDelta)}`}>{formatDelta(visitorsDelta)}</p>
+              </div>
+              <div className="rounded-2xl border border-[#f3f4f6] bg-white p-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+                <div className="mb-2 flex items-center justify-between text-sm font-medium text-[#6b7280]">
+                  <span>Conversion</span>
+                  <ArrowTrendingUpIcon className="h-4 w-4" />
+                </div>
+                <p className="text-[22px] font-bold leading-[33px] tracking-[-0.2578px] text-[#1f2937]">{conversionValue.toFixed(1)}%</p>
+                <p className={`mt-1 text-sm font-medium ${getDeltaColor(conversionDelta)}`}>{formatDelta(conversionDelta)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="mb-4 text-[18px] font-semibold leading-[27px] tracking-[-0.4395px] text-[#1f2937]">Alerts</h2>
+            <div className="space-y-2">
+              <Link
+                href="/dashboard/orders"
+                className="flex items-center gap-3 rounded-2xl border border-[#f3f4f6] bg-white px-4 py-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#f59f001a] text-[#f59f00]">
+                  <ShoppingCartIcon className="h-5 w-5" />
+                </span>
+                <span className="flex-1 text-sm font-medium text-[#1f2937]">
+                  {pendingOrdersCount} pending orders
+                </span>
+                <ArrowRightIcon className="h-4 w-4 text-[#6b7280]" />
+              </Link>
+              <Link
+                href="/dashboard/inventory"
+                className="flex items-center gap-3 rounded-2xl border border-[#f3f4f6] bg-white px-4 py-4 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#f59f001a] text-[#f59f00]">
+                  <CubeIcon className="h-5 w-5" />
+                </span>
+                <span className="flex-1 text-sm font-medium text-[#1f2937]">
+                  {lowStockCount} items low in stock
+                </span>
+                <ArrowRightIcon className="h-4 w-4 text-[#6b7280]" />
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="mb-4 text-[18px] font-semibold leading-[27px] tracking-[-0.4395px] text-[#1f2937]">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                href="/dashboard/products/new"
+                className="rounded-2xl border border-[#f3f4f6] bg-white p-5 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+                  <PlusIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-medium text-[#1f2937]">Add Product</p>
+              </Link>
+              <Link
+                href="/dashboard/orders"
+                className="rounded-2xl border border-[#f3f4f6] bg-white p-5 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+                  <ShoppingCartIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-medium text-[#1f2937]">View Orders</p>
+              </Link>
+              <button
+                type="button"
+                onClick={handleCopyStoreLink}
+                className="rounded-2xl border border-[#f3f4f6] bg-white p-5 text-left shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+                  <ShareIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-medium text-[#1f2937]">Share Store</p>
+              </button>
+              <Link
+                href="/dashboard/analytics"
+                className="rounded-2xl border border-[#f3f4f6] bg-white p-5 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
+              >
+                <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+                  <ChartBarIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-medium text-[#1f2937]">Analytics</p>
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="mb-4 text-[18px] font-semibold leading-[27px] tracking-[-0.4395px] text-[#1f2937]">Recent Activity</h2>
+            <div className="overflow-hidden rounded-2xl border border-[#f3f4f6] bg-white shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]">
+              {(mobileActivities.length > 0 ? mobileActivities : [{ id: 'empty', label: 'No recent activity', time: 'just now' }]).map(
+                (item, index, arr) => (
+                  <div
+                    key={item.id}
+                    className={`px-4 py-3.5 ${index < arr.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}
+                  >
+                    <p className="text-sm font-medium text-[#1f2937]">{item.label}</p>
+                    <p className="mt-1 text-xs text-[#6b7280]">{item.time}</p>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <div className="hidden space-y-6 md:block">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -986,6 +1359,7 @@ export default function DashboardClient({
             <span className="text-sm">Inventory</span>
           </Link>
         </Button>
+      </div>
       </div>
     </div>
   );

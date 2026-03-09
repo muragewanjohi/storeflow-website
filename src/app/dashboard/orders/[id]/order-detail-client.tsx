@@ -118,7 +118,7 @@ export default function OrderDetailClient({
 
   if (error || !order) {
     return (
-      <div>
+      <div className="px-4 pb-24 pt-4 md:px-0 md:pb-0 md:pt-0">
         <div className="mb-6">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/orders">
@@ -388,9 +388,9 @@ export default function OrderDetailClient({
   ];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#f3f4f6] px-4 pb-24 pt-4 md:min-h-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+      <div className="mb-5 flex flex-col gap-4 md:mb-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3 md:items-center md:gap-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/orders">
               <ArrowLeftIcon className="mr-2 h-4 w-4" />
@@ -398,27 +398,27 @@ export default function OrderDetailClient({
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Order {order.order_number}</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Order {order.order_number}</h1>
+            <p className="mt-1 text-sm text-muted-foreground md:mt-2 md:text-base">
               Created on {new Date(order.created_at).toLocaleDateString()} at{' '}
               {new Date(order.created_at).toLocaleTimeString()}
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:justify-end">
           {order.status !== 'cancelled' && order.status !== 'delivered' && (
             <Button
               variant={order.delivery_fee_status === 'rejected' ? 'destructive' : 'outline'}
               size="sm"
               onClick={() => setShowCancelDialog(true)}
-              className={order.delivery_fee_status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
+              className={`w-full sm:w-auto ${order.delivery_fee_status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}`}
             >
               <XMarkIcon className="mr-2 h-4 w-4" />
               {order.delivery_fee_status === 'rejected' ? 'Cancel Order (Required)' : 'Cancel Order'}
             </Button>
           )}
           {order.status === 'processing' && (
-            <Button variant="outline" size="sm" onClick={handlePrintShippingLabel}>
+            <Button variant="outline" size="sm" onClick={handlePrintShippingLabel} className="w-full sm:w-auto">
               <PrinterIcon className="mr-2 h-4 w-4" />
               Print Label
             </Button>
@@ -427,6 +427,7 @@ export default function OrderDetailClient({
             variant="outline" 
             size="sm" 
             onClick={() => window.open(`/api/orders/${order.id}/invoice/download`, '_blank')}
+            className="w-full sm:w-auto"
           >
             <PrinterIcon className="mr-2 h-4 w-4" />
             {order.payment_status === 'paid' ? 'Download Receipt' : 'Download Invoice'}
@@ -446,9 +447,9 @@ export default function OrderDetailClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-4 md:space-y-6 lg:col-span-2">
           {/* Order Items */}
           <Card>
             <CardHeader>
@@ -458,12 +459,12 @@ export default function OrderDetailClient({
             <CardContent>
               <div className="space-y-4">
                 {order.items.map((item: any) => (
-                  <div key={item.id} className="flex items-start gap-4 border-b pb-4 last:border-0">
+                  <div key={item.id} className="flex flex-col gap-3 border-b pb-4 last:border-0 sm:flex-row sm:items-start sm:gap-4">
                     {item.product_image && (
                       <img
                         src={item.product_image}
                         alt={item.product_name}
-                        className="h-16 w-16 rounded-md object-cover"
+                        className="h-14 w-14 rounded-md object-cover sm:h-16 sm:w-16"
                       />
                     )}
                     <div className="flex-1">
@@ -473,7 +474,7 @@ export default function OrderDetailClient({
                       </p>
                       <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center justify-between sm:block sm:text-right">
                       <p className="font-medium">{formatCurrency(item.total)}</p>
                       <p className="text-sm text-muted-foreground">{formatCurrency(item.price)} each</p>
                     </div>
@@ -481,12 +482,12 @@ export default function OrderDetailClient({
                 ))}
               </div>
               <Separator className="my-4" />
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Total</span>
-                <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-base font-semibold md:text-lg">Total</span>
+                <span className="text-xl font-bold md:text-2xl">{formatCurrency(order.total_amount)}</span>
               </div>
               {order.coupon_discounted && (
-                <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
+                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
                   <span>Coupon Discount ({order.coupon})</span>
                   <span>-{formatCurrency(order.coupon_discounted)}</span>
                 </div>
@@ -583,7 +584,7 @@ export default function OrderDetailClient({
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Delivery Fee Quote Section - Show First */}
           {order.delivery_fee_status === 'pending' && (
             <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
@@ -707,7 +708,7 @@ export default function OrderDetailClient({
                         </Badge>
                       )}
                       {order.delivery_fee_status === 'quoted' && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
                           Quote Sent - Awaiting Customer Approval
                         </Badge>
                       )}
@@ -889,7 +890,7 @@ export default function OrderDetailClient({
               
               {/* Payment Verification Details (for M-Pesa) */}
               {order.payment_gateway === 'mpesa' && order.payment_meta && (
-                <div className="mt-4 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                <div className="mt-4 rounded-lg border bg-primary/10 p-4">
                   <h4 className="font-semibold text-sm mb-3">Payment Verification Details</h4>
                   <div className="space-y-2 text-sm">
                     {order.payment_meta.transaction_id && (
@@ -944,7 +945,7 @@ export default function OrderDetailClient({
                   
                   {/* Admin Verification Actions */}
                   {order.payment_meta.verification_status === 'pending' && (
-                    <div className="mt-4 pt-4 border-t flex gap-2">
+                    <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row">
                       <Button
                         size="sm"
                         onClick={async () => {

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -256,8 +256,194 @@ export default function ProductsListClient({
     });
   };
 
+  const mobileFilteredProducts = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return initialProducts.filter((product: any) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        product.name?.toLowerCase().includes(normalizedSearch) ||
+        product.sku?.toLowerCase().includes(normalizedSearch);
+      const matchesStatus = status === 'all' || product.status === status;
+      const matchesCategory = categoryId === 'all' || product.category_id === categoryId;
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+  }, [initialProducts, search, status, categoryId]);
+
+  const mobileSummary = useMemo(() => {
+    const total = mobileFilteredProducts.length;
+    const active = mobileFilteredProducts.filter((p: any) => p.status === 'active').length;
+    const lowStock = mobileFilteredProducts.filter((p: any) => (p.stock_quantity ?? 0) > 0 && (p.stock_quantity ?? 0) <= 10).length;
+    const outOfStock = mobileFilteredProducts.filter((p: any) => (p.stock_quantity ?? 0) <= 0).length;
+    return { total, active, lowStock, outOfStock };
+  }, [mobileFilteredProducts]);
+
   return (
     <div>
+      <div className="min-h-screen bg-[#f3f4f6] pb-24 md:hidden">
+        <section className="bg-gradient-to-b from-primary to-primary/80 px-4 pb-6 pt-8">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-[30px] font-bold leading-tight text-primary-foreground">Your Products</h1>
+              <p className="mt-1 text-xs text-primary-foreground/80">Manage your product catalog</p>
+            </div>
+            <Button asChild className="h-9 bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+              <Link href="/dashboard/products/new">
+                <PlusIcon className="mr-1.5 h-4 w-4" />
+                Add
+              </Link>
+            </Button>
+          </div>
+        </section>
+
+        <section className="space-y-4 px-4 pt-4">
+          {(error || dbError) && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive">{error || dbError}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-4 gap-2">
+            <Card className="border-[#e5e7eb]">
+              <CardContent className="p-3">
+                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.total}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Total</p>
+              </CardContent>
+            </Card>
+            <Card className="border-[#e5e7eb]">
+              <CardContent className="p-3">
+                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.active}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Active</p>
+              </CardContent>
+            </Card>
+            <Card className="border-[#e5e7eb]">
+              <CardContent className="p-3">
+                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.lowStock}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Low</p>
+              </CardContent>
+            </Card>
+            <Card className="border-[#e5e7eb]">
+              <CardContent className="p-3">
+                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.outOfStock}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Out</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border-[#e5e7eb]">
+            <CardContent className="space-y-3 p-3">
+              <Input
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={status} onValueChange={(value) => setStatus(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={categoryId} onValueChange={(value) => setCategoryId(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((category: any) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleSearch} className="w-full" disabled={isPending}>
+                Apply filters
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {mobileFilteredProducts.length === 0 ? (
+              <Card className="border-[#e5e7eb]">
+                <CardContent className="py-10 text-center">
+                  <p className="text-sm text-muted-foreground">No products found.</p>
+                  <Button asChild className="mt-4">
+                    <Link href="/dashboard/products/new">Create product</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              mobileFilteredProducts.map((product: any) => (
+                <Card key={product.id} className="border-[#e5e7eb]">
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-3">
+                      {product.image ? (
+                        <div className="relative h-14 w-14 overflow-hidden rounded-md border border-[#e5e7eb] bg-white">
+                          <Image src={product.image} alt={product.name} fill className="object-cover" sizes="56px" />
+                        </div>
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[10px] text-muted-foreground">
+                          No Image
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#111827]">{product.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">SKU: {product.sku || 'N/A'}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          {getStatusBadge(product.status)}
+                          <Badge variant={product.stock_quantity > 0 ? 'default' : 'destructive'}>
+                            Stock {product.stock_quantity ?? 0}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between border-t border-[#f3f4f6] pt-3">
+                      <div>
+                        {product.sale_price ? (
+                          <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground line-through">{formatPrice(product.price)}</span>
+                            <span className="text-base font-bold text-red-600">{formatPrice(product.sale_price)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-base font-bold text-[#111827]">{formatPrice(product.price)}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/dashboard/products/${product.id}`}>
+                            <EyeIcon className="mr-1.5 h-4 w-4" />
+                            View
+                          </Link>
+                        </Button>
+                        <Button asChild size="sm">
+                          <Link href={`/dashboard/products/${product.id}/edit`}>
+                            <PencilIcon className="mr-1.5 h-4 w-4" />
+                            Edit
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="hidden md:block">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Products</h1>
@@ -556,6 +742,7 @@ export default function ProductsListClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

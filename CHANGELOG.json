@@ -1,6 +1,25 @@
 {
-  "version": "0.1.7",
+  "version": "0.1.8",
   "entries": [
+    {
+      "version": "0.1.8",
+      "date": "2026-03-06",
+      "features": [
+        "Mobile dashboard shell: expanded immersive mobile behavior to Products and Settings pages so mobile uses bottom navigation without the global top header",
+        "Products page (tenant dashboard): implemented dedicated mobile-first UI with gradient header, add-product CTA, summary KPI cards, mobile filters, and product action cards",
+        "Order detail page (tenant dashboard): improved mobile responsiveness with stacked actions, card spacing updates, mobile-safe bottom padding, and theme-consistent status styling",
+        "Analytics page (mobile): replaced header quick-range button with timeframe dropdown, added Today timeframe, and set Today as the default mobile analytics range",
+        "Customer account: added Notifications section with delivery quote updates (quoted/approved/rejected) and direct order actions",
+        "Customer account UX: surfaced delivery quote alerts beyond orders list by adding badges to storefront Account entry, account sidebar, and dashboard action-required callouts",
+        "Delivery quote emails: updated customer CTA to account requiring-action view and improved subtotal/total calculation to prevent quote double-counting",
+        "Checkout flow: for out-of-zone delivery orders that require quoted delivery fee, customers can now place orders without immediate payment and pay after quote approval"
+      ],
+      "bugfixes": [
+        "Fixed tenant delivery quote approval/rejection email links to open direct dashboard order detail URLs",
+        "Fixed checkout payment verification gating so M-Pesa transaction ID is only required when immediate payment is actually needed",
+        "Fixed mobile settings/header overlap by ensuring settings route follows the same bottom-navigation-only mobile shell pattern"
+      ]
+    },
     {
       "version": "0.1.7",
       "date": "2026-02-16",

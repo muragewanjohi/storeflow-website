@@ -899,10 +899,18 @@ export async function sendDeliveryFeeQuoteEmail({
 
   const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const accountActionUrl = `${storeUrl}/account/orders?filter=requiring_action`;
   const contactEmail = getTenantContactEmail(tenant);
   const currency = await getTenantCurrencySettings(tenant.id);
   const formattedQuote = formatCurrencyForEmail(deliveryFeeQuote, currency);
-  const formattedTotal = formatCurrencyForEmail(Number(order.total_amount) + deliveryFeeQuote, currency);
+  // When quote is sent, order.total_amount may already include quote; normalize subtotal for accurate email totals.
+  const orderTotal = Number(order.total_amount);
+  const subtotalAmount =
+    order.delivery_fee_status === 'quoted'
+      ? Math.max(0, orderTotal - deliveryFeeQuote)
+      : orderTotal;
+  const formattedSubtotal = formatCurrencyForEmail(subtotalAmount, currency);
+  const formattedTotal = formatCurrencyForEmail(subtotalAmount + deliveryFeeQuote, currency);
 
   const html = `
     <!DOCTYPE html>
@@ -929,7 +937,7 @@ export async function sendDeliveryFeeQuoteEmail({
 
           <div style="margin: 20px 0;">
             <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Order Subtotal</p>
-            <p style="margin: 0; font-size: 18px; font-weight: bold;">${formatCurrencyForEmail(Number(order.total_amount), currency)}</p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold;">${formattedSubtotal}</p>
           </div>
 
           <div style="margin: 20px 0; padding-top: 20px; border-top: 2px solid #e5e7eb;">
@@ -942,9 +950,12 @@ export async function sendDeliveryFeeQuoteEmail({
             <p style="margin: 0 0 20px 0; color: #1e3a8a;">
               Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
             </p>
-            <a href="${orderUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-right: 10px;">
+            <a href="${accountActionUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-right: 10px;">
               Review & Approve Quote
             </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #475569;">
+              Prefer direct order view? <a href="${orderUrl}" style="color: #1d4ed8;">Open order details</a>
+            </p>
           </div>
         </div>
         
@@ -970,13 +981,14 @@ We've calculated the delivery fee for your order ${order.order_number}.
 Delivery Fee Quote: ${formattedQuote}
 ${notes ? `Notes: ${notes}` : ''}
 
-Order Subtotal: ${formatCurrencyForEmail(Number(order.total_amount), currency)}
+Order Subtotal: ${formattedSubtotal}
 New Total (including delivery): ${formattedTotal}
 
 Action Required:
 Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
 
-Review your order: ${orderUrl}
+Go to your account dashboard and review: ${accountActionUrl}
+Direct order link: ${orderUrl}
 
 If you have any questions about this delivery fee, please contact us at ${contactEmail}.
 
@@ -1108,8 +1120,7 @@ export async function sendDeliveryFeeQuoteApprovedEmail({
 
   const customerName = order.name || 'Customer';
   const customerEmail = order.email || 'N/A';
-  const dashboardUrl = getTenantStoreUrl(tenant, '/dashboard/orders');
-  const orderUrl = `${dashboardUrl}/${order.id}`;
+  const orderUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
   const currency = await getTenantCurrencySettings(tenant.id);
   const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
   const formattedTotal = formatCurrencyForEmail(Number(order.total_amount), currency);
@@ -1214,8 +1225,7 @@ export async function sendDeliveryFeeQuoteRejectedEmail({
 
   const customerName = order.name || 'Customer';
   const customerEmail = order.email || 'N/A';
-  const dashboardUrl = getTenantStoreUrl(tenant, '/dashboard/orders');
-  const orderUrl = `${dashboardUrl}/${order.id}`;
+  const orderUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
   const currency = await getTenantCurrencySettings(tenant.id);
   const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
 

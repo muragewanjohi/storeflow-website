@@ -15,7 +15,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -31,8 +30,6 @@ import {
   ChartBarIcon,
   DocumentTextIcon,
   InformationCircleIcon,
-  DevicePhoneMobileIcon,
-  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import {
   AlertDialog,
@@ -166,14 +163,8 @@ export default function TenantSubscriptionClient({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedPlanName, setSelectedPlanName] = useState<string | null>(null);
   
-  // M-Pesa payment state
-  const [showMpesaPayment, setShowMpesaPayment] = useState(false);
-  const [mpesaPhoneNumber, setMpesaPhoneNumber] = useState('');
-  const [mpesaLoading, setMpesaLoading] = useState(false);
-  const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
-
-  // PesaPal payment state
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'pesapal'>('mpesa');
+  // Payment state
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [pesapalLoading, setPesapalLoading] = useState(false);
 
@@ -305,115 +296,6 @@ export default function TenantSubscriptionClient({
     }
   };
 
-  // M-Pesa payment handler
-  const handleMpesaPayment = async (planId: string) => {
-    if (!mpesaPhoneNumber) {
-      setUpgradeError('Please enter your M-Pesa phone number');
-      return;
-    }
-
-    // Validate phone number format
-    const phoneRegex = /^(?:254|0)[0-9]{9}$/;
-    if (!phoneRegex.test(mpesaPhoneNumber)) {
-      setUpgradeError('Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX');
-      return;
-    }
-
-    setMpesaLoading(true);
-    setUpgradeError(null);
-    setUpgradeSuccess(null);
-
-    try {
-      const response = await fetch('/api/mpesa/subscription/initiate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan_id: planId,
-          phone_number: mpesaPhoneNumber,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to initiate payment');
-      }
-
-      const data = await response.json();
-      setCheckoutRequestId(data.checkout_request_id);
-      setUpgradeSuccess(
-        `Payment request sent! Please check your phone (${mpesaPhoneNumber}) and enter your M-Pesa PIN to complete the payment.`
-      );
-      
-      // Poll for payment status
-      pollPaymentStatus(data.checkout_request_id);
-    } catch (error) {
-      setUpgradeError(error instanceof Error ? error.message : 'Payment initiation failed');
-      setMpesaLoading(false);
-    }
-  };
-
-  // Poll payment status
-  const pollPaymentStatus = async (checkoutRequestId: string) => {
-    const maxAttempts = 60; // 5 minutes (5 second intervals)
-    let attempts = 0;
-
-    const poll = async () => {
-      if (attempts >= maxAttempts) {
-        setMpesaLoading(false);
-        setUpgradeError('Payment timeout. Please check your M-Pesa and try again, or contact support.');
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `/api/mpesa/subscription/status?checkout_request_id=${checkoutRequestId}`
-        );
-        
-        if (!response.ok) {
-          attempts++;
-          setTimeout(poll, 5000);
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data.status === 'completed') {
-          const subType = data.subscription_type || 'activation';
-          trackMetaPixelEvent('Subscribe', {
-            content_name: 'Subscription payment',
-            content_category: subType === 'renewal' ? 'subscription_renewal' : 'subscription',
-            subscription_type: subType,
-            status: 'completed',
-          });
-          setMpesaLoading(false);
-          setShowMpesaPayment(false);
-          setMpesaPhoneNumber('');
-          setUpgradeSuccess('Payment successful! Your subscription has been activated.');
-          setTimeout(() => window.location.reload(), 2000);
-        } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'timeout') {
-          setMpesaLoading(false);
-          const statusMessage = data.status === 'cancelled' 
-            ? 'Payment was cancelled. Please try again.'
-            : data.status === 'timeout'
-            ? 'Payment timed out. Please try again.'
-            : 'Payment failed. Please try again or contact support.';
-          setUpgradeError(statusMessage);
-        } else {
-          // Still pending, poll again
-          attempts++;
-          setTimeout(poll, 5000); // Poll every 5 seconds
-        }
-      } catch (error) {
-        attempts++;
-        setTimeout(poll, 5000);
-      }
-    };
-
-    poll();
-  };
-
   // PesaPal payment handler: initiate then load PesaPal in our page (embedded iframe)
   const handlePesapalPayment = async (planId: string) => {
     setPesapalLoading(true);
@@ -454,6 +336,17 @@ export default function TenantSubscriptionClient({
 
   return (
     <div className="container mx-auto py-8 space-y-6 max-w-7xl">
+      {pesapalLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="rounded-xl border bg-card p-6 text-center shadow-lg">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+            <p className="mt-4 text-sm font-medium">Preparing secure checkout...</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Please wait while we connect you to PesaPal.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Subscription & Billing</h1>
@@ -579,12 +472,12 @@ export default function TenantSubscriptionClient({
                   onClick={() => {
                     setSelectedPlanId(currentPlan.id);
                     setSelectedPlanName(currentPlan.name);
-                    setShowMpesaPayment(true);
+                    setShowPaymentDialog(true);
                   }}
-                  disabled={mpesaLoading || pesapalLoading}
+                  disabled={pesapalLoading}
                   className="sm:flex-shrink-0"
                 >
-                  {mpesaLoading || pesapalLoading ? 'Processing...' : 'Pay now'}
+                  {pesapalLoading ? 'Processing...' : 'Pay now'}
                 </Button>
               )}
             </div>
@@ -927,18 +820,18 @@ export default function TenantSubscriptionClient({
                                   if (getDisplayPrice(plan.name, plan.price) > 0) {
                                     setSelectedPlanId(plan.id);
                                     setSelectedPlanName(plan.name);
-                                    setShowMpesaPayment(true);
+                                    setShowPaymentDialog(true);
                                   } else {
                                     // Free plan, activate directly
                                     handleUpgrade(plan.id, false);
                                   }
                                 }
                               }}
-                              disabled={isUpgrading || mpesaLoading || pesapalLoading}
+                              disabled={isUpgrading || pesapalLoading}
                               className="w-full"
                               variant={isUpgrade ? 'default' : 'outline'}
                             >
-                              {isUpgrading || mpesaLoading || pesapalLoading ? (
+                              {isUpgrading || pesapalLoading ? (
                                 'Processing...'
                               ) : isUpgrade ? (
                                 <>
@@ -1012,11 +905,11 @@ export default function TenantSubscriptionClient({
                     onClick={() => {
                       setSelectedPlanId(currentPlan.id);
                       setSelectedPlanName(currentPlan.name);
-                      setShowMpesaPayment(true);
+                      setShowPaymentDialog(true);
                     }}
-                    disabled={mpesaLoading || pesapalLoading}
+                    disabled={pesapalLoading}
                   >
-                    {mpesaLoading || pesapalLoading ? 'Processing...' : 'Pay now'}
+                    {pesapalLoading ? 'Processing...' : 'Pay now'}
                   </Button>
                 </div>
               </CardContent>
@@ -1113,16 +1006,13 @@ export default function TenantSubscriptionClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Payment method dialog: M-Pesa or PesaPal */}
+      {/* Payment dialog: PesaPal only */}
       <AlertDialog
-        open={showMpesaPayment}
+        open={showPaymentDialog}
         onOpenChange={(open) => {
-          setShowMpesaPayment(open);
+          setShowPaymentDialog(open);
           if (!open) {
-            setPaymentMethod('mpesa');
             setBillingInterval('monthly');
-            setMpesaPhoneNumber('');
-            setCheckoutRequestId(null);
           }
         }}
       >
@@ -1134,92 +1024,10 @@ export default function TenantSubscriptionClient({
             <AlertDialogDescription asChild>
               <div className="space-y-5 pt-1">
                 <p className="text-muted-foreground text-sm">
-                  Choose how you&apos;d like to pay for <strong className="text-foreground">{selectedPlanName}</strong>.
+                  Continue to secure checkout for <strong className="text-foreground">{selectedPlanName}</strong>.
                 </p>
-
-                {/* Payment method choice - card style */}
-                <div className="space-y-3">
-                  <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Payment method
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('mpesa')}
-                      className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                        paymentMethod === 'mpesa'
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border bg-muted/20 hover:border-muted-foreground/30 hover:bg-muted/30'
-                      }`}
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-                        <DevicePhoneMobileIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">M-Pesa</p>
-                        <p className="text-xs text-muted-foreground">STK Push</p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod('pesapal')}
-                      className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                        paymentMethod === 'pesapal'
-                          ? 'border-primary bg-primary/5 shadow-sm'
-                          : 'border-border bg-muted/20 hover:border-muted-foreground/30 hover:bg-muted/30'
-                      }`}
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                        <BanknotesIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">PesaPal</p>
-                        <p className="text-xs text-muted-foreground">Card, M-Pesa, etc.</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* M-Pesa: amount + phone */}
-                {paymentMethod === 'mpesa' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
-                  const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
-                  return sel ? (
-                  <>
-                    <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-4">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Amount to Pay</p>
-                      <p className="text-2xl font-bold tracking-tight text-foreground">
-                        {formatPlanPrice(sel.name, sel.price)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="mpesa-phone">M-Pesa phone number</Label>
-                      <Input
-                        id="mpesa-phone"
-                        type="tel"
-                        value={mpesaPhoneNumber}
-                        onChange={(e) => setMpesaPhoneNumber(e.target.value)}
-                        placeholder="254712345678 or 0712345678"
-                        disabled={mpesaLoading}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        You&apos;ll receive an STK Push prompt to complete the payment.
-                      </p>
-                    </div>
-                    {checkoutRequestId && (
-                      <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
-                        <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-blue-200 dark:bg-blue-800" />
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                          Waiting for payment... Check your phone and enter your M-Pesa PIN.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                  ) : null;
-                })()}
-
                 {/* PesaPal: billing interval + amount */}
-                {paymentMethod === 'pesapal' && selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
+                {selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
                   const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
                   if (!sel) return null;
                   const monthlyDisplay = getDisplayPrice(sel.name, sel.price);
@@ -1270,7 +1078,7 @@ export default function TenantSubscriptionClient({
                     </div>
                     <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                       <CreditCardIcon className="h-4 w-4 shrink-0" />
-                      You&apos;ll complete payment on PesaPal (card, M-Pesa, or other methods). You can stay on our site.
+                      You&apos;ll complete payment on PesaPal (card, mobile money, or other methods). You can stay on our site.
                     </p>
                   </>
                   );
@@ -1280,32 +1088,21 @@ export default function TenantSubscriptionClient({
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
             <AlertDialogCancel
-              disabled={mpesaLoading || pesapalLoading}
+              disabled={pesapalLoading}
               onClick={() => {
-                setMpesaPhoneNumber('');
-                setCheckoutRequestId(null);
+                setBillingInterval('monthly');
               }}
               className="mt-2"
             >
               Cancel
             </AlertDialogCancel>
-            {paymentMethod === 'mpesa' ? (
-              <AlertDialogAction
-                onClick={() => selectedPlanId && handleMpesaPayment(selectedPlanId)}
-                disabled={mpesaLoading || !mpesaPhoneNumber || !!checkoutRequestId}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {mpesaLoading ? 'Processing...' : checkoutRequestId ? 'Waiting...' : 'Pay with M-Pesa'}
-              </AlertDialogAction>
-            ) : (
-              <AlertDialogAction
-                onClick={() => selectedPlanId && handlePesapalPayment(selectedPlanId)}
-                disabled={pesapalLoading}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {pesapalLoading ? 'Redirecting...' : 'Pay with PesaPal'}
-              </AlertDialogAction>
-            )}
+            <AlertDialogAction
+              onClick={() => selectedPlanId && handlePesapalPayment(selectedPlanId)}
+              disabled={pesapalLoading}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {pesapalLoading ? 'Redirecting...' : 'Continue to PesaPal'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -24,6 +24,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
 import { prisma } from '@/lib/prisma/client';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { cache } from '@/lib/cache/simple-cache';
 
@@ -37,6 +38,8 @@ const settingsUpdateSchema = z.object({
   store_postal_code: z.string().optional().nullable(),
   store_phone: z.string().optional().nullable(),
   store_logo: z.string().optional().nullable(),
+  business_type: z.string().optional().nullable(),
+  selling: z.string().optional().nullable(),
   
   // Currency Settings
   currency_code: z.string().max(10).optional(),
@@ -279,6 +282,42 @@ export async function PUT(request: NextRequest) {
     }
     if (validatedData.store_logo !== undefined) {
       optionsToSave.store_logo = validatedData.store_logo || null;
+    }
+
+    // Tenant profile data stored in tenants.data JSON
+    if (validatedData.business_type !== undefined || validatedData.selling !== undefined) {
+      const existingTenant = await prisma.tenants.findUnique({
+        where: { id: tenant.id },
+        select: { data: true },
+      });
+      const existingData =
+        existingTenant?.data && typeof existingTenant.data === 'object' && !Array.isArray(existingTenant.data)
+          ? (existingTenant.data as Record<string, unknown>)
+          : {};
+      const nextData: Record<string, unknown> = { ...existingData };
+
+      if (validatedData.business_type !== undefined) {
+        const businessType = validatedData.business_type?.trim();
+        if (businessType) {
+          nextData.business_type = businessType;
+        } else {
+          delete nextData.business_type;
+        }
+      }
+
+      if (validatedData.selling !== undefined) {
+        const selling = validatedData.selling?.trim();
+        if (selling) {
+          nextData.selling = selling;
+        } else {
+          delete nextData.selling;
+        }
+      }
+
+      await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: { data: nextData as Prisma.InputJsonValue },
+      });
     }
 
     // Currency Settings

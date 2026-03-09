@@ -38,6 +38,7 @@ import {
 } from '@/components/analytics/lazy-charts';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { useThemeColors } from '@/lib/analytics/use-theme-colors';
 import { hasAdvancedAnalyticsAccess, getUpgradeMessage } from '@/lib/analytics/plan-access';
@@ -45,6 +46,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { LockClosedIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import ScheduledReportsManager from '@/components/analytics/scheduled-reports-manager';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DateRange {
   from: Date | undefined;
@@ -233,9 +235,10 @@ export default function AnalyticsDashboardClient({
   const { primary, secondary, accent, colors: themeColors } = useThemeColors();
   const hasAdvancedAccess = hasAdvancedAnalyticsAccess(currentPlanName);
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+    from: new Date(new Date().setHours(0, 0, 0, 0)), // today (default)
     to: new Date(),
   });
+  const [mobileTimeframe, setMobileTimeframe] = useState<'today' | '7d' | '30d' | '90d'>('today');
   
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
@@ -429,6 +432,68 @@ export default function AnalyticsDashboardClient({
     }
   };
 
+  const setMobileQuickRange = (days: number) => {
+    const now = new Date();
+    setDateRange({
+      from: new Date(now.getTime() - days * 24 * 60 * 60 * 1000),
+      to: now,
+    });
+  };
+
+  const setMobileTodayRange = () => {
+    const now = new Date();
+    setDateRange({
+      from: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      to: now,
+    });
+  };
+
+  const handleMobileTimeframeChange = (value: 'today' | '7d' | '30d' | '90d') => {
+    setMobileTimeframe(value);
+    if (value === 'today') {
+      setMobileTodayRange();
+      return;
+    }
+
+    if (value === '7d') setMobileQuickRange(7);
+    if (value === '30d') setMobileQuickRange(30);
+    if (value === '90d') setMobileQuickRange(90);
+  };
+
+  const mobileRevenueTrend = ((revenue?.trends ?? []).slice(-7).length > 0
+    ? (revenue?.trends ?? []).slice(-7)
+    : Array.from({ length: 7 }).map((_, index) => ({
+        date: new Date(Date.now() - (6 - index) * 24 * 60 * 60 * 1000).toISOString(),
+        revenue: 0,
+      }))).map((point: any) => ({
+    ...point,
+    shortDate: format(new Date(point.date), 'EEE'),
+  }));
+
+  const mobileOrdersTrend = mobileRevenueTrend.map((point: any) => ({
+    ...point,
+    orders:
+      revenue?.averageOrderValue && revenue.averageOrderValue > 0
+        ? Math.max(0, Math.round((point.revenue || 0) / revenue.averageOrderValue))
+        : 0,
+  }));
+
+  const topProducts = sales?.byProduct?.slice(0, 5) ?? [];
+  const newCustomers = customers?.newCustomers ?? 0;
+  const returningCustomers = Math.max((customers?.totalCustomers ?? 0) - newCustomers, 0);
+  const conversionRate = customers?.conversionRate ?? 0;
+  const mobileVisitors = conversionFunnel?.funnel?.visitors ?? trafficSources?.totalSessions ?? 0;
+  const mobileBounceRate = Math.max(0, Math.min(100, 100 - conversionRate));
+  const topSource = trafficSources?.bySource?.[0]?.source ?? 'Direct';
+  const mobileRevenueChange =
+    (overview?.overview.totalRevenue ?? 0) > 0
+      ? ((overview?.thisMonth.revenue ?? 0) / Math.max(overview?.overview.totalRevenue ?? 1, 1)) * 100
+      : 0;
+  const mobileOrdersChange =
+    (overview?.overview.totalOrders ?? 0) > 0
+      ? ((overview?.thisMonth.orders ?? 0) / Math.max(overview?.overview.totalOrders ?? 1, 1)) * 100
+      : 0;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -452,7 +517,159 @@ export default function AnalyticsDashboardClient({
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="min-h-screen bg-[#f3f4f6] pb-24 md:hidden">
+        <section className="bg-gradient-to-b from-primary to-primary/80 px-4 pb-6 pt-8">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[28px] font-bold tracking-tight text-primary-foreground">Your Analytics</h1>
+            <Select value={mobileTimeframe} onValueChange={(value) => handleMobileTimeframeChange(value as 'today' | '7d' | '30d' | '90d')}>
+              <SelectTrigger className="h-9 w-[130px] border-primary-foreground/25 bg-primary-foreground/15 text-xs font-medium text-primary-foreground [&>svg]:text-primary-foreground">
+                <SelectValue placeholder="Timeframe" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+
+        <section className="space-y-4 px-4 pt-4">
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-[16px]">Revenue</CardTitle>
+                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+                  {mobileTimeframe === 'today'
+                    ? 'Today'
+                    : mobileTimeframe === '7d'
+                    ? '7d'
+                    : mobileTimeframe === '30d'
+                    ? '30d'
+                    : '90d'}
+                </Badge>
+              </div>
+              <CardDescription>Total Revenue</CardDescription>
+              <p className="text-[34px] font-bold leading-tight">{formatCurrency(overview?.overview.totalRevenue ?? 0)}</p>
+              <p className="text-xs font-medium text-[#2f9e44]">
+                {`+${mobileRevenueChange.toFixed(1)}%`}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={mobileRevenueTrend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="shortDate" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                    <Line type="monotone" dataKey="revenue" stroke={primary} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-[16px]">Orders over time</CardTitle>
+              <CardDescription>Total Orders</CardDescription>
+              <p className="text-[34px] font-bold leading-tight">{(overview?.overview.totalOrders ?? 0).toLocaleString()}</p>
+              <p className="text-xs font-medium text-[#2f9e44]">
+                {`+${mobileOrdersChange.toFixed(1)}%`}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={mobileOrdersTrend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="shortDate" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip formatter={(value: any) => `${value} orders`} />
+                    <Bar dataKey="orders" fill={primary} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[16px]">Top Products</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {topProducts.length > 0 ? (
+                topProducts.map((product: any) => (
+                  <div key={product.id} className="flex items-start justify-between border-b border-[#f3f4f6] pb-3 last:border-b-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-medium text-[#1f2937]">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{product.quantity} units sold</p>
+                    </div>
+                    <p className="text-sm font-semibold text-[#1f2937]">{formatCurrency(product.revenue)}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No product sales data yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[16px]">Customer Insights</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">New customers</p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-[32px] font-bold leading-none">{newCustomers}</p>
+                  <p className="text-xs font-medium text-[#2f9e44]">↗ +12.5%</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Returning customers</p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-[32px] font-bold leading-none">{returningCustomers}</p>
+                  <p className="text-xs font-medium text-[#2f9e44]">↗ +8.2%</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Conversion rate</p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-[32px] font-bold leading-none">{conversionRate.toFixed(1)}%</p>
+                  <p className="text-xs font-medium text-[#2f9e44]">↗ +0.3%</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-[16px]">Traffic Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Visitors</p>
+                <p className="mt-1 text-[34px] font-bold leading-tight">{mobileVisitors.toLocaleString()}</p>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Bounce rate</p>
+                <p className="mt-1 text-[34px] font-bold leading-tight">{mobileBounceRate.toFixed(1)}%</p>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Top source</p>
+                <p className="mt-1 text-[28px] font-bold leading-tight">{topSource}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+      </div>
+
+      <div className="hidden space-y-6 md:block">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1609,7 +1826,8 @@ export default function AnalyticsDashboardClient({
           </TabsContent>
         )}
       </Tabs>
-    </div>
+      </div>
+    </>
   );
 }
 

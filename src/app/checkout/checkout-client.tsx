@@ -710,10 +710,8 @@ export default function CheckoutClient({
         metadata: { step: 'payment' },
       });
     } else if (currentStep === 'payment') {
-      // Validate M-Pesa payment verification if payment timing is before_delivery
-      if (paymentMethod === 'mpesa' && 
-          checkoutSettings?.payment_timing === 'before_delivery' && 
-          !paymentTransactionId.trim()) {
+      // Validate M-Pesa payment verification only when immediate payment is required.
+      if (requiresMpesaVerification && !paymentTransactionId.trim()) {
         toast.error('Please provide your M-Pesa Transaction ID / Receipt Number before proceeding');
         return;
       }
@@ -737,17 +735,8 @@ export default function CheckoutClient({
       return;
     }
 
-    // Check if order is in-zone (only for delivery with delivery_zones method)
-    const isInZone = deliveryMethod === 'delivery' && 
-                     checkoutSettings?.shipping_method_type === 'delivery_zones' && 
-                     zoneDetectionStatus === 'matched' && 
-                     selectedZoneId;
-
-    // Validate M-Pesa payment verification details
-    // Required if: payment timing is before_delivery OR order is in-zone
-    if (paymentMethod === 'mpesa' && 
-        (checkoutSettings?.payment_timing === 'before_delivery' || isInZone) && 
-        !paymentTransactionId.trim()) {
+    // Validate M-Pesa payment verification details when immediate payment is required.
+    if (requiresMpesaVerification && !paymentTransactionId.trim()) {
       toast.error('Please provide your M-Pesa Transaction ID / Receipt Number');
       return;
     }
@@ -816,7 +805,7 @@ export default function CheckoutClient({
             : null,
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
-        payment_verification: paymentMethod === 'mpesa' && (checkoutSettings?.payment_timing === 'before_delivery' || isInZone) ? {
+        payment_verification: requiresMpesaVerification ? {
           transaction_id: paymentTransactionId.trim(),
           reference: paymentReference.trim() || null,
           notes: paymentVerificationNotes.trim() || null,
@@ -896,6 +885,23 @@ export default function CheckoutClient({
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
+
+  // For out-of-zone delivery orders, payment can happen later after quote review.
+  const isOutOfZoneQuotePending =
+    deliveryMethod === 'delivery' &&
+    checkoutSettings?.shipping_method_type === 'delivery_zones' &&
+    !selectedZoneId &&
+    zoneDetectionStatus === 'not_matched';
+
+  const isInZoneDelivery =
+    deliveryMethod === 'delivery' &&
+    checkoutSettings?.shipping_method_type === 'delivery_zones' &&
+    zoneDetectionStatus === 'matched' &&
+    !!selectedZoneId;
+
+  const requiresMpesaVerification =
+    paymentMethod === 'mpesa' &&
+    ((checkoutSettings?.payment_timing === 'before_delivery' || isInZoneDelivery) && !isOutOfZoneQuotePending);
 
   if (loading) {
     return (
@@ -1519,24 +1525,26 @@ export default function CheckoutClient({
                       {/* Payment Timing Information */}
                       {checkoutSettings?.payment_timing && checkoutSettings.payment_timing !== 'user_choice' && (
                         <div className={`p-4 border rounded-lg ${
-                          checkoutSettings.payment_timing === 'before_delivery' 
+                          checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending
                             ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800'
                             : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'
                         }`}>
                           <p className={`text-sm font-medium ${
-                            checkoutSettings.payment_timing === 'before_delivery'
+                            checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending
                               ? 'text-blue-900 dark:text-blue-100'
                               : 'text-amber-900 dark:text-amber-100'
                           }`}>
-                            {checkoutSettings.payment_timing === 'before_delivery' && '⚠️ Payment Required Before Delivery'}
+                            {checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending && '⚠️ Payment Required Before Delivery'}
+                            {checkoutSettings.payment_timing === 'before_delivery' && isOutOfZoneQuotePending && '📝 Delivery Quote Required First'}
                             {checkoutSettings.payment_timing === 'after_delivery' && '💳 Cash on Delivery Available'}
                           </p>
                           <p className={`text-sm mt-1 ${
-                            checkoutSettings.payment_timing === 'before_delivery'
+                            checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending
                               ? 'text-blue-700 dark:text-blue-300'
                               : 'text-amber-700 dark:text-amber-300'
                           }`}>
-                            {checkoutSettings.payment_timing === 'before_delivery' && 'You must complete payment before your order can be delivered.'}
+                            {checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending && 'You must complete payment before your order can be delivered.'}
+                            {checkoutSettings.payment_timing === 'before_delivery' && isOutOfZoneQuotePending && 'Because this address needs a custom delivery quote, you can place the order now and decide to pay after you approve the quote.'}
                             {checkoutSettings.payment_timing === 'after_delivery' && 'You can pay when your order is delivered.'}
                           </p>
                         </div>
@@ -1588,7 +1596,8 @@ export default function CheckoutClient({
                                 </div>
                                 {checkoutSettings.payment_timing && (
                                   <div className="text-xs text-muted-foreground mt-1">
-                                    {checkoutSettings.payment_timing === 'before_delivery' && 'Payment required before delivery'}
+                                    {checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending && 'Payment required before delivery'}
+                                    {checkoutSettings.payment_timing === 'before_delivery' && isOutOfZoneQuotePending && 'Payment after quote approval'}
                                     {checkoutSettings.payment_timing === 'after_delivery' && 'Payment can be made after delivery'}
                                     {checkoutSettings.payment_timing === 'user_choice' && 'You can pay before or after delivery'}
                                   </div>
@@ -1625,13 +1634,8 @@ export default function CheckoutClient({
                     />
                   </div>
 
-                  {/* Payment Verification Form (for M-Pesa when payment timing is before_delivery OR for in-zone orders) */}
-                  {paymentMethod === 'mpesa' && 
-                   (checkoutSettings?.payment_timing === 'before_delivery' ||
-                    (deliveryMethod === 'delivery' && 
-                     checkoutSettings?.shipping_method_type === 'delivery_zones' && 
-                     zoneDetectionStatus === 'matched' && 
-                     selectedZoneId)) && (
+                  {/* Payment Verification Form (for M-Pesa when immediate payment is required) */}
+                  {requiresMpesaVerification && (
                     <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                       <CardHeader>
                         <CardTitle className="text-sm">Payment Verification</CardTitle>
@@ -1649,9 +1653,7 @@ export default function CheckoutClient({
                             required
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            {checkoutSettings?.payment_timing === 'before_delivery' 
-                              ? 'Payment is required before delivery. Please make your M-Pesa payment and enter the transaction ID from your confirmation message.'
-                              : 'After making payment, enter the transaction ID from your M-Pesa confirmation message.'}
+                            Payment is required before delivery. Please make your M-Pesa payment and enter the transaction ID from your confirmation message.
                           </p>
                         </div>
                         <div>
@@ -1880,7 +1882,8 @@ export default function CheckoutClient({
                       )}
                       {checkoutSettings?.payment_timing && (
                         <div className="text-xs mt-1">
-                          {checkoutSettings.payment_timing === 'before_delivery' && 'Payment required before delivery'}
+                          {checkoutSettings.payment_timing === 'before_delivery' && !isOutOfZoneQuotePending && 'Payment required before delivery'}
+                          {checkoutSettings.payment_timing === 'before_delivery' && isOutOfZoneQuotePending && 'Payment after quote approval'}
                           {checkoutSettings.payment_timing === 'after_delivery' && 'Payment after delivery (Cash on Delivery)'}
                           {checkoutSettings.payment_timing === 'user_choice' && 'You can pay before or after delivery'}
                         </div>
@@ -1917,10 +1920,7 @@ export default function CheckoutClient({
                   onClick={handleNext}
                   disabled={
                     !canProcessOrders ||
-                    (currentStep === 'payment' &&
-                    paymentMethod === 'mpesa' &&
-                    checkoutSettings?.payment_timing === 'before_delivery' &&
-                    !paymentTransactionId.trim())
+                    (currentStep === 'payment' && requiresMpesaVerification && !paymentTransactionId.trim())
                   }
                 >
                   Next

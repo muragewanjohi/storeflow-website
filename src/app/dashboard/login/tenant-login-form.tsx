@@ -10,10 +10,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { Mail, Lock } from 'lucide-react';
 
 export default function TenantLoginForm() {
   const router = useRouter();
@@ -26,7 +26,6 @@ export default function TenantLoginForm() {
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
   const [mfaCode, setMfaCode] = useState('');
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
 
   const handleGoogleLogin = async () => {
     setError(null);
@@ -171,149 +170,79 @@ export default function TenantLoginForm() {
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-12">
-      <Card className="w-full max-w-md shadow-lg border-2 border-blue-100">
-        <CardHeader className="space-y-4">
-          {/* Admin Login Badge */}
-          <div className="flex items-center justify-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              Store Admin Login
+    <main className="flex-1 bg-gradient-to-b from-[#eff6ff] via-[#fcfeff] to-white px-4 py-8">
+      <div className="mx-auto w-full max-w-[408px]">
+        <div className="mb-8 flex justify-center">
+          <Link href="/" className="relative flex h-10 w-[170px] items-center justify-center">
+            <img src="/logo_with_name.png" alt="DukaNest" className="h-10 w-auto object-contain" />
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-[#e5e7eb] bg-white px-6 py-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]">
+          <div className="rounded-2xl bg-[#f3f4f6] p-1">
+            <div className="grid grid-cols-2 gap-1">
+              <div className="flex h-11 items-center justify-center rounded-[14px] bg-white text-sm font-bold text-[#101828] shadow-[0_4px_6px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)]">
+                Shop Owner
+              </div>
+              <Link
+                href="/customer-login"
+                className="flex h-11 items-center justify-center rounded-[14px] text-sm font-bold text-[#4a5565] transition-colors hover:text-[#101828]"
+              >
+                Customer
+              </Link>
             </div>
           </div>
-          <CardTitle className="text-3xl text-center font-bold text-gray-900">
-            Store Admin Dashboard
-          </CardTitle>
-          <CardDescription className="text-center text-base">
-            {tenantName
-              ? <>Sign in to manage <strong>{tenantName}</strong></>
-              : 'Sign in to access your store dashboard'}
-          </CardDescription>
-          <p className="text-center text-xs text-muted-foreground">
-            For store owners and staff only
-          </p>
-        </CardHeader>
-        <CardContent>
+
+          <div className="mt-8 text-center">
+            <h1 className="text-[24px] font-black leading-8 text-[#101828]">
+              {requiresMFA ? 'Verify your code' : 'Welcome back, Owner'}
+            </h1>
+            <p className="mt-2 text-base text-[#4a5565]">
+              {requiresMFA
+                ? 'Enter the 6-digit code to finish sign in'
+                : tenantName
+                  ? `Sign in to manage ${tenantName}`
+                  : 'Sign in to manage your store'}
+            </p>
+          </div>
+
           {!requiresMFA && (
-            <div className="space-y-3 mb-4">
+            <>
               <Button
                 type="button"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
+                variant="outline"
+                className="mt-8 h-[59px] w-full rounded-2xl border-[1.7px] border-[#d1d5dc] bg-white text-base font-semibold text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] hover:bg-white"
               >
                 <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.46a5.52 5.52 0 01-2.4 3.63v3h3.88c2.27-2.09 3.55-5.17 3.55-8.66z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 01-10.72-3.78h-4V17.4A12 12 0 0012 24z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M5.34 14.31a7.2 7.2 0 010-4.62v-3h-4a12 12 0 000 10.62l4-3z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.43-3.43A12 12 0 001.34 6.69l4 3A7.2 7.2 0 0112 4.77z"
-                    fill="#EA4335"
-                  />
+                  <path d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.46a5.52 5.52 0 01-2.4 3.63v3h3.88c2.27-2.09 3.55-5.17 3.55-8.66z" fill="#4285F4" />
+                  <path d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 01-10.72-3.78h-4V17.4A12 12 0 0012 24z" fill="#34A853" />
+                  <path d="M5.34 14.31a7.2 7.2 0 010-4.62v-3h-4a12 12 0 000 10.62l4-3z" fill="#FBBC05" />
+                  <path d="M12 4.77c1.76 0 3.34.61 4.58 1.8l3.43-3.43A12 12 0 001.34 6.69l4 3A7.2 7.2 0 0112 4.77z" fill="#EA4335" />
                 </svg>
                 Continue with Google
               </Button>
-              <div className="relative text-center text-xs uppercase text-muted-foreground">
-                <span className="bg-background px-2 relative z-10">or</span>
-                <div className="absolute left-0 right-0 top-1/2 h-px bg-border -z-0" />
+
+              <div className="my-6 flex items-center gap-4">
+                <span className="h-px flex-1 bg-[#e5e7eb]" />
+                <span className="text-sm text-[#6a7282]">or</span>
+                <span className="h-px flex-1 bg-[#e5e7eb]" />
               </div>
-              {!showEmailLogin && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowEmailLogin(true)}
-                  disabled={isLoading}
-                >
-                  Continue with email and password
-                </Button>
-              )}
-            </div>
+            </>
           )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded-md bg-red-50 p-4 border border-red-200">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
-            {!requiresMFA && showEmailLogin ? (
+            {requiresMFA ? (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setShowEmailLogin(false)}
-                    className="text-sm text-muted-foreground hover:underline"
-                  >
-                    Back
-                  </button>
-                </div>
-              </>
-            ) : requiresMFA ? (
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <div>
-                      <h3 className="text-sm font-semibold text-blue-900 mb-1">Two-Factor Authentication Required</h3>
-                      <p className="text-sm text-blue-800">
-                        Enter the 6-digit code sent to your email to complete login.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 <div>
-                  <Label htmlFor="mfaCode" className="mb-2">
-                    Authentication Code
-                  </Label>
+                  <Label htmlFor="mfaCode" className="text-sm font-bold text-[#101828]">Authentication Code</Label>
                   <Input
                     id="mfaCode"
                     name="mfaCode"
@@ -327,16 +256,12 @@ export default function TenantLoginForm() {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setMfaCode(value);
                     }}
-                    className="text-center text-2xl tracking-widest font-mono"
+                    className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-center text-xl tracking-[0.2em]"
                     placeholder="000000"
                     autoFocus
                   />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Check your email inbox for the 6-digit code. It may take a few moments to arrive.
-                  </p>
                 </div>
-
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between text-sm">
                   <button
                     type="button"
                     onClick={() => {
@@ -346,9 +271,9 @@ export default function TenantLoginForm() {
                       setMfaCode('');
                       setError(null);
                     }}
-                    className="text-sm text-primary hover:underline font-medium"
+                    className="font-semibold text-[#355cad] hover:underline"
                   >
-                    &larr; Back to password
+                    Back
                   </button>
                   <button
                     type="button"
@@ -367,45 +292,77 @@ export default function TenantLoginForm() {
                         } else {
                           setError(data.message || 'Failed to resend code');
                         }
-                      } catch (err) {
+                      } catch {
                         setError('Failed to resend code');
                       }
                     }}
-                    className="text-sm text-primary hover:underline font-medium"
+                    className="font-semibold text-[#355cad] hover:underline"
                   >
                     Resend code
                   </button>
                 </div>
-              </div>
-            ) : null}
-
-            {(showEmailLogin || requiresMFA) && (
-              <Button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-base"
-                disabled={isLoading}
-              >
-                {isLoading && (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-transparent mr-2" />
-                )}
-                {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
-              </Button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label htmlFor="email" className="text-sm font-bold text-[#101828]">Email</Label>
+                  <div className="relative mt-2">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#99a1af]" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pl-12 text-base placeholder:text-[#99a1af]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="password" className="text-sm font-bold text-[#101828]">Password</Label>
+                  <div className="relative mt-2">
+                    <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#99a1af]" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] pl-12 text-base placeholder:text-[#99a1af]"
+                    />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <Link href="/forgot-password" className="text-sm font-semibold text-[#355cad] hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+              </>
             )}
-          </form>
 
-          <div className="mt-6 pt-6 border-t space-y-4">
-            <p className="text-sm text-center text-muted-foreground">
-              Are you a customer?{' '}
-              <Link
-                href="/customer-login"
-                className="text-primary hover:underline font-medium"
-              >
-                Sign in here
-              </Link>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+            <Button
+              type="submit"
+              className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
+            </Button>
+          </form>
+        </div>
+
+        <p className="mt-7 text-center text-[14px] text-[#4a5565]">
+          Don&apos;t have a store?{' '}
+          <Link href="https://dukanest.com" className="font-bold text-[#355cad]">
+            Start free trial
+          </Link>
+        </p>
+      </div>
     </main>
   );
 }
