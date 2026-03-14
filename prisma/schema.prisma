@@ -766,6 +766,32 @@ model trusted_devices {
   @@index([user_id, ip_pattern], map: "idx_trusted_devices_ip_pattern")
 }
 
+model mobile_push_devices {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  user_id                  String    @db.Uuid
+  device_id                String    @db.VarChar(191)
+  push_token               String    @db.VarChar(1024)
+  platform                 String    @db.VarChar(20) // android | ios | web
+  app_version              String?   @db.VarChar(50)
+  device_name              String?   @db.VarChar(255)
+  active                   Boolean?  @default(true)
+  notify_new_order         Boolean?  @default(true)
+  notify_pending_payment   Boolean?  @default(true)
+  notify_low_stock         Boolean?  @default(true)
+  notify_support_ticket    Boolean?  @default(true)
+  notify_delivery_updates  Boolean?  @default(true)
+  last_seen_at             DateTime? @default(now()) @db.Timestamp(6)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, user_id, device_id], map: "idx_mobile_push_devices_unique")
+  @@index([tenant_id], map: "idx_mobile_push_devices_tenant")
+  @@index([tenant_id, active], map: "idx_mobile_push_devices_tenant_active")
+  @@index([user_id], map: "idx_mobile_push_devices_user")
+}
+
 model mfa_otp_codes {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id    String     @db.Uuid
@@ -802,6 +828,27 @@ model tenant_themes {
   @@index([tenant_id, is_active], map: "idx_tenant_themes_active")
   @@index([tenant_id], map: "idx_tenant_themes_tenant_id")
   @@index([theme_id], map: "idx_tenant_themes_theme_id")
+}
+
+model onboarding_starter_packs {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  selling_key      String    @db.VarChar(255)
+  selling_raw      String?   @db.VarChar(255)
+  business_type    String?   @db.VarChar(255)
+  theme_slug       String    @default("default") @db.VarChar(100)
+  locale           String    @default("en-KE") @db.VarChar(20)
+  currency         String    @default("KES") @db.VarChar(10)
+  source_tenant_id String?   @db.Uuid
+  starter_pack_data Json?    @default("{}")
+  is_complete      Boolean?  @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  tenants          tenants?  @relation(fields: [source_tenant_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([selling_key, theme_slug, locale, currency], map: "idx_onboarding_starter_packs_key_theme_locale_currency")
+  @@index([selling_key], map: "idx_onboarding_starter_packs_selling_key")
+  @@index([theme_slug], map: "idx_onboarding_starter_packs_theme_slug")
+  @@index([source_tenant_id], map: "idx_onboarding_starter_packs_source_tenant")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -859,6 +906,8 @@ model tenants {
   static_options             static_options[]
   support_ticket_messages    support_ticket_messages[]
   support_tickets            support_tickets[]
+  mobile_push_devices        mobile_push_devices[]
+  onboarding_starter_packs   onboarding_starter_packs[]
   price_plans                price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses    user_delivery_addresses[]
   wallets                    wallets[]

@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
+import { THEME_COLOR_SETTINGS } from '@/lib/themes/color-settings';
 
 interface ThemeColors {
   primary?: string;
@@ -566,56 +567,7 @@ export default function ThemeCustomizeClient() {
                 </div>
               </div>
 
-              {[
-                { 
-                  key: 'primary', 
-                  description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements',
-                  recommended: '#4CAF50', // Green - e-commerce friendly
-                  note: 'Recommended: Blue (#2196F3) or Green (#4CAF50) for trust and action'
-                },
-                { 
-                  key: 'secondary', 
-                  description: 'Used for: Secondary buttons, hover states, complementary UI elements',
-                  recommended: '#10b981', // Emerald
-                  note: 'Should complement primary color'
-                },
-                { 
-                  key: 'accent', 
-                  description: 'Used for: Highlights, special features, decorative elements, hover effects, and active links',
-                  recommended: '#FF9800', // Orange
-                  note: 'Use sparingly for emphasis'
-                },
-                { 
-                  key: 'background', 
-                  description: 'Used for: Page background color (applied via CSS variables)',
-                  recommended: '#FFFFFF',
-                  note: 'Keep light (#FFFFFF or #FAFAFA) for readability'
-                },
-                { 
-                  key: 'text', 
-                  description: 'Used for: Main text color, headings, body text (applied via CSS variables)',
-                  recommended: '#212121',
-                  note: 'Dark neutral (#212121 or #1A1A1A) for contrast'
-                },
-                { 
-                  key: 'muted', 
-                  description: 'Used for: Muted text, placeholders, secondary text, borders',
-                  recommended: '#6B7280',
-                  note: '⚠️ Important: Use medium grey (#6B7280 or #9CA3AF) - avoid too light or too dark to prevent visibility issues'
-                },
-                { 
-                  key: 'buttonBackground', 
-                  description: 'Used for: Button background color (applied via CSS variables --button-background)',
-                  recommended: '#4CAF50',
-                  note: 'Typically matches primary color'
-                },
-                { 
-                  key: 'buttonText', 
-                  description: 'Used for: Button text color (applied via CSS variables --button-text)',
-                  recommended: '#FFFFFF',
-                  note: 'White or light color for contrast on button background'
-                },
-              ].map(({ key: colorKey, description, recommended, note }) => {
+              {THEME_COLOR_SETTINGS.map(({ key: colorKey, description, recommended, note }) => {
                 const defaultValue = (defaultColors as ThemeColors)[colorKey] || recommended || '#000000';
                 const currentValue = customColors[colorKey] || defaultValue;
                 return (

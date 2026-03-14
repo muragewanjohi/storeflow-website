@@ -32,7 +32,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { MapPinIcon, AlertCircle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { MapPinIcon, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
@@ -186,12 +195,18 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const [contactEmailError, setContactEmailError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [linkedAuthProviders, setLinkedAuthProviders] = useState<string[]>([]);
   const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
   const tenantData = tenant.data && typeof tenant.data === 'object' ? (tenant.data as Record<string, unknown>) : {};
   const initialBusinessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : '';
   const initialSelling = typeof tenantData.selling === 'string' ? tenantData.selling : '';
+  const accountDeletionConfirmationPhrase = `DELETE ${tenant.subdomain}`;
 
   const getSupabaseClient = async () => {
     const { createClient } = await import('@/lib/supabase/client');
@@ -510,6 +525,43 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       setSettingsError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteAccountError(null);
+    setIsDeletingAccount(true);
+
+    try {
+      const response = await fetch('/api/dashboard/settings/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          confirmation: deleteConfirmation,
+          reason: deleteReason.trim() ? deleteReason : undefined,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to delete account');
+      }
+
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('Client sign out after account deletion failed:', signOutError);
+      }
+
+      const redirectTo = typeof data.redirectTo === 'string' ? data.redirectTo : '/';
+      window.location.href = redirectTo;
+    } catch (err) {
+      setDeleteAccountError(err instanceof Error ? err.message : 'Failed to delete account');
+      setIsDeletingAccount(false);
     }
   };
 
@@ -935,6 +987,42 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
           {/* Two-Factor Authentication */}
           <MFASettings />
+
+          {/* Account Deletion (Danger Zone) */}
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Account
+              </CardTitle>
+              <CardDescription>
+                Permanently close your store. Your storefront and dashboard access will be disabled immediately.
+                Store data is retained for up to {process.env.NEXT_PUBLIC_TENANT_RETENTION_DAYS || '90'} days before permanent deletion.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>This action is serious</AlertTitle>
+                <AlertDescription>
+                  Deleting your account will sign you out, disable your store, and schedule hard deletion after the retention period.
+                  If you change your mind, contact support before the retention period expires.
+                </AlertDescription>
+              </Alert>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteAccountError(null);
+                    setShowDeleteAccountDialog(true);
+                  }}
+                >
+                  Delete my account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Currency Settings Tab */}
@@ -1727,6 +1815,75 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           <VersionInfo />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        open={showDeleteAccountDialog}
+        onOpenChange={(open) => {
+          if (isDeletingAccount) return;
+          setShowDeleteAccountDialog(open);
+          if (!open) {
+            setDeleteConfirmation('');
+            setDeleteReason('');
+            setDeleteAccountError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately disable <strong>{tenant.name || tenant.subdomain}</strong>.
+              Type <strong>{accountDeletionConfirmationPhrase}</strong> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            {deleteAccountError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {deleteAccountError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-account-confirmation">Confirmation</Label>
+              <Input
+                id="delete-account-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder={accountDeletionConfirmationPhrase}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-account-reason">Reason (optional)</Label>
+              <Textarea
+                id="delete-account-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                placeholder="Help us improve by sharing why you are closing your store."
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={
+                isDeletingAccount ||
+                deleteConfirmation.trim() !== accountDeletionConfirmationPhrase
+              }
+            >
+              {isDeletingAccount ? 'Deleting account...' : 'Confirm delete'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

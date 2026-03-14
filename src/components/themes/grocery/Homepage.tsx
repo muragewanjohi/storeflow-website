@@ -42,6 +42,18 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
     }));
   }, [products]);
 
+  const topSectionBannerImage = useMemo(() => {
+    const firstProductWithImage = featuredProducts.find(
+      (product) => typeof product.image === 'string' && product.image.trim().length > 0
+    );
+    if (firstProductWithImage?.image) {
+      return firstProductWithImage.image;
+    }
+    return isFashionPreview
+      ? 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop'
+      : 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop';
+  }, [featuredProducts, isFashionPreview]);
+
   const handleProductClick = useCallback((product: { id: string; name: string; slug: string | null; price: number; compareAtPrice?: number; image: string | null; stock_quantity: number | null; metadata?: Record<string, unknown> }) => {
     if (onProductClickPreview) {
       onProductClickPreview(product.id);
@@ -558,7 +570,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
               {/* Left Side - Banner */}
               <div className={`relative rounded-lg overflow-hidden shadow-lg h-full min-h-[500px] ${isFashionPreview ? 'bg-gradient-to-br from-slate-50 to-gray-100' : 'bg-gradient-to-br from-green-50 to-emerald-50'} group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}>
                 <Image
-                  src={isFashionPreview ? 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=800&fit=crop' : 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop'}
+                  src={topSectionBannerImage}
                   alt={isFashionPreview ? 'Fashion Collection' : 'Organic Vegetables'}
                   fill
                   className="object-cover opacity-70 group-hover:scale-110 transition-transform duration-500"

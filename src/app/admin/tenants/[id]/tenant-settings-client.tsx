@@ -106,6 +106,7 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
 
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Subscription management state
   const [isChangingSubscription, setIsChangingSubscription] = useState(false);
@@ -269,6 +270,35 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
     }
   };
 
+  const handleRestore = async () => {
+    if (!confirm(`Restore "${tenant.name}" and reactivate the account?`)) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/admin/tenants/${tenant.id}/restore`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus('active');
+        setSuccess('Tenant restored and reactivated successfully');
+        router.refresh();
+      } else {
+        setError(data.message || 'Failed to restore tenant');
+      }
+    } catch (err) {
+      setError('An error occurred while restoring tenant');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const handleSubscriptionChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsChangingSubscription(true);
@@ -348,6 +378,8 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
         return <Badge className="bg-yellow-500">Suspended</Badge>;
       case 'expired':
         return <Badge className="bg-red-500">Expired</Badge>;
+      case 'deleted':
+        return <Badge variant="secondary">Deleted</Badge>;
       default:
         return <Badge variant="secondary">{status || 'Unknown'}</Badge>;
     }
@@ -425,6 +457,7 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="deleted" disabled>Deleted (restore from Danger Zone)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -807,11 +840,21 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
               <Button
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={isDeleting}
+                disabled={isDeleting || status === 'deleted'}
               >
                 <TrashIcon className="mr-2 h-4 w-4" />
                 {isDeleting ? 'Deleting...' : 'Delete Tenant'}
               </Button>
+
+              {status === 'deleted' && (
+                <Button
+                  variant="outline"
+                  onClick={handleRestore}
+                  disabled={isRestoring}
+                >
+                  {isRestoring ? 'Restoring...' : 'Restore Tenant'}
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>

@@ -476,6 +476,99 @@ export async function sendPreDeletionWarningEmail({
 }
 
 /**
+ * Send account deletion confirmation email with restore instructions
+ */
+export async function sendAccountDeletionConfirmationEmail({
+  tenant,
+  deletedAt,
+  retentionDays,
+}: {
+  tenant: Tenant;
+  deletedAt: Date;
+  retentionDays: number;
+}) {
+  try {
+    const tenantEmail = getTenantContactEmail(tenant);
+    const finalDeletionDate = new Date(deletedAt);
+    finalDeletionDate.setDate(finalDeletionDate.getDate() + retentionDays);
+
+    const supportEmail = 'support@dukanest.com';
+    const subject = `Account Restore Request - ${tenant.name} (${tenant.subdomain})`;
+    const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Account Deletion Confirmation</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+            <h1 style="color: #dc2626; margin-top: 0;">Your store is now deactivated</h1>
+            <p style="margin: 0;">
+              We received and processed your account deletion request.
+            </p>
+          </div>
+
+          <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Account Details</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold; width: 180px;">Store Name:</td>
+                <td style="padding: 8px 0;">${tenant.name}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Store Subdomain:</td>
+                <td style="padding: 8px 0;">${tenant.subdomain}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Deleted At:</td>
+                <td style="padding: 8px 0;">${deletedAt.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Permanent Deletion Date:</td>
+                <td style="padding: 8px 0;"><strong>${finalDeletionDate.toLocaleString()}</strong></td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background-color: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #1e40af;">
+              <strong>Need to restore your account?</strong><br/>
+              You can request account restoration within the next ${retentionDays} days by emailing
+              <a href="mailto:${supportEmail}" style="color: #1e40af;">${supportEmail}</a>.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${mailto}"
+               style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              Email Support to Restore Account
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
+            <p style="margin: 0;">This is an automated confirmation from DukaNest Platform.</p>
+            <p style="margin: 5px 0 0 0;">Store: ${tenant.name} (${tenant.subdomain})</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return sendPlatformEmail({
+      to: tenantEmail,
+      subject: `Account deletion confirmation - ${tenant.name}`,
+      html,
+    });
+  } catch (error) {
+    console.error('Error sending account deletion confirmation email:', error);
+    throw error;
+  }
+}
+
+/**
  * Send subscription activated email
  */
 export async function sendSubscriptionActivatedEmail({

@@ -961,7 +961,7 @@ export default function CheckoutClient({
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto max-w-full overflow-x-hidden px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center">Loading...</div>
         </div>
@@ -971,7 +971,7 @@ export default function CheckoutClient({
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto max-w-full overflow-x-hidden px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardContent className="pt-6">
@@ -989,7 +989,7 @@ export default function CheckoutClient({
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto max-w-full overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8">
       <div className="max-w-4xl mx-auto">
         {/* Store Unavailable Notice (Expired/Suspended) */}
         {!canProcessOrders && accessRestriction && (
@@ -1030,10 +1030,10 @@ export default function CheckoutClient({
         )}
         
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+        <div className="mb-6">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 currentStep === 'shipping' ? 'bg-primary text-primary-foreground' :
                 ['payment', 'review'].includes(currentStep) ? 'bg-primary/20 text-primary' :
                 'bg-muted text-muted-foreground'
@@ -1044,15 +1044,13 @@ export default function CheckoutClient({
                   <span>1</span>
                 )}
               </div>
-              <span className={currentStep === 'shipping' ? 'font-semibold' : ''}>
+              <span className={`text-xs sm:text-sm ${currentStep === 'shipping' ? 'font-semibold' : ''}`}>
                 Shipping
               </span>
             </div>
-            
-            <div className="flex-1 h-0.5 bg-muted mx-4" />
-            
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 currentStep === 'payment' ? 'bg-primary text-primary-foreground' :
                 currentStep === 'review' ? 'bg-primary/20 text-primary' :
                 'bg-muted text-muted-foreground'
@@ -1063,21 +1061,19 @@ export default function CheckoutClient({
                   <span>2</span>
                 )}
               </div>
-              <span className={currentStep === 'payment' ? 'font-semibold' : ''}>
+              <span className={`text-xs sm:text-sm ${currentStep === 'payment' ? 'font-semibold' : ''}`}>
                 Payment
               </span>
             </div>
-            
-            <div className="flex-1 h-0.5 bg-muted mx-4" />
-            
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                 currentStep === 'review' ? 'bg-primary text-primary-foreground' :
                 'bg-muted text-muted-foreground'
               }`}>
                 <span>3</span>
               </div>
-              <span className={currentStep === 'review' ? 'font-semibold' : ''}>
+              <span className={`text-xs sm:text-sm ${currentStep === 'review' ? 'font-semibold' : ''}`}>
                 Review
               </span>
             </div>
@@ -1102,7 +1098,7 @@ export default function CheckoutClient({
                         value={deliveryMethod}
                         onValueChange={(value) => setDeliveryMethod(value as DeliveryMethod)}
                       >
-                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                        <div className="flex items-center space-x-2 rounded-lg border p-4">
                           <RadioGroupItem value="delivery" id="delivery" />
                           <Label htmlFor="delivery" className="flex-1 cursor-pointer">
                             <div>
@@ -1111,7 +1107,7 @@ export default function CheckoutClient({
                             </div>
                           </Label>
                         </div>
-                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                        <div className="flex items-center space-x-2 rounded-lg border p-4">
                           <RadioGroupItem value="pickup" id="pickup" />
                           <Label htmlFor="pickup" className="flex-1 cursor-pointer">
                             <div>
@@ -1613,7 +1609,7 @@ export default function CheckoutClient({
                         <div className="space-y-3">
                         {/* Cash Payment Method */}
                         {checkoutSettings?.payment_cash_enabled && (
-                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div className="flex min-h-11 items-start space-x-3 rounded-lg border p-4 transition-colors hover:bg-accent/50">
                             <RadioGroupItem value="cash" id="payment_cash" className="mt-1" />
                             <Label htmlFor="payment_cash" className="flex-1 cursor-pointer">
                               <div>
@@ -1630,7 +1626,7 @@ export default function CheckoutClient({
 
                         {/* M-Pesa Payment Method */}
                         {checkoutSettings?.payment_mpesa_enabled && (
-                          <div className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div className="flex min-h-11 items-start space-x-3 rounded-lg border p-4 transition-colors hover:bg-accent/50">
                             <RadioGroupItem value="mpesa" id="payment_mpesa" className="mt-1" />
                             <Label htmlFor="payment_mpesa" className="flex-1 cursor-pointer">
                               <div>
@@ -1697,12 +1693,21 @@ export default function CheckoutClient({
                         <CardTitle className="text-sm">Payment Verification</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
+                        <div className="rounded-md border border-blue-200 bg-white/70 p-3 text-xs text-blue-900 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-100">
+                          <p className="font-medium">M-Pesa payment guide</p>
+                          <ul className="mt-1 space-y-1">
+                            <li>1. Complete the payment on your phone using the details above.</li>
+                            <li>2. Copy the M-Pesa receipt code from SMS (for example: QKP7H8L9M1).</li>
+                            <li>3. Paste it below to let the store verify your payment quickly.</li>
+                          </ul>
+                        </div>
                         <div>
                           <Label htmlFor="payment_transaction_id">
                             M-Pesa Transaction ID / Receipt Number *
                           </Label>
                           <Input
                             id="payment_transaction_id"
+                            className="h-11"
                             value={paymentTransactionId}
                             onChange={(e) => setPaymentTransactionId(e.target.value)}
                             placeholder="Enter your M-Pesa transaction ID"
@@ -1716,6 +1721,7 @@ export default function CheckoutClient({
                           <Label htmlFor="payment_reference">Reference (Optional)</Label>
                           <Input
                             id="payment_reference"
+                            className="h-11"
                             value={paymentReference}
                             onChange={(e) => setPaymentReference(e.target.value)}
                             placeholder="Enter reference if any"
@@ -1961,9 +1967,10 @@ export default function CheckoutClient({
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
               <Button
                 variant="outline"
+                className="min-h-11"
                 onClick={handleBack}
                 disabled={currentStep === 'shipping'}
               >
@@ -1973,6 +1980,7 @@ export default function CheckoutClient({
               
               {currentStep !== 'review' ? (
                 <Button 
+                  className="min-h-11"
                   onClick={handleNext}
                   disabled={
                     !canProcessOrders ||
@@ -1983,7 +1991,7 @@ export default function CheckoutClient({
                   <ArrowRightIcon className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleSubmit} disabled={submitting || !canProcessOrders}>
+                <Button className="min-h-11" onClick={handleSubmit} disabled={submitting || !canProcessOrders}>
                   {submitting ? 'Processing...' : !canProcessOrders ? 'Store Unavailable' : 'Place Order'}
                 </Button>
               )}

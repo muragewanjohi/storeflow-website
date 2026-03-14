@@ -25,6 +25,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon, ShareIcon } from '@heroicons/react/24/outline';
+import {
+  Squares2X2Icon,
+  AdjustmentsHorizontalIcon,
+  ArchiveBoxIcon,
+  ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
+  FunnelIcon,
+  QrCodeIcon,
+} from '@heroicons/react/24/outline';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/solid';
 import {
   DropdownMenu,
@@ -107,6 +116,7 @@ export default function ProductsListClient({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   const handleSearch = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -277,21 +287,46 @@ export default function ProductsListClient({
     return { total, active, lowStock, outOfStock };
   }, [mobileFilteredProducts]);
 
+  const mobileQuickActions = [
+    {
+      label: 'Categories',
+      href: '/dashboard/categories',
+      Icon: Squares2X2Icon,
+    },
+    {
+      label: 'Inventory',
+      href: '/dashboard/inventory',
+      Icon: ArchiveBoxIcon,
+    },
+    {
+      label: 'Product Options',
+      href: '/dashboard/settings/attributes',
+      Icon: AdjustmentsHorizontalIcon,
+    },
+    {
+      label: 'Stock Alerts',
+      href: '/dashboard/inventory/alerts',
+      Icon: ExclamationTriangleIcon,
+    },
+    {
+      label: 'Import Products',
+      href: '#',
+      Icon: ArrowDownTrayIcon,
+      onClick: () => toast.info('Import Products is coming soon.'),
+    },
+  ];
+
+  const recentProducts = useMemo(() => initialProducts.slice(0, 3), [initialProducts]);
+
   return (
     <div>
       <div className="min-h-screen bg-[#f3f4f6] pb-24 md:hidden">
         <section className="bg-gradient-to-b from-primary to-primary/80 px-4 pb-6 pt-8">
-          <div className="flex items-start justify-between gap-3">
+          <div>
             <div>
               <h1 className="text-[30px] font-bold leading-tight text-primary-foreground">Your Products</h1>
               <p className="mt-1 text-xs text-primary-foreground/80">Manage your product catalog</p>
             </div>
-            <Button asChild className="h-9 bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-              <Link href="/dashboard/products/new">
-                <PlusIcon className="mr-1.5 h-4 w-4" />
-                Add
-              </Link>
-            </Button>
           </div>
         </section>
 
@@ -302,37 +337,66 @@ export default function ProductsListClient({
             </div>
           )}
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Card className="border-[#e5e7eb]">
               <CardContent className="p-3">
                 <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.total}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Total</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Total Products</p>
               </CardContent>
             </Card>
             <Card className="border-[#e5e7eb]">
               <CardContent className="p-3">
-                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.active}</p>
+                <p className="text-[22px] font-bold leading-none text-green-600">{mobileSummary.active}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">Active</p>
               </CardContent>
             </Card>
             <Card className="border-[#e5e7eb]">
               <CardContent className="p-3">
-                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.lowStock}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Low</p>
+                <p className="text-[22px] font-bold leading-none text-amber-600">{mobileSummary.lowStock}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Low Stock</p>
               </CardContent>
             </Card>
             <Card className="border-[#e5e7eb]">
               <CardContent className="p-3">
-                <p className="text-[22px] font-bold leading-none text-[#1f2937]">{mobileSummary.outOfStock}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Out</p>
+                <p className="text-[22px] font-bold leading-none text-red-600">{mobileSummary.outOfStock}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Out of Stock</p>
               </CardContent>
             </Card>
+          </div>
+
+          <div>
+            <h2 className="mb-3 text-xl font-semibold text-[#111827]">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {mobileQuickActions.map((action: any) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className="text-left"
+                  onClick={() => {
+                    if (action.onClick) {
+                      action.onClick();
+                      return;
+                    }
+                    router.push(action.href);
+                  }}
+                >
+                  <Card className="h-full border-[#e5e7eb] transition-colors hover:border-primary/40">
+                    <CardContent className="flex h-full min-h-[104px] flex-col items-start justify-center gap-3 p-4">
+                      <div className="rounded-xl bg-[#e8eefb] p-2.5 text-primary">
+                        <action.Icon className="h-5 w-5" />
+                      </div>
+                      <p className="text-base font-medium text-[#111827]">{action.label}</p>
+                    </CardContent>
+                  </Card>
+                </button>
+              ))}
+            </div>
           </div>
 
           <Card className="border-[#e5e7eb]">
             <CardContent className="space-y-3 p-3">
               <Input
-                placeholder="Search products..."
+                placeholder="Search by product name, SKU or category"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -341,47 +405,90 @@ export default function ProductsListClient({
                   }
                 }}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={status} onValueChange={(value) => setStatus(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={categoryId} onValueChange={(value) => setCategoryId(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((category: any) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowFilters((prev) => !prev)}
+                >
+                  <FunnelIcon className="mr-1.5 h-4 w-4" />
+                  {showFilters ? 'Hide Filters' : 'Filters'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => toast.info('Scan barcode is coming soon.')}
+                >
+                  <QrCodeIcon className="mr-1.5 h-4 w-4" />
+                  Scan barcode
+                </Button>
               </div>
-              <Button onClick={handleSearch} className="w-full" disabled={isPending}>
-                Apply filters
-              </Button>
+              {showFilters && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={status} onValueChange={(value) => setStatus(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={categoryId} onValueChange={(value) => setCategoryId(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((category: any) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={handleSearch} className="w-full" disabled={isPending}>
+                    Apply filters
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
+
+          {recentProducts.length > 0 && (
+            <Card className="border-[#e5e7eb]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Recent Products</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {recentProducts.map((product: any) => (
+                  <div key={product.id} className="rounded-lg border border-[#eef2f7] p-3">
+                    <p className="truncate text-sm font-semibold text-[#111827]">{product.name}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{formatPrice(product.price)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground capitalize">{product.status}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-3">
             {mobileFilteredProducts.length === 0 ? (
               <Card className="border-[#e5e7eb]">
                 <CardContent className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">No products found.</p>
+                  <p className="text-sm font-medium text-[#111827]">You haven&apos;t added any products yet.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Start by adding your first product to your store.</p>
                   <Button asChild className="mt-4">
-                    <Link href="/dashboard/products/new">Create product</Link>
+                    <Link href="/dashboard/products/new">Add Your First Product</Link>
                   </Button>
+                  <p className="mt-4 text-xs text-muted-foreground">Tip: Products with images sell better.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -441,6 +548,16 @@ export default function ProductsListClient({
             )}
           </div>
         </section>
+
+        <Button
+          asChild
+          size="icon"
+          className="fixed bottom-24 right-4 z-30 h-14 w-14 rounded-full shadow-[0_10px_20px_rgba(37,99,235,0.35)]"
+        >
+          <Link href="/dashboard/products/new" aria-label="Add Product">
+            <PlusIcon className="h-6 w-6" />
+          </Link>
+        </Button>
       </div>
 
       <div className="hidden md:block">

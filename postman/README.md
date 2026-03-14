@@ -37,12 +37,27 @@ Update these variables in the environment:
 - **`tenant_id`** - Current tenant ID (auto-set by some requests)
 - **`tenant_subdomain`** - Tenant subdomain (default: `teststore`)
 - **`auth_token`** - Authentication token (auto-set after login)
+- **`mobile_access_token`** - Mobile bearer token (auto-set by Mobile Login)
+- **`mobile_refresh_token`** - Mobile refresh token (auto-set by Mobile Login/Refresh)
+- **`mobile_temp_access_token`** - Temporary token returned when login requires MFA
+- **`mobile_temp_refresh_token`** - Temporary refresh token returned when login requires MFA
+- **`mobile_requires_mfa`** - Indicates whether MFA verify step is pending
+- **`mobile_email`** - Mobile API login email
+- **`mobile_password`** - Mobile API login password
+- **`mobile_user_id`** - Mobile user ID (auto-set by Mobile Login)
+- **`mobile_user_email`** - Mobile user email (auto-set by Mobile Login)
+- **`mobile_mfa_code`** - OTP code for MFA verify (set manually while testing)
 - **`plan_id`** - Price plan ID (auto-set by Get Price Plans request)
 - **`cron_secret_token`** - Secret token for cron endpoints (set manually)
 - **`product_id`** - Product ID (auto-set by product requests)
 - **`variant_id`** - Product variant ID (auto-set by variant requests)
 - **`category_id`** - Category ID (auto-set by category requests)
 - **`product_image_url`** - Product image URL (auto-set by upload request)
+- **`onboarding_business_type`** - Business type for onboarding starter pack tests (e.g., `Pets`)
+- **`onboarding_selling`** - Niche/free-text selling value (e.g., `Ornamental Fish`)
+- **`onboarding_theme_slug`** - Theme slug for onboarding starter pack generation (e.g., `grocery`)
+- **`starter_pack_job_id`** - Async starter-pack job ID (auto-set by Create Job request)
+- **`starter_pack_image_url`** - Generated image URL used by Save Assets request
 
 ---
 
@@ -82,6 +97,25 @@ Update these variables in the environment:
 - **Update Category** - Update category
 - **Delete Category** - Delete category
 
+### Mobile API (Phase 0)
+- **Mobile Login** - Get mobile access and refresh tokens
+- **Mobile Refresh Token** - Refresh mobile access token
+- **Mobile MFA Status** - Check whether MFA is required/enabled
+- **Mobile MFA Send Code** - Send OTP code to mobile user email
+- **Mobile MFA Verify** - Verify OTP code
+- **Mobile Logout** - Revoke/close mobile session and clear tokens
+- **Mobile Dashboard Overview** - Metrics + recent orders
+- **Mobile Dashboard Products** - Mobile product list with filters/pagination
+- **Mobile Dashboard Orders** - Mobile order list with filters/pagination
+- **Mobile Dashboard Customers** - Mobile customer list with filters/pagination
+- **Mobile Dashboard Inventory** - Mobile inventory list with stock metrics
+- **Mobile Dashboard Settings** - Core store settings for mobile app
+- **Onboarding Selling Exists** - Precheck if `selling` niche already exists
+- **Onboarding Starter Pack (Sync)** - Build starter-pack payload + precheck decision
+- **Onboarding Starter Pack Create Job** - Create async generation job for Flutter
+- **Onboarding Starter Pack Job Status** - Poll async starter-pack job
+- **Onboarding Starter Pack Save Assets** - Persist generated image URLs/metadata
+
 ### Domain Management (Day 11)
 - **Add Custom Domain** - Add a custom domain to tenant
 - **Get Domain Info** - Get domain information and verification status
@@ -116,6 +150,47 @@ Each request includes automated tests that verify:
 3. **Check Response:**
    - View response in **Body** tab
    - Check **Headers** for additional info
+
+### Mobile MFA Test Order (Phase 0)
+
+For tenant accounts that require MFA, run requests in this order:
+
+1. **Mobile Login**
+   - Expected: `requiresMfa: true`
+   - Auto-sets `mobile_user_id`, `mobile_temp_access_token`, `mobile_temp_refresh_token`
+2. **Mobile MFA Status**
+   - Confirms MFA requirement/enabled flags for the user
+3. **Mobile MFA Send Code**
+   - Sends OTP to the login email
+4. **Mobile MFA Verify**
+   - Uses `mobile_mfa_code` + temp session to finalize auth
+   - Auto-promotes to `mobile_access_token` / `mobile_refresh_token`
+5. **Mobile Dashboard Overview** (or any protected mobile dashboard endpoint)
+   - Confirms bearer token works end-to-end
+
+### Onboarding Starter Pack Test Order (Gemini + Nano Banana)
+
+Use this sequence for niche onboarding tests (Flutter-compatible flow):
+
+1. **Onboarding Selling Exists**
+   - Endpoint: `POST /api/onboarding/selling-exists`
+   - Purpose: check if `selling` already exists and avoid unnecessary generation.
+2. **Onboarding Starter Pack Create Job**
+   - Endpoint: `POST /api/onboarding/starter-pack-jobs`
+   - Purpose: create async job for starter-pack generation (recommended mobile flow).
+   - Auto-sets `starter_pack_job_id`.
+3. **Onboarding Starter Pack Job Status**
+   - Endpoint: `GET /api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}`
+   - Purpose: poll until status is `success` or `failed`.
+4. **(External step) Generate images from `nanoBanana.jobs`**
+   - Use returned prompts with your Nano Banana service.
+   - Upload resulting images to your storage and capture final URLs.
+5. **Onboarding Starter Pack Save Assets**
+   - Endpoint: `POST /api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}/save-assets`
+   - Purpose: persist generated image URLs/metadata to job result and optionally tenant profile.
+
+Optional:
+- **Onboarding Starter Pack (Sync)** can be used for quick contract tests or dry runs without async job polling.
 
 ---
 

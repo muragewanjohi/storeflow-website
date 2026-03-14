@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import type { Prisma } from '@prisma/client';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendEmail } from '@/lib/email/sendgrid';
@@ -24,9 +25,134 @@ import {
 } from '@/lib/themes/homepage-templates';
 import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
-import { createDemoContent } from '@/lib/themes/demo-content';
+import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+interface StarterPackProduct {
+  name: string;
+  priceKES: number;
+  description: string;
+  imagePrompt?: string;
+  nanoBananaPrompt?: string;
+  imageUrl?: string;
+}
+
+interface StarterPackSalesPromotion {
+  title: string;
+  subtitle: string;
+  ctaText?: string;
+  imagePrompt?: string;
+  imageUrl?: string;
+}
+
+interface StarterPackBlogPost {
+  title: string;
+  summary?: string;
+}
+
+interface StarterPackPayload {
+  copy?: {
+    headline?: string;
+    subheadline?: string;
+    ctaText?: string;
+  };
+  themeConfig?: Record<string, { hex: string; description?: string }>;
+  categories?: string[];
+  demoProducts?: StarterPackProduct[];
+  salesPromotions?: StarterPackSalesPromotion[];
+  blogPosts?: StarterPackBlogPost[];
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
+  const niche = toTitleCase(selling) || 'Specialty';
+
+  const categories = [
+    `${niche} Bouquets`,
+    `${niche} Arrangements`,
+    `${niche} Gift Baskets`,
+    'Occasion Arrangements',
+    'Gift Sets',
+    'Fresh Stems',
+    'Indoor Plants',
+    'Wedding Flowers',
+    'Event Packages',
+  ];
+
+  return {
+    copy: {
+      headline: `Fresh ${niche} for Every Occasion`,
+      subheadline: `Shop curated ${niche.toLowerCase()} collections with same-day delivery options.`,
+      ctaText: 'Shop the Collection',
+    },
+    categories,
+    demoProducts: [
+      {
+        name: `${niche} Signature Bouquet`,
+        priceKES: 1800,
+        description: `A hand-tied bouquet of premium ${niche.toLowerCase()} stems, wrapped and ready for gifting.`,
+      },
+      {
+        name: `${niche} Celebration Box`,
+        priceKES: 2500,
+        description: `A premium gift box featuring seasonal ${niche.toLowerCase()} with an elegant presentation.`,
+      },
+      {
+        name: `${niche} Weekly Bundle`,
+        priceKES: 3200,
+        description: `A value bundle of fresh ${niche.toLowerCase()} selections suitable for home or office display.`,
+      },
+      {
+        name: `${niche} Event Centerpiece`,
+        priceKES: 4500,
+        description: `A statement centerpiece arrangement crafted from fresh ${niche.toLowerCase()} and greenery.`,
+      },
+      {
+        name: `${niche} Mini Gift Wrap`,
+        priceKES: 1200,
+        description: `A compact ${niche.toLowerCase()} wrap perfect for quick gifting and special moments.`,
+      },
+      {
+        name: `${niche} Premium Vase Set`,
+        priceKES: 3800,
+        description: `A ready-to-display set with premium ${niche.toLowerCase()} arranged in a reusable vase.`,
+      },
+    ],
+    salesPromotions: [
+      {
+        title: `${niche} Weekend Sale`,
+        subtitle: `Save up to 20% on selected ${niche.toLowerCase()} bouquets this weekend.`,
+        ctaText: 'Shop Weekend Deals',
+        imagePrompt: `4k promotional banner for ${niche.toLowerCase()} weekend sale, elegant floral arrangement, premium ecommerce marketing style`,
+      },
+      {
+        title: `Same-Day ${niche} Delivery`,
+        subtitle: `Order before 4PM and get fresh ${niche.toLowerCase()} delivered today.`,
+        ctaText: 'Order for Today',
+        imagePrompt: `4k ecommerce hero banner for same-day ${niche.toLowerCase()} delivery, clean modern composition, high-conversion marketing style`,
+      },
+    ],
+    blogPosts: [
+      {
+        title: `${niche} Care Guide`,
+        summary: `How to choose and care for premium ${niche.toLowerCase()} products at home.`,
+      },
+      {
+        title: `Best ${niche} Gift Ideas`,
+        summary: `Top curated ${niche.toLowerCase()} gift ideas for special occasions and everyday moments.`,
+      },
+    ],
+  };
+}
 
 /**
  * Remove blob URLs from page builder content
@@ -74,6 +200,813 @@ function cleanBlobUrlsFromPageBuilder(pageBuilderData: any): any {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function extractStarterPackPayload(jobResult: unknown): StarterPackPayload | null {
+  if (!isRecord(jobResult)) return null;
+  const data = jobResult.data;
+  if (!isRecord(data)) return null;
+  const gemini = data.gemini;
+  if (!isRecord(gemini)) return null;
+  const generatedStarterPack = gemini.generatedStarterPack;
+  if (!isRecord(generatedStarterPack)) return null;
+
+  const categories = Array.isArray(generatedStarterPack.categories)
+    ? generatedStarterPack.categories.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+
+  const demoProductsRaw = Array.isArray(generatedStarterPack.demoProducts)
+    ? generatedStarterPack.demoProducts
+    : [];
+
+  const demoProducts: StarterPackProduct[] = demoProductsRaw
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => ({
+      name: typeof item.name === 'string' ? item.name : '',
+      priceKES: typeof item.priceKES === 'number' ? item.priceKES : Number(item.priceKES || 0),
+      description: typeof item.description === 'string' ? item.description : '',
+      imagePrompt: typeof item.imagePrompt === 'string' ? item.imagePrompt : undefined,
+      nanoBananaPrompt: typeof item.nanoBananaPrompt === 'string' ? item.nanoBananaPrompt : undefined,
+      imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
+    }))
+    .filter((item) => item.name.trim().length > 0);
+
+  const salesPromotionsRaw = Array.isArray(generatedStarterPack.salesPromotions)
+    ? generatedStarterPack.salesPromotions
+    : [];
+
+  const salesPromotions: StarterPackSalesPromotion[] = salesPromotionsRaw
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => ({
+      title: typeof item.title === 'string' ? item.title : '',
+      subtitle: typeof item.subtitle === 'string' ? item.subtitle : '',
+      ctaText: typeof item.ctaText === 'string' ? item.ctaText : undefined,
+      imagePrompt: typeof item.imagePrompt === 'string' ? item.imagePrompt : undefined,
+      imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
+    }))
+    .filter((item) => item.title.trim().length > 0);
+
+  const blogPostsRaw = Array.isArray(generatedStarterPack.blogPosts)
+    ? generatedStarterPack.blogPosts
+    : [];
+
+  const blogPosts: StarterPackBlogPost[] = blogPostsRaw
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => ({
+      title: typeof item.title === 'string' ? item.title : '',
+      summary: typeof item.summary === 'string' ? item.summary : undefined,
+    }))
+    .filter((item) => item.title.trim().length > 0);
+
+  const copy = isRecord(generatedStarterPack.copy)
+    ? {
+        headline: typeof generatedStarterPack.copy.headline === 'string' ? generatedStarterPack.copy.headline : undefined,
+        subheadline: typeof generatedStarterPack.copy.subheadline === 'string' ? generatedStarterPack.copy.subheadline : undefined,
+        ctaText: typeof generatedStarterPack.copy.ctaText === 'string' ? generatedStarterPack.copy.ctaText : undefined,
+      }
+    : undefined;
+
+  const themeConfig = isRecord(generatedStarterPack.themeConfig)
+    ? Object.entries(generatedStarterPack.themeConfig).reduce<Record<string, { hex: string; description?: string }>>(
+        (acc, [key, rawValue]) => {
+          if (!isRecord(rawValue)) return acc;
+          if (typeof rawValue.hex !== 'string' || rawValue.hex.trim().length === 0) return acc;
+          acc[key] = {
+            hex: rawValue.hex,
+            description: typeof rawValue.description === 'string' ? rawValue.description : undefined,
+          };
+          return acc;
+        },
+        {}
+      )
+    : undefined;
+
+  if (categories.length === 0 && demoProducts.length === 0 && salesPromotions.length === 0 && blogPosts.length === 0 && !copy) {
+    return null;
+  }
+
+  return {
+    copy,
+    themeConfig,
+    categories,
+    demoProducts,
+    salesPromotions,
+    blogPosts,
+  };
+}
+
+async function getUniqueProductSlug(tenantId: string, name: string): Promise<string> {
+  const base = generateSlug(name) || `product-${Date.now()}`;
+  let candidate = base;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await prisma.products.findFirst({
+      where: {
+        tenant_id: tenantId,
+        slug: candidate,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+}
+
+async function getUniqueSaleSlug(tenantId: string, name: string): Promise<string> {
+  const base = generateSlug(name) || `sale-${Date.now()}`;
+  let candidate = base;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await prisma.sales.findFirst({
+      where: {
+        tenant_id: tenantId,
+        slug: candidate,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+}
+
+async function getUniqueBlogSlug(tenantId: string, title: string): Promise<string> {
+  const base = generateSlug(title) || `blog-${Date.now()}`;
+  let candidate = base;
+  let suffix = 1;
+
+  while (true) {
+    const existing = await prisma.blogs.findFirst({
+      where: {
+        tenant_id: tenantId,
+        slug: candidate,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return candidate;
+    }
+
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+}
+
+async function applyStarterPackToTenant(
+  tenantId: string,
+  starterPack: StarterPackPayload,
+  businessType?: string,
+  selling?: string
+): Promise<{ applied: boolean; categoriesCreated: number; productsCreated: number; salesCreated: number; blogsCreated: number }> {
+  const categories = (starterPack.categories ?? []).slice(0, 12);
+  const products = (starterPack.demoProducts ?? []).slice(0, 40);
+  const salesPromotions = (starterPack.salesPromotions ?? []).slice(0, 2);
+  const blogPosts = (starterPack.blogPosts ?? []).slice(0, 4);
+
+  if (
+    categories.length === 0 &&
+    products.length === 0 &&
+    !starterPack.copy &&
+    salesPromotions.length === 0 &&
+    blogPosts.length === 0
+  ) {
+    return { applied: false, categoriesCreated: 0, productsCreated: 0, salesCreated: 0, blogsCreated: 0 };
+  }
+
+  const categoryIds: string[] = [];
+  const categoryImageCandidates = new Map<string, string>();
+  const createdProductIds: string[] = [];
+  let categoriesCreated = 0;
+  let productsCreated = 0;
+  let salesCreated = 0;
+  let blogsCreated = 0;
+
+  for (const categoryName of categories) {
+    const trimmed = categoryName.trim();
+    if (!trimmed) continue;
+
+    const existing = await prisma.categories.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { equals: trimmed, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      categoryIds.push(existing.id);
+      continue;
+    }
+
+    const created = await prisma.categories.create({
+      data: {
+        tenant_id: tenantId,
+        name: trimmed,
+        slug: generateSlug(trimmed),
+        status: 'active',
+      },
+      select: { id: true },
+    });
+    categoryIds.push(created.id);
+    categoriesCreated += 1;
+  }
+
+  for (let index = 0; index < products.length; index += 1) {
+    const product = products[index];
+    const name = product.name.trim();
+    if (!name) continue;
+
+    const price = Number(product.priceKES);
+    const validPrice = Number.isFinite(price) && price > 0 ? price : 100;
+    const slug = await getUniqueProductSlug(tenantId, name);
+    const categoryId = categoryIds.length > 0 ? categoryIds[index % categoryIds.length] : null;
+
+    const createdProduct = await prisma.products.create({
+      data: {
+        tenant_id: tenantId,
+        name,
+        slug,
+        description: product.description || null,
+        short_description: product.description ? product.description.slice(0, 160) : null,
+        price: validPrice,
+        stock_quantity: 20,
+        status: 'active',
+        image: product.imageUrl || null,
+        category_id: categoryId,
+        sku: `SP-${String(index + 1).padStart(3, '0')}-${Date.now().toString().slice(-6)}`,
+        metadata: {
+          source: 'starter_pack_ai',
+          generated_image_prompt: product.imagePrompt ?? product.nanoBananaPrompt ?? null,
+        },
+      },
+    });
+    createdProductIds.push(createdProduct.id);
+    if (categoryId && product.imageUrl && product.imageUrl.trim().length > 0) {
+      if (!categoryImageCandidates.has(categoryId)) {
+        categoryImageCandidates.set(categoryId, product.imageUrl);
+      }
+    }
+    productsCreated += 1;
+  }
+
+  for (const [categoryId, imageUrl] of categoryImageCandidates.entries()) {
+    await prisma.categories.update({
+      where: { id: categoryId },
+      data: {
+        image: imageUrl,
+      },
+    });
+  }
+
+  for (let index = 0; index < salesPromotions.length; index += 1) {
+    const promotion = salesPromotions[index];
+    const saleName = promotion.title?.trim();
+    if (!saleName) continue;
+
+    const saleSlug = await getUniqueSaleSlug(tenantId, saleName);
+    const now = new Date();
+    const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const sale = await prisma.sales.create({
+      data: {
+        tenant_id: tenantId,
+        name: saleName,
+        slug: saleSlug,
+        description: promotion.subtitle || null,
+        badge_text: (promotion.ctaText || 'SALE').slice(0, 50),
+        badge_color: index % 2 === 0 ? '#EF4444' : '#10B981',
+        start_date: now,
+        end_date: endDate,
+        status: 'active',
+        is_featured: true,
+        banner_image: promotion.imageUrl || null,
+        metadata: {
+          source: 'starter_pack_ai',
+          image_prompt: promotion.imagePrompt || null,
+        },
+      },
+      select: { id: true },
+    });
+    salesCreated += 1;
+
+    const saleProducts = createdProductIds.slice(0, 6);
+    for (let productOrder = 0; productOrder < saleProducts.length; productOrder += 1) {
+      const productId = saleProducts[productOrder];
+      const product = await prisma.products.findUnique({
+        where: { id: productId },
+        select: { price: true },
+      });
+      if (!product) continue;
+
+      const discountPercent = 10 + ((index + productOrder) % 15);
+      const salePrice = Number(product.price) * (1 - discountPercent / 100);
+
+      await prisma.product_sales.create({
+        data: {
+          tenant_id: tenantId,
+          product_id: productId,
+          sale_id: sale.id,
+          sale_price: Number(salePrice.toFixed(2)),
+          discount_percent: discountPercent,
+          order_index: productOrder,
+        },
+      });
+    }
+  }
+
+  if (blogPosts.length > 0) {
+    let blogCategoryId: string | null = null;
+    const existingBlogCategory = await prisma.blog_categories.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { equals: 'Tips & Guides', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    if (existingBlogCategory) {
+      blogCategoryId = existingBlogCategory.id;
+    } else {
+      const createdBlogCategory = await prisma.blog_categories.create({
+        data: {
+          tenant_id: tenantId,
+          name: 'Tips & Guides',
+          slug: 'tips-guides',
+        },
+        select: { id: true },
+      });
+      blogCategoryId = createdBlogCategory.id;
+    }
+
+    for (const post of blogPosts) {
+      const title = post.title.trim();
+      if (!title) continue;
+      const slug = await getUniqueBlogSlug(tenantId, title);
+      const excerpt = (post.summary || '').trim();
+      const content = `<h1>${title}</h1><p>${excerpt || `Discover insights about ${selling || 'your products'} and smarter shopping decisions.`}</p>`;
+      const existingBlog = await prisma.blogs.findFirst({
+        where: {
+          tenant_id: tenantId,
+          title: { equals: title, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      if (existingBlog) continue;
+
+      await prisma.blogs.create({
+        data: {
+          tenant_id: tenantId,
+          title,
+          slug,
+          excerpt: excerpt || null,
+          content,
+          category_id: blogCategoryId,
+          status: 'published',
+          image: products.find((item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0)?.imageUrl || null,
+        },
+      });
+      blogsCreated += 1;
+    }
+  }
+
+  const tenantRecord = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: { data: true },
+  });
+  const existingData = isRecord(tenantRecord?.data) ? tenantRecord.data : {};
+
+  await prisma.tenants.update({
+    where: { id: tenantId },
+    data: {
+      data: {
+        ...existingData,
+        business_type: businessType || existingData.business_type,
+        selling: selling || existingData.selling,
+        onboarding_starter_pack: {
+          copy: starterPack.copy || null,
+          themeConfig: starterPack.themeConfig || null,
+          categories,
+          salesPromotions,
+          productImages: products
+            .filter((item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0)
+            .map((item) => ({
+              name: item.name,
+              imageUrl: item.imageUrl,
+            })),
+          products_count: productsCreated,
+          categories_count: categoriesCreated,
+          sales_count: salesCreated,
+          blogs_count: blogsCreated,
+          applied_at: new Date().toISOString(),
+        },
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  if (starterPack.themeConfig && Object.keys(starterPack.themeConfig).length > 0) {
+    const activeTenantTheme = await prisma.tenant_themes.findFirst({
+      where: {
+        tenant_id: tenantId,
+        is_active: true,
+      },
+      select: {
+        id: true,
+        custom_colors: true,
+      },
+    });
+
+    if (activeTenantTheme) {
+      const existingColors =
+        activeTenantTheme.custom_colors &&
+        typeof activeTenantTheme.custom_colors === 'object' &&
+        !Array.isArray(activeTenantTheme.custom_colors)
+          ? (activeTenantTheme.custom_colors as Record<string, unknown>)
+          : {};
+
+      const aiColors = Object.entries(starterPack.themeConfig).reduce<Record<string, string>>((acc, [key, value]) => {
+        if (value?.hex && typeof value.hex === 'string') {
+          acc[key] = value.hex;
+        }
+        return acc;
+      }, {});
+
+      await prisma.tenant_themes.update({
+        where: { id: activeTenantTheme.id },
+        data: {
+          custom_colors: ({
+            ...existingColors,
+            ...aiColors,
+          } as unknown as Prisma.InputJsonValue),
+        },
+      });
+
+      console.log('[Registration] Applied AI theme colors to active tenant theme', {
+        tenantId,
+        tenantThemeId: activeTenantTheme.id,
+        aiColorKeys: Object.keys(aiColors),
+        aiColors,
+      });
+    }
+  }
+
+  const homePage = await prisma.pages.findFirst({
+    where: {
+      tenant_id: tenantId,
+      slug: 'home',
+    },
+    select: {
+      id: true,
+      content: true,
+    },
+  });
+
+  if (homePage?.content) {
+    try {
+      const pageBuilderData = JSON.parse(homePage.content) as {
+        sections?: Array<Record<string, unknown>>;
+      };
+      if (Array.isArray(pageBuilderData.sections)) {
+        const firstPromoImage = salesPromotions.find(
+          (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
+        )?.imageUrl;
+        const firstProductImage = products.find(
+          (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
+        )?.imageUrl;
+        const bestStarterPackImage = firstPromoImage || firstProductImage;
+
+        const updatedSections = pageBuilderData.sections.map((section) => {
+          if (section.type === 'hero') {
+            return {
+              ...section,
+              title: starterPack.copy?.headline || section.title,
+              subtitle: starterPack.copy?.subheadline || section.subtitle,
+              cta_text: starterPack.copy?.ctaText || section.cta_text,
+              image: bestStarterPackImage || section.image,
+            };
+          }
+
+          if (
+            section.type === 'banners' &&
+            Array.isArray(section.banners) &&
+            salesPromotions.length > 0
+          ) {
+            const existingBanners = section.banners as Array<Record<string, unknown>>;
+            const nextBanners = [...existingBanners];
+
+            for (let i = 0; i < Math.min(2, salesPromotions.length, nextBanners.length); i += 1) {
+              const promotion = salesPromotions[i];
+              nextBanners[i] = {
+                ...nextBanners[i],
+                title: promotion.title || nextBanners[i]?.title,
+                subtitle: promotion.subtitle || nextBanners[i]?.subtitle,
+                cta_text: promotion.ctaText || nextBanners[i]?.cta_text,
+                image: promotion.imageUrl || nextBanners[i]?.image,
+              };
+            }
+
+            return {
+              ...section,
+              banners: nextBanners,
+            };
+          }
+
+          if (
+            section.type === 'split_layout' &&
+            bestStarterPackImage &&
+            isRecord(section.left_side)
+          ) {
+            return {
+              ...section,
+              left_side: {
+                ...section.left_side,
+                image: bestStarterPackImage,
+              },
+            };
+          }
+
+          return section;
+        });
+
+        await prisma.pages.update({
+          where: { id: homePage.id },
+          data: {
+            content: JSON.stringify({
+              ...pageBuilderData,
+              sections: updatedSections,
+            }),
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('[Registration] Failed to apply starter-pack copy/promotions to homepage', {
+        tenantId,
+        error: error instanceof Error ? error.message : 'Unknown homepage starter-pack apply error',
+      });
+    }
+  }
+
+  return {
+    applied: true,
+    categoriesCreated,
+    productsCreated,
+    salesCreated,
+    blogsCreated,
+  };
+}
+
+async function applyStarterPackImagesToTenant(
+  tenantId: string,
+  starterPack: StarterPackPayload
+): Promise<{ productsUpdated: number; salesUpdated: number; categoriesUpdated: number; blogsUpdated: number }> {
+  const products = (starterPack.demoProducts ?? []).filter(
+    (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
+  );
+  const promotions = (starterPack.salesPromotions ?? []).filter(
+    (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
+  );
+
+  let productsUpdated = 0;
+  let salesUpdated = 0;
+  let categoriesUpdated = 0;
+  let blogsUpdated = 0;
+  const categoryImageCandidates = new Map<string, string>();
+
+  for (const product of products) {
+    const imageUrl = product.imageUrl!.trim();
+    const existingProduct = await prisma.products.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { equals: product.name, mode: 'insensitive' },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        image: true,
+        category_id: true,
+      },
+    });
+    if (!existingProduct) continue;
+
+    if (existingProduct.image !== imageUrl) {
+      await prisma.products.update({
+        where: { id: existingProduct.id },
+        data: { image: imageUrl },
+      });
+      productsUpdated += 1;
+    }
+
+    if (existingProduct.category_id && !categoryImageCandidates.has(existingProduct.category_id)) {
+      categoryImageCandidates.set(existingProduct.category_id, imageUrl);
+    }
+  }
+
+  for (const [categoryId, imageUrl] of categoryImageCandidates.entries()) {
+    await prisma.categories.update({
+      where: { id: categoryId },
+      data: { image: imageUrl },
+    });
+    categoriesUpdated += 1;
+  }
+
+  for (const promotion of promotions) {
+    const imageUrl = promotion.imageUrl!.trim();
+    const existingSale = await prisma.sales.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { equals: promotion.title, mode: 'insensitive' },
+      },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        banner_image: true,
+      },
+    });
+    if (!existingSale) continue;
+
+    if (existingSale.banner_image !== imageUrl) {
+      await prisma.sales.update({
+        where: { id: existingSale.id },
+        data: { banner_image: imageUrl },
+      });
+      salesUpdated += 1;
+    }
+  }
+
+  const blogImagePool = Array.from(
+    new Set(
+      [
+        ...products.map((item) => item.imageUrl?.trim()).filter((item): item is string => Boolean(item)),
+        ...promotions.map((item) => item.imageUrl?.trim()).filter((item): item is string => Boolean(item)),
+      ]
+    )
+  );
+
+  if (blogImagePool.length > 0) {
+    const starterPackBlogs = starterPack.blogPosts ?? [];
+    for (let index = 0; index < starterPackBlogs.length; index += 1) {
+      const blog = starterPackBlogs[index];
+      const title = blog.title?.trim();
+      if (!title) continue;
+
+      const existingBlog = await prisma.blogs.findFirst({
+        where: {
+          tenant_id: tenantId,
+          title: { equals: title, mode: 'insensitive' },
+        },
+        orderBy: { created_at: 'desc' },
+        select: { id: true, image: true },
+      });
+      if (!existingBlog) continue;
+      if (existingBlog.image && existingBlog.image.trim().length > 0) continue;
+
+      const imageUrl = blogImagePool[index % blogImagePool.length];
+      await prisma.blogs.update({
+        where: { id: existingBlog.id },
+        data: { image: imageUrl },
+      });
+      blogsUpdated += 1;
+    }
+
+    const remainingBlogs = await prisma.blogs.findMany({
+      where: {
+        tenant_id: tenantId,
+        OR: [{ image: null }, { image: '' }],
+      },
+      select: { id: true },
+      orderBy: { created_at: 'desc' },
+      take: Math.max(4, blogImagePool.length),
+    });
+
+    for (let index = 0; index < remainingBlogs.length; index += 1) {
+      const blog = remainingBlogs[index];
+      const imageUrl = blogImagePool[index % blogImagePool.length];
+      await prisma.blogs.update({
+        where: { id: blog.id },
+        data: { image: imageUrl },
+      });
+      blogsUpdated += 1;
+    }
+  }
+
+  const homePage = await prisma.pages.findFirst({
+    where: {
+      tenant_id: tenantId,
+      slug: 'home',
+    },
+    select: {
+      id: true,
+      content: true,
+    },
+  });
+
+  if (homePage?.content) {
+    try {
+      const pageBuilderData = JSON.parse(homePage.content) as {
+        sections?: Array<Record<string, unknown>>;
+      };
+      if (Array.isArray(pageBuilderData.sections)) {
+        const firstPromoImage = promotions[0]?.imageUrl;
+        const firstProductImage = products[0]?.imageUrl;
+        const bestStarterPackImage = firstPromoImage || firstProductImage;
+        const updatedSections = pageBuilderData.sections.map((section) => {
+          if (section.type === 'hero' && bestStarterPackImage) {
+            return {
+              ...section,
+              image: bestStarterPackImage,
+            };
+          }
+          if (
+            section.type === 'banners' &&
+            Array.isArray(section.banners) &&
+            promotions.length > 0
+          ) {
+            const existingBanners = section.banners as Array<Record<string, unknown>>;
+            const nextBanners = [...existingBanners];
+            for (let i = 0; i < Math.min(2, promotions.length, nextBanners.length); i += 1) {
+              const promotion = promotions[i];
+              nextBanners[i] = {
+                ...nextBanners[i],
+                image: promotion.imageUrl || nextBanners[i]?.image,
+              };
+            }
+            return {
+              ...section,
+              banners: nextBanners,
+            };
+          }
+          if (section.type === 'split_layout' && bestStarterPackImage && isRecord(section.left_side)) {
+            return {
+              ...section,
+              left_side: {
+                ...section.left_side,
+                image: bestStarterPackImage,
+              },
+            };
+          }
+          return section;
+        });
+
+        await prisma.pages.update({
+          where: { id: homePage.id },
+          data: {
+            content: JSON.stringify({
+              ...pageBuilderData,
+              sections: updatedSections,
+            }),
+          },
+        });
+      }
+    } catch (error) {
+      console.warn('[Registration] Failed to apply starter-pack images to homepage', {
+        tenantId,
+        error: error instanceof Error ? error.message : 'Unknown homepage image apply error',
+      });
+    }
+  }
+
+  const tenantRecord = await prisma.tenants.findUnique({
+    where: { id: tenantId },
+    select: { data: true },
+  });
+  const existingData = isRecord(tenantRecord?.data) ? tenantRecord.data : {};
+  const existingStarterPack = isRecord(existingData.onboarding_starter_pack)
+    ? (existingData.onboarding_starter_pack as Record<string, unknown>)
+    : {};
+  await prisma.tenants.update({
+    where: { id: tenantId },
+    data: {
+      data: {
+        ...existingData,
+        onboarding_starter_pack: {
+          ...existingStarterPack,
+          salesPromotions: starterPack.salesPromotions ?? existingStarterPack.salesPromotions ?? [],
+          productImages: products.map((item) => ({
+            name: item.name,
+            imageUrl: item.imageUrl,
+          })),
+          images_applied_at: new Date().toISOString(),
+        },
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return { productsUpdated, salesUpdated, categoriesUpdated, blogsUpdated };
+}
+
 const registerTenantSchema = z.object({
   name: z.string().min(1, 'Store name is required'),
   subdomain: z.string()
@@ -89,14 +1022,26 @@ const registerTenantSchema = z.object({
   themeId: z.string().uuid().optional(),
   businessType: z.string().optional(),
   selling: z.string().optional(),
+  starterPackJobId: z.string().uuid().optional(),
   includeDemoContent: z.boolean().optional(),
   includeDemoAttributes: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
+  const registrationTraceId = `reg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   try {
     const body = await request.json();
     const validatedData = registerTenantSchema.parse(body);
+    console.log('[Registration][Trace] Request received', {
+      traceId: registrationTraceId,
+      subdomain: validatedData.subdomain,
+      authProvider: validatedData.authProvider,
+      businessType: validatedData.businessType || null,
+      selling: validatedData.selling || null,
+      includeDemoContent: Boolean(validatedData.includeDemoContent),
+      starterPackJobId: validatedData.starterPackJobId || null,
+      hasPlanId: Boolean(validatedData.planId),
+    });
 
     // Detect user location for pricing - check client-provided headers first, then server headers
     let locationInfo = detectUserLocation(request.headers);
@@ -305,6 +1250,141 @@ export async function POST(request: NextRequest) {
       validatedData.businessType?.trim() ||
       undefined;
 
+    let starterPackPayload: StarterPackPayload | null = null;
+    if (validatedData.starterPackJobId) {
+      try {
+        const starterPackJob = await prisma.cron_job_logs.findUnique({
+          where: { id: validatedData.starterPackJobId },
+          select: {
+            id: true,
+            job_name: true,
+            status: true,
+            result: true,
+          },
+        });
+
+        if (
+          starterPackJob &&
+          starterPackJob.job_name === 'onboarding_starter_pack_generation' &&
+          starterPackJob.status === 'success'
+        ) {
+          starterPackPayload = extractStarterPackPayload(starterPackJob.result);
+          if (starterPackPayload) {
+            console.log('[Registration] Starter-pack payload loaded for registration apply', {
+              traceId: registrationTraceId,
+              jobId: starterPackJob.id,
+              categories: starterPackPayload.categories?.length ?? 0,
+              products: starterPackPayload.demoProducts?.length ?? 0,
+            });
+          } else {
+            console.warn('[Registration][Trace] Starter-pack job exists but payload could not be extracted', {
+              traceId: registrationTraceId,
+              jobId: starterPackJob.id,
+            });
+          }
+        } else {
+          console.warn('[Registration][Trace] Starter-pack job unavailable or not successful', {
+            traceId: registrationTraceId,
+            found: Boolean(starterPackJob),
+            status: starterPackJob?.status || null,
+            jobName: starterPackJob?.job_name || null,
+          });
+        }
+      } catch (starterPackLookupError) {
+        console.warn('[Registration] Failed to load starter-pack job for apply', {
+          traceId: registrationTraceId,
+          error:
+            starterPackLookupError instanceof Error
+              ? starterPackLookupError.message
+              : 'Unknown starter-pack lookup error',
+        });
+      }
+    }
+
+    // Run Gemini in foreground (fast) and defer image generation to background.
+    if (
+      !starterPackPayload &&
+      validatedData.includeDemoContent &&
+      finalSelling &&
+      validatedData.businessType
+    ) {
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      try {
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), 45000);
+
+        const starterPackResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Registration-Trace-Id': registrationTraceId,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            businessType: validatedData.businessType,
+            selling: finalSelling,
+            themeId: effectiveThemeId,
+            locale: 'en-KE',
+            currency: 'KES',
+            productsCount: 8,
+            categoriesCount: 8,
+            blogPostsCount: 2,
+            includeGeminiCall: true,
+            includeNanoBananaCall: false,
+            checkSellingExists: true,
+            forceExternalGeneration: false,
+            geminiModel: 'gemini-2.5-flash',
+          }),
+        });
+        const starterPackData = await starterPackResponse.json();
+        if (starterPackResponse.ok && starterPackData?.success) {
+          starterPackPayload = extractStarterPackPayload(starterPackData);
+          if (starterPackPayload) {
+            console.log('[Registration] Starter-pack generated in foreground (Gemini only)', {
+              traceId: registrationTraceId,
+              categories: starterPackPayload.categories?.length ?? 0,
+              products: starterPackPayload.demoProducts?.length ?? 0,
+            });
+          }
+        }
+      } catch (starterPackForegroundError) {
+        console.warn('[Registration] Foreground starter-pack generation failed, will continue with background setup', {
+          traceId: registrationTraceId,
+          error:
+            starterPackForegroundError instanceof Error
+              ? starterPackForegroundError.message
+              : 'Unknown starter-pack foreground error',
+        });
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      }
+    }
+
+    if (starterPackPayload && validatedData.includeDemoContent && finalSelling) {
+      const hasCategories = Array.isArray(starterPackPayload.categories) && starterPackPayload.categories.length > 0;
+      const hasProducts = Array.isArray(starterPackPayload.demoProducts) && starterPackPayload.demoProducts.length > 0;
+      if (!hasCategories || !hasProducts) {
+        const fallbackPack = buildSellingFallbackStarterPack(finalSelling);
+        starterPackPayload = {
+          ...starterPackPayload,
+          categories: hasCategories ? starterPackPayload.categories : fallbackPack.categories,
+          demoProducts: hasProducts ? starterPackPayload.demoProducts : fallbackPack.demoProducts,
+        };
+        console.log('[Registration] Starter-pack payload was partial; merged selling-based fallback catalog', {
+          traceId: registrationTraceId,
+          selling: finalSelling,
+          categories: starterPackPayload.categories?.length ?? 0,
+          products: starterPackPayload.demoProducts?.length ?? 0,
+          preservedThemeConfig: Boolean(
+            starterPackPayload.themeConfig && Object.keys(starterPackPayload.themeConfig).length > 0
+          ),
+          preservedSalesPromotions: starterPackPayload.salesPromotions?.length ?? 0,
+        });
+      }
+    }
+
     // Create tenant in database
     const tenant = await prisma.tenants.create({
       data: {
@@ -460,6 +1540,14 @@ export async function POST(request: NextRequest) {
     let demoContentCreated = false;
     let demoProductsCreated = 0;
     let demoCategoriesCreated = 0;
+    let demoSalesCreated = 0;
+    let demoBlogsCreated = 0;
+    let demoAttributesCreated = 0;
+    let starterPackApplied = false;
+    let demoContentQueued = false;
+    let onboardingSetupJobId: string | null = null;
+    let onboardingSetupStatus: 'none' | 'pending' | 'completed' | 'failed' = 'none';
+    let contentSource: 'starter-pack-job-or-api' | 'generic-demo' | 'background-queued' | 'none' = 'none';
 
     // Install default or selected theme
     if (effectiveThemeId) {
@@ -765,33 +1853,414 @@ export async function POST(request: NextRequest) {
 
         // Create demo content if requested
         if (validatedData.includeDemoContent) {
-          try {
-            console.log(`[Registration] Creating demo content...`, {
-              businessType: validatedData.businessType || 'Grocery Store / Supermarket',
-              includeAttributes: validatedData.includeDemoAttributes || false,
+          let appliedFromStarterPack = false;
+          if (starterPackPayload) {
+            try {
+              console.log('[Registration] Applying starter-pack generated content...');
+              const starterPackResult = await applyStarterPackToTenant(
+                tenant.id,
+                starterPackPayload,
+                validatedData.businessType,
+                finalSelling
+              );
+
+              if (starterPackResult.applied) {
+                demoContentCreated = true;
+                demoProductsCreated = starterPackResult.productsCreated;
+                demoCategoriesCreated = starterPackResult.categoriesCreated;
+                demoSalesCreated = starterPackResult.salesCreated;
+                demoBlogsCreated = starterPackResult.blogsCreated;
+                if (validatedData.includeDemoAttributes) {
+                  demoAttributesCreated = await createDemoAttributes(
+                    prisma,
+                    tenant.id,
+                    validatedData.businessType || finalSelling || 'General'
+                  );
+                }
+                starterPackApplied = true;
+                onboardingSetupStatus = 'completed';
+                appliedFromStarterPack = true;
+                contentSource = 'starter-pack-job-or-api';
+                console.log('[Registration] ✅ Applied starter-pack generated content', {
+                  ...starterPackResult,
+                  attributesCreated: demoAttributesCreated,
+                });
+
+                const starterPackForImages = starterPackPayload;
+                const needsImageEnrichment = Boolean(
+                  starterPackForImages &&
+                    (
+                      (starterPackForImages.demoProducts ?? []).some(
+                        (item) =>
+                          (!item.imageUrl || item.imageUrl.trim().length === 0) &&
+                          Boolean(item.imagePrompt || item.nanoBananaPrompt)
+                      ) ||
+                      (starterPackForImages.salesPromotions ?? []).some(
+                        (item) =>
+                          (!item.imageUrl || item.imageUrl.trim().length === 0) &&
+                          Boolean(item.imagePrompt)
+                      )
+                    )
+                );
+
+                if (needsImageEnrichment && starterPackForImages) {
+                  const imageJob = await prisma.cron_job_logs.create({
+                    data: {
+                      job_name: 'onboarding_tenant_image_enrichment',
+                      job_path: '/api/tenants/register',
+                      status: 'running',
+                      metadata: {
+                        traceId: registrationTraceId,
+                        tenantId: tenant.id,
+                        mode: 'nano-banana-background',
+                      } as Prisma.InputJsonValue,
+                      result: {} as Prisma.InputJsonValue,
+                    },
+                    select: { id: true },
+                  });
+
+                  onboardingSetupJobId = imageJob.id;
+                  onboardingSetupStatus = 'pending';
+                  demoContentQueued = true;
+
+                  const setupTenant = await prisma.tenants.findUnique({
+                    where: { id: tenant.id },
+                    select: { data: true },
+                  });
+                  const setupTenantData = isRecord(setupTenant?.data) ? setupTenant.data : {};
+                  await prisma.tenants.update({
+                    where: { id: tenant.id },
+                    data: {
+                      data: {
+                        ...setupTenantData,
+                        onboarding_setup: {
+                          status: 'pending',
+                          jobId: imageJob.id,
+                          queuedAt: new Date().toISOString(),
+                          estimatedReadyInMinutes: 2,
+                          stage: 'images',
+                        },
+                      } as unknown as Prisma.InputJsonValue,
+                    },
+                  });
+
+                  void (async () => {
+                    const startedAt = Date.now();
+                    try {
+                      const imageResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'X-Registration-Trace-Id': registrationTraceId,
+                        },
+                        body: JSON.stringify({
+                          businessType: validatedData.businessType,
+                          selling: finalSelling,
+                          themeId: effectiveThemeId,
+                          locale: 'en-KE',
+                          currency: 'KES',
+                          productsCount: 8,
+                          categoriesCount: 8,
+                          blogPostsCount: 2,
+                          includeGeminiCall: false,
+                          includeNanoBananaCall: true,
+                          checkSellingExists: false,
+                          forceExternalGeneration: false,
+                          geminiModel: 'gemini-2.5-flash',
+                          geminiResult: starterPackForImages,
+                        }),
+                      });
+                      const imageData = await imageResponse.json();
+                      if (!imageResponse.ok || !imageData?.success) {
+                        throw new Error(imageData?.error?.message || 'Background image generation failed');
+                      }
+
+                      const imagePack = extractStarterPackPayload(imageData);
+                      if (!imagePack) {
+                        throw new Error('Image generation returned invalid starter-pack payload');
+                      }
+
+                      const imageResult = await applyStarterPackImagesToTenant(tenant.id, imagePack);
+
+                      const latestTenant = await prisma.tenants.findUnique({
+                        where: { id: tenant.id },
+                        select: { data: true },
+                      });
+                      const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
+                      await prisma.tenants.update({
+                        where: { id: tenant.id },
+                        data: {
+                          data: {
+                            ...latestTenantData,
+                            onboarding_setup: {
+                              status: 'completed',
+                              jobId: imageJob.id,
+                              completedAt: new Date().toISOString(),
+                              stage: 'images',
+                              result: imageResult,
+                            },
+                          } as unknown as Prisma.InputJsonValue,
+                        },
+                      });
+
+                      await prisma.cron_job_logs.update({
+                        where: { id: imageJob.id },
+                        data: {
+                          status: 'success',
+                          completed_at: new Date(),
+                          duration_ms: Date.now() - startedAt,
+                          result: imageResult as Prisma.InputJsonValue,
+                        },
+                      });
+                    } catch (backgroundImageError) {
+                      const latestTenant = await prisma.tenants.findUnique({
+                        where: { id: tenant.id },
+                        select: { data: true },
+                      });
+                      const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
+                      await prisma.tenants.update({
+                        where: { id: tenant.id },
+                        data: {
+                          data: {
+                            ...latestTenantData,
+                            onboarding_setup: {
+                              status: 'failed',
+                              jobId: imageJob.id,
+                              failedAt: new Date().toISOString(),
+                              stage: 'images',
+                              error:
+                                backgroundImageError instanceof Error
+                                  ? backgroundImageError.message
+                                  : 'Unknown image enrichment error',
+                            },
+                          } as unknown as Prisma.InputJsonValue,
+                        },
+                      });
+
+                      await prisma.cron_job_logs.update({
+                        where: { id: imageJob.id },
+                        data: {
+                          status: 'failed',
+                          completed_at: new Date(),
+                          duration_ms: Date.now() - startedAt,
+                          error:
+                            backgroundImageError instanceof Error
+                              ? backgroundImageError.message
+                              : 'Unknown image enrichment error',
+                        },
+                      });
+                    }
+                  })();
+                }
+              }
+            } catch (starterPackApplyError: any) {
+              console.error('[Registration] ❌ Failed to apply starter-pack generated content:', starterPackApplyError);
+            }
+          }
+
+          if (!appliedFromStarterPack) {
+            const setupJob = await prisma.cron_job_logs.create({
+              data: {
+                job_name: 'onboarding_tenant_content_setup',
+                job_path: '/api/tenants/register',
+                status: 'running',
+                metadata: {
+                  traceId: registrationTraceId,
+                  tenantId: tenant.id,
+                  businessType: validatedData.businessType || null,
+                  selling: finalSelling || null,
+                  includeDemoAttributes: Boolean(validatedData.includeDemoAttributes),
+                } as Prisma.InputJsonValue,
+                result: {} as Prisma.InputJsonValue,
+              },
+              select: { id: true },
             });
-            const demoResult = await createDemoContent(
-              prisma,
-              tenant.id,
-              validatedData.businessType || 'Grocery Store / Supermarket',
-              validatedData.includeDemoAttributes || false
-            );
-            demoContentCreated = true;
-            demoProductsCreated = demoResult.productsCreated;
-            demoCategoriesCreated = demoResult.categoriesCreated;
-            console.log(`[Registration] ✅ Demo content created:`, {
-              products: demoProductsCreated,
-              categories: demoCategoriesCreated,
-              attributes: demoResult.attributesCreated,
-              pages: demoResult.pagesCreated,
+
+            onboardingSetupJobId = setupJob.id;
+            onboardingSetupStatus = 'pending';
+            demoContentQueued = true;
+            contentSource = 'background-queued';
+
+            const currentTenant = await prisma.tenants.findUnique({
+              where: { id: tenant.id },
+              select: { data: true },
             });
-          } catch (demoError: any) {
-            console.error(`[Registration] ❌ Failed to create demo content:`, demoError);
-            console.error(`[Registration] Demo content error details:`, {
-              message: demoError.message,
-              stack: demoError.stack,
+            const currentTenantData = isRecord(currentTenant?.data) ? currentTenant.data : {};
+            await prisma.tenants.update({
+              where: { id: tenant.id },
+              data: {
+                data: {
+                  ...currentTenantData,
+                  onboarding_setup: {
+                    status: 'pending',
+                    jobId: setupJob.id,
+                    queuedAt: new Date().toISOString(),
+                    estimatedReadyInMinutes: 2,
+                  },
+                } as unknown as Prisma.InputJsonValue,
+              },
             });
-            // Non-critical - continue even if demo content fails
+
+            console.log('[Registration] Demo content queued for background setup', {
+              traceId: registrationTraceId,
+              tenantId: tenant.id,
+              jobId: setupJob.id,
+            });
+
+            void (async () => {
+              const startedAt = Date.now();
+              try {
+                let backgroundStarterPackPayload: StarterPackPayload | null = null;
+                if (finalSelling && validatedData.businessType) {
+                  const starterPackResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-Registration-Trace-Id': registrationTraceId,
+                    },
+                    body: JSON.stringify({
+                      businessType: validatedData.businessType,
+                      selling: finalSelling,
+                      themeId: effectiveThemeId,
+                      locale: 'en-KE',
+                      currency: 'KES',
+                      productsCount: 8,
+                      categoriesCount: 8,
+                      blogPostsCount: 2,
+                      includeGeminiCall: true,
+                      includeNanoBananaCall: true,
+                      checkSellingExists: true,
+                      forceExternalGeneration: false,
+                      geminiModel: 'gemini-2.5-flash',
+                    }),
+                  });
+                  const starterPackData = await starterPackResponse.json();
+                  if (starterPackResponse.ok && starterPackData?.success) {
+                    backgroundStarterPackPayload = extractStarterPackPayload(starterPackData);
+                  }
+                }
+
+                let resultPayload: Record<string, unknown> = {};
+                let appliedSource: 'starter-pack-job-or-api' | 'generic-demo' = 'generic-demo';
+
+                if (backgroundStarterPackPayload) {
+                  if (finalSelling) {
+                    const hasCategories =
+                      Array.isArray(backgroundStarterPackPayload.categories) &&
+                      backgroundStarterPackPayload.categories.length > 0;
+                    const hasProducts =
+                      Array.isArray(backgroundStarterPackPayload.demoProducts) &&
+                      backgroundStarterPackPayload.demoProducts.length > 0;
+                    if (!hasCategories || !hasProducts) {
+                      const fallbackPack = buildSellingFallbackStarterPack(finalSelling);
+                      backgroundStarterPackPayload = {
+                        ...backgroundStarterPackPayload,
+                        categories: hasCategories ? backgroundStarterPackPayload.categories : fallbackPack.categories,
+                        demoProducts: hasProducts ? backgroundStarterPackPayload.demoProducts : fallbackPack.demoProducts,
+                      };
+                    }
+                  }
+
+                  const starterPackResult = await applyStarterPackToTenant(
+                    tenant.id,
+                    backgroundStarterPackPayload,
+                    validatedData.businessType,
+                    finalSelling
+                  );
+                  const attributesCreated = validatedData.includeDemoAttributes
+                    ? await createDemoAttributes(
+                        prisma,
+                        tenant.id,
+                        validatedData.businessType || finalSelling || 'General'
+                      )
+                    : 0;
+                  appliedSource = 'starter-pack-job-or-api';
+                  resultPayload = {
+                    source: appliedSource,
+                    productsCreated: starterPackResult.productsCreated,
+                    categoriesCreated: starterPackResult.categoriesCreated,
+                    salesCreated: starterPackResult.salesCreated,
+                    blogsCreated: starterPackResult.blogsCreated,
+                    attributesCreated,
+                  };
+                } else {
+                  const demoResult = await createDemoContent(
+                    prisma,
+                    tenant.id,
+                    validatedData.businessType || 'Grocery Store / Supermarket',
+                    validatedData.includeDemoAttributes || false
+                  );
+                  resultPayload = {
+                    source: appliedSource,
+                    productsCreated: demoResult.productsCreated,
+                    categoriesCreated: demoResult.categoriesCreated,
+                    salesCreated: demoResult.salesCreated ?? 0,
+                    blogsCreated: demoResult.blogsCreated ?? 0,
+                    attributesCreated: demoResult.attributesCreated ?? 0,
+                  };
+                }
+
+                const latestTenant = await prisma.tenants.findUnique({
+                  where: { id: tenant.id },
+                  select: { data: true },
+                });
+                const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
+                await prisma.tenants.update({
+                  where: { id: tenant.id },
+                  data: {
+                    data: {
+                      ...latestTenantData,
+                      onboarding_setup: {
+                        status: 'completed',
+                        jobId: setupJob.id,
+                        completedAt: new Date().toISOString(),
+                        result: resultPayload,
+                      },
+                    } as unknown as Prisma.InputJsonValue,
+                  },
+                });
+
+                await prisma.cron_job_logs.update({
+                  where: { id: setupJob.id },
+                  data: {
+                    status: 'success',
+                    completed_at: new Date(),
+                    duration_ms: Date.now() - startedAt,
+                    result: resultPayload as Prisma.InputJsonValue,
+                  },
+                });
+              } catch (backgroundError) {
+                const latestTenant = await prisma.tenants.findUnique({
+                  where: { id: tenant.id },
+                  select: { data: true },
+                });
+                const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
+                await prisma.tenants.update({
+                  where: { id: tenant.id },
+                  data: {
+                    data: {
+                      ...latestTenantData,
+                      onboarding_setup: {
+                        status: 'failed',
+                        jobId: setupJob.id,
+                        failedAt: new Date().toISOString(),
+                        error: backgroundError instanceof Error ? backgroundError.message : 'Unknown setup error',
+                      },
+                    } as unknown as Prisma.InputJsonValue,
+                  },
+                });
+
+                await prisma.cron_job_logs.update({
+                  where: { id: setupJob.id },
+                  data: {
+                    status: 'failed',
+                    completed_at: new Date(),
+                    duration_ms: Date.now() - startedAt,
+                    error: backgroundError instanceof Error ? backgroundError.message : 'Unknown setup error',
+                  },
+                });
+              }
+            })();
           }
         } else {
           console.log(`[Registration] Demo content not requested (includeDemoContent: false)`);
@@ -1506,9 +2975,22 @@ export async function POST(request: NextRequest) {
       demoContentCreated,
       demoProductsCreated,
       demoCategoriesCreated,
+      demoSalesCreated,
+      demoBlogsCreated,
+      demoAttributesCreated,
+      demoContentQueued,
+      onboardingSetupJobId,
+      onboardingSetupStatus,
+      starterPackApplied,
+      debugTraceId: registrationTraceId,
+      contentSource,
     }, { status: 201 });
   } catch (error: any) {
-    console.error('Tenant registration error:', error);
+    console.error('Tenant registration error:', {
+      traceId: registrationTraceId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     // Handle validation errors
     if (error instanceof z.ZodError) {

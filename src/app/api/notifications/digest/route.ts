@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { sendNotificationDigestEmail } from '@/lib/notifications/email';
 import type { Notification } from '@/lib/notifications/types';
+import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
 
 /**
  * POST /api/notifications/digest - Send digest email
@@ -144,6 +145,17 @@ export async function POST(request: NextRequest) {
           product_id: item.id,
           stock_quantity: item.stock,
         },
+      });
+    }
+
+    // Wire to mobile push path (FCM/APNs) for real-time delivery.
+    for (const notification of notifications.slice(0, 20)) {
+      await dispatchNotificationToTenantDevices({
+        tenantId: tenant.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        link: notification.link,
       });
     }
 

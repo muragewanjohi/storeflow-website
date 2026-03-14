@@ -1,7 +1,7 @@
 # DukaNest Mobile-First & Flutter App Roadmap
 
 > **Created**: February 27, 2026
-> **Status**: Planning
+> **Status**: In progress (Phase 1 partial; Phase 0 pending)
 > **Goal**: Transform DukaNest into a mobile-first platform with native Flutter apps for Android & iOS, enabling business owners to create and run their online shop entirely from their phone.
 
 ---
@@ -20,6 +20,88 @@
 10. [Risk Assessment](#10-risk-assessment)
 11. [Success Metrics](#11-success-metrics)
 12. [Timeline Summary](#12-timeline-summary)
+
+---
+
+## 🚧 Progress Snapshot (March 10, 2026)
+
+### Overall Phase Status
+- [ ] Phase 0 — API Foundation (in progress)
+- [ ] Phase 1 — Mobile-First Web Dashboard
+- [ ] Phase 2 — Flutter Shop Owner App (MVP)
+- [ ] Phase 3 — Flutter Customer Storefront App
+- [ ] Phase 4 — Platform Maturity & Growth
+
+### Current Position
+- [x] Started execution on Phase 1 (partial implementation)
+- [x] Product mobile quick actions/cards shipped
+- [x] Product page mobile UX improvements shipped (Add Product FAB, search/filter UX)
+- [x] Product-adjacent pages have responsive table/layout improvements (Categories, Attributes, Inventory, Inventory Settings)
+- [x] Phase 0 core mobile auth shell started (`/api/v1/mobile/auth/*`)
+- [x] Phase 0 initial mobile dashboard endpoints started (`overview`, `products`, `orders`, `customers`, `inventory`, `settings`)
+- [x] Postman mobile collection updated for end-to-end testing (login/refresh/MFA/dashboard/logout)
+- [x] Phase 0 foundation complete
+- [ ] Phase 1 complete
+
+### Phase 0 — API Foundation Checklist
+
+#### P0.1: Mobile API Namespace
+- [x] Create `/api/v1/mobile/*` route namespace
+- [x] Add mobile auth endpoints (`login`, `refresh`, `logout`, `mfa/*`, `forgot-password`)
+- [x] Add mobile dashboard endpoints (`overview`, `products`, `orders`, `customers`, `inventory`, `sales`, `analytics`, `settings`)
+- [x] Add mobile notifications endpoints (`list`, `register-device`, `preferences`)
+- [x] Add mobile media upload endpoint
+- [x] Add mobile M-Pesa endpoints (`initiate`, `status`)
+
+#### P0.2: Token-Based Authentication
+- [x] Implement bearer-token middleware for mobile (`Authorization: Bearer <token>`)
+- [x] Add shared `authenticateMobileRequest()` helper
+- [x] Map authenticated Supabase user to platform auth context (`role`, `tenant_id`)
+- [x] Add token refresh flow for mobile clients
+
+#### P0.3: Standardized API Response Format
+- [x] Enforce `{ success, data, error, pagination }` envelope across mobile endpoints
+- [x] Define and apply shared mobile error codes
+
+#### P0.4: Push Notification Infrastructure
+- [x] Add device token persistence model/table
+- [x] Add notification dispatch wiring to FCM/APNs path
+- [x] Add notification preferences per user/device
+
+### Phase 1 — Mobile-First Web Dashboard Checklist
+
+#### P1.1: Mobile Navigation Redesign
+- [x] Add mobile bottom tab navigation
+- [x] Add mobile full-screen "More" menu
+- [x] Integrate mobile nav into dashboard layout/client shell
+
+#### P1.2: Mobile-Optimized Dashboard Pages
+- [x] Products page: mobile-first quick action cards and FAB workflow
+- [x] Products page: improved mobile search/filter interaction
+- [x] Categories page: responsive list/table behavior
+- [x] Attributes page: responsive list/table behavior
+- [x] Inventory pages: responsive layouts/tables
+- [x] Dashboard Home mobile redesign complete
+- [x] Orders mobile redesign complete
+- [x] Order Detail mobile redesign complete
+- [x] Product Add/Edit mobile redesign complete
+
+#### P1.3: PWA Enablement
+- [x] Complete `public/favicon_io/site.webmanifest` for installable PWA
+- [x] Add `public/sw.js` service worker with caching/sync strategy
+- [x] Add install prompt UX in dashboard
+- [x] Register and wire web push notifications
+
+#### P1.4: Mobile Camera & Media Integration
+- [x] Camera-first capture flow for product media
+- [x] Client-side image compression
+- [x] Upload progress UX for slow networks
+
+#### P1.5: Storefront Mobile Audit
+- [x] Touch target audit/fixes (44x44 minimum)
+- [x] Checkout flow validation on 360px widths
+- [x] Mobile M-Pesa flow audit/fixes
+- [x] Typography/form readability and no-horizontal-scroll checks
 
 ---
 
@@ -539,6 +621,7 @@ dependencies:
   retrofit: ^4.x               # Type-safe API calls
   # Auth
   flutter_secure_storage: ^9.x # Secure token storage
+  google_sign_in: ^6.x         # Google OAuth on Android/iOS
   # Navigation
   go_router: ^14.x
   # UI
@@ -586,10 +669,21 @@ dev_dependencies:
 **Screens**:
 1. **Splash Screen** — Check for stored tokens, auto-login if valid
 2. **Welcome Screen** — App value proposition, "Login" and "Create Shop" buttons
-3. **Login Screen** — Email + password, "Forgot password" link, M-Pesa payment option
+3. **Login Screen** — Email + password, **Continue with Google**, "Forgot password" link
 4. **MFA Screen** — If MFA enabled, prompt for TOTP code
 5. **Register Screen** — Name, email, password, shop name, subdomain picker
 6. **Setup Shop** — Upload logo, choose theme, add first product (guided)
+
+**Google Sign-In requirements (Shop Owner app)**:
+- Add Google Sign-In on both **Login** and **Register** flows (Android + iOS)
+- Reuse existing Supabase Google OAuth project configuration already used by web
+- Exchange resulting session/tokens through mobile auth flow and keep `accessToken`/`refreshToken` in secure storage
+- Support MFA continuation for tenant roles after Google auth (same flow as email login)
+- Fallback auth option remains email/password to avoid account lockout
+
+**Recommended API additions for parity**:
+- `POST /api/v1/mobile/auth/google` (init/complete Google auth handshake)
+- Keep using existing `refresh`, `logout`, and `mfa/*` endpoints after Google login success
 
 **Auth state machine**:
 ```
@@ -1534,6 +1628,168 @@ Use this as the backend contract for Flutter customer login/registration.
   }
 }
 ```
+
+### Flutter Onboarding Starter Pack APIs (Gemini + Nano Banana)
+
+To support niche onboarding from Flutter (e.g., `business_type: Pets`, `selling: Ornamental Fish`) while avoiding unnecessary generation costs, use this API sequence.
+
+#### 1) Pre-check if selling already exists
+
+**Endpoint**
+- `POST /api/onboarding/selling-exists`
+
+**Purpose**
+- Check whether this `selling` value already exists in tenant onboarding data before calling Gemini/Nano Banana.
+- If it exists, reuse existing content strategy and skip expensive generation by default.
+
+**Request body**
+
+```json
+{
+  "selling": "Ornamental Fish",
+  "businessType": "Pets"
+}
+```
+
+**Response (example)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "query": {
+      "selling": "Ornamental Fish",
+      "sellingKey": "ornamental fish",
+      "businessType": "Pets"
+    },
+    "exists": true,
+    "exactMatchCount": 7,
+    "matches": [
+      {
+        "selling": "Ornamental Fish",
+        "businessType": "Pets",
+        "tenantCount": 7
+      }
+    ]
+  }
+}
+```
+
+#### 2) Generate starter pack directly (sync mode)
+
+**Endpoint**
+- `POST /api/onboarding/starter-pack`
+
+**Key behavior**
+- Includes full theme color settings contract (all color keys + descriptions from theme settings).
+- Performs built-in selling precheck when `checkSellingExists = true`.
+- Skips Gemini call when selling exists unless forced.
+
+**Important request flags**
+- `includeGeminiCall` (default `false`)
+- `checkSellingExists` (default `true`)
+- `forceExternalGeneration` (default `false`)
+
+**Starter pack request example**
+
+```json
+{
+  "businessType": "Pets",
+  "selling": "Ornamental Fish",
+  "themeSlug": "grocery",
+  "locale": "en-KE",
+  "currency": "KES",
+  "productsCount": 8,
+  "categoriesCount": 5,
+  "blogPostsCount": 2,
+  "includeGeminiCall": true,
+  "checkSellingExists": true,
+  "forceExternalGeneration": false
+}
+```
+
+#### 3) Async job mode for Flutter (recommended)
+
+Use async mode for better mobile UX: create job, poll status, then save generated assets.
+
+##### 3a) Create generation job
+
+**Endpoint**
+- `POST /api/onboarding/starter-pack-jobs`
+
+**Response**
+- Returns `202` with `jobId` and `statusUrl`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "uuid",
+    "status": "running",
+    "statusUrl": "/api/onboarding/starter-pack-jobs/uuid"
+  }
+}
+```
+
+##### 3b) Poll job status
+
+**Endpoint**
+- `GET /api/onboarding/starter-pack-jobs/{jobId}`
+
+**Status values**
+- `running`
+- `success`
+- `failed`
+
+When `success`, `result` contains the same payload shape as `/api/onboarding/starter-pack` including:
+- `sellingPrecheck`
+- `themeConfig.requiredColorSettings`
+- `gemini.generatedStarterPack`
+- `nanoBanana.jobs`
+
+##### 3c) Save generated image assets metadata
+
+**Endpoint**
+- `POST /api/onboarding/starter-pack-jobs/{jobId}/save-assets`
+
+**Request body example**
+
+```json
+{
+  "assets": [
+    {
+      "productName": "Fancy Red Cap Oranda",
+      "sourcePrompt": "4k studio product photo ...",
+      "imageUrl": "https://cdn.example.com/onboarding/red-cap-oranda.png",
+      "storagePath": "onboarding/starter-pack/red-cap-oranda.png",
+      "width": 2048,
+      "height": 2048,
+      "mimeType": "image/png",
+      "provider": "nano-banana"
+    }
+  ],
+  "persistMode": "tenant-profile",
+  "tenantId": "tenant_uuid"
+}
+```
+
+`persistMode` options:
+- `job-only`: save only on job result payload
+- `tenant-profile`: also persist under `tenants.data.onboarding_generated_assets`
+
+#### Flutter implementation notes
+
+Recommended flow in app code:
+
+1. Call `/api/onboarding/selling-exists`.
+2. If `exists == true`: skip external generation unless merchant explicitly requests a fresh pack.
+3. Else call `/api/onboarding/starter-pack-jobs`.
+4. Poll `/api/onboarding/starter-pack-jobs/{jobId}` every 2-3 seconds until `success|failed`.
+5. On success, call Nano Banana for each `nanoBanana.jobs[*].prompt`.
+6. Upload final images to storage, then call `/save-assets`.
+7. Render preview and continue to simplified "update prices" flow.
+
+This keeps onboarding fast while controlling AI spend.
 
 ---
 

@@ -21,6 +21,7 @@ import { generateVariantName } from '@/lib/products/variant-helpers';
 import ProductSalesSection from './product-sales-section';
 import RichTextEditor from '@/components/content/rich-text-editor';
 import ContextualHelp from '@/components/dashboard/contextual-help';
+import { compressImageForMobile, uploadImageWithProgress } from '@/lib/media/mobile-image-upload';
 
 interface Product {
   id: string;
@@ -93,6 +94,7 @@ export default function ProductFormClient({
 }: Readonly<ProductFormClientProps>) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!product;
 
   // Determine initial parent category and subcategory
@@ -199,6 +201,8 @@ export default function ProductFormClient({
 
   const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadContext, setUploadContext] = useState<string>('image');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -250,29 +254,26 @@ export default function ProductFormClient({
 
     // Upload image
     setIsUploading(true);
+    setUploadContext('main image');
+    setUploadProgress(0);
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/products/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to upload image');
-      }
-
-      const data = await response.json();
+      const compressedFile = await compressImageForMobile(file);
+      const data = await uploadImageWithProgress(
+        '/api/products/upload',
+        compressedFile,
+        (percent) => setUploadProgress(percent),
+      );
       setFormData((prev) => ({ ...prev, image: data.url }));
     } catch (err: any) {
       setError(err.message || 'Failed to upload image');
       setImagePreview(null);
     } finally {
+      setUploadProgress(0);
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   };
 
@@ -933,35 +934,31 @@ export default function ProductFormClient({
                               if (!file) return;
 
                               setIsUploading(true);
+                              setUploadContext(`variant ${index + 1} image`);
+                              setUploadProgress(0);
                               try {
-                                const formData = new FormData();
-                                formData.append('file', file);
-
-                                const response = await fetch('/api/products/upload', {
-                                  method: 'POST',
-                                  body: formData,
-                                });
-
-                                if (!response.ok) {
-                                  const data = await response.json();
-                                  throw new Error(data.error || 'Failed to upload image');
-                                }
-
-                                const data = await response.json();
+                                const compressedFile = await compressImageForMobile(file);
+                                const data = await uploadImageWithProgress(
+                                  '/api/products/upload',
+                                  compressedFile,
+                                  (percent) => setUploadProgress(percent),
+                                );
                                 const newVariants = [...variants];
                                 newVariants[index].image = data.url;
                                 setVariants(newVariants);
                               } catch (err: any) {
                                 setError(err.message || 'Failed to upload image');
                               } finally {
+                                setUploadProgress(0);
                                 setIsUploading(false);
                               }
                             };
+                            input.capture = 'environment';
                             input.click();
                           }}
                         >
                           <PhotoIcon className="h-8 w-8 text-muted-foreground" />
-                          <p className="mt-2 text-xs text-muted-foreground">Upload</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Camera / Upload</p>
                         </div>
                       )}
                     </div>
@@ -1115,15 +1112,39 @@ export default function ProductFormClient({
                   disabled={isUploading}
                 />
                 {!imagePreview && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? 'Uploading...' : 'Choose Image'}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      Use Camera
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      Upload File
+                    </Button>
+                  </div>
+                )}
+                {isUploading && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Uploading {uploadContext}... {uploadProgress}%
+                    </p>
+                    <div className="h-2 w-full rounded bg-muted">
+                      <div
+                        className="h-2 rounded bg-primary transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1294,6 +1315,15 @@ export default function ProductFormClient({
                 : 'Create Product'}
           </Button>
         </div>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleImageChange}
+          className="hidden"
+          disabled={isUploading}
+        />
       </form>
     </div>
   );

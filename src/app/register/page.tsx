@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -216,27 +217,79 @@ function TenantRegisterForm() {
   const isHandlingGoogleCallback = useRef(false);
   const subdomainCheckCacheRef = useRef<Map<string, boolean>>(new Map());
 
-  // Business types for Kenya/Africa market
-  const businessTypes = [
-    'Grocery Store / Supermarket',
-    'Pharmacy / Health & Wellness',
-    'Fashion / Clothing',
-    'Electronics & Mobile Phones',
-    'Beauty & Personal Care',
-    'Home & Kitchen',
-    'Baby & Kids Products',
-    'Food & Beverages / Restaurant',
-    'Convenience Store / Duka',
-    'Furniture & Home Decor',
-    'Pets',
-    'Hardware',
-    'Other',
+  const businessTypes: Array<{ value: string; description: string }> = [
+    {
+      value: 'Fashion & Clothing',
+      description: 'Clothes, shoes, handbags, accessories, tailoring.',
+    },
+    {
+      value: 'Beauty & Personal Care',
+      description: 'Cosmetics, skincare, hair products, barbershops, salons.',
+    },
+    {
+      value: 'Electronics & Gadgets',
+      description: 'Phones, laptops, accessories, earphones, smart devices.',
+    },
+    {
+      value: 'Home & Kitchen',
+      description: 'Furniture, utensils, decor, appliances.',
+    },
+    {
+      value: 'Groceries & Food',
+      description: 'Mini-marts, food stores, packaged foods.',
+    },
+    {
+      value: 'Bakery & Cakes',
+      description: 'Bakeries, cake shops, pastry businesses.',
+    },
+    {
+      value: 'Restaurant & Takeaway',
+      description: 'Food vendors, restaurants, fast food.',
+    },
+    {
+      value: 'Agriculture & Farm Supplies',
+      description: 'Seeds, fertilizers, agrovet products, farm tools.',
+    },
+    {
+      value: 'Flowers & Gifts',
+      description: 'Florists, gift shops, hampers, event gifts.',
+    },
+    {
+      value: 'Health & Pharmacy',
+      description: 'Pharmacies, supplements, medical supplies.',
+    },
+    {
+      value: 'Automotive & Motorbike',
+      description: 'Car parts, accessories, motorcycle gear.',
+    },
+    {
+      value: 'Hardware & Construction',
+      description: 'Tools, building materials, plumbing supplies.',
+    },
+    {
+      value: 'Sports & Outdoor',
+      description: 'Gym equipment, bicycles, sports gear.',
+    },
+    {
+      value: 'Toys, Kids & Baby Products',
+      description: 'Toys, baby clothes, baby products.',
+    },
+    {
+      value: 'Pets & Animals',
+      description: 'Pet food, accessories, ornamental fish, pet stores.',
+    },
+    {
+      value: 'Other',
+      description: 'Choose this if your business does not fit the categories above.',
+    },
   ];
 
 
   // Fetch all plans on component mount
   useEffect(() => {
     async function fetchPlans() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
         // First, detect location on client side
         let locationInfo = detectUserLocationClient();
@@ -244,7 +297,12 @@ function TenantRegisterForm() {
         // Try IP-based detection as fallback (only if browser detection didn't find Kenya)
         if (!locationInfo.isKenya) {
           try {
-            locationInfo = await detectLocationByIP();
+            locationInfo = await Promise.race([
+              detectLocationByIP(),
+              new Promise<typeof locationInfo>((_, reject) =>
+                setTimeout(() => reject(new Error('IP location timeout')), 3000)
+              ),
+            ]);
           } catch (ipError) {
             // If IP detection fails, use browser detection result
             console.log('IP detection failed, using browser detection');
@@ -253,6 +311,7 @@ function TenantRegisterForm() {
 
         // Fetch plans with location header
         const response = await fetch('/api/pricing', {
+          signal: controller.signal,
           headers: {
             'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
             'X-User-Currency': locationInfo.currency,
@@ -289,6 +348,7 @@ function TenantRegisterForm() {
       } catch (err) {
         console.error('Error fetching plans:', err);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoadingPlans(false);
       }
     }
@@ -629,7 +689,12 @@ function TenantRegisterForm() {
     let locationInfo = detectUserLocationClient();
     if (!locationInfo.isKenya) {
       try {
-        locationInfo = await detectLocationByIP();
+        locationInfo = await Promise.race([
+          detectLocationByIP(),
+          new Promise<typeof locationInfo>((_, reject) =>
+            setTimeout(() => reject(new Error('IP location timeout')), 3000)
+          ),
+        ]);
       } catch {
         // Use browser detection result
       }
@@ -1050,7 +1115,7 @@ function TenantRegisterForm() {
           <Button
             type="button"
             onClick={handleGoogleSignup}
-            disabled={isSubmitting || isLoadingPlans}
+            disabled={isSubmitting}
             variant="outline"
             className="mt-6 h-[59px] w-full rounded-2xl border-[1.7px] border-[#d1d5dc] bg-white text-base font-semibold text-[#101828] shadow-[0_1px_3px_rgba(0,0,0,0.1),0_1px_2px_rgba(0,0,0,0.1)] hover:bg-white active:bg-white disabled:opacity-100 disabled:text-[#101828]"
           >
@@ -1226,8 +1291,11 @@ function TenantRegisterForm() {
                 </SelectTrigger>
                 <SelectContent>
                   {businessTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                    <SelectItem key={type.value} value={type.value} className="py-2">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{type.value}</span>
+                        <span className="text-xs text-[#6a7282]">{type.description}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1285,7 +1353,7 @@ function TenantRegisterForm() {
 
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingPlans}
+              disabled={isSubmitting}
               className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
             >
               {isSubmitting ? (
@@ -1299,7 +1367,7 @@ function TenantRegisterForm() {
             </Button>
 
             {isLoadingPlans && (
-              <p className="text-center text-xs text-[#6a7282]">Loading plan details...</p>
+              <p className="text-center text-xs text-[#6a7282]">Loading plan details in background...</p>
             )}
           </form>
         </div>

@@ -17,6 +17,7 @@ This document outlines planned features and enhancements for DukaNest. Features 
 
 ### E-Commerce Features
 - ✅ Product management (variants, categories, inventory)
+- ✅ Mobile web optimization for product workflows (products mobile quick actions/FAB, plus responsive categories, attributes, inventory, and inventory settings pages)
 - ✅ Shopping cart and checkout flow
 - ✅ Order management and processing
 - ✅ Customer management
@@ -272,9 +273,9 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - **Implementation:** Day 1 email is sent on tenant registration; automated Day 3/7/14 follow-ups run via cron endpoint `/api/admin/onboarding/welcome-series` with send-tracking in `tenants.data.onboarding_emails`
 
 4.5 **Onboarding Drop-off Reduction (Preview-first)**
-  - [ ] Add onboarding business classification with optional `selling` field (`business_type` + optional free-text `selling`, e.g. Fashion/Clothing -> Bags)
-  - [ ] Store creation fallback rule: if `selling` is empty, auto-fill it with `business_type`
-  - [ ] Expose `business_type` + `selling` breakdown in landlord analytics for tenant/business distribution insights
+  - [x] Add onboarding business classification with optional `selling` field (`business_type` + optional free-text `selling`, e.g. Fashion/Clothing -> Bags)
+  - [x] Store creation fallback rule: if `selling` is empty, auto-fill it with `business_type`
+  - [x] Expose `business_type` + `selling` breakdown in landlord analytics for tenant/business distribution insights
    - [ ] Render instant storefront preview from template + cached assets in onboarding
    - [ ] Implement image resolution order: exact match -> similar cached -> fallback image -> async AI generation
    - [ ] Route merchants to simplified "update prices only" flow after preview confirmation
@@ -282,7 +283,8 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - [ ] Add image source/license metadata and enforce approved source policy
    - [ ] Add funnel + preview analytics (time-to-first-preview, preview acceptance, step conversion, drop-off)
    - [ ] Add cache hit rate + AI spend tracking dashboard
-   - **Status:** Planned - High Priority (drop-off reduction initiative)
+   - **Status:** Partially implemented - High Priority (drop-off reduction initiative)
+   - **Implementation:** Registration flow captures `businessType` + optional `selling`; backend stores both and falls back `selling` to `businessType` when blank; landlord analytics API returns both `tenantsByBusinessType` and `tenantsBySelling`.
    - **Reference:** `docs/ONBOARDING_PREVIEW_AND_IMAGE_STRATEGY.md`
 
 **Medium Priority (User Engagement):**
@@ -322,10 +324,10 @@ This document outlines planned features and enhancements for DukaNest. Features 
    - [ ] Completion rewards
 
 10. **Sample Data & Templates**
-    - [ ] Option to import sample products during setup
-    - [ ] Demo store mode for testing
-    - [ ] Pre-configured templates for different industries
-    - [ ] Example product categories and attributes
+    - [x] Option to import sample products during setup
+    - [x] Demo store mode for testing
+    - [x] Pre-configured templates for different industries
+    - [x] Example product categories and attributes
 
 11. **Feature Discovery & Announcements**
     - [ ] "What's New" modal for feature updates
