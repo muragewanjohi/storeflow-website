@@ -31,6 +31,7 @@ interface Tenant {
   name: string;
   subdomain: string;
   custom_domain: string | null;
+  contact_phone: string | null;
   status: string | null;
   created_at: Date | null;
   expire_date: Date | null;
@@ -199,12 +200,14 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
         const name = tenant.name?.toLowerCase() || '';
         const subdomain = tenant.subdomain?.toLowerCase() || '';
         const customDomain = tenant.custom_domain?.toLowerCase() || '';
+        const contactPhone = tenant.contact_phone?.toLowerCase() || '';
         const businessType = getBusinessType(tenant).toLowerCase();
         const selling = getSelling(tenant).toLowerCase();
         return (
           name.includes(query) ||
           subdomain.includes(query) ||
           customDomain.includes(query) ||
+          contactPhone.includes(query) ||
           businessType.includes(query) ||
           selling.includes(query)
         );
@@ -412,6 +415,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Subdomain</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Custom Domain</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
@@ -436,6 +440,13 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         <code className="text-sm bg-muted px-2 py-1 rounded">
                           {tenant.subdomain}
                         </code>
+                      </TableCell>
+                      <TableCell>
+                        {tenant.contact_phone ? (
+                          <span>{tenant.contact_phone}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {tenant.custom_domain ? (
@@ -721,6 +732,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Subdomain</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Custom Domain</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
@@ -738,6 +750,13 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         <code className="text-sm bg-muted px-2 py-1 rounded">
                           {tenant.subdomain}
                         </code>
+                      </TableCell>
+                      <TableCell>
+                        {tenant.contact_phone ? (
+                          <span>{tenant.contact_phone}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {tenant.custom_domain ? (

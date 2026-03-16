@@ -16,7 +16,7 @@ export default async function TenantsPage() {
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');
 
   // Fetch all tenants
-  const tenants = await prisma.tenants.findMany({
+  const tenantsRaw = await prisma.tenants.findMany({
     orderBy: {
       created_at: 'desc',
     },
@@ -31,6 +31,29 @@ export default async function TenantsPage() {
       data: true, // Include data field to check for isDemo flag
     },
   });
+
+  const tenantIds = tenantsRaw.map((tenant) => tenant.id);
+  const phoneOptions = tenantIds.length
+    ? await prisma.static_options.findMany({
+        where: {
+          tenant_id: { in: tenantIds },
+          option_name: 'store_phone',
+        },
+        select: {
+          tenant_id: true,
+          option_value: true,
+        },
+      })
+    : [];
+
+  const phoneByTenantId = new Map(
+    phoneOptions.map((item) => [item.tenant_id, item.option_value ?? null])
+  );
+
+  const tenants = tenantsRaw.map((tenant) => ({
+    ...tenant,
+    contact_phone: phoneByTenantId.get(tenant.id) ?? null,
+  }));
 
   return (
     <div>

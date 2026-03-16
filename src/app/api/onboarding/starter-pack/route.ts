@@ -379,15 +379,34 @@ function ensureStarterPackCompleteness(
   starterPack: z.infer<typeof generatedStarterPackSchema>,
   input: { niche: string; categoriesCount: number; productsCount: number }
 ): z.infer<typeof generatedStarterPackSchema> {
-  const categories =
-    starterPack.categories.length > 0
-      ? starterPack.categories.slice(0, input.categoriesCount)
-      : buildCategoryFallbacks(input.niche, input.categoriesCount);
+  const requestedCategoryCount = Math.max(1, input.categoriesCount);
+  const requestedProductCount = Math.max(1, input.productsCount);
 
-  const demoProducts =
-    starterPack.demoProducts.length > 0
-      ? starterPack.demoProducts.slice(0, input.productsCount)
-      : buildProductFallbacks(input.niche, categories, input.productsCount);
+  const normalizedCategories = starterPack.categories
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .slice(0, requestedCategoryCount);
+
+  const categoryFallbacks = buildCategoryFallbacks(input.niche, requestedCategoryCount);
+  const categories = [...normalizedCategories];
+  for (const fallbackCategory of categoryFallbacks) {
+    if (categories.length >= requestedCategoryCount) break;
+    if (categories.includes(fallbackCategory)) continue;
+    categories.push(fallbackCategory);
+  }
+
+  const normalizedProducts = starterPack.demoProducts
+    .filter((item) => item.name.trim().length > 0)
+    .slice(0, requestedProductCount);
+  const productFallbacks = buildProductFallbacks(input.niche, categories, requestedProductCount);
+  const demoProducts = [...normalizedProducts];
+  for (const fallbackProduct of productFallbacks) {
+    if (demoProducts.length >= requestedProductCount) break;
+    if (demoProducts.some((existing) => existing.name.trim().toLowerCase() === fallbackProduct.name.trim().toLowerCase())) {
+      continue;
+    }
+    demoProducts.push(fallbackProduct);
+  }
 
   return {
     ...starterPack,
@@ -442,6 +461,7 @@ async function loadStarterPackFromExistingBusiness(params: {
       );
       return {
         sourceTenantId: cachedPack.source_tenant_id || null,
+        sourceKind: 'cache' as const,
         starterPack: ensureStarterPackCompleteness(parsedCached, {
           niche: params.niche,
           categoriesCount: params.categoriesCount,
@@ -575,6 +595,7 @@ async function loadStarterPackFromExistingBusiness(params: {
 
   return {
     sourceTenantId: source.id,
+    sourceKind: 'tenant-match' as const,
     starterPack: parsed,
   };
 }
@@ -1054,8 +1075,14 @@ export async function POST(request: NextRequest) {
     let geminiAttemptedModels: string[] = [input.geminiModel];
     let reusedExistingBusiness = false;
     let reuseSourceTenantId: string | null = null;
+    let starterPackSource:
+      | 'cache'
+      | 'tenant-match'
+      | 'generated'
+      | 'provided-result'
+      | 'none' = 'none';
 
-    if (input.includeGeminiCall && !shouldCallExternalApis) {
+    if (input.includeGeminiCall && !input.forceExternalGeneration) {
       const reused = await loadStarterPackFromExistingBusiness({
         sellingInput: niche,
         sellingKey: normalizeSellingKey(niche),
@@ -1072,6 +1099,8 @@ export async function POST(request: NextRequest) {
         parsedStarterPack = reused.starterPack;
         reusedExistingBusiness = true;
         reuseSourceTenantId = reused.sourceTenantId;
+        starterPackSource = reused.sourceKind;
+        shouldCallExternalApisEffective = false;
         geminiRaw = {
           source: 'existing_business_match',
           sourceTenantId: reused.sourceTenantId,
@@ -1153,6 +1182,7 @@ export async function POST(request: NextRequest) {
         categoriesCount: input.categoriesCount,
         productsCount: input.productsCount,
       });
+      starterPackSource = 'generated';
       geminiDurationMs = Date.now() - geminiStartedAt;
       console.log('[StarterPack][Trace] Gemini generation completed', {
         traceId,
@@ -1181,6 +1211,7 @@ export async function POST(request: NextRequest) {
         categoriesCount: input.categoriesCount,
         productsCount: input.productsCount,
       });
+      starterPackSource = 'provided-result';
       console.log('[StarterPack][Trace] Used provided geminiResult payload', { traceId });
     } else {
       console.log('[StarterPack][Trace] Gemini generation skipped', {
@@ -1296,6 +1327,7 @@ export async function POST(request: NextRequest) {
           nanoBananaMs: nanoBananaExecution?.durationMs ?? null,
         },
         niche,
+        starterPackSource,
         sellingPrecheck: {
           enabled: input.checkSellingExists,
           ...(sellingPrecheck ?? {
@@ -1366,6 +1398,7 @@ export async function POST(request: NextRequest) {
           rawResponse: geminiRaw,
           skippedBySellingCheck: input.includeGeminiCall && !shouldCallExternalApisEffective,
           reusedExistingBusiness,
+          source: starterPackSource,
         },
         nanoBanana: {
           endpointContract: {

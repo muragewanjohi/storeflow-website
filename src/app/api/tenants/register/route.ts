@@ -1365,12 +1365,17 @@ export async function POST(request: NextRequest) {
     if (starterPackPayload && validatedData.includeDemoContent && finalSelling) {
       const hasCategories = Array.isArray(starterPackPayload.categories) && starterPackPayload.categories.length > 0;
       const hasProducts = Array.isArray(starterPackPayload.demoProducts) && starterPackPayload.demoProducts.length > 0;
-      if (!hasCategories || !hasProducts) {
+      const hasSalesPromotions =
+        Array.isArray(starterPackPayload.salesPromotions) && starterPackPayload.salesPromotions.length > 0;
+      if (!hasCategories || !hasProducts || !hasSalesPromotions) {
         const fallbackPack = buildSellingFallbackStarterPack(finalSelling);
         starterPackPayload = {
           ...starterPackPayload,
           categories: hasCategories ? starterPackPayload.categories : fallbackPack.categories,
           demoProducts: hasProducts ? starterPackPayload.demoProducts : fallbackPack.demoProducts,
+          salesPromotions: hasSalesPromotions
+            ? starterPackPayload.salesPromotions
+            : fallbackPack.salesPromotions,
         };
         console.log('[Registration] Starter-pack payload was partial; merged selling-based fallback catalog', {
           traceId: registrationTraceId,
@@ -2151,12 +2156,18 @@ export async function POST(request: NextRequest) {
                     const hasProducts =
                       Array.isArray(backgroundStarterPackPayload.demoProducts) &&
                       backgroundStarterPackPayload.demoProducts.length > 0;
-                    if (!hasCategories || !hasProducts) {
+                    const hasSalesPromotions =
+                      Array.isArray(backgroundStarterPackPayload.salesPromotions) &&
+                      backgroundStarterPackPayload.salesPromotions.length > 0;
+                    if (!hasCategories || !hasProducts || !hasSalesPromotions) {
                       const fallbackPack = buildSellingFallbackStarterPack(finalSelling);
                       backgroundStarterPackPayload = {
                         ...backgroundStarterPackPayload,
                         categories: hasCategories ? backgroundStarterPackPayload.categories : fallbackPack.categories,
                         demoProducts: hasProducts ? backgroundStarterPackPayload.demoProducts : fallbackPack.demoProducts,
+                        salesPromotions: hasSalesPromotions
+                          ? backgroundStarterPackPayload.salesPromotions
+                          : fallbackPack.salesPromotions,
                       };
                     }
                   }
