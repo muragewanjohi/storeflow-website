@@ -10,6 +10,10 @@ import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getStaticOptions, setStaticOption } from '@/lib/settings/static-options';
+import {
+  buildGettingStartedProgress,
+  GETTING_STARTED_OPTION_NAMES,
+} from '@/lib/onboarding/getting-started-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,149 +43,89 @@ export async function GET() {
       prisma.delivery_zones.count({
         where: { tenant_id: tenant.id, is_active: true },
       }),
-      getStaticOptions(tenant.id, [
-        'getting_started_shared_link',
-        'store_phone',
-        'store_logo',
-        'shipping_enabled',
-        'shipping_method_type',
-        'flat_rate_amount',
-        'currency_code',
-        'payment_cash_enabled',
-        'payment_mpesa_enabled',
-        'payment_mpesa_send_money_number',
-        'payment_mpesa_buy_goods_till',
-        'payment_mpesa_paybill_number',
-        'payment_mpesa_paybill_account',
-      ]),
+      getStaticOptions(tenant.id, [...GETTING_STARTED_OPTION_NAMES]),
     ]);
 
-    const hasLogo = !!(
-      settings.store_logo &&
-      String(settings.store_logo).trim().length > 0
+    const progress = buildGettingStartedProgress({
+      productCount,
+      deliveryZoneCount,
+      settings,
+    });
+    const completionById = new Map(
+      progress.items.map((item) => [item.id, item.completed] as const),
     );
-    const hasContactPhone = !!(
-      settings.store_phone &&
-      String(settings.store_phone).trim().length > 0
-    );
-
-    const flatRateSet =
-      settings.flat_rate_amount != null &&
-      settings.flat_rate_amount !== '' &&
-      !isNaN(parseFloat(String(settings.flat_rate_amount)));
-    const hasShipping =
-      settings.shipping_enabled === 'true' &&
-      (settings.shipping_method_type === 'delivery_zones'
-        ? deliveryZoneCount > 0
-        : flatRateSet);
-
-    const hasPayment =
-      settings.payment_cash_enabled === 'true' ||
-      (settings.payment_mpesa_enabled === 'true' &&
-        (!!(
-          settings.payment_mpesa_send_money_number &&
-          String(settings.payment_mpesa_send_money_number).trim()
-        ) ||
-          !!(
-            settings.payment_mpesa_buy_goods_till &&
-            String(settings.payment_mpesa_buy_goods_till).trim()
-          ) ||
-          !!(
-            settings.payment_mpesa_paybill_number &&
-            String(settings.payment_mpesa_paybill_number).trim()
-          )));
-
-    const hasCurrency = !!(
-      settings.currency_code && String(settings.currency_code).trim()
-    );
-    const tenantData =
-      tenant.data && typeof tenant.data === 'object' && !Array.isArray(tenant.data)
-        ? (tenant.data as Record<string, unknown>)
-        : {};
-    const hasSellingProfile =
-      typeof tenantData.selling === 'string' && tenantData.selling.trim().length > 0;
-
     const items: GettingStartedItem[] = [
       {
         id: 'product',
         label: 'Add your first product',
         description: 'Create a product so customers can start buying',
-        completed: productCount > 0,
+        completed: completionById.get('product') ?? false,
         href: '/dashboard/products/new',
         cta: 'Add product',
         priority: 1,
       },
       {
-        id: 'contact_phone',
-        label: 'Add contact phone number',
-        description: 'Add a phone number so customers and your landlord can reach you',
-        completed: hasContactPhone,
-        href: '/dashboard/settings',
-        cta: 'Add phone',
+        id: 'preview',
+        label: 'Preview your store 👀',
+        description: 'Open your storefront in a new tab and confirm it looks right',
+        completed: completionById.get('preview') ?? false,
+        href: storeUrl,
+        cta: 'Preview store',
         priority: 2,
       },
       {
-        id: 'selling_profile',
-        label: 'Tell us what you are selling',
-        description: 'Help us personalize your setup and recommendations',
-        completed: hasSellingProfile,
-        href: '/dashboard/settings',
-        cta: 'Update profile',
+        id: 'share',
+        label: 'Share your store 🔗',
+        description: 'Copy and share your store URL with customers',
+        completed: completionById.get('share') ?? false,
+        href: storeUrl,
+        cta: 'Copy link',
         priority: 3,
       },
       {
-        id: 'delivery',
-        label: 'Configure delivery & shipping',
-        description: 'Set up flat rate or delivery zones for orders',
-        completed: hasShipping,
-        href:
-          settings.shipping_method_type === 'delivery_zones'
-            ? '/dashboard/settings/delivery-zones'
-            : '/dashboard/settings',
-        cta: 'Configure shipping',
-        priority: 5,
-      },
-      {
-        id: 'logo',
-        label: 'Add your store logo',
-        description: 'Brand your storefront with a logo',
-        completed: hasLogo,
+        id: 'contact_phone',
+        label: 'Get order alerts via SMS',
+        description: 'Add your phone number so you never miss a customer order',
+        completed: completionById.get('contact_phone') ?? false,
         href: '/dashboard/settings',
-        cta: 'Add logo',
-        priority: 6,
+        cta: 'Add phone',
+        priority: 4,
       },
       {
         id: 'payment',
         label: 'Set up checkout preferences',
         description: 'Enable Cash, M-Pesa, or other payment methods',
-        completed: hasPayment,
+        completed: completionById.get('payment') ?? false,
         href: '/dashboard/settings',
         cta: 'Set up payments',
-        priority: 4,
+        priority: 5,
       },
       {
-        id: 'currency',
-        label: 'Set your store currency',
-        description: 'Choose the currency for your prices',
-        completed: hasCurrency,
+        id: 'delivery',
+        label: 'Configure delivery & shipping',
+        description: 'Set up flat rate or delivery zones for orders',
+        completed: completionById.get('delivery') ?? false,
+        href:
+          settings.shipping_method_type === 'delivery_zones'
+            ? '/dashboard/settings/delivery-zones'
+            : '/dashboard/settings',
+        cta: 'Configure shipping',
+        priority: 6,
+      },
+      {
+        id: 'logo',
+        label: 'Add your store logo',
+        description: 'Brand your storefront with a logo',
+        completed: completionById.get('logo') ?? false,
         href: '/dashboard/settings',
-        cta: 'Set currency',
+        cta: 'Add logo',
         priority: 7,
-      },
-      {
-        id: 'share',
-        label: 'Share your store link',
-        description: 'Copy and share your store URL with customers',
-        completed: settings.getting_started_shared_link === 'true',
-        href: storeUrl,
-        cta: 'Copy link',
-        priority: 8,
       },
     ];
 
-    const completedCount = items.filter((i) => i.completed).length;
-    const totalCount = items.length;
-    const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+    const completedCount = progress.completedCount;
+    const totalCount = progress.totalCount;
+    const progressPercent = progress.progressPercent;
     const allComplete = completedCount === totalCount;
     const nextSteps = items
       .filter((item) => !item.completed)
@@ -213,7 +157,7 @@ export async function GET() {
 
 /**
  * POST /api/dashboard/getting-started
- * Mark a checklist item as done (e.g. after copying store link)
+ * Mark a checklist item as done
  */
 export async function POST(request: NextRequest) {
   try {
@@ -226,6 +170,10 @@ export async function POST(request: NextRequest) {
     if (action === 'share_done') {
       await setStaticOption(tenant.id, 'getting_started_shared_link', 'true');
       return NextResponse.json({ success: true, data: { shared: true } });
+    }
+    if (action === 'preview_done') {
+      await setStaticOption(tenant.id, 'getting_started_previewed_store', 'true');
+      return NextResponse.json({ success: true, data: { previewed: true } });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 // Note: Alert component may need to be created if it doesn't exist
 // For now, using inline divs for alerts
 import { 
@@ -71,14 +72,35 @@ interface PricePlan {
   features: any;
 }
 
+interface OnboardingJourneyItem {
+  id: string;
+  label: string;
+  description: string;
+  completed: boolean;
+}
+
+interface OnboardingJourney {
+  items: OnboardingJourneyItem[];
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+}
+
 interface TenantSettingsClientProps {
   tenant: Tenant;
   pricePlans: PricePlan[];
   countries: Country[];
   contactPhone: string;
+  onboardingJourney: OnboardingJourney;
 }
 
-export default function TenantSettingsClient({ tenant, pricePlans, countries, contactPhone }: TenantSettingsClientProps) {
+export default function TenantSettingsClient({
+  tenant,
+  pricePlans,
+  countries,
+  contactPhone,
+  onboardingJourney,
+}: TenantSettingsClientProps) {
   const countryOptions = countries.length > 0 ? countries : FALLBACK_COUNTRIES;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -385,6 +407,9 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
     }
   };
 
+  const completedOnboardingItems = onboardingJourney.items.filter((item) => item.completed);
+  const incompleteOnboardingItems = onboardingJourney.items.filter((item) => !item.completed);
+
   return (
     <div className="space-y-6">
       {error && (
@@ -412,6 +437,68 @@ export default function TenantSettingsClient({ tenant, pricePlans, countries, co
         </TabsList>
 
         <TabsContent value="store-details" className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Onboarding Journey</CardTitle>
+          <CardDescription>
+            Setup completion for this tenant store
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-2xl font-bold">
+                {Math.round(onboardingJourney.progressPercent)}%
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {onboardingJourney.completedCount} of {onboardingJourney.totalCount} steps completed
+              </p>
+            </div>
+            <Badge variant={onboardingJourney.progressPercent >= 100 ? 'default' : 'secondary'}>
+              {onboardingJourney.progressPercent >= 100 ? 'Complete' : 'In progress'}
+            </Badge>
+          </div>
+          <Progress value={onboardingJourney.progressPercent} className="h-2" />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border p-4">
+              <h4 className="mb-3 text-sm font-semibold">Completed Steps</h4>
+              <div className="space-y-2">
+                {completedOnboardingItems.length > 0 ? (
+                  completedOnboardingItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2">
+                      <CheckCircleIcon className="mt-0.5 h-4 w-4 text-green-600" />
+                      <p className="text-sm">{item.label}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No completed steps yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <h4 className="mb-3 text-sm font-semibold">Incomplete Steps</h4>
+              <div className="space-y-2">
+                {incompleteOnboardingItems.length > 0 ? (
+                  incompleteOnboardingItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2">
+                      <XCircleIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">All onboarding steps are complete.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Basic Information */}
       <Card>
         <CardHeader>

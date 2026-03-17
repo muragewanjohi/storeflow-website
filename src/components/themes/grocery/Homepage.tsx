@@ -17,6 +17,7 @@ import GroceryProductGrid from './ProductGrid';
 import GroceryHero from './Hero';
 import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { getCategoryImageOrFallback } from '@/lib/images/fallbacks';
 
 interface GroceryHomepageProps {
   products?: DemoProduct[];
@@ -62,23 +63,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
 
   // Category images - prefer category.image from API, fallback to name-based lookup
   const getCategoryImage = (categoryName: string, categoryImage?: string) => {
-    // Use the image from the API data if available (fashion categories include their own images)
-    if (categoryImage) return categoryImage;
-
-    const name = categoryName.toLowerCase();
-    if (name.includes('meat') || name.includes('fresh')) {
-      return 'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=400&h=400&fit=crop';
-    } else if (name.includes('fruit')) {
-      return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop';
-    } else if (name.includes('vegetable')) {
-      return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop';
-    } else if (name.includes('spice')) {
-      return 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&h=400&fit=crop';
-    } else if (name.includes('bread')) {
-      return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop';
-    } else {
-      return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop';
-    }
+    return getCategoryImageOrFallback(categoryName, categoryImage);
   };
 
   return (
@@ -248,7 +233,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-6">
-              {categories.slice(0, 8).map((category: any) => {
+              {categories.slice(0, 8).map((category: any, index: number) => {
                 // Count items in this category (mock data for demo)
                 const itemCount = Math.floor(Math.random() * 5);
                 return (
@@ -269,6 +254,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                               fill
                               className="object-cover group-hover:scale-110 transition-transform duration-500"
                               sizes="96px"
+                              priority={index === 0}
                             />
                           </div>
                         </div>
@@ -289,6 +275,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                               fill
                               className="object-cover group-hover:scale-110 transition-transform duration-500"
                               sizes="96px"
+                              priority={index === 0}
                             />
                           </div>
                         </div>
@@ -320,6 +307,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                 fill
                 className="object-cover opacity-60"
                 sizes="(max-width: 768px) 100vw, 33vw"
+                priority
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">
@@ -359,6 +347,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                 fill
                 className="object-cover opacity-60 group-hover:scale-110 transition-transform duration-500"
                 sizes="(max-width: 768px) 100vw, 33vw"
+                priority
               />
               <div className="absolute inset-0 flex flex-col justify-center p-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-3">

@@ -18,6 +18,11 @@ import Link from 'next/link';
 import * as LucideIcons from 'lucide-react';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 import CountdownTimer from '@/components/storefront/countdown-timer';
+import {
+  getCategoryImageOrFallback,
+  getSaleImageOrFallback,
+  shouldUseUnoptimizedImage,
+} from '@/lib/images/fallbacks';
 
 interface SectionRendererProps {
   section: PageSection;
@@ -1054,16 +1059,7 @@ function CategoriesSectionComponent({
 
   // Helper to get category image or default
   const getCategoryImage = (category: Category) => {
-    if (category.image) return category.image;
-    const name = category.name.toLowerCase();
-    if (name.includes('meat') || name.includes('fresh')) {
-      return 'https://images.unsplash.com/photo-1603048297172-c92544798d5e?w=400&h=400&fit=crop';
-    } else if (name.includes('fruit')) {
-      return 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop';
-    } else if (name.includes('vegetable')) {
-      return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop';
-    }
-    return 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop';
+    return getCategoryImageOrFallback(category.name, category.image);
   };
 
   // Set CSS variables on section for better performance (section-specific naming)
@@ -1147,6 +1143,7 @@ function CategoriesSectionComponent({
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
                       sizes="96px"
+                      unoptimized={shouldUseUnoptimizedImage(getCategoryImage(category))}
                     />
                   </div>
                 </div>
@@ -1238,15 +1235,14 @@ function BannersSectionComponent({
                 className="relative rounded-lg overflow-hidden shadow-lg h-48 group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
                 style={bannerStyle}
               >
-                {banner.image && !banner.image.startsWith('blob:') && (
-                  <Image
-                    src={banner.image}
-                    alt={banner.title}
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                  />
-                )}
+                <Image
+                  src={getSaleImageOrFallback(banner.title, banner.image)}
+                  alt={banner.title}
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  unoptimized={shouldUseUnoptimizedImage(getSaleImageOrFallback(banner.title, banner.image))}
+                />
                 <div className="absolute inset-0 flex flex-col justify-center p-6">
                   {banner.subtitle && (
                     <p 
@@ -1643,15 +1639,16 @@ function SalesTabSectionComponent({
                 </h3>
               </div>
             )}
-            {section.banner_style !== 'none' && block.sale.banner_image && (
+            {section.banner_style !== 'none' && (
               <div className={`${containerClass} mb-6`} style={containerStyle}>
                 <div className="relative aspect-[21/9] overflow-hidden rounded-lg">
                   <Image
-                    src={block.sale.banner_image}
+                    src={getSaleImageOrFallback(block.sale.name, block.sale.banner_image)}
                     alt={block.sale.name}
                     fill
                     className="object-cover"
                     sizes="(max-width: 1200px) 100vw, 1200px"
+                    unoptimized={shouldUseUnoptimizedImage(getSaleImageOrFallback(block.sale.name, block.sale.banner_image))}
                   />
                 </div>
               </div>
@@ -1679,15 +1676,16 @@ function SalesTabSectionComponent({
           const block = saleBlocks[0];
           return (
             <>
-              {section.banner_style !== 'none' && block.sale.banner_image && (
+              {section.banner_style !== 'none' && (
                 <div className={`${containerClass} mb-8`} style={containerStyle}>
                   <div className="relative aspect-[21/9] overflow-hidden rounded-lg">
                     <Image
-                      src={block.sale.banner_image}
+                      src={getSaleImageOrFallback(block.sale.name, block.sale.banner_image)}
                       alt={block.sale.name}
                       fill
                       className="object-cover"
                       sizes="(max-width: 1200px) 100vw, 1200px"
+                      unoptimized={shouldUseUnoptimizedImage(getSaleImageOrFallback(block.sale.name, block.sale.banner_image))}
                     />
                   </div>
                 </div>

@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useCurrency } from '@/lib/currency/currency-context';
 import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
+import { generateSaleSlug } from '@/lib/sales/validation';
 import { toast } from 'sonner';
 
 interface Sale {
@@ -426,10 +427,16 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+                    onBlur={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        slug: generateSaleSlug(e.target.value),
+                      }))
+                    }
                     placeholder="black-friday-2024"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave empty to auto-generate from name
+                    Letters, numbers, and hyphens only. Leave empty to auto-generate from name.
                   </p>
                 </div>
 

@@ -11,6 +11,10 @@ import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server'
 import { prisma } from '@/lib/prisma/client';
 import TenantSettingsClient from './tenant-settings-client';
 import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import {
+  buildGettingStartedProgress,
+  GETTING_STARTED_OPTION_NAMES,
+} from '@/lib/onboarding/getting-started-progress';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -41,16 +45,44 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     redirect('/admin/tenants');
   }
 
-  const contactPhoneOption = await prisma.static_options.findUnique({
-    where: {
-      tenant_id_option_name: {
+  const [productCount, deliveryZoneCount, onboardingSettingsRaw] = await Promise.all([
+    prisma.products.count({
+      where: {
         tenant_id: tenant.id,
-        option_name: 'store_phone',
+        status: 'active',
+        created_by: { not: null },
       },
+    }),
+    prisma.delivery_zones.count({
+      where: {
+        tenant_id: tenant.id,
+        is_active: true,
+      },
+    }),
+    prisma.static_options.findMany({
+      where: {
+        tenant_id: tenant.id,
+        option_name: { in: [...GETTING_STARTED_OPTION_NAMES] },
+      },
+      select: {
+        option_name: true,
+        option_value: true,
+      },
+    }),
+  ]);
+
+  const onboardingSettings = onboardingSettingsRaw.reduce<Record<string, string | null>>(
+    (acc, item) => {
+      acc[item.option_name] = item.option_value ?? null;
+      return acc;
     },
-    select: {
-      option_value: true,
-    },
+    {},
+  );
+
+  const onboardingJourney = buildGettingStartedProgress({
+    productCount,
+    deliveryZoneCount,
+    settings: onboardingSettings,
   });
 
   // Include data field for reminder tracking
@@ -133,7 +165,8 @@ export default async function TenantSettingsPage({ params }: PageProps) {
         tenant={tenantData as any}
         pricePlans={pricePlans}
         countries={countries}
-        contactPhone={contactPhoneOption?.option_value || ''}
+        contactPhone={onboardingSettings.store_phone || ''}
+        onboardingJourney={onboardingJourney}
       />
     </div>
   );

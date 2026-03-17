@@ -127,6 +127,69 @@ function normalizeThemeColorKey(rawKey: string): string {
   return mapping[key] || rawKey;
 }
 
+function getThemeHexMapFromConfig(
+  themeConfig: Record<string, { hex: string; description: string }> | undefined
+): Record<string, string> {
+  if (!themeConfig) return {};
+  return Object.entries(themeConfig).reduce<Record<string, string>>((acc, [key, value]) => {
+    const normalizedKey = normalizeThemeColorKey(key);
+    const normalizedHex = normalizeHexColor(value?.hex);
+    if (normalizedHex) {
+      acc[normalizedKey] = normalizedHex.toUpperCase();
+    }
+    return acc;
+  }, {});
+}
+
+function getThemeHexMapFromSettings(
+  themeColorSettings: ReturnType<typeof getThemeColorSettingsWithDefaults>
+): Record<string, string> {
+  return themeColorSettings.reduce<Record<string, string>>((acc, item) => {
+    const normalizedHex = normalizeHexColor(item.defaultHex);
+    if (normalizedHex) {
+      acc[item.key] = normalizedHex.toUpperCase();
+    }
+    return acc;
+  }, {});
+}
+
+function hasThemeVariationFromDefaults(
+  themeConfig: Record<string, { hex: string; description: string }> | undefined,
+  themeColorSettings: ReturnType<typeof getThemeColorSettingsWithDefaults>
+): boolean {
+  const configHexes = getThemeHexMapFromConfig(themeConfig);
+  const defaultHexes = getThemeHexMapFromSettings(themeColorSettings);
+  const keysToCompare = ['primary', 'secondary', 'accent', 'buttonBackground'];
+
+  if (Object.keys(configHexes).length === 0) return false;
+
+  return keysToCompare.some((key) => {
+    const configHex = configHexes[key];
+    const defaultHex = defaultHexes[key];
+    return Boolean(configHex && defaultHex && configHex !== defaultHex);
+  });
+}
+
+function buildThemeOnlyPrompt(input: {
+  businessType: string;
+  niche: string;
+  themeColorSettings: ReturnType<typeof getThemeColorSettingsWithDefaults>;
+}) {
+  const settingsLines = input.themeColorSettings
+    .map((item) => `- ${item.key}: ${item.defaultHex} (${item.description})`)
+    .join('\n');
+
+  return [
+    `Generate ONLY "themeConfig" JSON for business type "${input.businessType}" and niche "${input.niche}".`,
+    'Return exactly: { "themeConfig": { "<key>": { "hex": "#RRGGBB", "description": "..." } } }',
+    'Include all required keys: primary, secondary, accent, background, text, muted, buttonBackground, buttonText.',
+    'Create a niche-specific palette. Do NOT simply copy all provided default hex values.',
+    'Maintain good contrast and readable ecommerce UI.',
+    'Use these existing theme key descriptions:',
+    settingsLines,
+  ].join('\n');
+}
+
 function normalizeGeneratedStarterPack(
   raw: unknown,
   input: { niche: string; categoriesCount: number; productsCount: number; blogPostsCount: number }
@@ -1182,6 +1245,63 @@ export async function POST(request: NextRequest) {
         categoriesCount: input.categoriesCount,
         productsCount: input.productsCount,
       });
+
+      if (!hasThemeVariationFromDefaults(parsedStarterPack.themeConfig, themeColorSettings)) {
+        console.warn('[StarterPack][Trace] Gemini returned default-like theme colors; attempting theme-only retry', {
+          traceId,
+          model: geminiUsedModel,
+        });
+        try {
+          const retryPrompt = buildThemeOnlyPrompt({
+            businessType: input.businessType,
+            niche,
+            themeColorSettings,
+          });
+          const themeRetry = await executeGeminiJsonWithFallback({
+            apiKey: geminiApiKey,
+            preferredModel: geminiUsedModel,
+            systemInstruction:
+              'You are a UI theming assistant. Return ONLY valid JSON with no markdown and no extra prose.',
+            userPrompt: retryPrompt,
+          });
+
+          const normalizedThemeRetry = normalizeGeneratedStarterPack(themeRetry.raw, {
+            niche,
+            categoriesCount: input.categoriesCount,
+            productsCount: input.productsCount,
+            blogPostsCount: input.blogPostsCount,
+          });
+
+          if (
+            normalizedThemeRetry.themeConfig &&
+            hasThemeVariationFromDefaults(normalizedThemeRetry.themeConfig, themeColorSettings)
+          ) {
+            parsedStarterPack = {
+              ...parsedStarterPack,
+              themeConfig: normalizedThemeRetry.themeConfig,
+            };
+            geminiUsedModel = themeRetry.usedModel;
+            geminiAttemptedModels = Array.from(
+              new Set([...geminiAttemptedModels, ...themeRetry.attemptedModels]),
+            );
+            console.log('[StarterPack][Trace] Theme-only retry produced niche-specific colors', {
+              traceId,
+              model: themeRetry.usedModel,
+              keys: Object.keys(normalizedThemeRetry.themeConfig),
+            });
+          } else {
+            console.warn('[StarterPack][Trace] Theme-only retry still matched defaults; keeping original themeConfig', {
+              traceId,
+            });
+          }
+        } catch (themeRetryError) {
+          console.warn('[StarterPack][Trace] Theme-only retry failed; keeping original themeConfig', {
+            traceId,
+            error: themeRetryError instanceof Error ? themeRetryError.message : 'Unknown error',
+          });
+        }
+      }
+
       starterPackSource = 'generated';
       geminiDurationMs = Date.now() - geminiStartedAt;
       console.log('[StarterPack][Trace] Gemini generation completed', {
@@ -1191,6 +1311,10 @@ export async function POST(request: NextRequest) {
         attemptedModels: geminiAttemptedModels,
         themeConfigKeys: Object.keys(parsedStarterPack.themeConfig ?? {}),
         themeConfigCount: Object.keys(parsedStarterPack.themeConfig ?? {}).length,
+        themeConfigVariesFromDefaults: hasThemeVariationFromDefaults(
+          parsedStarterPack.themeConfig,
+          themeColorSettings
+        ),
         categories: parsedStarterPack.categories.length,
         products: parsedStarterPack.demoProducts.length,
         salesPromotions: parsedStarterPack.salesPromotions.length,

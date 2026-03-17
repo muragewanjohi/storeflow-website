@@ -19,6 +19,7 @@ import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { toast } from 'sonner';
 import RatingDisplay from '@/components/storefront/rating-display';
+import { getProductImageOrFallback } from '@/lib/images/fallbacks';
 
 interface Product {
   id: string;
@@ -36,15 +37,17 @@ interface Product {
 interface ModernProductCardProps {
   product: Product;
   className?: string;
+  imagePriority?: boolean;
 }
 
-export default function ModernProductCard({ product, className }: ModernProductCardProps) {
+export default function ModernProductCard({ product, className, imagePriority = false }: ModernProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const { formatCurrency, currency } = useCurrency();
   const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const productImage = getProductImageOrFallback(product.name, product.image);
   
   // Format currency with space between symbol and amount
   const formatCurrencyWithSpace = (amount: number): string => {
@@ -142,18 +145,13 @@ export default function ModernProductCard({ product, className }: ModernProductC
             }}
           >
             <div className="relative aspect-square bg-muted overflow-hidden">
-              {product.image ? (
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📱</span>
-                </div>
-              )}
+              <img
+                src={productImage}
+                alt={product.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading={imagePriority ? 'eager' : 'lazy'}
+                fetchPriority={imagePriority ? 'high' : 'auto'}
+              />
               {isOnSale && (
                 <Badge className="absolute top-2 left-2 z-10" variant="destructive">
                   Sale
@@ -169,28 +167,24 @@ export default function ModernProductCard({ product, className }: ModernProductC
         ) : (
           <Link href={`/products/${product.slug || product.id}`}>
             <div className="relative aspect-square bg-muted overflow-hidden">
-              {product.image ? (
-                product.image.startsWith('http') || product.image.includes('unsplash.com') ? (
+              {productImage.startsWith('http') || productImage.includes('unsplash.com') ? (
                   <img
-                    src={product.image}
+                    src={productImage}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
+                    loading={imagePriority ? 'eager' : 'lazy'}
+                    fetchPriority={imagePriority ? 'high' : 'auto'}
                   />
                 ) : (
                   <Image
-                    src={product.image}
+                    src={productImage}
                     alt={product.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={imagePriority}
                   />
-                )
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📱</span>
-                </div>
-              )}
+                )}
               {isOnSale && (
                 <Badge className="absolute top-2 left-2 z-10" variant="destructive">
                   Sale

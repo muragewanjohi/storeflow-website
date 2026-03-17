@@ -18,6 +18,27 @@ const nextConfig: NextConfig = {
   // Optimize images - critical for performance (Amazon/Shopify use CDN + optimization)
   images: {
     remotePatterns: [
+      // Storefront/domain-hosted assets (tenant subdomains and CDN paths)
+      {
+        protocol: 'https',
+        hostname: 'dukanest.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.dukanest.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dukanest.co.ke',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.dukanest.co.ke',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: '*.supabase.co',

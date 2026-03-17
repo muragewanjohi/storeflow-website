@@ -1,6 +1,31 @@
 {
-  "version": "0.1.8",
+  "version": "0.1.9",
   "entries": [
+    {
+      "version": "0.1.9",
+      "date": "2026-03-16",
+      "features": [
+        "Onboarding starter-pack generation now prefers existing packs by selling/business match before creating a new one, with clearer response/source tracing for cache vs tenant-match vs generated",
+        "Starter-pack completeness checks now top up missing categories, products, and sales promotions from selling-based fallbacks to prevent partial onboarding payloads",
+        "Landlord tenants table enhancements: added Phone column, added Onboarding completion percentage column with progress bar, and included onboarding progress data for each tenant",
+        "Landlord tenant details now include an Onboarding Journey card showing overall completion plus completed and incomplete setup steps",
+        "Landlord tenants table actions simplified by removing Delete action from table rows and removing the Custom Domain column",
+        "Getting Started checklist redesigned to a 7-step flow: Add first product, Preview store, Share store, Get order alerts via SMS, Set payments, Configure shipping, Add logo",
+        "Getting Started now includes a new 'Preview your store' step that opens storefront in a new tab and tracks completion",
+        "Getting Started copy improvements: contact-phone step rewritten to SMS-alert messaging and inline help added under first product step ('Takes 2 minutes')",
+        "Storefront image reliability improvements: added neutral placeholder assets for products/categories/sales and fallback helpers to avoid unrelated random images",
+        "Image delivery hardening: added conditional unoptimized handling for Supabase public storage URLs to avoid Next.js image optimizer timeouts, plus expanded allowed image domains",
+        "AI-driven theming improvements: tenant registration now prioritizes starter-pack themeConfig colors (AI or cached-by-selling) over local business-type color defaults",
+        "Starter-pack generation now retries theme-only color generation when Gemini returns default-like palette values, reducing generic green/orange carryover for new niches"
+      ],
+      "bugfixes": [
+        "Fixed missing/invalid storefront images by adding stable placeholders and bypassing optimization for slow upstream Supabase image responses",
+        "Fixed LCP image warnings by prioritizing first meaningful product/category/banner images in storefront listing and homepage contexts",
+        "Fixed TypeScript narrowing issues in starter-pack image repair route for Prisma JsonValue handling",
+        "Fixed sales URL breakage when slug contains special characters by enforcing slug sanitization on sale create/update APIs and auto-cleaning slug input in sale form",
+        "Fixed occasional malformed starter-pack theme behavior by validating useful theme variation against defaults before caching/applying generated colors"
+      ]
+    },
     {
       "version": "0.1.8",
       "date": "2026-03-06",

@@ -23,7 +23,7 @@ import {
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
 } from '@/lib/themes/homepage-templates';
-import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
+import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
 import { generateSlug } from '@/lib/content/validation';
@@ -295,6 +295,21 @@ function extractStarterPackPayload(jobResult: unknown): StarterPackPayload | nul
     salesPromotions,
     blogPosts,
   };
+}
+
+function extractThemeColorsFromStarterPack(
+  starterPack: StarterPackPayload | null | undefined,
+): Record<string, string> {
+  if (!starterPack?.themeConfig) {
+    return {};
+  }
+
+  return Object.entries(starterPack.themeConfig).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (value?.hex && typeof value.hex === 'string') {
+      acc[key] = value.hex;
+    }
+    return acc;
+  }, {});
 }
 
 async function getUniqueProductSlug(tenantId: string, name: string): Promise<string> {
@@ -1574,17 +1589,14 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Registration] Found theme: ${theme.slug} (${theme.title})`);
 
-        // Get theme defaults
+        // Start from theme defaults, then prioritize starter-pack theme colors
+        // (AI-generated or reused from existing selling starter packs).
         const themeDefaults = getThemeDefaults(theme.slug);
-        
-        // Get business type color scheme if provided
-        let finalColors = themeDefaults?.colors || {};
-        if (validatedData.businessType) {
-          const businessColors = getBusinessTypeColorScheme(validatedData.businessType);
-          if (businessColors) {
-            finalColors = { ...finalColors, ...businessColors };
-          }
-        }
+        const starterPackThemeColors = extractThemeColorsFromStarterPack(starterPackPayload);
+        const finalColors = {
+          ...(themeDefaults?.colors || {}),
+          ...starterPackThemeColors,
+        };
 
         // Create tenant theme
         try {
@@ -1597,7 +1609,10 @@ export async function POST(request: NextRequest) {
               custom_fonts: themeDefaults?.fonts || {},
             },
           });
-          console.log(`[Registration] ✅ Created tenant theme for ${theme.slug}`);
+          console.log(`[Registration] ✅ Created tenant theme for ${theme.slug}`, {
+            starterPackThemeColorKeys: Object.keys(starterPackThemeColors),
+            usedStarterPackThemeColors: Object.keys(starterPackThemeColors).length > 0,
+          });
         } catch (themeCreateError: any) {
           console.error(`[Registration] ❌ Failed to create tenant theme:`, themeCreateError);
           throw themeCreateError;

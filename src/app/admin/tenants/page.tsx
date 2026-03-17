@@ -8,6 +8,10 @@ import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import TenantsListClient from './tenants-list-client';
+import {
+  buildGettingStartedProgress,
+  GETTING_STARTED_OPTION_NAMES,
+} from '@/lib/onboarding/getting-started-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,26 +37,66 @@ export default async function TenantsPage() {
   });
 
   const tenantIds = tenantsRaw.map((tenant) => tenant.id);
-  const phoneOptions = tenantIds.length
+  const allSettings = tenantIds.length
     ? await prisma.static_options.findMany({
         where: {
           tenant_id: { in: tenantIds },
-          option_name: 'store_phone',
+          option_name: { in: [...GETTING_STARTED_OPTION_NAMES] },
         },
         select: {
           tenant_id: true,
+          option_name: true,
           option_value: true,
         },
       })
     : [];
 
-  const phoneByTenantId = new Map(
-    phoneOptions.map((item) => [item.tenant_id, item.option_value ?? null])
+  const productCountsRaw = tenantIds.length
+    ? await prisma.products.groupBy({
+        by: ['tenant_id'],
+        where: {
+          tenant_id: { in: tenantIds },
+          status: 'active',
+          created_by: { not: null },
+        },
+        _count: { _all: true },
+      })
+    : [];
+
+  const deliveryZoneCountsRaw = tenantIds.length
+    ? await prisma.delivery_zones.groupBy({
+        by: ['tenant_id'],
+        where: {
+          tenant_id: { in: tenantIds },
+          is_active: true,
+        },
+        _count: { _all: true },
+      })
+    : [];
+
+  const settingsByTenantId = new Map<string, Record<string, string | null>>();
+  for (const item of allSettings) {
+    const current = settingsByTenantId.get(item.tenant_id) ?? {};
+    current[item.option_name] = item.option_value ?? null;
+    settingsByTenantId.set(item.tenant_id, current);
+  }
+
+  const productCountByTenantId = new Map(
+    productCountsRaw.map((item) => [item.tenant_id, item._count._all] as const),
+  );
+
+  const deliveryZoneCountByTenantId = new Map(
+    deliveryZoneCountsRaw.map((item) => [item.tenant_id, item._count._all] as const),
   );
 
   const tenants = tenantsRaw.map((tenant) => ({
     ...tenant,
-    contact_phone: phoneByTenantId.get(tenant.id) ?? null,
+    contact_phone: settingsByTenantId.get(tenant.id)?.store_phone ?? null,
+    onboarding_progress_percent: buildGettingStartedProgress({
+      productCount: productCountByTenantId.get(tenant.id) ?? 0,
+      deliveryZoneCount: deliveryZoneCountByTenantId.get(tenant.id) ?? 0,
+      settings: settingsByTenantId.get(tenant.id) ?? {},
+    }).progressPercent,
   }));
 
   return (

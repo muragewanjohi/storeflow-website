@@ -687,8 +687,12 @@ function ProductsListingClient({
         <div className="relative">
           <div className="opacity-50 pointer-events-none">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {products.map((product: any) => (
-                <ThemeProductCard key={product.id} product={product} />
+              {products.map((product: any, index: number) => (
+                <ThemeProductCard
+                  key={product.id}
+                  product={product}
+                  imagePriority={index < 4}
+                />
               ))}
             </div>
           </div>
@@ -698,12 +702,13 @@ function ProductsListingClient({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-          {products.map((product: any) => {
+          {products.map((product: any, index: number) => {
             try {
               return (
                 <ThemeProductCard
                   key={product.id}
                   product={product}
+                  imagePriority={index < 4}
                 />
               );
             } catch (error) {

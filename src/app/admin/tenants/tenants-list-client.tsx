@@ -23,15 +23,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { PlusIcon, PencilIcon, TrashIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, ArrowPathIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { Progress } from '@/components/ui/progress';
+import { PlusIcon, PencilIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, ArrowPathIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 
 interface Tenant {
   id: string;
   name: string;
   subdomain: string;
-  custom_domain: string | null;
   contact_phone: string | null;
+  onboarding_progress_percent: number;
   status: string | null;
   created_at: Date | null;
   expire_date: Date | null;
@@ -44,7 +45,6 @@ interface TenantsListClientProps {
 
 export default function TenantsListClient({ tenants }: Readonly<TenantsListClientProps>) {
   const router = useRouter();
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,31 +143,6 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
     }
   };
 
-  const handleDelete = async (tenantId: string) => {
-    if (!confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
-      return;
-    }
-
-    setIsDeleting(tenantId);
-    try {
-      const response = await fetch(`/api/admin/tenants/${tenantId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        router.refresh();
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to delete tenant');
-        setIsDeleting(null);
-      }
-    } catch (error) {
-      console.error('Error deleting tenant:', error);
-      alert('An error occurred while deleting the tenant');
-      setIsDeleting(null);
-    }
-  };
-
   // Separate demo stores and regular tenants
   const demoStores = useMemo(() => {
     return tenants.filter((tenant) => isDemoStore(tenant));
@@ -193,20 +168,18 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
       filtered = filtered.filter((tenant) => tenant.status === statusFilter);
     }
 
-    // Filter by search query (name, subdomain, custom_domain)
+    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((tenant) => {
         const name = tenant.name?.toLowerCase() || '';
         const subdomain = tenant.subdomain?.toLowerCase() || '';
-        const customDomain = tenant.custom_domain?.toLowerCase() || '';
         const contactPhone = tenant.contact_phone?.toLowerCase() || '';
         const businessType = getBusinessType(tenant).toLowerCase();
         const selling = getSelling(tenant).toLowerCase();
         return (
           name.includes(query) ||
           subdomain.includes(query) ||
-          customDomain.includes(query) ||
           contactPhone.includes(query) ||
           businessType.includes(query) ||
           selling.includes(query)
@@ -347,7 +320,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, subdomain, or custom domain..."
+                  placeholder="Search by name, subdomain, phone, or business type..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -416,7 +389,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                     <TableHead>Name</TableHead>
                     <TableHead>Subdomain</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Custom Domain</TableHead>
+                    <TableHead>Onboarding</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
@@ -449,13 +422,18 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         )}
                       </TableCell>
                       <TableCell>
-                        {tenant.custom_domain ? (
-                          <code className="text-sm bg-muted px-2 py-1 rounded">
-                            {tenant.custom_domain}
-                          </code>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <div className="min-w-[140px] space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="font-medium">
+                              {Math.round(tenant.onboarding_progress_percent)}%
+                            </span>
+                          </div>
+                          <Progress
+                            value={tenant.onboarding_progress_percent}
+                            className="h-1.5"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -514,15 +492,6 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                                 <Link href={`/admin/tenants/${tenant.id}`}>
                                   <PencilIcon className="h-4 w-4" />
                                 </Link>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(tenant.id)}
-                                disabled={isDeleting === tenant.id}
-                                title="Delete Tenant"
-                              >
-                                <TrashIcon className="h-4 w-4 text-destructive" />
                               </Button>
                             </>
                           )}
@@ -664,7 +633,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, subdomain, or custom domain..."
+                  placeholder="Search by name, subdomain, phone, or business type..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -733,7 +702,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                     <TableHead>Name</TableHead>
                     <TableHead>Subdomain</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead>Custom Domain</TableHead>
+                    <TableHead>Onboarding</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
@@ -759,13 +728,18 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                         )}
                       </TableCell>
                       <TableCell>
-                        {tenant.custom_domain ? (
-                          <code className="text-sm bg-muted px-2 py-1 rounded">
-                            {tenant.custom_domain}
-                          </code>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <div className="min-w-[140px] space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Progress</span>
+                            <span className="font-medium">
+                              {Math.round(tenant.onboarding_progress_percent)}%
+                            </span>
+                          </div>
+                          <Progress
+                            value={tenant.onboarding_progress_percent}
+                            className="h-1.5"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -811,15 +785,6 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                                 <Link href={`/admin/tenants/${tenant.id}`}>
                                   <PencilIcon className="h-4 w-4" />
                                 </Link>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(tenant.id)}
-                                disabled={isDeleting === tenant.id}
-                                title="Delete Tenant"
-                              >
-                                <TrashIcon className="h-4 w-4 text-destructive" />
                               </Button>
                             </>
                           )}

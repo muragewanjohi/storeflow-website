@@ -20,6 +20,7 @@ import { loadThemeProductCard } from '@/lib/themes/theme-loader';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { getSaleImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
 
 interface Sale {
   id: string;
@@ -71,6 +72,8 @@ export default function SalePageClient({
   const [sortBy, setSortBy] = useState((searchParams.get('sort') as string) || 'order');
 
   const { formatCurrency } = useCurrency();
+  const saleBannerImage = getSaleImageOrFallback(sale.name, sale.banner_image);
+  const useUnoptimizedSaleBanner = shouldUseUnoptimizedImage(saleBannerImage);
 
   // Load theme-specific product card
   const ProductCard = loadThemeProductCard(themeSlug) || DefaultProductCard;
@@ -123,17 +126,16 @@ export default function SalePageClient({
       </nav>
 
       {/* Sale Banner */}
-      {sale.banner_image && (
-        <div className="relative mb-8 aspect-[3/1] w-full overflow-hidden rounded-lg">
-          <Image
-            src={sale.banner_image}
-            alt={sale.name}
-            fill
-            className="object-contain"
-            priority
-          />
-        </div>
-      )}
+      <div className="relative mb-8 aspect-[3/1] w-full overflow-hidden rounded-lg">
+        <Image
+          src={saleBannerImage}
+          alt={sale.name}
+          fill
+          className="object-contain"
+          priority
+          unoptimized={useUnoptimizedSaleBanner}
+        />
+      </div>
 
       {/* Sale Header */}
       <div className="mb-8">

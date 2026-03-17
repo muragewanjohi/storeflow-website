@@ -134,10 +134,24 @@ export async function PUT(
       );
     }
 
-    // Generate slug if name is being updated and slug is not provided
-    let slug = validatedData.slug;
-    if (validatedData.name && !slug) {
+    // Normalize slug when provided or when name changes.
+    let slug: string | undefined;
+    if (validatedData.slug !== undefined) {
+      slug = generateSaleSlug(validatedData.slug);
+      if (!slug) {
+        return NextResponse.json(
+          { error: 'Invalid sale slug. Use letters, numbers, and hyphens only.' },
+          { status: 400 }
+        );
+      }
+    } else if (validatedData.name) {
       slug = generateSaleSlug(validatedData.name);
+      if (!slug) {
+        return NextResponse.json(
+          { error: 'Invalid sale name for slug generation.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if new slug conflicts with another sale

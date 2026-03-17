@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import CountdownTimer from '@/components/storefront/countdown-timer';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { getSaleImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
 
 interface Sale {
   id: string;
@@ -65,19 +66,14 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
           >
             {/* Image Section with Overlay */}
             <div className="relative aspect-[4/3] overflow-hidden bg-transparent">
-              {sale.banner_image ? (
-                <Image
-                  src={sale.banner_image}
-                  alt={sale.name}
-                  fill
-                  className="object-contain group-hover:scale-105 transition-transform duration-500"
-                  priority={sale.is_featured}
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                  <span className="text-6xl opacity-50">🏷️</span>
-                </div>
-              )}
+              <Image
+                src={getSaleImageOrFallback(sale.name, sale.banner_image)}
+                alt={sale.name}
+                fill
+                className="object-contain group-hover:scale-105 transition-transform duration-500"
+                priority={sale.is_featured}
+                unoptimized={shouldUseUnoptimizedImage(getSaleImageOrFallback(sale.name, sale.banner_image))}
+              />
               
               {/* Gradient Overlay - pointer-events-none so it never blocks clicks on card/content below */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" aria-hidden="true" />

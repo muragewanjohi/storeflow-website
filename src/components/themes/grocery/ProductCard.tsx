@@ -18,6 +18,7 @@ import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { toast } from 'sonner';
 import RatingDisplay from '@/components/storefront/rating-display';
+import { getProductImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
 
 interface Product {
   id: string;
@@ -35,9 +36,10 @@ interface Product {
 interface GroceryProductCardProps {
   product: Product;
   className?: string;
+  imagePriority?: boolean;
 }
 
-export default function GroceryProductCard({ product, className }: GroceryProductCardProps) {
+export default function GroceryProductCard({ product, className, imagePriority = false }: GroceryProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const { formatCurrency, currency } = useCurrency();
   const router = useRouter();
@@ -61,6 +63,8 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
   const discountPercent = isOnSale && product.compareAtPrice 
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : 0;
+  const productImage = getProductImageOrFallback(product.name, product.image);
+  const useUnoptimizedImage = shouldUseUnoptimizedImage(productImage);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -144,19 +148,15 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
             }}
           >
             <div className="relative aspect-square bg-primary/5 overflow-hidden">
-              {product.image ? (
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                  <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🥬</span>
-                </div>
-              )}
+              <Image
+                src={productImage}
+                alt={product.name}
+                fill
+                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                priority={imagePriority}
+                unoptimized={useUnoptimizedImage}
+              />
               {isOnSale && (
                 <Badge className="absolute top-3 left-3 z-10 bg-primary text-primary-foreground font-bold px-3 py-1">
                   {discountPercent}% OFF
@@ -178,19 +178,15 @@ export default function GroceryProductCard({ product, className }: GroceryProduc
         ) : (
           <Link href={`/products/${product.slug || product.id}`}>
             <div className="relative aspect-square bg-primary/5 overflow-hidden">
-              {product.image ? (
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                  <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🥬</span>
-                </div>
-              )}
+              <Image
+                src={productImage}
+                alt={product.name}
+                fill
+                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                priority={imagePriority}
+                unoptimized={useUnoptimizedImage}
+              />
               {isOnSale && (
                 <Badge className="absolute top-3 left-3 z-10 bg-primary text-primary-foreground font-bold px-3 py-1">
                   {discountPercent}% OFF

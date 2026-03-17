@@ -141,6 +141,10 @@ interface DashboardNotificationsResponse {
   unread_count?: number;
 }
 
+const ONBOARDING_INLINE_HINTS: Partial<Record<string, string>> = {
+  product: '⏱ Takes 2 minutes',
+};
+
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -281,6 +285,19 @@ export default function DashboardClient({
     }
   };
 
+  const handlePreviewStore = async () => {
+    if (!effectiveStoreUrl) return;
+    window.open(effectiveStoreUrl, '_blank', 'noopener,noreferrer');
+    if (gettingStarted) {
+      await fetch('/api/dashboard/getting-started', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview_done' }),
+      });
+      refetchGettingStarted();
+    }
+  };
+
   // Trial days remaining (only when in trial period)
   const trialDaysRemaining = (() => {
     const trialDays = planInfo?.trial_days;
@@ -317,31 +334,55 @@ export default function DashboardClient({
       description: '',
       completed: false,
       href: '/dashboard/products/new',
-      cta: 'Add',
+      cta: 'Add product',
     },
     {
-      id: 'payments',
-      label: 'Configure payment settings',
+      id: 'preview',
+      label: 'Preview your store 👀',
       description: '',
       completed: false,
-      href: '/dashboard/settings',
-      cta: 'Configure',
-    },
-    {
-      id: 'theme',
-      label: 'Customize store design',
-      description: '',
-      completed: false,
-      href: '/dashboard/themes/customize',
-      cta: 'Customize',
+      href: effectiveStoreUrl,
+      cta: 'Preview store',
     },
     {
       id: 'share',
-      label: 'Share your store link',
+      label: 'Share your store 🔗',
+      description: '',
+      completed: false,
+      href: effectiveStoreUrl,
+      cta: 'Copy link',
+    },
+    {
+      id: 'contact_phone',
+      label: 'Get order alerts via SMS',
+      description: 'Add your phone number so you never miss a customer order',
+      completed: false,
+      href: '/dashboard/settings',
+      cta: 'Add phone',
+    },
+    {
+      id: 'payment',
+      label: 'Set up checkout preferences',
       description: '',
       completed: false,
       href: '/dashboard/settings',
-      cta: 'Share',
+      cta: 'Set up payments',
+    },
+    {
+      id: 'delivery',
+      label: 'Configure delivery & shipping',
+      description: '',
+      completed: false,
+      href: '/dashboard/settings',
+      cta: 'Configure shipping',
+    },
+    {
+      id: 'logo',
+      label: 'Add your store logo',
+      description: '',
+      completed: false,
+      href: '/dashboard/settings',
+      cta: 'Add logo',
     },
   ];
 
@@ -375,6 +416,7 @@ export default function DashboardClient({
   const checklistCompleted = Boolean(gettingStarted?.allComplete);
   const unreadNotificationCount = notificationsData?.unread_count ?? 0;
   const hasUnreadNotifications = unreadNotificationCount > 0;
+  const getOnboardingInlineHint = (itemId: string) => ONBOARDING_INLINE_HINTS[itemId];
 
   const todayRevenueValue =
     revenueTrends?.trends?.length && revenueTrends.trends[revenueTrends.trends.length - 1]
@@ -495,18 +537,52 @@ export default function DashboardClient({
             <div className="space-y-3">
               {mobileSetupItems.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-2">
-                  <Link href={item.href} className="flex min-w-0 items-center gap-3">
-                    {item.completed ? (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00c950] text-white">
-                        <CheckCircleIcon className="h-4 w-4" />
+                  {item.id === 'preview' ? (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        void handlePreviewStore();
+                      }}
+                      className="flex min-w-0 items-center gap-3"
+                    >
+                      {item.completed ? (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00c950] text-white">
+                          <CheckCircleIcon className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="h-5 w-5 rounded-full border border-[#d1d5dc]" />
+                      )}
+                      <span className={`truncate text-[15px] ${item.completed ? 'text-[#6a7282]' : 'text-[#101828]'}`}>
+                        {item.label}
                       </span>
-                    ) : (
-                      <span className="h-5 w-5 rounded-full border border-[#d1d5dc]" />
-                    )}
-                    <span className={`truncate text-[15px] ${item.completed ? 'text-[#6a7282]' : 'text-[#101828]'}`}>
-                      {item.label}
-                    </span>
-                  </Link>
+                      {getOnboardingInlineHint(item.id) && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {getOnboardingInlineHint(item.id)}
+                        </span>
+                      )}
+                    </a>
+                  ) : (
+                    <Link href={item.href} className="flex min-w-0 items-center gap-3">
+                      {item.completed ? (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00c950] text-white">
+                          <CheckCircleIcon className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="h-5 w-5 rounded-full border border-[#d1d5dc]" />
+                      )}
+                      <span className={`truncate text-[15px] ${item.completed ? 'text-[#6a7282]' : 'text-[#101828]'}`}>
+                        {item.label}
+                      </span>
+                      {getOnboardingInlineHint(item.id) && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {getOnboardingInlineHint(item.id)}
+                        </span>
+                      )}
+                    </Link>
+                  )}
                   {!item.completed && item.cta && (
                     item.id === 'share' ? (
                       <Button
@@ -515,6 +591,16 @@ export default function DashboardClient({
                         size="sm"
                         onClick={handleCopyStoreLink}
                       className="h-7 rounded-full border-[#d1d5dc] px-3 text-xs font-semibold text-primary"
+                      >
+                        {item.cta}
+                      </Button>
+                    ) : item.id === 'preview' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePreviewStore}
+                        className="h-7 rounded-full border-[#d1d5dc] px-3 text-xs font-semibold text-primary"
                       >
                         {item.cta}
                       </Button>
@@ -754,6 +840,11 @@ export default function DashboardClient({
                       Suggested Next Step
                     </p>
                     <p className="text-sm font-medium">{gettingStarted.nextAction.label}</p>
+                    {getOnboardingInlineHint(gettingStarted.nextAction.id) && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {getOnboardingInlineHint(gettingStarted.nextAction.id)}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {gettingStarted.nextAction.description}
                     </p>
@@ -767,6 +858,16 @@ export default function DashboardClient({
                             className="h-7 text-xs"
                           >
                             <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                            {gettingStarted.nextAction.cta}
+                          </Button>
+                        ) : gettingStarted.nextAction.id === 'preview' ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handlePreviewStore}
+                            className="h-7 text-xs"
+                          >
+                            <EyeIcon className="h-3 w-3 mr-1" />
                             {gettingStarted.nextAction.cta}
                           </Button>
                         ) : (
@@ -800,6 +901,11 @@ export default function DashboardClient({
                         <p className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : ''}`}>
                           {item.label}
                         </p>
+                        {getOnboardingInlineHint(item.id) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {getOnboardingInlineHint(item.id)}
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
                         {!item.completed && item.cta && (
                           <div className="mt-2">
@@ -811,6 +917,16 @@ export default function DashboardClient({
                                 className="h-7 text-xs"
                               >
                                 <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
+                                {item.cta}
+                              </Button>
+                            ) : item.id === 'preview' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePreviewStore}
+                                className="h-7 text-xs"
+                              >
+                                <EyeIcon className="h-3 w-3 mr-1" />
                                 {item.cta}
                               </Button>
                             ) : (

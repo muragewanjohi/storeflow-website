@@ -191,8 +191,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createSaleSchema.parse(body);
 
-    // Generate slug if not provided
-    const slug = validatedData.slug || generateSaleSlug(validatedData.name);
+    // Always sanitize slug to keep sale URLs browser-safe.
+    const slugSource = validatedData.slug?.trim() || validatedData.name;
+    const slug = generateSaleSlug(slugSource);
+    if (!slug) {
+      return NextResponse.json(
+        { error: 'Invalid sale slug. Use letters, numbers, and hyphens only.' },
+        { status: 400 }
+      );
+    }
 
     // Check if slug already exists for this tenant
     const existingSale = await prisma.sales.findFirst({
