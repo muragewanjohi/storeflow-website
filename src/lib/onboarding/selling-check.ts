@@ -25,6 +25,31 @@ function singularizeWord(word: string): string {
   return word;
 }
 
+const SELLING_QUALIFIER_TOKENS = new Set([
+  'kid',
+  'kids',
+  'child',
+  'children',
+  'boy',
+  'boys',
+  'girl',
+  'girls',
+  'adult',
+  'adults',
+  'men',
+  'mens',
+  'man',
+  'women',
+  'womens',
+  'woman',
+  'male',
+  'female',
+  'unisex',
+  'for',
+  'the',
+  'and',
+]);
+
 function normalizeSellingTokens(value: string): string[] {
   return value
     .toLowerCase()
@@ -37,21 +62,35 @@ function normalizeSellingTokens(value: string): string[] {
     .filter(Boolean);
 }
 
+function reduceSellingTokens(tokens: string[]): string[] {
+  const normalized = tokens.map((item) => singularizeWord(item));
+  const withoutQualifiers = normalized.filter((item) => !SELLING_QUALIFIER_TOKENS.has(item));
+  return withoutQualifiers.length > 0 ? withoutQualifiers : normalized;
+}
+
 export function normalizeSellingKey(value: string): string {
-  const singularTokens = normalizeSellingTokens(value).map((item) => singularizeWord(item));
-  return singularTokens.sort().join(' ');
+  const reducedTokens = reduceSellingTokens(normalizeSellingTokens(value));
+  return reducedTokens.sort().join(' ');
 }
 
 export function buildSellingMatchKeys(value: string): string[] {
-  const tokens = normalizeSellingTokens(value);
-  if (tokens.length === 0) return [];
+  const originalTokens = normalizeSellingTokens(value);
+  if (originalTokens.length === 0) return [];
 
+  const tokens = reduceSellingTokens(originalTokens);
   const singularTokens = tokens.map((item) => singularizeWord(item));
+
+  const originalSingularTokens = originalTokens.map((item) => singularizeWord(item));
+
   const keySet = new Set<string>([
     tokens.join(' '),
     [...tokens].sort().join(' '),
     singularTokens.join(' '),
     [...singularTokens].sort().join(' '),
+    originalTokens.join(' '),
+    [...originalTokens].sort().join(' '),
+    originalSingularTokens.join(' '),
+    [...originalSingularTokens].sort().join(' '),
   ]);
 
   return Array.from(keySet).filter(Boolean);
@@ -66,9 +105,15 @@ export function isSellingEquivalent(a: string, b: string): boolean {
     if (keysB.has(key)) return true;
   }
 
-  const tokensA = new Set(normalizeSellingTokens(a).map((item) => singularizeWord(item)));
-  const tokensB = new Set(normalizeSellingTokens(b).map((item) => singularizeWord(item)));
+  const tokensA = new Set(reduceSellingTokens(normalizeSellingTokens(a)));
+  const tokensB = new Set(reduceSellingTokens(normalizeSellingTokens(b)));
   if (tokensA.size === 0 || tokensB.size === 0) return false;
+
+  // If one reduced token set is a subset of the other, treat it as equivalent.
+  const [smaller, larger] =
+    tokensA.size <= tokensB.size ? [tokensA, tokensB] : [tokensB, tokensA];
+  const subsetMatch = Array.from(smaller).every((token) => larger.has(token));
+  if (subsetMatch) return true;
 
   let intersection = 0;
   for (const token of tokensA) {
