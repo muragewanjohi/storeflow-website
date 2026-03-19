@@ -265,6 +265,8 @@ export default function DashboardClient({
   });
 
   const effectiveStoreUrl = gettingStarted?.storeUrl ?? storeUrl;
+  const welcomeStoreUrl = effectiveStoreUrl || `https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`;
+  const welcomeStoreHost = welcomeStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   const handleCopyStoreLink = async () => {
     if (!effectiveStoreUrl) return;
@@ -754,6 +756,55 @@ export default function DashboardClient({
       </div>
 
       <div className="hidden space-y-6 md:block">
+      {/* Welcome Banner for New Tenants */}
+      {isNewTenant && (
+        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  🎉 Welcome to DukaNest!
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Your store <strong>{tenantName}</strong> is live at{' '}
+                  <a 
+                    href={welcomeStoreUrl}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {welcomeStoreHost}
+                  </a>
+                </p>
+                {planInfo && (
+                  <Badge variant="secondary" className="mt-2">
+                    {planInfo.name} Plan - ${planInfo.price}/{planInfo.duration_months === 1 ? 'mo' : `${planInfo.duration_months}mo`}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void handlePreviewStore();
+                  }}
+                >
+                  <EyeIcon className="h-4 w-4 mr-1" />
+                  Preview Store
+                </Button>
+                <Button asChild size="sm">
+                  <Link href="/dashboard/products/new">Add First Product</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/settings">Configure Store</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -942,45 +993,6 @@ export default function DashboardClient({
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Welcome Banner for New Tenants */}
-      {isNewTenant && (
-        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  🎉 Welcome to DukaNest!
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Your store <strong>{tenantName}</strong> is live at{' '}
-                  <a 
-                    href={`https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
-                  </a>
-                </p>
-                {planInfo && (
-                  <Badge variant="secondary" className="mt-2">
-                    {planInfo.name} Plan - ${planInfo.price}/{planInfo.duration_months === 1 ? 'mo' : `${planInfo.duration_months}mo`}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button asChild size="sm">
-                  <Link href="/dashboard/products/new">Add First Product</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/settings">Configure Store</Link>
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       )}

@@ -762,7 +762,6 @@ function TenantRegisterForm() {
     }
 
     await completeAllSteps();
-    setSuccess(true);
     setShowProgress(false);
     identifyTikTokPixelUser({
       email: options.email,
@@ -784,7 +783,13 @@ function TenantRegisterForm() {
       utm_medium: utmMedium || undefined,
       utm_campaign: utmCampaign || undefined,
     });
-    if (data.loginUrl) setLoginUrl(data.loginUrl);
+    if (data.loginUrl) {
+      // Navigate straight to tenant admin login after successful registration.
+      window.location.assign(data.loginUrl);
+      return true;
+    }
+
+    setSuccess(true);
     if (data.demoContentCreated) {
       setDemoContentInfo({
         created: true,

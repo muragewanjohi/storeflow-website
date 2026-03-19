@@ -120,7 +120,7 @@ export default function DashboardLayoutClient({
             <div className={useImmersiveMobileShell ? 'md:mx-auto md:max-w-7xl md:px-6 lg:px-8' : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'}>
               <div className={useImmersiveMobileShell ? 'hidden md:block' : ''}>
                 <AccessRestrictionBanner restriction={accessRestriction} />
-                <UpdateNotificationBanner />
+                {!isDashboardHome && <UpdateNotificationBanner />}
                 <CompleteProfilePrompt
                   openByDefault={shouldShowProfilePrompt}
                   initialName={profileName}
