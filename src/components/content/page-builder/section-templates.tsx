@@ -1330,6 +1330,27 @@ function SalesTabSectionComponent({
       };
     }).slice(0, limit), [section.badge_text, section.badge_color]);
 
+  const fetchJsonWithRetry = useCallback(async (url: string, retries = 1) => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          if (response.status === 404) return null;
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+        if (attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          continue;
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('Failed to fetch');
+  }, []);
+
   useEffect(() => {
     if (isPreview) {
       setIsLoading(false);
@@ -1360,25 +1381,20 @@ function SalesTabSectionComponent({
           }
           
           // Fetch sale with products using slug (public API)
-          const saleResponse = await fetch(`/api/sales/${saleSlug}`);
-          if (!saleResponse.ok) {
-            if (saleResponse.status === 404) {
-              throw new Error('Sale not found. The sale may have been deleted or is not active.');
-            }
-            throw new Error('Failed to fetch sale');
+          const saleData = await fetchJsonWithRetry(`/api/sales/${saleSlug}`);
+          if (!saleData) {
+            throw new Error('Sale not found. The sale may have been deleted or is not active.');
           }
-          const saleData = await saleResponse.json();
           const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || {}, section.limit || 8);
           setProducts(saleProducts);
           setSales([saleData.sale]);
           setSaleBlocks([{ sale: saleData.sale, products: saleProducts }]);
         } else if (displayMode === 'featured_sales' && section.featured_sale_ids && section.featured_sale_ids.length > 0) {
           // Fetch featured sales from public API
-          const featuredSalesResponse = await fetch('/api/sales?status=active&is_featured=true&limit=10');
-          if (!featuredSalesResponse.ok) {
+          const featuredData = await fetchJsonWithRetry('/api/sales?status=active&is_featured=true&limit=10');
+          if (!featuredData) {
             throw new Error('Failed to fetch featured sales');
           }
-          const featuredData = await featuredSalesResponse.json();
           const featuredSales = featuredData.sales || [];
           
           // Limit to the number of featured sales selected
@@ -1416,21 +1432,28 @@ function SalesTabSectionComponent({
             setProducts([]);
           }
         } else if (displayMode === 'all_active') {
-          const salesResponse = await fetch('/api/sales?status=active&limit=10');
-          if (!salesResponse.ok) throw new Error('Failed to fetch sales');
-          const salesData = await salesResponse.json();
+          const salesData = await fetchJsonWithRetry('/api/sales?status=active&limit=10');
+          if (!salesData) throw new Error('Failed to fetch sales');
           const allSales = salesData.sales || [];
           setSales(allSales);
 
-          const blocks: Array<{ sale: any; products: Product[] }> = [];
-          for (const sale of allSales) {
-            const saleResponse = await fetch(`/api/sales/${sale.slug}`);
-            if (saleResponse.ok) {
-              const saleData = await saleResponse.json();
-              const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || sale, section.limit || 8);
-              blocks.push({ sale: saleData.sale || sale, products: saleProducts });
-            }
-          }
+          const blocksRaw = await Promise.all(
+            allSales.map(async (sale: any) => {
+              try {
+                if (!sale?.slug) return null;
+                const saleData = await fetchJsonWithRetry(`/api/sales/${sale.slug}`);
+                if (!saleData) return null;
+                const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || sale, section.limit || 8);
+                return { sale: saleData.sale || sale, products: saleProducts };
+              } catch (saleFetchError) {
+                console.warn('Skipping failed sale fetch', { slug: sale?.slug, error: saleFetchError });
+                return null;
+              }
+            }),
+          );
+          const blocks: Array<{ sale: any; products: Product[] }> = blocksRaw.filter(
+            (item): item is { sale: any; products: Product[] } => item !== null
+          );
           setSaleBlocks(blocks);
           setProducts(blocks[0]?.products ?? []);
         } else {
@@ -1446,7 +1469,7 @@ function SalesTabSectionComponent({
     };
 
     fetchData();
-  }, [displayMode, section.sale_id, section.sale_slug, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview, mapSaleProducts]);
+  }, [displayMode, section.sale_id, section.sale_slug, section.featured_sale_ids, section.limit, section.badge_text, section.badge_color, activeTab, isPreview, mapSaleProducts, fetchJsonWithRetry]);
 
   // Update products when active tab changes (featured_sales with tabs layout)
   useEffect(() => {
