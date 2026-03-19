@@ -25,7 +25,7 @@ import {
 } from '@/lib/themes/homepage-templates';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
-import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
+import { createDemoAttributes, createDemoContent, getDemoProducts } from '@/lib/themes/demo-content';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
@@ -75,70 +75,80 @@ function toTitleCase(value: string): string {
 
 function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
   const niche = toTitleCase(selling) || 'Specialty';
+  const fallbackImages = getDemoProducts(niche, 8)
+    .map((item) => item.image?.trim())
+    .filter((value): value is string => Boolean(value));
 
   const categories = [
-    `${niche} Bouquets`,
-    `${niche} Arrangements`,
-    `${niche} Gift Baskets`,
-    'Occasion Arrangements',
-    'Gift Sets',
-    'Fresh Stems',
-    'Indoor Plants',
-    'Wedding Flowers',
-    'Event Packages',
+    `${niche} Essentials`,
+    `${niche} Best Sellers`,
+    `${niche} New Arrivals`,
+    `${niche} Gift Sets`,
+    `${niche} Premium Collection`,
+    `${niche} Everyday Value`,
+    `${niche} Featured Picks`,
+    `${niche} Seasonal Offers`,
   ];
 
   return {
     copy: {
       headline: `Fresh ${niche} for Every Occasion`,
-      subheadline: `Shop curated ${niche.toLowerCase()} collections with same-day delivery options.`,
+      subheadline: `Shop curated ${niche.toLowerCase()} collections tailored for your customers.`,
       ctaText: 'Shop the Collection',
     },
     categories,
     demoProducts: [
       {
-        name: `${niche} Signature Bouquet`,
+        name: `${niche} Starter Pick 1`,
         priceKES: 1800,
-        description: `A hand-tied bouquet of premium ${niche.toLowerCase()} stems, wrapped and ready for gifting.`,
+        description: `A premium ${niche.toLowerCase()} product selected for quality and everyday demand.`,
+        imageUrl: fallbackImages[0],
       },
       {
-        name: `${niche} Celebration Box`,
+        name: `${niche} Starter Pick 2`,
         priceKES: 2500,
-        description: `A premium gift box featuring seasonal ${niche.toLowerCase()} with an elegant presentation.`,
+        description: `A high-value ${niche.toLowerCase()} option ideal for customers seeking quality and value.`,
+        imageUrl: fallbackImages[1],
       },
       {
-        name: `${niche} Weekly Bundle`,
+        name: `${niche} Starter Pick 3`,
         priceKES: 3200,
-        description: `A value bundle of fresh ${niche.toLowerCase()} selections suitable for home or office display.`,
+        description: `A bestselling ${niche.toLowerCase()} selection curated for repeat purchases.`,
+        imageUrl: fallbackImages[2],
       },
       {
-        name: `${niche} Event Centerpiece`,
+        name: `${niche} Starter Pick 4`,
         priceKES: 4500,
-        description: `A statement centerpiece arrangement crafted from fresh ${niche.toLowerCase()} and greenery.`,
+        description: `A premium ${niche.toLowerCase()} product for customers looking for top-tier quality.`,
+        imageUrl: fallbackImages[3],
       },
       {
-        name: `${niche} Mini Gift Wrap`,
+        name: `${niche} Starter Pick 5`,
         priceKES: 1200,
-        description: `A compact ${niche.toLowerCase()} wrap perfect for quick gifting and special moments.`,
+        description: `An affordable ${niche.toLowerCase()} option designed for quick conversions.`,
+        imageUrl: fallbackImages[4],
       },
       {
-        name: `${niche} Premium Vase Set`,
+        name: `${niche} Starter Pick 6`,
         priceKES: 3800,
-        description: `A ready-to-display set with premium ${niche.toLowerCase()} arranged in a reusable vase.`,
+        description: `A standout ${niche.toLowerCase()} product that balances quality and strong margins.`,
+        imageUrl: fallbackImages[5],
       },
     ],
     salesPromotions: [
       {
         title: `${niche} Weekend Sale`,
-        subtitle: `Save up to 20% on selected ${niche.toLowerCase()} bouquets this weekend.`,
+        subtitle: `Save up to 20% on selected ${niche.toLowerCase()} products this weekend.`,
         ctaText: 'Shop Weekend Deals',
-        imagePrompt: `4k promotional banner for ${niche.toLowerCase()} weekend sale, elegant floral arrangement, premium ecommerce marketing style`,
+        imagePrompt: `4k promotional banner for ${niche.toLowerCase()} weekend sale, premium ecommerce marketing style`,
+        imageUrl: fallbackImages[6] || fallbackImages[0],
       },
       {
         title: `Same-Day ${niche} Delivery`,
-        subtitle: `Order before 4PM and get fresh ${niche.toLowerCase()} delivered today.`,
+        subtitle: `Order before 4PM and get your ${niche.toLowerCase()} picks delivered today.`,
         ctaText: 'Order for Today',
         imagePrompt: `4k ecommerce hero banner for same-day ${niche.toLowerCase()} delivery, clean modern composition, high-conversion marketing style`,
+        imageUrl: fallbackImages[7] || fallbackImages[1] || fallbackImages[0],
       },
     ],
     blogPosts: [
@@ -391,6 +401,12 @@ async function applyStarterPackToTenant(
   const products = (starterPack.demoProducts ?? []).slice(0, 40);
   const salesPromotions = (starterPack.salesPromotions ?? []).slice(0, 2);
   const blogPosts = (starterPack.blogPosts ?? []).slice(0, 4);
+  const fallbackImagePool = getDemoProducts(
+    businessType || selling || 'General',
+    Math.max(products.length, 8)
+  )
+    .map((item) => item.image?.trim())
+    .filter((value): value is string => Boolean(value));
 
   if (
     categories.length === 0 &&
@@ -449,6 +465,11 @@ async function applyStarterPackToTenant(
     const validPrice = Number.isFinite(price) && price > 0 ? price : 100;
     const slug = await getUniqueProductSlug(tenantId, name);
     const categoryId = categoryIds.length > 0 ? categoryIds[index % categoryIds.length] : null;
+    const fallbackImageUrl = fallbackImagePool.length > 0 ? fallbackImagePool[index % fallbackImagePool.length] : null;
+    const resolvedProductImage =
+      typeof product.imageUrl === 'string' && product.imageUrl.trim().length > 0
+        ? product.imageUrl.trim()
+        : fallbackImageUrl;
 
     const createdProduct = await prisma.products.create({
       data: {
@@ -460,7 +481,7 @@ async function applyStarterPackToTenant(
         price: validPrice,
         stock_quantity: 20,
         status: 'active',
-        image: product.imageUrl || null,
+        image: resolvedProductImage || null,
         category_id: categoryId,
         sku: `SP-${String(index + 1).padStart(3, '0')}-${Date.now().toString().slice(-6)}`,
         metadata: {
@@ -470,9 +491,9 @@ async function applyStarterPackToTenant(
       },
     });
     createdProductIds.push(createdProduct.id);
-    if (categoryId && product.imageUrl && product.imageUrl.trim().length > 0) {
+    if (categoryId && resolvedProductImage && resolvedProductImage.trim().length > 0) {
       if (!categoryImageCandidates.has(categoryId)) {
-        categoryImageCandidates.set(categoryId, product.imageUrl);
+        categoryImageCandidates.set(categoryId, resolvedProductImage);
       }
     }
     productsCreated += 1;
@@ -495,6 +516,11 @@ async function applyStarterPackToTenant(
     const saleSlug = await getUniqueSaleSlug(tenantId, saleName);
     const now = new Date();
     const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const fallbackPromotionImage = fallbackImagePool.length > 0 ? fallbackImagePool[index % fallbackImagePool.length] : null;
+    const resolvedPromotionImage =
+      typeof promotion.imageUrl === 'string' && promotion.imageUrl.trim().length > 0
+        ? promotion.imageUrl.trim()
+        : fallbackPromotionImage;
 
     const sale = await prisma.sales.create({
       data: {
@@ -508,7 +534,7 @@ async function applyStarterPackToTenant(
         end_date: endDate,
         status: 'active',
         is_featured: true,
-        banner_image: promotion.imageUrl || null,
+        banner_image: resolvedPromotionImage || null,
         metadata: {
           source: 'starter_pack_ai',
           image_prompt: promotion.imagePrompt || null,
@@ -591,7 +617,9 @@ async function applyStarterPackToTenant(
           content,
           category_id: blogCategoryId,
           status: 'published',
-          image: products.find((item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0)?.imageUrl || null,
+          image:
+            products.find((item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0)?.imageUrl ||
+            (fallbackImagePool.length > 0 ? fallbackImagePool[0] : null),
         },
       });
       blogsCreated += 1;
@@ -697,10 +725,10 @@ async function applyStarterPackToTenant(
       if (Array.isArray(pageBuilderData.sections)) {
         const firstPromoImage = salesPromotions.find(
           (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
-        )?.imageUrl;
+        )?.imageUrl || (fallbackImagePool.length > 0 ? fallbackImagePool[0] : undefined);
         const firstProductImage = products.find(
           (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
-        )?.imageUrl;
+        )?.imageUrl || (fallbackImagePool.length > 0 ? fallbackImagePool[0] : undefined);
         const bestStarterPackImage = firstPromoImage || firstProductImage;
 
         const updatedSections = pageBuilderData.sections.map((section) => {
@@ -729,7 +757,10 @@ async function applyStarterPackToTenant(
                 title: promotion.title || nextBanners[i]?.title,
                 subtitle: promotion.subtitle || nextBanners[i]?.subtitle,
                 cta_text: promotion.ctaText || nextBanners[i]?.cta_text,
-                image: promotion.imageUrl || nextBanners[i]?.image,
+                image:
+                  promotion.imageUrl ||
+                  (fallbackImagePool.length > 0 ? fallbackImagePool[i % fallbackImagePool.length] : undefined) ||
+                  nextBanners[i]?.image,
               };
             }
 
