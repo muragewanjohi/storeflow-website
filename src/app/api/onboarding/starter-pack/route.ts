@@ -1223,28 +1223,53 @@ export async function POST(request: NextRequest) {
       }
 
       const geminiStartedAt = Date.now();
-      const geminiResult = await executeGeminiJsonWithFallback({
-        apiKey: geminiApiKey,
-        preferredModel: input.geminiModel,
-        systemInstruction,
-        userPrompt,
-      });
-      geminiRaw = geminiResult.raw;
-      geminiUsedModel = geminiResult.usedModel;
-      geminiAttemptedModels = geminiResult.attemptedModels;
-      parsedStarterPack = generatedStarterPackSchema.parse(
-        normalizeGeneratedStarterPack(geminiRaw, {
+      try {
+        const geminiResult = await executeGeminiJsonWithFallback({
+          apiKey: geminiApiKey,
+          preferredModel: input.geminiModel,
+          systemInstruction,
+          userPrompt,
+        });
+        geminiRaw = geminiResult.raw;
+        geminiUsedModel = geminiResult.usedModel;
+        geminiAttemptedModels = geminiResult.attemptedModels;
+        parsedStarterPack = generatedStarterPackSchema.parse(
+          normalizeGeneratedStarterPack(geminiRaw, {
+            niche,
+            categoriesCount: input.categoriesCount,
+            productsCount: input.productsCount,
+            blogPostsCount: input.blogPostsCount,
+          })
+        );
+        parsedStarterPack = ensureStarterPackCompleteness(parsedStarterPack, {
           niche,
           categoriesCount: input.categoriesCount,
           productsCount: input.productsCount,
-          blogPostsCount: input.blogPostsCount,
-        })
-      );
-      parsedStarterPack = ensureStarterPackCompleteness(parsedStarterPack, {
-        niche,
-        categoriesCount: input.categoriesCount,
-        productsCount: input.productsCount,
-      });
+        });
+      } catch (geminiError) {
+        console.warn('[StarterPack][Trace] Gemini generation failed; using deterministic fallback starter pack', {
+          traceId,
+          error: geminiError instanceof Error ? geminiError.message : 'Unknown Gemini error',
+        });
+        geminiRaw = {
+          error: geminiError instanceof Error ? geminiError.message : 'Unknown Gemini error',
+          source: 'deterministic_fallback',
+        };
+        parsedStarterPack = generatedStarterPackSchema.parse(
+          normalizeGeneratedStarterPack({}, {
+            niche,
+            categoriesCount: input.categoriesCount,
+            productsCount: input.productsCount,
+            blogPostsCount: input.blogPostsCount,
+          })
+        );
+        parsedStarterPack = ensureStarterPackCompleteness(parsedStarterPack, {
+          niche,
+          categoriesCount: input.categoriesCount,
+          productsCount: input.productsCount,
+        });
+        starterPackSource = 'generated';
+      }
 
       if (!hasThemeVariationFromDefaults(parsedStarterPack.themeConfig, themeColorSettings)) {
         console.warn('[StarterPack][Trace] Gemini returned default-like theme colors; attempting theme-only retry', {

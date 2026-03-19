@@ -1408,6 +1408,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Guarantee starter-pack content for registration even if Gemini fails.
+    if (!starterPackPayload && validatedData.includeDemoContent && finalSelling) {
+      starterPackPayload = buildSellingFallbackStarterPack(finalSelling);
+      console.warn('[Registration] Starter-pack API unavailable; using deterministic selling fallback', {
+        traceId: registrationTraceId,
+        selling: finalSelling,
+        categories: starterPackPayload.categories?.length ?? 0,
+        products: starterPackPayload.demoProducts?.length ?? 0,
+      });
+    }
+
     if (starterPackPayload && validatedData.includeDemoContent && finalSelling) {
       const hasCategories = Array.isArray(starterPackPayload.categories) && starterPackPayload.categories.length > 0;
       const hasProducts = Array.isArray(starterPackPayload.demoProducts) && starterPackPayload.demoProducts.length > 0;
