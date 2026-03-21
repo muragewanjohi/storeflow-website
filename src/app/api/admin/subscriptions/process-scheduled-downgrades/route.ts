@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     // Find tenants with scheduled downgrades that are due
     const tenantsWithScheduledDowngrades = await prisma.tenants.findMany({
       where: {
+        status: { not: 'deleted' },
         scheduled_plan_id: { not: null },
         scheduled_plan_change_date: {
           lte: now, // Due date has passed or is today

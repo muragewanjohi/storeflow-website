@@ -49,6 +49,7 @@
 - [x] Create `/api/v1/mobile/*` route namespace
 - [x] Add mobile auth endpoints (`login`, `refresh`, `logout`, `mfa/*`, `forgot-password`)
 - [x] Add mobile dashboard endpoints (`overview`, `products`, `orders`, `customers`, `inventory`, `sales`, `analytics`, `settings`)
+- [x] Add `POST /api/v1/mobile/dashboard/settings/delete-account` (Bearer; same soft-delete as web)
 - [x] Add mobile notifications endpoints (`list`, `register-device`, `preferences`)
 - [x] Add mobile media upload endpoint
 - [x] Add mobile M-Pesa endpoints (`initiate`, `status`)

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import CountdownTimer from '@/components/storefront/countdown-timer';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { getSaleImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 
 interface Sale {
   id: string;
@@ -110,7 +111,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
             <div className="p-6 flex flex-col flex-1">
               {/* Title - links to sale page */}
               <Link
-                href={`/sales/${sale.slug}`}
+                href={storefrontSalePath(sale.slug)}
                 className="block mb-3 group/title"
               >
                 <h2 className="text-xl md:text-2xl font-bold mb-2 group-hover/title:text-primary transition-colors line-clamp-2">
@@ -139,7 +140,7 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
               {sale.slug ? (
                 <div className="mt-auto">
                   <a
-                    href={`/sales/${sale.slug}`}
+                    href={storefrontSalePath(sale.slug)}
                     className={cn(
                       'inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors',
                       'hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

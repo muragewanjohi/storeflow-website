@@ -27,6 +27,13 @@ import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { cache } from '@/lib/cache/simple-cache';
+import { isValidE164DigitsString } from '@/lib/phone/parse';
+
+function storePhoneDigitsOrNull(v: string | null | undefined): string | null {
+  if (v == null || v === '') return null;
+  const d = v.replace(/\D/g, '');
+  return d || null;
+}
 
 const settingsUpdateSchema = z.object({
   // Store Details (store_name and custom_domain are stored in tenants table, not here)
@@ -37,6 +44,9 @@ const settingsUpdateSchema = z.object({
   store_country: z.string().optional().nullable(),
   store_postal_code: z.string().optional().nullable(),
   store_phone: z.string().optional().nullable(),
+  /** Pro (non-Basic) plans only; cleared server-side for Basic tenants */
+  store_phone_2: z.string().optional().nullable(),
+  store_phone_3: z.string().optional().nullable(),
   store_logo: z.string().optional().nullable(),
   business_type: z.string().optional().nullable(),
   selling: z.string().optional().nullable(),
@@ -104,6 +114,8 @@ export async function GET(request: NextRequest) {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'store_phone_2',
+      'store_phone_3',
       
       // Currency Settings
       'currency_code',
@@ -255,6 +267,14 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const validatedData = settingsUpdateSchema.parse(body);
 
+    const currentPlan = tenant.plan_id
+      ? await prisma.price_plans.findUnique({
+          where: { id: tenant.plan_id },
+          select: { name: true },
+        })
+      : null;
+    const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+
     // Convert to string format for static_options
     const optionsToSave: Record<string, string | null> = {};
 
@@ -278,7 +298,30 @@ export async function PUT(request: NextRequest) {
       optionsToSave.store_postal_code = validatedData.store_postal_code || null;
     }
     if (validatedData.store_phone !== undefined) {
-      optionsToSave.store_phone = validatedData.store_phone || null;
+      const d = storePhoneDigitsOrNull(validatedData.store_phone);
+      if (d && !isValidE164DigitsString(d)) {
+        return NextResponse.json({ error: 'Invalid store phone number' }, { status: 400 });
+      }
+      optionsToSave.store_phone = d;
+    }
+    if (isBasicPlan) {
+      optionsToSave.store_phone_2 = null;
+      optionsToSave.store_phone_3 = null;
+    } else {
+      if (validatedData.store_phone_2 !== undefined) {
+        const d = storePhoneDigitsOrNull(validatedData.store_phone_2);
+        if (d && !isValidE164DigitsString(d)) {
+          return NextResponse.json({ error: 'Invalid additional store phone (2)' }, { status: 400 });
+        }
+        optionsToSave.store_phone_2 = d;
+      }
+      if (validatedData.store_phone_3 !== undefined) {
+        const d = storePhoneDigitsOrNull(validatedData.store_phone_3);
+        if (d && !isValidE164DigitsString(d)) {
+          return NextResponse.json({ error: 'Invalid additional store phone (3)' }, { status: 400 });
+        }
+        optionsToSave.store_phone_3 = d;
+      }
     }
     if (validatedData.store_logo !== undefined) {
       optionsToSave.store_logo = validatedData.store_logo || null;

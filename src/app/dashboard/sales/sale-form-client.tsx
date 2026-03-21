@@ -35,7 +35,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useCurrency } from '@/lib/currency/currency-context';
 import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
-import { generateSaleSlug } from '@/lib/sales/validation';
+import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 import { toast } from 'sonner';
 
 interface Sale {
@@ -187,7 +188,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       }
 
       const saleData = {
-        name: formData.name.trim(),
+        name: sanitizeSaleName(formData.name.trim()),
         slug: formData.slug.trim() || undefined,
         description: formData.description.trim() || null,
         banner_image: formData.banner_image || null,
@@ -332,7 +333,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
     p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  const saleUrl = sale?.slug ? `${baseUrl}/sales/${sale.slug}` : null;
+  const saleUrl =
+    sale?.slug && baseUrl ? `${baseUrl.replace(/\/$/, '')}${storefrontSalePath(sale.slug)}` : null;
 
   return (
     <div className="space-y-6">
@@ -356,7 +358,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
           <div className="flex items-center gap-2">
             <AdminShareButtons
               title={formData.name || 'Sale'}
-              url={`/sales/${sale?.slug || formData.slug}`}
+              url={sale?.slug ? storefrontSalePath(sale.slug) : storefrontSalePath(formData.slug.trim() || '')}
               image={formData.banner_image}
               description={formData.description}
               type="sale"
@@ -416,6 +418,12 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                    onBlur={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        name: sanitizeSaleName(e.target.value),
+                      }))
+                    }
                     placeholder="Black Friday 2024"
                     required
                   />

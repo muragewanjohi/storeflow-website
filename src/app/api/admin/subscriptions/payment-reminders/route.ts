@@ -1,7 +1,7 @@
 /**
  * Payment Reminders API Route
  * 
- * GET: Send payment reminder emails to tenants with upcoming or overdue payments
+ * GET: Send payment reminder emails (and optional Ujumbe SMS when configured) to tenants
  * 
  * This endpoint should be called by a cron job (daily at 9 AM UTC)
  * Security: Protected by CRON_SECRET_TOKEN
@@ -20,6 +20,10 @@ import { prisma } from '@/lib/prisma/client';
 import { sendPaymentDueReminderEmail } from '@/lib/subscriptions/emails';
 import { sendSubscriptionRenewalReminderEmail } from '@/lib/subscriptions/emails';
 import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
+import {
+  sendPaymentDueReminderSms,
+  sendSubscriptionRenewalReminderSms,
+} from '@/lib/sms/tenant-notifications';
 
 /**
  * GET /api/admin/subscriptions/payment-reminders
@@ -68,6 +72,8 @@ export async function GET(request: NextRequest) {
     // Find tenants with subscriptions expiring in 7 days OR already expired (in grace period)
     const tenantsExpiringSoon = await prisma.tenants.findMany({
       where: {
+        // Never send renewal/payment reminders to self-deleted tenants
+        NOT: { status: 'deleted' },
         OR: [
           // Expiring within 7 days (future)
           {
@@ -145,11 +151,16 @@ export async function GET(request: NextRequest) {
       checked: tenantsExpiringSoon.length,
       renewal_reminders_sent: 0,
       payment_reminders_sent: 0,
+      renewal_sms_sent: 0,
+      payment_sms_sent: 0,
       errors: [] as string[],
     };
 
     for (const tenant of tenantsExpiringSoon) {
       try {
+        if (tenant.status === 'deleted') {
+          continue;
+        }
         // Type assertion for price_plans relation (Prisma includes it in select but TypeScript may not infer it)
         const tenantWithPlan = tenant as typeof tenant & { 
           price_plans: { 
@@ -209,6 +220,18 @@ export async function GET(request: NextRequest) {
           });
           results.renewal_reminders_sent++;
 
+          try {
+            const smsOk = await sendSubscriptionRenewalReminderSms({
+              tenantId: tenant.id,
+              countryIso2: tenant.country,
+              storeName: tenant.name,
+              daysLeft: daysUntilExpiry,
+            });
+            if (smsOk) results.renewal_sms_sent++;
+          } catch (smsError) {
+            console.error('[Payment Reminders] Renewal SMS failed:', smsError);
+          }
+
           // Update last renewal reminder date
           const updatedData = {
             ...tenantData,
@@ -241,6 +264,17 @@ export async function GET(request: NextRequest) {
             isKenya,
           });
           results.payment_reminders_sent++;
+
+          try {
+            const smsOk = await sendPaymentDueReminderSms({
+              tenantId: tenant.id,
+              countryIso2: tenant.country,
+              storeName: tenant.name,
+            });
+            if (smsOk) results.payment_sms_sent++;
+          } catch (smsError) {
+            console.error('[Payment Reminders] Payment-due SMS failed:', smsError);
+          }
 
           // Update last payment reminder date in tenant data
           const updatedData = {

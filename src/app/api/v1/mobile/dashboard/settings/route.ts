@@ -7,6 +7,8 @@ import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 const SETTINGS_KEYS = [
   'store_description',
   'store_phone',
+  'store_phone_2',
+  'store_phone_3',
   'store_address',
   'store_city',
   'store_state',
@@ -96,6 +98,8 @@ export async function GET(request: NextRequest) {
           contactEmail: tenant.contact_email,
           description: options.store_description,
           phone: options.store_phone,
+          phone2: options.store_phone_2 ?? null,
+          phone3: options.store_phone_3 ?? null,
           address: {
             line1: options.store_address,
             city: options.store_city,

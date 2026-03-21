@@ -24,6 +24,7 @@ import ImageUploadField from '@/components/content/image-upload-field';
 import { IconEmojiPicker } from '@/components/content/icon-emoji-picker';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useQuery } from '@tanstack/react-query';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 
 interface SectionEditorProps {
   section: PageSection;
@@ -1725,7 +1726,7 @@ function SalesTabSectionEditor({
     if (displayMode === 'single_sale' && section.sale_id) {
       const selectedSale = sales.find((s: any) => s.id === section.sale_id);
       if (selectedSale && !section.cta_link) {
-        onUpdate({ cta_link: `/sales/${selectedSale.slug}` });
+        onUpdate({ cta_link: storefrontSalePath(selectedSale.slug) });
       }
     } else if (displayMode === 'all_active' && !section.cta_link) {
       onUpdate({ cta_link: '/sales' });
@@ -1780,7 +1781,7 @@ function SalesTabSectionEditor({
                   onUpdate({
                     sale_id: value,
                     sale_slug: selectedSale?.slug || undefined,
-                    cta_link: selectedSale ? `/sales/${selectedSale.slug}` : section.cta_link,
+                    cta_link: selectedSale ? storefrontSalePath(selectedSale.slug) : section.cta_link,
                   });
                 }}
               >

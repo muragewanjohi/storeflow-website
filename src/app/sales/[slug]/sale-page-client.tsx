@@ -21,6 +21,7 @@ import DefaultProductCard from '@/components/themes/default/ProductCard';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { getSaleImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 
 interface Sale {
   id: string;
@@ -84,7 +85,7 @@ export default function SalePageClient({
     params.set('sort', value);
     params.set('page', '1'); // Reset to first page on sort
     startTransition(() => {
-      router.push(`/sales/${sale.slug}?${params.toString()}`);
+      router.push(`${storefrontSalePath(sale.slug)}?${params.toString()}`);
     });
   };
 
@@ -230,7 +231,7 @@ export default function SalePageClient({
                 onClick={() => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', String(initialPage - 1));
-                  router.push(`/sales/${sale.slug}?${params.toString()}`);
+                  router.push(`${storefrontSalePath(sale.slug)}?${params.toString()}`);
                 }}
               >
                 <ChevronLeftIcon className="h-4 w-4 mr-1" />
@@ -246,7 +247,7 @@ export default function SalePageClient({
                 onClick={() => {
                   const params = new URLSearchParams(searchParams.toString());
                   params.set('page', String(initialPage + 1));
-                  router.push(`/sales/${sale.slug}?${params.toString()}`);
+                  router.push(`${storefrontSalePath(sale.slug)}?${params.toString()}`);
                 }}
               >
                 Next

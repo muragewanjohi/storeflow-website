@@ -10,6 +10,7 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import Link from 'next/link';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -286,7 +287,7 @@ export default function SalesListClient({
 
   // Quick share function for social media
   const handleQuickShare = async (sale: Sale, platform: string) => {
-    const saleUrl = `/sales/${sale.slug}`;
+    const saleUrl = storefrontSalePath(sale.slug);
     const baseUrl = typeof window !== 'undefined' ? window.location.origin.replace('/dashboard', '') : '';
     const fullUrl = `${baseUrl}${saleUrl}?utm_source=${platform}&utm_medium=social&utm_campaign=sale_promotion`;
     const encodedUrl = encodeURIComponent(fullUrl);
@@ -458,8 +459,11 @@ export default function SalesListClient({
                               <div>
                                 <div className="font-semibold">{sale.name}</div>
                                 {sale.slug && (
-                                  <div className="text-xs text-muted-foreground" title={`Storefront URL: /sales/${sale.slug} (path is /sales/, slug is ${sale.slug})`}>
-                                    <span className="font-medium">Storefront:</span> /sales/{sale.slug}
+                                  <div
+                                    className="text-xs text-muted-foreground"
+                                    title={`Storefront URL: ${storefrontSalePath(sale.slug)} (slug: ${sale.slug})`}
+                                  >
+                                    <span className="font-medium">Storefront:</span> {storefrontSalePath(sale.slug)}
                                   </div>
                                 )}
                               </div>
@@ -499,7 +503,7 @@ export default function SalesListClient({
                                 asChild
                                 title="View sale page"
                               >
-                                <Link href={`/sales/${sale.slug}`} target="_blank">
+                                <Link href={storefrontSalePath(sale.slug)} target="_blank">
                                   <EyeIcon className="h-4 w-4" />
                                 </Link>
                               </Button>

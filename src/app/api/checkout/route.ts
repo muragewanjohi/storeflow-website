@@ -392,6 +392,16 @@ export async function POST(request: NextRequest) {
       // Don't fail the order creation if emails fail
     });
 
+    const { sendNewOrderSmsToMerchant } = await import('@/lib/sms/tenant-notifications');
+    void sendNewOrderSmsToMerchant({
+      tenantId: tenant.id,
+      countryIso2: tenant.country,
+      orderNumber: order.order_number,
+      totalLabel: Number(order.total_amount).toFixed(2),
+    }).catch((error) => {
+      console.error('[Checkout] Failed to send new-order SMS:', error);
+    });
+
     // Send immediate notification email separately (different return type)
     (async () => {
       try {

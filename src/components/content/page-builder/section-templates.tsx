@@ -23,6 +23,7 @@ import {
   getSaleImageOrFallback,
   shouldUseUnoptimizedImage,
 } from '@/lib/images/fallbacks';
+import { publicSaleApiPath } from '@/lib/sales/slug-url';
 
 interface SectionRendererProps {
   section: PageSection;
@@ -1381,7 +1382,7 @@ function SalesTabSectionComponent({
           }
           
           // Fetch sale with products using slug (public API)
-          const saleData = await fetchJsonWithRetry(`/api/sales/${saleSlug}`);
+          const saleData = await fetchJsonWithRetry(publicSaleApiPath(saleSlug));
           if (!saleData) {
             throw new Error('Sale not found. The sale may have been deleted or is not active.');
           }
@@ -1390,21 +1391,24 @@ function SalesTabSectionComponent({
           setSales([saleData.sale]);
           setSaleBlocks([{ sale: saleData.sale, products: saleProducts }]);
         } else if (displayMode === 'featured_sales' && section.featured_sale_ids && section.featured_sale_ids.length > 0) {
-          // Fetch featured sales from public API
-          const featuredData = await fetchJsonWithRetry('/api/sales?status=active&is_featured=true&limit=10');
-          if (!featuredData) {
-            throw new Error('Failed to fetch featured sales');
+          // Load all active sales, then keep only those selected in the page builder (by ID, in order).
+          // Do not use is_featured=true — merchants often pick specific sales without toggling "featured",
+          // while /sales lists every active sale and would show them there.
+          const listData = await fetchJsonWithRetry('/api/sales?status=active&limit=100');
+          if (!listData) {
+            throw new Error('Failed to fetch sales');
           }
-          const featuredSales = featuredData.sales || [];
-          
-          // Limit to the number of featured sales selected
-          const salesToShow = featuredSales.slice(0, section.featured_sale_ids.length);
-          
-          // Fetch products for each featured sale
+          const allSales = listData.sales || [];
+          const idOrder = section.featured_sale_ids;
+          const salesToShow = idOrder
+            .map((id) => allSales.find((s: { id: string }) => s.id === id))
+            .filter((s): s is NonNullable<typeof s> => s != null);
+
+          // Fetch products for each selected sale
           const salesWithProducts = await Promise.all(
             salesToShow.map(async (sale: any) => {
               try {
-                const saleResponse = await fetch(`/api/sales/${sale.slug}`);
+                const saleResponse = await fetch(publicSaleApiPath(sale.slug));
                 if (saleResponse.ok) {
                   const saleData = await saleResponse.json();
                   return {
@@ -1441,7 +1445,7 @@ function SalesTabSectionComponent({
             allSales.map(async (sale: any) => {
               try {
                 if (!sale?.slug) return null;
-                const saleData = await fetchJsonWithRetry(`/api/sales/${sale.slug}`);
+                const saleData = await fetchJsonWithRetry(publicSaleApiPath(sale.slug));
                 if (!saleData) return null;
                 const saleProducts = mapSaleProducts(saleData.products || [], saleData.sale || sale, section.limit || 8);
                 return { sale: saleData.sale || sale, products: saleProducts };
@@ -1482,7 +1486,7 @@ function SalesTabSectionComponent({
       const activeSale = sales[activeTab] || sales[0];
       if (activeSale && activeSale.slug) {
         // Fallback: fetch if products not already loaded
-        fetch(`/api/sales/${activeSale.slug}`)
+        fetch(publicSaleApiPath(activeSale.slug))
           .then(res => res.json())
           .then(data => {
             const productsArray = data.products || [];

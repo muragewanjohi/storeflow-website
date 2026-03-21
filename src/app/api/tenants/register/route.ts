@@ -28,6 +28,8 @@ import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoAttributes, createDemoContent, getDemoProducts } from '@/lib/themes/demo-content';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
+import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
 
 interface StarterPackProduct {
   name: string;
@@ -346,7 +348,7 @@ async function getUniqueProductSlug(tenantId: string, name: string): Promise<str
 }
 
 async function getUniqueSaleSlug(tenantId: string, name: string): Promise<string> {
-  const base = generateSlug(name) || `sale-${Date.now()}`;
+  const base = generateSaleSlug(sanitizeSaleName(name)) || `sale-${Date.now()}`;
   let candidate = base;
   let suffix = 1;
 
@@ -510,7 +512,7 @@ async function applyStarterPackToTenant(
 
   for (let index = 0; index < salesPromotions.length; index += 1) {
     const promotion = salesPromotions[index];
-    const saleName = promotion.title?.trim();
+    const saleName = sanitizeSaleName(promotion.title?.trim() || '');
     if (!saleName) continue;
 
     const saleSlug = await getUniqueSaleSlug(tenantId, saleName);
@@ -1071,6 +1073,10 @@ const registerTenantSchema = z.object({
   starterPackJobId: z.string().uuid().optional(),
   includeDemoContent: z.boolean().optional(),
   includeDemoAttributes: z.boolean().optional(),
+  /** National or international format — validated with libphonenumber */
+  adminPhone: z.string().trim().min(1, 'Store phone number is required'),
+  /** ISO 3166-1 alpha-2; defaults to KE on the server if omitted */
+  adminPhoneCountry: z.string().length(2).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -1078,6 +1084,24 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = registerTenantSchema.parse(body);
+
+    const phoneCountry = (
+      validatedData.adminPhoneCountry?.toUpperCase() &&
+      isKnownCountryCode(validatedData.adminPhoneCountry.toUpperCase())
+        ? validatedData.adminPhoneCountry.toUpperCase()
+        : 'KE'
+    ) as CountryCode;
+    const e164Normalized = parseToE164Digits(validatedData.adminPhone, phoneCountry);
+    if (!e164Normalized) {
+      return NextResponse.json(
+        {
+          message: 'Invalid phone number',
+          errors: [{ field: 'adminPhone', message: 'Enter a valid phone number for the selected country' }],
+        },
+        { status: 400 },
+      );
+    }
+    const normalizedAdminPhoneE164 = e164Normalized;
     console.log('[Registration][Trace] Request received', {
       traceId: registrationTraceId,
       subdomain: validatedData.subdomain,
@@ -1462,6 +1486,8 @@ export async function POST(request: NextRequest) {
           theme: 'light',
           business_type: validatedData.businessType || undefined,
           selling: finalSelling,
+          admin_phone: normalizedAdminPhoneE164,
+          admin_phone_country: phoneCountry,
           // Store subscription pricing info for future payments
           subscription: validatedData.planId ? {
             currency: subscriptionCurrency,
@@ -1546,6 +1572,7 @@ export async function POST(request: NextRequest) {
         currency_thousand_separator: currencyInfo.thousandSeparator,
         currency_decimal_separator: currencyInfo.decimalSeparator,
         currency_decimal_places: String(currencyInfo.decimalPlaces),
+        store_phone: validatedData.adminPhone.trim(),
       });
       console.log(`[Registration] ✅ Initialized currency settings: ${currencyInfo.code} (${currencyInfo.symbol}) for country ${countryCode}`);
     } catch (currencyError) {
@@ -1553,17 +1580,22 @@ export async function POST(request: NextRequest) {
       // Non-critical - store can still function with default USD
     }
 
-    // Generate login URL with subdomain format
+    // Generate login URL and public storefront URL (subdomain)
     let loginUrl: string;
+    let storeUrl: string;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
     
     if (isLocalhost) {
       const url = new URL(baseUrl);
-      loginUrl = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard/login`;
+      const tenantHost = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}`;
+      loginUrl = `${tenantHost}/dashboard/login`;
+      storeUrl = `${tenantHost}/`;
     } else {
       const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
-      loginUrl = `https://${tenant.subdomain}.${baseDomain}/dashboard/login`;
+      const tenantHost = `https://${tenant.subdomain}.${baseDomain}`;
+      loginUrl = `${tenantHost}/dashboard/login`;
+      storeUrl = `${tenantHost}/`;
     }
 
     // Automatically add subdomain to Vercel
@@ -2767,6 +2799,32 @@ export async function POST(request: NextRequest) {
       })
       .catch((error) => {
         console.error('[Registration] Failed to send Day 1 onboarding email:', error);
+      });
+
+    const { sendRegistrationSms } = await import('@/lib/sms/tenant-notifications');
+    console.log('[Registration][SMS] Scheduling welcome SMS (async)', {
+      traceId: registrationTraceId,
+      tenantId: tenant.id,
+    });
+    void sendRegistrationSms({
+      tenantId: tenant.id,
+      adminPhoneE164: normalizedAdminPhoneE164,
+      storeName: tenant.name,
+      storeUrl,
+    })
+      .then((success) => {
+        console.log('[Registration][SMS] Welcome SMS promise settled', {
+          traceId: registrationTraceId,
+          tenantId: tenant.id,
+          success,
+        });
+      })
+      .catch((error) => {
+        console.error('[Registration][SMS] Welcome SMS rejected', {
+          traceId: registrationTraceId,
+          tenantId: tenant.id,
+          error: error instanceof Error ? error.message : error,
+        });
       });
 
     // Return success response

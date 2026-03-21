@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -46,6 +48,12 @@ import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
 import { VersionInfo } from '@/components/dashboard/version-info';
+import { RegistrationPhoneField } from '@/components/phone/registration-phone-field';
+import {
+  parseStoredPhoneToParts,
+  parseToE164Digits,
+  type CountryCode,
+} from '@/lib/phone/parse';
 
 // Store Hours Editor Component
 interface StoreHoursEditorProps {
@@ -169,6 +177,8 @@ interface TenantSettingsClientProps {
   tenant: Tenant;
   initialSettings: Record<string, any>;
   countries: Array<{ id: string; name: string; code: string | null }>;
+  canUseExtraStorePhones: boolean;
+  extraStorePhonesPlanName: string | null;
 }
 
 const CURRENCIES = [
@@ -184,7 +194,13 @@ const CURRENCIES = [
   { code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr' },
 ];
 
-export default function TenantSettingsClient({ tenant, initialSettings, countries }: Readonly<TenantSettingsClientProps>) {
+export default function TenantSettingsClient({
+  tenant,
+  initialSettings,
+  countries,
+  canUseExtraStorePhones,
+  extraStorePhonesPlanName,
+}: Readonly<TenantSettingsClientProps>) {
   const GOOGLE_LINK_PENDING_STORAGE_KEY = 'dukanest:tenant-google-link-pending';
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -203,6 +219,7 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const [linkedAuthProviders, setLinkedAuthProviders] = useState<string[]>([]);
   const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const [showExtraPhonesUpgradeDialog, setShowExtraPhonesUpgradeDialog] = useState(false);
   const tenantData = tenant.data && typeof tenant.data === 'object' ? (tenant.data as Record<string, unknown>) : {};
   const initialBusinessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : '';
   const initialSelling = typeof tenantData.selling === 'string' ? tenantData.selling : '';
@@ -212,8 +229,14 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     const { createClient } = await import('@/lib/supabase/client');
     return createClient();
   };
-  
-  const [formData, setFormData] = useState({
+
+  const phoneFallbackCountry: CountryCode = 'KE';
+
+  const [formData, setFormData] = useState(() => {
+    const p1 = parseStoredPhoneToParts(initialSettings.store_phone, phoneFallbackCountry);
+    const p2 = parseStoredPhoneToParts(initialSettings.store_phone_2, phoneFallbackCountry);
+    const p3 = parseStoredPhoneToParts(initialSettings.store_phone_3, phoneFallbackCountry);
+    return {
     // Contact Email
     contactEmail: tenant.contact_email || '',
     
@@ -224,7 +247,12 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     store_state: initialSettings.store_state || '',
     store_country: initialSettings.store_country || '',
     store_postal_code: initialSettings.store_postal_code || '',
-    store_phone: initialSettings.store_phone || '',
+    store_phone_country: p1.country,
+    store_phone_national: p1.national,
+    store_phone_2_country: p2.country,
+    store_phone_2_national: p2.national,
+    store_phone_3_country: p3.country,
+    store_phone_3_national: p3.national,
     store_logo: initialSettings.store_logo || '',
     business_type: initialBusinessType,
     selling: initialSelling,
@@ -268,7 +296,23 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     default_tax_rate: initialSettings.default_tax_rate || '',
     tax_pricing_type: initialSettings.tax_pricing_type || (initialSettings.tax_included_in_price ? 'inclusive' : 'exclusive'),
     tax_calculation_based_on: initialSettings.tax_calculation_based_on || 'billing_address',
+  };
   });
+
+  useEffect(() => {
+    const p1 = parseStoredPhoneToParts(initialSettings.store_phone, phoneFallbackCountry);
+    const p2 = parseStoredPhoneToParts(initialSettings.store_phone_2, phoneFallbackCountry);
+    const p3 = parseStoredPhoneToParts(initialSettings.store_phone_3, phoneFallbackCountry);
+    setFormData((prev) => ({
+      ...prev,
+      store_phone_country: p1.country,
+      store_phone_national: p1.national,
+      store_phone_2_country: p2.country,
+      store_phone_2_national: p2.national,
+      store_phone_3_country: p3.country,
+      store_phone_3_national: p3.national,
+    }));
+  }, [initialSettings.store_phone, initialSettings.store_phone_2, initialSettings.store_phone_3]);
 
   // Update currency symbol when currency code changes
   useEffect(() => {
@@ -444,6 +488,35 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     setIsSubmitting(true);
 
     try {
+      const toE164 = (national: string, country: string) => {
+        if (!national.trim()) return null;
+        return parseToE164Digits(national.trim(), country as CountryCode);
+      };
+
+      const primaryE164 = toE164(formData.store_phone_national, formData.store_phone_country);
+      if (formData.store_phone_national.trim() && !primaryE164) {
+        setSettingsError('Enter a valid primary store phone number, or clear the field.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      let phone2E164: string | null = null;
+      let phone3E164: string | null = null;
+      if (canUseExtraStorePhones) {
+        phone2E164 = toE164(formData.store_phone_2_national, formData.store_phone_2_country);
+        if (formData.store_phone_2_national.trim() && !phone2E164) {
+          setSettingsError('Enter a valid number for additional phone 2, or clear it.');
+          setIsSubmitting(false);
+          return;
+        }
+        phone3E164 = toE164(formData.store_phone_3_national, formData.store_phone_3_country);
+        if (formData.store_phone_3_national.trim() && !phone3E164) {
+          setSettingsError('Enter a valid number for additional phone 3, or clear it.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const payload: any = {
         // Store Details (store_name is stored in tenants table, not here)
         store_description: formData.store_description || null,
@@ -452,7 +525,13 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         store_state: formData.store_state || null,
         store_country: formData.store_country || null,
         store_postal_code: formData.store_postal_code || null,
-        store_phone: formData.store_phone || null,
+        store_phone: primaryE164,
+        ...(canUseExtraStorePhones
+          ? {
+              store_phone_2: phone2E164,
+              store_phone_3: phone3E164,
+            }
+          : {}),
         store_logo: formData.store_logo || null,
         business_type: formData.business_type?.trim() || null,
         selling: formData.selling?.trim() || null,
@@ -638,14 +717,14 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center rounded-md border border-transparent bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+                <span className="inline-flex items-center rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
                   Email &amp; Password
                 </span>
                 <span
                   className={
                     linkedAuthProviders.includes('google')
-                      ? 'inline-flex items-center rounded-md border border-transparent bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground'
-                      : 'inline-flex items-center rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold text-foreground'
+                      ? 'inline-flex items-center rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm'
+                      : 'inline-flex items-center rounded-md border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-semibold text-foreground'
                   }
                 >
                   {linkedAuthProviders.includes('google') ? 'Google Linked' : 'Google Not Linked'}
@@ -707,6 +786,113 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                 </p>
               </div>
             </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <RegistrationPhoneField
+                idPrefix="settings-store-phone-primary"
+                label="Store phone number"
+                description="Shown to customers where relevant. Used for SMS order alerts so you don&apos;t miss new orders—same flow as registration (country + number)."
+                countryCode={formData.store_phone_country}
+                nationalNumber={formData.store_phone_national}
+                onCountryCodeChange={(code) =>
+                  setFormData({ ...formData, store_phone_country: code as CountryCode })
+                }
+                onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_national: value })}
+                required={false}
+              />
+            </div>
+            {canUseExtraStorePhones ? (
+              <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm text-muted-foreground">
+                  Add up to two more numbers for the same SMS order alerts (and subscription reminders). Clear a field and save to remove it.
+                </p>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RegistrationPhoneField
+                        idPrefix="settings-store-phone-2"
+                        label="Additional phone 2"
+                        description="Optional. Same SMS alerts as your primary number."
+                        countryCode={formData.store_phone_2_country}
+                        nationalNumber={formData.store_phone_2_national}
+                        onCountryCodeChange={(code) =>
+                          setFormData({ ...formData, store_phone_2_country: code as CountryCode })
+                        }
+                        onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_2_national: value })}
+                        required={false}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          store_phone_2_national: '',
+                          store_phone_2_country: phoneFallbackCountry,
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RegistrationPhoneField
+                        idPrefix="settings-store-phone-3"
+                        label="Additional phone 3"
+                        description="Optional. Same SMS alerts as your primary number."
+                        countryCode={formData.store_phone_3_country}
+                        nationalNumber={formData.store_phone_3_national}
+                        onCountryCodeChange={(code) =>
+                          setFormData({ ...formData, store_phone_3_country: code as CountryCode })
+                        }
+                        onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_3_national: value })}
+                        required={false}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          store_phone_3_national: '',
+                          store_phone_3_country: phoneFallbackCountry,
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="font-medium text-foreground">Additional store phone numbers</strong> (up to two) are included on non-Basic
+                  plans. Your current plan ({extraStorePhonesPlanName || 'Basic'}) includes the primary number only.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" asChild size="sm">
+                    <Link href="/dashboard/subscription?tab=plans">View plans &amp; pricing</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowExtraPhonesUpgradeDialog(true)}
+                  >
+                    Why upgrade?
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="store_logo">Store Logo</Label>
               <div className="flex items-start gap-4">
@@ -814,16 +1000,6 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     />
                   )}
                 </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="store_phone">Phone Number</Label>
-                <Input
-                  id="store_phone"
-                  value={formData.store_phone}
-                  onChange={(e) => setFormData({ ...formData, store_phone: e.target.value })}
-                />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1815,6 +1991,31 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           <VersionInfo />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showExtraPhonesUpgradeDialog} onOpenChange={setShowExtraPhonesUpgradeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Additional phone numbers</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                On Pro and higher plans you can add two more store numbers. All configured numbers receive the same SMS
+                alerts for new orders and subscription reminders.
+              </p>
+              <p>Upgrade to unlock this alongside other Pro features.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                router.push('/dashboard/subscription?tab=plans');
+              }}
+            >
+              View plans &amp; pricing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={showDeleteAccountDialog}

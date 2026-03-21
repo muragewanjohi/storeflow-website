@@ -14,6 +14,7 @@ import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 import { getCurrencyForTenant } from '@/lib/currency/get-currency-server';
 import SalePageClient from './sale-page-client';
 import SalePageCurrencyWrapper from './sale-page-currency-wrapper';
@@ -49,7 +50,7 @@ export async function generateMetadata({
     tenant,
     title: sale.name,
     description: sale.description || `Shop ${sale.name} at ${tenant.name || tenant.subdomain}`,
-    url: `/sales/${slug}`,
+    url: storefrontSalePath(slug),
   });
 }
 
@@ -111,7 +112,7 @@ export default async function SalePage({
         },
       });
       if (saleByAltSlug) {
-        redirect(`/sales/${saleByAltSlug.slug}`);
+        redirect(storefrontSalePath(saleByAltSlug.slug));
       }
     }
     notFound();

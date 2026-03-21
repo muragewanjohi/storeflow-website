@@ -9,15 +9,30 @@
 import { z } from 'zod';
 
 /**
- * Generate slug from sale name
+ * Strip characters that break URL paths or confuse links (keeps letters in any script, numbers, spaces, and common punctuation).
+ */
+export function sanitizeSaleName(name: string): string {
+  return name
+    .trim()
+    .replace(/[^\p{L}\p{N}\s\-'.,&]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * URL-safe slug: lowercase ASCII, hyphens only (no :, %, !, &, etc.).
  */
 export function generateSaleSlug(name: string): string {
-  return name
+  const s = String(name || '')
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return s;
 }
 
 /**
@@ -29,7 +44,10 @@ export const saleStatusEnum = z.enum(['draft', 'active', 'scheduled', 'ended']);
  * Sale creation schema
  */
 export const createSaleSchema = z.object({
-  name: z.string().min(1, 'Sale name is required').max(255, 'Sale name must be less than 255 characters'),
+  name: z.preprocess(
+    (val) => (typeof val === 'string' ? sanitizeSaleName(val) : val),
+    z.string().min(1, 'Sale name is required').max(255, 'Sale name must be less than 255 characters'),
+  ),
   slug: z.string().optional(),
   description: z.string().nullable().optional().or(z.literal('').transform(() => null)),
   banner_image: z.string().url().optional().nullable().or(z.literal('').transform(() => null)),

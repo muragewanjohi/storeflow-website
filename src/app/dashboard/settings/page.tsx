@@ -26,6 +26,15 @@ export default async function TenantSettingsPage() {
     redirect('/login');
   }
 
+  const currentPlan = tenant.plan_id
+    ? await prisma.price_plans.findUnique({
+        where: { id: tenant.plan_id },
+        select: { id: true, name: true },
+      })
+    : null;
+  const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+  const canUseExtraStorePhones = !isBasicPlan;
+
   // Fetch all settings with error handling
   let settings: Record<string, string | null> = {};
   try {
@@ -38,6 +47,8 @@ export default async function TenantSettingsPage() {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'store_phone_2',
+      'store_phone_3',
       'store_logo',
       
       // Currency Settings
@@ -117,6 +128,8 @@ export default async function TenantSettingsPage() {
     store_country: settings.store_country || '',
     store_postal_code: settings.store_postal_code || '',
     store_phone: settings.store_phone || '',
+    store_phone_2: settings.store_phone_2 || '',
+    store_phone_3: settings.store_phone_3 || '',
     store_logo: settings.store_logo || '',
     
     // Currency Settings
@@ -161,6 +174,14 @@ export default async function TenantSettingsPage() {
     tax_calculation_based_on: settings.tax_calculation_based_on || 'billing_address',
   };
 
-  return <TenantSettingsClient tenant={tenant} initialSettings={formattedSettings} countries={countries} />;
+  return (
+    <TenantSettingsClient
+      tenant={tenant}
+      initialSettings={formattedSettings}
+      countries={countries}
+      canUseExtraStorePhones={canUseExtraStorePhones}
+      extraStorePhonesPlanName={currentPlan?.name ?? null}
+    />
+  );
 }
 

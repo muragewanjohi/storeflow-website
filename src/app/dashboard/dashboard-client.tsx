@@ -777,9 +777,12 @@ export default function DashboardClient({
                   </a>
                 </p>
                 {planInfo && (
-                  <Badge variant="secondary" className="mt-2">
-                    {planInfo.name} Plan - ${planInfo.price}/{planInfo.duration_months === 1 ? 'mo' : `${planInfo.duration_months}mo`}
-                  </Badge>
+                  <Button asChild size="sm" className="mt-2 h-auto rounded-md px-3 py-1.5 text-xs font-semibold shadow-sm">
+                    <Link href="/dashboard/subscription">
+                      {planInfo.name} Plan · ${planInfo.price}/
+                      {planInfo.duration_months === 1 ? 'mo' : `${planInfo.duration_months}mo`}
+                    </Link>
+                  </Button>
                 )}
               </div>
               <div className="flex gap-2">

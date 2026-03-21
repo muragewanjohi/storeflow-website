@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import { loadEnvConfig } from "@next/env";
+
+// Ensure .env* are loaded relative to this app (helps when cwd/env resolution differs)
+loadEnvConfig(process.cwd());
 
 const nextConfig: NextConfig = {
   // Avoid monorepo root inference issues (multiple lockfiles)

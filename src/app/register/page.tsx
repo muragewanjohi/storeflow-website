@@ -20,6 +20,8 @@ import { identifyTikTokPixelUser } from '@/lib/analytics/tiktok-pixel';
 import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
 import { detectUserLocationClient, detectLocationByIP } from '@/lib/pricing/location-client';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { RegistrationPhoneField } from '@/components/phone/registration-phone-field';
+import { isPhoneValidForCountry, type CountryCode } from '@/lib/phone/parse';
 
 interface PricingPlan {
   id: string;
@@ -213,6 +215,8 @@ function TenantRegisterForm() {
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [selling, setSelling] = useState<string>('');
   const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
+  const [adminPhoneCountry, setAdminPhoneCountry] = useState('KE');
+  const [adminPhone, setAdminPhone] = useState('');
   const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
   const isHandlingGoogleCallback = useRef(false);
   const subdomainCheckCacheRef = useRef<Map<string, boolean>>(new Map());
@@ -435,6 +439,11 @@ function TenantRegisterForm() {
         if (!businessType) return 'Please select a business type';
         if (businessType === 'Other' && !otherBusinessType.trim()) return 'Please enter your business type';
         return null;
+      case 'adminPhone':
+        if (!adminPhone.trim()) return 'Store phone number is required';
+        return isPhoneValidForCountry(adminPhone.trim(), adminPhoneCountry as CountryCode)
+          ? null
+          : 'Enter a valid mobile number for the selected country';
       default:
         return null;
     }
@@ -563,12 +572,18 @@ function TenantRegisterForm() {
       errors.otherBusinessType = 'Please enter your business type';
     }
 
+    if (!adminPhone.trim()) {
+      errors.adminPhone = 'Store phone number is required';
+    } else if (!isPhoneValidForCountry(adminPhone.trim(), adminPhoneCountry as CountryCode)) {
+      errors.adminPhone = 'Enter a valid mobile number for the selected country';
+    }
+
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setError('Please fill in all required fields highlighted below.');
       const firstFieldOrder = useEmailSignup
-        ? ['adminEmail', 'adminPassword', 'name', 'subdomain', 'businessType', 'otherBusinessType']
-        : ['name', 'subdomain', 'businessType', 'otherBusinessType'];
+        ? ['adminEmail', 'adminPassword', 'name', 'subdomain', 'adminPhone', 'businessType', 'otherBusinessType']
+        : ['name', 'subdomain', 'adminPhone', 'businessType', 'otherBusinessType'];
       const firstInvalidKey = firstFieldOrder.find((field) => errors[field]);
       const firstInvalidIdMap: Record<string, string> = {
         adminEmail: 'adminEmail',
@@ -577,6 +592,7 @@ function TenantRegisterForm() {
         subdomain: 'subdomain',
         businessType: 'business-type',
         otherBusinessType: 'otherBusinessType',
+        adminPhone: 'admin-phone-national',
       };
       const firstInvalidId = firstInvalidKey ? firstInvalidIdMap[firstInvalidKey] : null;
       if (firstInvalidId && typeof window !== 'undefined') {
@@ -672,6 +688,8 @@ function TenantRegisterForm() {
       otherBusinessType?: string;
       selling?: string;
       includeDemoContent?: boolean;
+      adminPhone?: string;
+      adminPhoneCountry?: string;
     };
   }) => {
     const effectiveFormData = options.overrides?.formData ?? formData;
@@ -680,6 +698,8 @@ function TenantRegisterForm() {
     const effectiveOtherBusinessType = options.overrides?.otherBusinessType ?? otherBusinessType;
     const effectiveSelling = options.overrides?.selling ?? selling;
     const effectiveIncludeDemoContent = options.overrides?.includeDemoContent ?? includeDemoContent;
+    const effectiveAdminPhone = options.overrides?.adminPhone ?? adminPhone;
+    const effectiveAdminPhoneCountry = options.overrides?.adminPhoneCountry ?? adminPhoneCountry;
 
     // Start the animated progress screen
     const steps = getProgressSteps(effectiveFormData.name, effectiveIncludeDemoContent);
@@ -725,6 +745,8 @@ function TenantRegisterForm() {
         selling: effectiveSelling.trim() || undefined,
         includeDemoContent: effectiveIncludeDemoContent,
         includeDemoAttributes: effectiveIncludeDemoContent,
+        adminPhone: effectiveAdminPhone.trim(),
+        adminPhoneCountry: effectiveAdminPhoneCountry || 'KE',
       }),
     });
 
@@ -762,7 +784,6 @@ function TenantRegisterForm() {
     }
 
     await completeAllSteps();
-    setShowProgress(false);
     identifyTikTokPixelUser({
       email: options.email,
       externalId: options.email,
@@ -784,11 +805,13 @@ function TenantRegisterForm() {
       utm_campaign: utmCampaign || undefined,
     });
     if (data.loginUrl) {
-      // Navigate straight to tenant admin login after successful registration.
+      // Keep progress UI until the browser navigates — do not setShowProgress(false) first
+      // or the registration form flashes briefly before redirect.
       window.location.assign(data.loginUrl);
       return true;
     }
 
+    setShowProgress(false);
     setSuccess(true);
     if (data.demoContentCreated) {
       setDemoContentInfo({
@@ -817,6 +840,8 @@ function TenantRegisterForm() {
         otherBusinessType,
         selling,
         includeDemoContent,
+        adminPhone,
+        adminPhoneCountry,
         utmSource,
         utmMedium,
         utmCampaign,
@@ -904,6 +929,10 @@ function TenantRegisterForm() {
         email: user.email,
         name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
         accessToken: sessionData.session.access_token,
+        overrides: {
+          adminPhone,
+          adminPhoneCountry,
+        },
       });
     } catch {
       cancelProgress();
@@ -993,6 +1022,8 @@ function TenantRegisterForm() {
         setOtherBusinessType(pending.otherBusinessType ?? otherBusinessType);
         setSelling(pending.selling ?? '');
         setIncludeDemoContent(Boolean(pending.includeDemoContent));
+        if (typeof pending.adminPhone === 'string') setAdminPhone(pending.adminPhone);
+        if (typeof pending.adminPhoneCountry === 'string') setAdminPhoneCountry(pending.adminPhoneCountry);
 
         const supabase = createSupabaseClient();
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -1341,6 +1372,22 @@ function TenantRegisterForm() {
                 className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af]"
               />
             </div>
+
+            <RegistrationPhoneField
+              countryCode={adminPhoneCountry}
+              nationalNumber={adminPhone}
+              onCountryCodeChange={(code) => {
+                setAdminPhoneCountry(code);
+                clearFieldError('adminPhone');
+              }}
+              onNationalNumberChange={(value) => {
+                setAdminPhone(value);
+                clearFieldError('adminPhone');
+              }}
+              onNationalBlur={() => handleBlur('adminPhone')}
+              error={fieldErrors.adminPhone}
+              disabled={isSubmitting}
+            />
 
             <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
               <p className="text-sm font-semibold text-[#101828]">We will customize your store based on what you are selling</p>
