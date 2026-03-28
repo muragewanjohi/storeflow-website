@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import type { UserRole } from '@/lib/auth/types';
+import { getTenantIdForSupabaseUser } from '@/lib/auth/mobile-auth';
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'refreshToken is required'),
@@ -37,8 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const role = ((data.user.user_metadata?.role as UserRole | undefined) ?? 'customer');
-    const tenantId =
-      typeof data.user.user_metadata?.tenant_id === 'string' ? data.user.user_metadata.tenant_id : undefined;
+    const tenantId = await getTenantIdForSupabaseUser(data.user);
 
     return NextResponse.json(
       mobileSuccess({
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
           id: data.user.id,
           email: data.user.email,
           role,
-          tenantId,
+          tenantId: tenantId ?? null,
         },
       }),
       { status: 200 },

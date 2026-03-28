@@ -81,3 +81,13 @@ export async function requireMobileAuth(request: Request): Promise<AuthUser> {
   return user;
 }
 
+/** Resolve tenant id after Supabase session refresh or MFA (metadata + tenants.user_id fallback). */
+export async function getTenantIdForSupabaseUser(user: {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}): Promise<string | undefined> {
+  const authUser = await mapSupabaseUserToAuthUser(user);
+  return authUser?.tenant_id;
+}
+

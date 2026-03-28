@@ -6,7 +6,8 @@ export type MobileErrorCode =
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR'
   | 'SUBSCRIPTION_EXPIRED'
-  | 'BAD_REQUEST';
+  | 'BAD_REQUEST'
+  | 'CONFLICT';
 
 export interface MobilePagination {
   page: number;

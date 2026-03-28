@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { verifyOTP } from '@/lib/mfa/email-otp';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
+import { getTenantIdForSupabaseUser } from '@/lib/auth/mobile-auth';
+import type { UserRole } from '@/lib/auth/types';
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return createSupabaseClient(supabaseUrl, supabaseAnonKey);
+}
 
 const verifySchema = z.object({
   userId: z.string().uuid('Invalid userId'),
@@ -42,10 +54,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let userSummary: {
+      id: string;
+      email: string;
+      role: UserRole;
+      tenantId: string | null;
+    } | null = null;
+
+    if (tempSession?.accessToken) {
+      try {
+        const supabase = getSupabaseClient();
+        const {
+          data: { user },
+          error: userErr,
+        } = await supabase.auth.getUser(tempSession.accessToken);
+        if (!userErr && user?.email) {
+          const role = ((user.user_metadata?.role as UserRole | undefined) ?? 'customer');
+          const tenantId = await getTenantIdForSupabaseUser(user);
+          userSummary = {
+            id: user.id,
+            email: user.email,
+            role,
+            tenantId: tenantId ?? null,
+          };
+        }
+      } catch {
+        // Non-fatal: tokens are still returned for client use
+      }
+    }
+
     return NextResponse.json(
       mobileSuccess({
         verified: true,
         userId,
+        user: userSummary,
         accessToken: tempSession?.accessToken,
         refreshToken: tempSession?.refreshToken,
         expiresAt: tempSession?.expiresAt,

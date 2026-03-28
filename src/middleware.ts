@@ -13,6 +13,11 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getTenantFromRequest } from './lib/tenant-context';
 import { createServerClient } from '@supabase/ssr';
+import {
+  applyMobileApiCors,
+  isMobileOrPublicRegistrationApiPath,
+  mobileApiCorsPreflight,
+} from './lib/api/mobile-cors';
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
@@ -35,6 +40,16 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/auth/callback')
   ) {
+    if (pathname.startsWith('/api/')) {
+      if (isMobileOrPublicRegistrationApiPath(pathname) && request.method === 'OPTIONS') {
+        return mobileApiCorsPreflight(request);
+      }
+      const res = NextResponse.next();
+      if (isMobileOrPublicRegistrationApiPath(pathname)) {
+        return applyMobileApiCors(request, res);
+      }
+      return res;
+    }
     return NextResponse.next();
   }
 
