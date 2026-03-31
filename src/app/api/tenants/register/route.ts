@@ -1073,6 +1073,12 @@ const registerTenantSchema = z.object({
   starterPackJobId: z.string().uuid().optional(),
   includeDemoContent: z.boolean().optional(),
   includeDemoAttributes: z.boolean().optional(),
+  /** Optional for mobile Google sign-up: Supabase session access token */
+  supabaseAccessToken: z.string().optional(),
+  /** Optional for mobile Google sign-up: Google OIDC id_token (server exchanges via Supabase) */
+  googleIdToken: z.string().optional(),
+  /** Optional companion token for id_token flows that include at_hash */
+  googleAccessToken: z.string().optional(),
   /** National or international format — validated with libphonenumber */
   adminPhone: z.string().trim().min(1, 'Store phone number is required'),
   /** ISO 3166-1 alpha-2; defaults to KE on the server if omitted */
@@ -1204,12 +1210,9 @@ export async function POST(request: NextRequest) {
 
     if (validatedData.authProvider === 'google') {
       const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-      const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-      if (!token) {
-        return NextResponse.json(
-          { message: 'Missing Google auth token' },
-          { status: 401 }
-        );
+      let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+      if (!token && validatedData.supabaseAccessToken) {
+        token = validatedData.supabaseAccessToken;
       }
 
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -1222,26 +1225,58 @@ export async function POST(request: NextRequest) {
       }
 
       const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey);
-      const { data: authData, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !authData.user) {
+      let googleUser:
+        | {
+            id: string;
+            email?: string;
+            user_metadata?: Record<string, any>;
+          }
+        | null = null;
+
+      // Preferred path: use an existing Supabase session token (same as web flow).
+      if (token) {
+        const { data: authData, error: authError } = await supabase.auth.getUser(token);
+        if (!authError && authData.user) {
+          googleUser = {
+            id: authData.user.id,
+            email: authData.user.email,
+            user_metadata: authData.user.user_metadata ?? {},
+          };
+        }
+      }
+
+      // Mobile fallback: exchange Google id_token directly through Supabase.
+      if (!googleUser && validatedData.googleIdToken) {
+        const { data: idTokenData, error: idTokenError } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: validatedData.googleIdToken,
+          ...(validatedData.googleAccessToken ? { access_token: validatedData.googleAccessToken } : {}),
+        });
+
+        if (!idTokenError && idTokenData.user) {
+          googleUser = {
+            id: idTokenData.user.id,
+            email: idTokenData.user.email,
+            user_metadata: idTokenData.user.user_metadata ?? {},
+          };
+        }
+      }
+
+      if (!googleUser) {
         return NextResponse.json(
           { message: 'Google session is invalid or expired' },
           { status: 401 }
         );
       }
 
-      if (authData.user.email?.toLowerCase() !== validatedData.adminEmail.toLowerCase()) {
+      if (googleUser.email?.toLowerCase() !== validatedData.adminEmail.toLowerCase()) {
         return NextResponse.json(
           { message: 'Authenticated Google user does not match registration email' },
           { status: 403 }
         );
       }
 
-      existingUser = {
-        id: authData.user.id,
-        email: authData.user.email,
-        user_metadata: authData.user.user_metadata ?? {},
-      };
+      existingUser = googleUser;
     } else {
       for (let page = 1; page <= maxPagesToSearch; page++) {
         const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({

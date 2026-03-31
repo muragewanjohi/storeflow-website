@@ -182,8 +182,13 @@ Validated by `registerTenantSchema` in `src/app/api/tenants/register/route.ts`:
 | `businessType`, `selling` | No | Onboarding |
 | `starterPackJobId` | No | If using async starter pack |
 | `includeDemoContent`, `includeDemoAttributes` | No | Booleans |
+| `supabaseAccessToken` | Optional (Google) | Existing Supabase access token for the same Google user (equivalent to Authorization Bearer token) |
+| `googleIdToken` | Optional (Google) | Google OIDC id_token; server can exchange via Supabase when no Supabase token is provided |
+| `googleAccessToken` | Optional (Google) | Companion access token for id_token flows that include `at_hash` |
 
-**Google-driven registration** on web merges additional server logic; for a minimal Flutter MVP, prefer **`authProvider: "email"`** with `adminPassword` unless you replicate the web Google + register flow.
+For `authProvider: "google"`, server validates identity via either:
+- `Authorization: Bearer <supabase_access_token>` or `supabaseAccessToken`, or
+- `googleIdToken` (+ optional `googleAccessToken`) exchanged server-side through Supabase.
 
 ### Success (201)
 
