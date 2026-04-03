@@ -25,7 +25,8 @@ import {
 } from '@/lib/themes/homepage-templates';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
-import { createDemoAttributes, createDemoContent, getDemoProducts } from '@/lib/themes/demo-content';
+import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
+import { getOnboardingImagePlaceholderUrl } from '@/lib/onboarding/image-placeholder';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
@@ -77,9 +78,6 @@ function toTitleCase(value: string): string {
 
 function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
   const niche = toTitleCase(selling) || 'Specialty';
-  const fallbackImages = getDemoProducts(niche, 8)
-    .map((item) => item.image?.trim())
-    .filter((value): value is string => Boolean(value));
 
   const categories = [
     `${niche} Essentials`,
@@ -104,37 +102,31 @@ function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
         name: `${niche} Starter Pick 1`,
         priceKES: 1800,
         description: `A premium ${niche.toLowerCase()} product selected for quality and everyday demand.`,
-        imageUrl: fallbackImages[0],
       },
       {
         name: `${niche} Starter Pick 2`,
         priceKES: 2500,
         description: `A high-value ${niche.toLowerCase()} option ideal for customers seeking quality and value.`,
-        imageUrl: fallbackImages[1],
       },
       {
         name: `${niche} Starter Pick 3`,
         priceKES: 3200,
         description: `A bestselling ${niche.toLowerCase()} selection curated for repeat purchases.`,
-        imageUrl: fallbackImages[2],
       },
       {
         name: `${niche} Starter Pick 4`,
         priceKES: 4500,
         description: `A premium ${niche.toLowerCase()} product for customers looking for top-tier quality.`,
-        imageUrl: fallbackImages[3],
       },
       {
         name: `${niche} Starter Pick 5`,
         priceKES: 1200,
         description: `An affordable ${niche.toLowerCase()} option designed for quick conversions.`,
-        imageUrl: fallbackImages[4],
       },
       {
         name: `${niche} Starter Pick 6`,
         priceKES: 3800,
         description: `A standout ${niche.toLowerCase()} product that balances quality and strong margins.`,
-        imageUrl: fallbackImages[5],
       },
     ],
     salesPromotions: [
@@ -143,14 +135,12 @@ function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
         subtitle: `Save up to 20% on selected ${niche.toLowerCase()} products this weekend.`,
         ctaText: 'Shop Weekend Deals',
         imagePrompt: `4k promotional banner for ${niche.toLowerCase()} weekend sale, premium ecommerce marketing style`,
-        imageUrl: fallbackImages[6] || fallbackImages[0],
       },
       {
         title: `Same-Day ${niche} Delivery`,
         subtitle: `Order before 4PM and get your ${niche.toLowerCase()} picks delivered today.`,
         ctaText: 'Order for Today',
         imagePrompt: `4k ecommerce hero banner for same-day ${niche.toLowerCase()} delivery, clean modern composition, high-conversion marketing style`,
-        imageUrl: fallbackImages[7] || fallbackImages[1] || fallbackImages[0],
       },
     ],
     blogPosts: [
@@ -403,12 +393,7 @@ async function applyStarterPackToTenant(
   const products = (starterPack.demoProducts ?? []).slice(0, 40);
   const salesPromotions = (starterPack.salesPromotions ?? []).slice(0, 2);
   const blogPosts = (starterPack.blogPosts ?? []).slice(0, 4);
-  const fallbackImagePool = getDemoProducts(
-    businessType || selling || 'General',
-    Math.max(products.length, 8)
-  )
-    .map((item) => item.image?.trim())
-    .filter((value): value is string => Boolean(value));
+  const placeholderImageUrl = getOnboardingImagePlaceholderUrl();
 
   if (
     categories.length === 0 &&
@@ -467,11 +452,10 @@ async function applyStarterPackToTenant(
     const validPrice = Number.isFinite(price) && price > 0 ? price : 100;
     const slug = await getUniqueProductSlug(tenantId, name);
     const categoryId = categoryIds.length > 0 ? categoryIds[index % categoryIds.length] : null;
-    const fallbackImageUrl = fallbackImagePool.length > 0 ? fallbackImagePool[index % fallbackImagePool.length] : null;
     const resolvedProductImage =
       typeof product.imageUrl === 'string' && product.imageUrl.trim().length > 0
         ? product.imageUrl.trim()
-        : fallbackImageUrl;
+        : placeholderImageUrl;
 
     const createdProduct = await prisma.products.create({
       data: {
@@ -483,7 +467,7 @@ async function applyStarterPackToTenant(
         price: validPrice,
         stock_quantity: 20,
         status: 'active',
-        image: resolvedProductImage || null,
+        image: resolvedProductImage,
         category_id: categoryId,
         sku: `SP-${String(index + 1).padStart(3, '0')}-${Date.now().toString().slice(-6)}`,
         metadata: {
@@ -493,7 +477,7 @@ async function applyStarterPackToTenant(
       },
     });
     createdProductIds.push(createdProduct.id);
-    if (categoryId && resolvedProductImage && resolvedProductImage.trim().length > 0) {
+    if (categoryId && resolvedProductImage.trim().length > 0) {
       if (!categoryImageCandidates.has(categoryId)) {
         categoryImageCandidates.set(categoryId, resolvedProductImage);
       }
@@ -518,11 +502,10 @@ async function applyStarterPackToTenant(
     const saleSlug = await getUniqueSaleSlug(tenantId, saleName);
     const now = new Date();
     const endDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const fallbackPromotionImage = fallbackImagePool.length > 0 ? fallbackImagePool[index % fallbackImagePool.length] : null;
     const resolvedPromotionImage =
       typeof promotion.imageUrl === 'string' && promotion.imageUrl.trim().length > 0
         ? promotion.imageUrl.trim()
-        : fallbackPromotionImage;
+        : placeholderImageUrl;
 
     const sale = await prisma.sales.create({
       data: {
@@ -536,7 +519,7 @@ async function applyStarterPackToTenant(
         end_date: endDate,
         status: 'active',
         is_featured: true,
-        banner_image: resolvedPromotionImage || null,
+        banner_image: resolvedPromotionImage,
         metadata: {
           source: 'starter_pack_ai',
           image_prompt: promotion.imagePrompt || null,
@@ -621,7 +604,7 @@ async function applyStarterPackToTenant(
           status: 'published',
           image:
             products.find((item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0)?.imageUrl ||
-            (fallbackImagePool.length > 0 ? fallbackImagePool[0] : null),
+            placeholderImageUrl,
         },
       });
       blogsCreated += 1;
@@ -727,11 +710,11 @@ async function applyStarterPackToTenant(
       if (Array.isArray(pageBuilderData.sections)) {
         const firstPromoImage = salesPromotions.find(
           (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
-        )?.imageUrl || (fallbackImagePool.length > 0 ? fallbackImagePool[0] : undefined);
+        )?.imageUrl;
         const firstProductImage = products.find(
           (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
-        )?.imageUrl || (fallbackImagePool.length > 0 ? fallbackImagePool[0] : undefined);
-        const bestStarterPackImage = firstPromoImage || firstProductImage;
+        )?.imageUrl;
+        const bestStarterPackImage = firstPromoImage || firstProductImage || placeholderImageUrl;
 
         const updatedSections = pageBuilderData.sections.map((section) => {
           if (section.type === 'hero') {
@@ -740,30 +723,37 @@ async function applyStarterPackToTenant(
               title: starterPack.copy?.headline || section.title,
               subtitle: starterPack.copy?.subheadline || section.subtitle,
               cta_text: starterPack.copy?.ctaText || section.cta_text,
-              image: bestStarterPackImage || section.image,
+              image: bestStarterPackImage,
             };
           }
 
           if (
             section.type === 'banners' &&
             Array.isArray(section.banners) &&
-            salesPromotions.length > 0
+            section.banners.length > 0 &&
+            (salesPromotions.length > 0 || products.length > 0)
           ) {
             const existingBanners = section.banners as Array<Record<string, unknown>>;
             const nextBanners = [...existingBanners];
 
-            for (let i = 0; i < Math.min(2, salesPromotions.length, nextBanners.length); i += 1) {
+            for (let i = 0; i < nextBanners.length; i += 1) {
               const promotion = salesPromotions[i];
-              nextBanners[i] = {
-                ...nextBanners[i],
-                title: promotion.title || nextBanners[i]?.title,
-                subtitle: promotion.subtitle || nextBanners[i]?.subtitle,
-                cta_text: promotion.ctaText || nextBanners[i]?.cta_text,
-                image:
-                  promotion.imageUrl ||
-                  (fallbackImagePool.length > 0 ? fallbackImagePool[i % fallbackImagePool.length] : undefined) ||
-                  nextBanners[i]?.image,
-              };
+              if (promotion) {
+                nextBanners[i] = {
+                  ...nextBanners[i],
+                  title: promotion.title || nextBanners[i]?.title,
+                  subtitle: promotion.subtitle || nextBanners[i]?.subtitle,
+                  cta_text: promotion.ctaText || nextBanners[i]?.cta_text,
+                  image: promotion.imageUrl?.trim() || placeholderImageUrl,
+                };
+              } else {
+                nextBanners[i] = {
+                  ...nextBanners[i],
+                  title: 'Shop the collection',
+                  subtitle: '',
+                  image: placeholderImageUrl,
+                };
+              }
             }
 
             return {
@@ -772,11 +762,7 @@ async function applyStarterPackToTenant(
             };
           }
 
-          if (
-            section.type === 'split_layout' &&
-            bestStarterPackImage &&
-            isRecord(section.left_side)
-          ) {
+          if (section.type === 'split_layout' && isRecord(section.left_side)) {
             return {
               ...section,
               left_side: {
@@ -820,6 +806,7 @@ async function applyStarterPackImagesToTenant(
   tenantId: string,
   starterPack: StarterPackPayload
 ): Promise<{ productsUpdated: number; salesUpdated: number; categoriesUpdated: number; blogsUpdated: number }> {
+  const placeholderImageUrl = getOnboardingImagePlaceholderUrl();
   const products = (starterPack.demoProducts ?? []).filter(
     (item) => typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0
   );
@@ -977,19 +964,27 @@ async function applyStarterPackImagesToTenant(
               image: bestStarterPackImage,
             };
           }
-          if (
-            section.type === 'banners' &&
-            Array.isArray(section.banners) &&
-            promotions.length > 0
-          ) {
+          if (section.type === 'banners' && Array.isArray(section.banners) && section.banners.length > 0) {
             const existingBanners = section.banners as Array<Record<string, unknown>>;
             const nextBanners = [...existingBanners];
-            for (let i = 0; i < Math.min(2, promotions.length, nextBanners.length); i += 1) {
-              const promotion = promotions[i];
-              nextBanners[i] = {
-                ...nextBanners[i],
-                image: promotion.imageUrl || nextBanners[i]?.image,
-              };
+            const fullPromotions = starterPack.salesPromotions ?? [];
+            for (let i = 0; i < nextBanners.length; i += 1) {
+              const promotionAtIndex = fullPromotions[i];
+              const imageUrl =
+                promotionAtIndex && typeof promotionAtIndex.imageUrl === 'string'
+                  ? promotionAtIndex.imageUrl.trim()
+                  : '';
+              if (imageUrl) {
+                nextBanners[i] = {
+                  ...nextBanners[i],
+                  image: imageUrl,
+                };
+              } else if (!promotionAtIndex) {
+                nextBanners[i] = {
+                  ...nextBanners[i],
+                  image: placeholderImageUrl,
+                };
+              }
             }
             return {
               ...section,
