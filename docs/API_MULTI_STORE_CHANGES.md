@@ -163,6 +163,14 @@ Server implementation delegates to the web register handler (`src/app/api/v1/mob
 | **Auth** | None (public) |
 | **Response shape** | Web-style JSON (top-level `success`, `tenant`, `message`—not the `data` wrapper) |
 
+### Web parity note (important)
+
+`POST /api/v1/mobile/auth/register` and `POST /api/tenants/register` use the **same registration logic** on the server.
+
+If a newly created store is empty (no products/categories/sales/blogs), this is typically a **request payload** issue, not a different endpoint issue.
+
+Starter/demo content generation depends on onboarding fields in the body (see **Starter content trigger checklist** below).
+
 ### Request body (core fields)
 
 Validated by `registerTenantSchema` in `src/app/api/tenants/register/route.ts`:
@@ -185,6 +193,34 @@ Validated by `registerTenantSchema` in `src/app/api/tenants/register/route.ts`:
 | `supabaseAccessToken` | Optional (Google) | Existing Supabase access token for the same Google user (equivalent to Authorization Bearer token) |
 | `googleIdToken` | Optional (Google) | Google OIDC id_token; server can exchange via Supabase when no Supabase token is provided |
 | `googleAccessToken` | Optional (Google) | Companion access token for id_token flows that include `at_hash` |
+
+### Starter content trigger checklist (for non-empty new stores)
+
+To match the web onboarding behavior (AI/starter-pack flow), send these fields on registration:
+
+- `includeDemoContent: true`
+- `includeDemoAttributes: true` (recommended when demo content is on)
+- `businessType`: non-empty string
+- `selling`: non-empty string
+
+If those are missing/false, registration still succeeds, but store content seeding may be skipped and the store can start empty.
+
+#### Minimal example payload for Flutter (email sign-up)
+
+```json
+{
+  "name": "My Store",
+  "subdomain": "my-store",
+  "adminEmail": "owner@example.com",
+  "adminPassword": "your-strong-password",
+  "adminPhone": "+254700000000",
+  "adminPhoneCountry": "KE",
+  "businessType": "Fashion",
+  "selling": "Clothes and accessories",
+  "includeDemoContent": true,
+  "includeDemoAttributes": true
+}
+```
 
 For `authProvider: "google"`, server validates identity via either:
 - `Authorization: Bearer <supabase_access_token>` or `supabaseAccessToken`, or
@@ -249,11 +285,18 @@ That work is **not** part of the current milestone. Revisit **`API_MULTI_STORE_C
 
 ---
 
-## Optional (still nice-to-have, not multi-store specific)
+## Session restore (single-store)
 
 ### `GET /api/v1/mobile/auth/me`
 
-Useful to restore session after app relaunch with user + **`tenant_id`** (single store). Does **not** require a `stores` list in the one-store model.
+| | |
+|--|--|
+| **Auth** | `Authorization: Bearer <accessToken>` |
+| **Roles** | Returns **`403`** if `tenant_admin` / `tenant_staff` but tenant context is missing; **`200`** with `tenant: null` for other roles (e.g. landlord). |
+
+**Success (`200`):** `{ "success": true, "data": { "user": { "id", "email", "role", "tenantId" }, "tenant": { "id", "name", "subdomain", "status", "domain" } | null } }`.
+
+Use after app relaunch to confirm the token and load **tenant** summary without a `stores[]` list. See [flutter_apis.md](./flutter_apis.md).
 
 ### `POST /api/v1/mobile/auth/google` (shop-owner mobile)
 

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
-import { getStaticOptions } from '@/lib/settings/static-options';
+import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
+import { cache } from '@/lib/cache/simple-cache';
 
 const SETTINGS_KEYS = [
   'store_description',
@@ -40,6 +42,195 @@ function asNumber(value: string | null | undefined, fallback: number | null = nu
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function storePhoneDigitsOrNull(v: string | null | undefined): string | null {
+  if (v == null || v === '') return null;
+  const d = v.replace(/\D/g, '');
+  return d || null;
+}
+
+type MobileSettingsPayload = {
+  store: {
+    id: string;
+    name: string;
+    subdomain: string;
+    domain: string;
+    contactEmail: string | null;
+    description: string | null;
+    phone: string | null;
+    phone2: string | null;
+    phone3: string | null;
+    address: {
+      line1: string | null;
+      city: string | null;
+      state: string | null;
+      country: string | null;
+      postalCode: string | null;
+    };
+    businessType: string | null;
+    selling: string | null;
+  };
+  currency: {
+    code: string;
+    symbol: string;
+    symbolPosition: string;
+  };
+  shipping: {
+    enabled: boolean;
+    freeShippingEnabled: boolean;
+    freeShippingThreshold: number | null;
+  };
+  payment: {
+    cashEnabled: boolean;
+    mpesaEnabled: boolean;
+    mpesaOption: string | null;
+    defaultMethod: string;
+  };
+  tax: {
+    enabled: boolean;
+    defaultRate: number | null;
+    calculationBasedOn: string;
+  };
+};
+
+async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettingsPayload | null> {
+  const [tenant, options] = await Promise.all([
+    prisma.tenants.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+        custom_domain: true,
+        contact_email: true,
+        data: true,
+      },
+    }),
+    getStaticOptions(tenantId, [...SETTINGS_KEYS]),
+  ]);
+
+  if (!tenant) return null;
+
+  const tenantData =
+    tenant.data && typeof tenant.data === 'object' && !Array.isArray(tenant.data)
+      ? (tenant.data as Record<string, unknown>)
+      : {};
+
+  const businessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : null;
+  const selling = typeof tenantData.selling === 'string' ? tenantData.selling : null;
+
+  return {
+    store: {
+      id: tenant.id,
+      name: tenant.name,
+      subdomain: tenant.subdomain,
+      domain: tenant.custom_domain || `${tenant.subdomain}.dukanest.com`,
+      contactEmail: tenant.contact_email,
+      description: options.store_description,
+      phone: options.store_phone,
+      phone2: options.store_phone_2 ?? null,
+      phone3: options.store_phone_3 ?? null,
+      address: {
+        line1: options.store_address,
+        city: options.store_city,
+        state: options.store_state,
+        country: options.store_country,
+        postalCode: options.store_postal_code,
+      },
+      businessType,
+      selling,
+    },
+    currency: {
+      code: options.currency_code || 'USD',
+      symbol: options.currency_symbol || '$',
+      symbolPosition: options.currency_symbol_position || 'left',
+    },
+    shipping: {
+      enabled: asBoolean(options.shipping_enabled, true),
+      freeShippingEnabled: asBoolean(options.free_shipping_enabled, false),
+      freeShippingThreshold: asNumber(options.free_shipping_threshold, null),
+    },
+    payment: {
+      cashEnabled: asBoolean(options.payment_cash_enabled, true),
+      mpesaEnabled: asBoolean(options.payment_mpesa_enabled, false),
+      mpesaOption: options.payment_mpesa_option || null,
+      defaultMethod: options.default_payment_method || 'cash',
+    },
+    tax: {
+      enabled: asBoolean(options.tax_enabled, false),
+      defaultRate: asNumber(options.default_tax_rate, null),
+      calculationBasedOn: options.tax_calculation_based_on || 'billing_address',
+    },
+  };
+}
+
+const addressPatchSchema = z.object({
+  line1: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+  postalCode: z.string().nullable().optional(),
+});
+
+const mobileSettingsPatchSchema = z.object({
+  store: z
+    .object({
+      name: z.string().min(1).optional(),
+      contactEmail: z.string().email().optional(),
+      description: z.string().nullable().optional(),
+      phone: z.string().nullable().optional(),
+      phone2: z.string().nullable().optional(),
+      phone3: z.string().nullable().optional(),
+      businessType: z.string().nullable().optional(),
+      selling: z.string().nullable().optional(),
+      address: addressPatchSchema.optional(),
+    })
+    .optional(),
+  currency: z
+    .object({
+      code: z.string().max(10).optional(),
+      symbol: z.string().max(10).nullable().optional(),
+      symbolPosition: z.enum(['left', 'right']).optional(),
+    })
+    .optional(),
+  shipping: z
+    .object({
+      enabled: z.boolean().optional(),
+      freeShippingEnabled: z.boolean().optional(),
+      freeShippingThreshold: z.number().nullable().optional(),
+    })
+    .optional(),
+  payment: z
+    .object({
+      cashEnabled: z.boolean().optional(),
+      mpesaEnabled: z.boolean().optional(),
+      mpesaOption: z.enum(['send_money', 'buy_goods', 'paybill', 'pochi']).nullable().optional(),
+      defaultMethod: z.enum(['cash', 'mpesa']).optional(),
+    })
+    .optional(),
+  tax: z
+    .object({
+      enabled: z.boolean().optional(),
+      defaultRate: z.number().min(0).max(100).nullable().optional(),
+      calculationBasedOn: z
+        .enum(['billing_address', 'shipping_address', 'store_address'])
+        .optional(),
+    })
+    .optional(),
+});
+
+function patchHasContent(p: z.infer<typeof mobileSettingsPatchSchema>): boolean {
+  if (p.store) {
+    const { address, ...rest } = p.store;
+    if (Object.values(rest).some((v) => v !== undefined)) return true;
+    if (address && Object.values(address).some((v) => v !== undefined)) return true;
+  }
+  if (p.currency && Object.values(p.currency).some((v) => v !== undefined)) return true;
+  if (p.shipping && Object.values(p.shipping).some((v) => v !== undefined)) return true;
+  if (p.payment && Object.values(p.payment).some((v) => v !== undefined)) return true;
+  if (p.tax && Object.values(p.tax).some((v) => v !== undefined)) return true;
+  return false;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireMobileAuth(request);
@@ -58,82 +249,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [tenant, options] = await Promise.all([
-      prisma.tenants.findUnique({
-        where: { id: user.tenant_id },
-        select: {
-          id: true,
-          name: true,
-          subdomain: true,
-          custom_domain: true,
-          contact_email: true,
-          data: true,
-        },
-      }),
-      getStaticOptions(user.tenant_id, [...SETTINGS_KEYS]),
-    ]);
-
-    if (!tenant) {
-      return NextResponse.json(
-        mobileError('NOT_FOUND', 'Tenant not found'),
-        { status: 404 },
-      );
+    const payload = await loadMobileSettingsPayload(user.tenant_id);
+    if (!payload) {
+      return NextResponse.json(mobileError('NOT_FOUND', 'Tenant not found'), { status: 404 });
     }
 
-    const tenantData =
-      tenant.data && typeof tenant.data === 'object' && !Array.isArray(tenant.data)
-        ? (tenant.data as Record<string, unknown>)
-        : {};
-
-    const businessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : null;
-    const selling = typeof tenantData.selling === 'string' ? tenantData.selling : null;
-
-    return NextResponse.json(
-      mobileSuccess({
-        store: {
-          id: tenant.id,
-          name: tenant.name,
-          subdomain: tenant.subdomain,
-          domain: tenant.custom_domain || `${tenant.subdomain}.dukanest.com`,
-          contactEmail: tenant.contact_email,
-          description: options.store_description,
-          phone: options.store_phone,
-          phone2: options.store_phone_2 ?? null,
-          phone3: options.store_phone_3 ?? null,
-          address: {
-            line1: options.store_address,
-            city: options.store_city,
-            state: options.store_state,
-            country: options.store_country,
-            postalCode: options.store_postal_code,
-          },
-          businessType,
-          selling,
-        },
-        currency: {
-          code: options.currency_code || 'USD',
-          symbol: options.currency_symbol || '$',
-          symbolPosition: options.currency_symbol_position || 'left',
-        },
-        shipping: {
-          enabled: asBoolean(options.shipping_enabled, true),
-          freeShippingEnabled: asBoolean(options.free_shipping_enabled, false),
-          freeShippingThreshold: asNumber(options.free_shipping_threshold, null),
-        },
-        payment: {
-          cashEnabled: asBoolean(options.payment_cash_enabled, true),
-          mpesaEnabled: asBoolean(options.payment_mpesa_enabled, false),
-          mpesaOption: options.payment_mpesa_option || null,
-          defaultMethod: options.default_payment_method || 'cash',
-        },
-        tax: {
-          enabled: asBoolean(options.tax_enabled, false),
-          defaultRate: asNumber(options.default_tax_rate, null),
-          calculationBasedOn: options.tax_calculation_based_on || 'billing_address',
-        },
-      }),
-      { status: 200 },
-    );
+    return NextResponse.json(mobileSuccess(payload), { status: 200 });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Unauthorized mobile request')) {
       return NextResponse.json(
@@ -142,7 +263,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.error('[Mobile Dashboard Settings] Unexpected error:', error);
+    console.error('[Mobile Dashboard Settings GET] Unexpected error:', error);
     return NextResponse.json(
       mobileError('INTERNAL_ERROR', 'Failed to fetch settings'),
       { status: 500 },
@@ -150,3 +271,200 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * PATCH /api/v1/mobile/dashboard/settings
+ * Partial update; same static_options + tenants columns as web settings. **tenant_admin only.**
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await requireMobileAuth(request);
+
+    if (user.role !== 'tenant_admin') {
+      return NextResponse.json(
+        mobileError('FORBIDDEN', 'Only the store owner can update settings'),
+        { status: 403 },
+      );
+    }
+
+    if (!user.tenant_id) {
+      return NextResponse.json(
+        mobileError('FORBIDDEN', 'Tenant context missing for this user'),
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json();
+    const parsed = mobileSettingsPatchSchema.parse(body);
+    if (!patchHasContent(parsed)) {
+      return NextResponse.json(
+        mobileError('VALIDATION_ERROR', 'No settings fields to update', [
+          { field: 'body', message: 'Provide at least one nested field under store, currency, shipping, payment, or tax' },
+        ]),
+        { status: 400 },
+      );
+    }
+
+    const tenantRow = await prisma.tenants.findFirst({
+      where: { id: user.tenant_id, deleted_at: null },
+      select: { id: true, name: true, contact_email: true, data: true },
+    });
+
+    if (!tenantRow) {
+      return NextResponse.json(mobileError('NOT_FOUND', 'Tenant not found'), { status: 404 });
+    }
+
+    const optionsToSave: Record<string, string | null> = {};
+    let tenantName: string | undefined;
+    let tenantContactEmail: string | undefined;
+    let tenantDataPatch: Record<string, unknown> | null = null;
+
+    if (parsed.store) {
+      const s = parsed.store;
+      if (s.name !== undefined) tenantName = s.name;
+      if (s.contactEmail !== undefined) tenantContactEmail = s.contactEmail;
+      if (s.description !== undefined) optionsToSave.store_description = s.description;
+      if (s.phone !== undefined) optionsToSave.store_phone = storePhoneDigitsOrNull(s.phone);
+      if (s.phone2 !== undefined) optionsToSave.store_phone_2 = storePhoneDigitsOrNull(s.phone2);
+      if (s.phone3 !== undefined) optionsToSave.store_phone_3 = storePhoneDigitsOrNull(s.phone3);
+      if (s.businessType !== undefined || s.selling !== undefined) {
+        const existing =
+          tenantRow.data && typeof tenantRow.data === 'object' && !Array.isArray(tenantRow.data)
+            ? { ...(tenantRow.data as Record<string, unknown>) }
+            : {};
+        if (s.businessType !== undefined) {
+          existing.business_type = s.businessType;
+        }
+        if (s.selling !== undefined) {
+          existing.selling = s.selling;
+        }
+        tenantDataPatch = existing;
+      }
+      if (s.address) {
+        const a = s.address;
+        if (a.line1 !== undefined) optionsToSave.store_address = a.line1;
+        if (a.city !== undefined) optionsToSave.store_city = a.city;
+        if (a.state !== undefined) optionsToSave.store_state = a.state;
+        if (a.country !== undefined) optionsToSave.store_country = a.country;
+        if (a.postalCode !== undefined) optionsToSave.store_postal_code = a.postalCode;
+      }
+    }
+
+    if (parsed.currency) {
+      const c = parsed.currency;
+      if (c.code !== undefined) optionsToSave.currency_code = c.code;
+      if (c.symbol !== undefined) optionsToSave.currency_symbol = c.symbol;
+      if (c.symbolPosition !== undefined) optionsToSave.currency_symbol_position = c.symbolPosition;
+    }
+
+    if (parsed.shipping) {
+      const sh = parsed.shipping;
+      if (sh.enabled !== undefined) optionsToSave.shipping_enabled = String(sh.enabled);
+      if (sh.freeShippingEnabled !== undefined) {
+        optionsToSave.free_shipping_enabled = String(sh.freeShippingEnabled);
+      }
+      if (sh.freeShippingThreshold !== undefined) {
+        optionsToSave.free_shipping_threshold =
+          sh.freeShippingThreshold === null ? null : String(sh.freeShippingThreshold);
+      }
+    }
+
+    const paymentTouched = parsed.payment && Object.values(parsed.payment).some((v) => v !== undefined);
+
+    if (parsed.payment) {
+      const pay = parsed.payment;
+      if (pay.cashEnabled !== undefined) optionsToSave.payment_cash_enabled = String(pay.cashEnabled);
+      if (pay.mpesaEnabled !== undefined) optionsToSave.payment_mpesa_enabled = String(pay.mpesaEnabled);
+      if (pay.mpesaOption !== undefined) optionsToSave.payment_mpesa_option = pay.mpesaOption;
+      if (pay.defaultMethod !== undefined) optionsToSave.default_payment_method = pay.defaultMethod;
+    }
+
+    if (parsed.tax) {
+      const t = parsed.tax;
+      if (t.enabled !== undefined) optionsToSave.tax_enabled = String(t.enabled);
+      if (t.defaultRate !== undefined) {
+        optionsToSave.default_tax_rate = t.defaultRate === null ? null : String(t.defaultRate);
+      }
+      if (t.calculationBasedOn !== undefined) {
+        optionsToSave.tax_calculation_based_on = t.calculationBasedOn;
+      }
+    }
+
+    if (paymentTouched) {
+      const current = await getStaticOptions(user.tenant_id, [
+        'payment_cash_enabled',
+        'payment_mpesa_enabled',
+      ]);
+      const cashNow = asBoolean(current.payment_cash_enabled, true);
+      const mpesaNow = asBoolean(current.payment_mpesa_enabled, false);
+      const nextCash =
+        parsed.payment?.cashEnabled !== undefined ? parsed.payment.cashEnabled : cashNow;
+      const nextMpesa =
+        parsed.payment?.mpesaEnabled !== undefined ? parsed.payment.mpesaEnabled : mpesaNow;
+      if (!nextCash && !nextMpesa) {
+        return NextResponse.json(
+          mobileError('VALIDATION_ERROR', 'At least one payment method must be enabled', [
+            { field: 'payment', message: 'Enable cash or M-Pesa' },
+          ]),
+          { status: 400 },
+        );
+      }
+    }
+
+    if (Object.keys(optionsToSave).length > 0) {
+      await setStaticOptions(user.tenant_id, optionsToSave);
+    }
+
+    const tenantUpdate: {
+      name?: string;
+      contact_email?: string;
+      data?: object;
+    } = {};
+
+    if (tenantName !== undefined) tenantUpdate.name = tenantName;
+    if (tenantContactEmail !== undefined) tenantUpdate.contact_email = tenantContactEmail;
+    if (tenantDataPatch !== null) tenantUpdate.data = tenantDataPatch;
+
+    if (Object.keys(tenantUpdate).length > 0) {
+      await prisma.tenants.update({
+        where: { id: user.tenant_id },
+        data: tenantUpdate,
+      });
+    }
+
+    cache.delete(`${user.tenant_id}:currency`);
+
+    const payload = await loadMobileSettingsPayload(user.tenant_id);
+    if (!payload) {
+      return NextResponse.json(mobileError('NOT_FOUND', 'Tenant not found'), { status: 404 });
+    }
+
+    return NextResponse.json(mobileSuccess(payload), { status: 200 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        mobileError(
+          'VALIDATION_ERROR',
+          'Invalid settings payload',
+          error.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        ),
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof Error && error.message.includes('Unauthorized mobile request')) {
+      return NextResponse.json(
+        mobileError('UNAUTHORIZED', 'Missing or invalid bearer token'),
+        { status: 401 },
+      );
+    }
+
+    console.error('[Mobile Dashboard Settings PATCH] Unexpected error:', error);
+    return NextResponse.json(
+      mobileError('INTERNAL_ERROR', 'Failed to update settings'),
+      { status: 500 },
+    );
+  }
+}

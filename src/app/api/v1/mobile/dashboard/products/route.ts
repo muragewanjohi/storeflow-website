@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
+import { revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
-import { productQuerySchema } from '@/lib/products/validation';
+import {
+  createProductSchema,
+  generateSKU,
+  generateSlug,
+  productQuerySchema,
+} from '@/lib/products/validation';
+import { requireMobileTenantStaff, mobileTenantMustAllowWrites } from '@/lib/auth/mobile-dashboard-tenant';
+import { canCreateProduct } from '@/lib/subscriptions/limits';
+import { getProductCachePatterns } from '@/lib/cache/product-cache-keys';
+import { deleteCachePattern } from '@/lib/cache/redis';
 
 export async function GET(request: NextRequest) {
   try {
@@ -169,6 +179,130 @@ export async function GET(request: NextRequest) {
       mobileError('INTERNAL_ERROR', 'Failed to fetch products'),
       { status: 500 },
     );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const gate = await requireMobileTenantStaff(request);
+  if (!gate.ok) return gate.response;
+  const forbid = mobileTenantMustAllowWrites(gate.ctx.tenant);
+  if (forbid) return forbid;
+
+  const { user, tenantId, tenant } = gate.ctx;
+
+  try {
+    const body = await request.json();
+    const validatedData = createProductSchema.parse(body);
+
+    const slug = validatedData.slug || generateSlug(validatedData.name);
+    const slugTaken = await prisma.products.findFirst({
+      where: { tenant_id: tenantId, slug },
+    });
+    if (slugTaken) {
+      return NextResponse.json(mobileError('CONFLICT', 'A product with this slug already exists'), {
+        status: 409,
+      });
+    }
+
+    const limitCheck = await canCreateProduct(tenant);
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        mobileError('FORBIDDEN', limitCheck.reason || 'Product limit reached'),
+        { status: 403 },
+      );
+    }
+
+    let finalSku =
+      validatedData.sku && validatedData.sku.trim() !== ''
+        ? validatedData.sku.trim()
+        : generateSKU(validatedData.name, tenantId);
+
+    const skuCollision = await prisma.products.findFirst({
+      where: { tenant_id: tenantId, sku: finalSku },
+    });
+    if (skuCollision) {
+      finalSku = generateSKU(validatedData.name, tenantId);
+    }
+
+    if (validatedData.category_id) {
+      const cat = await prisma.categories.findFirst({
+        where: { id: validatedData.category_id, tenant_id: tenantId },
+      });
+      if (!cat) {
+        return NextResponse.json(
+          mobileError('VALIDATION_ERROR', 'Category not found', [
+            { field: 'category_id', message: 'Invalid category for this store' },
+          ]),
+          { status: 400 },
+        );
+      }
+    }
+
+    const product = await prisma.products.create({
+      data: {
+        tenant_id: tenantId,
+        name: validatedData.name,
+        slug,
+        description: validatedData.description ?? null,
+        short_description: validatedData.short_description ?? null,
+        price: Number(validatedData.price),
+        sale_price: validatedData.sale_price != null ? Number(validatedData.sale_price) : null,
+        sku: finalSku,
+        stock_quantity: validatedData.stock_quantity ?? 0,
+        status: validatedData.status ?? 'active',
+        image: validatedData.image ?? null,
+        gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
+        category_id: validatedData.category_id ?? null,
+        brand_id: validatedData.brand_id ?? null,
+        created_by: user.id,
+        metadata:
+          validatedData.metadata && typeof validatedData.metadata === 'object'
+            ? validatedData.metadata
+            : {},
+        estimated_delivery_days: validatedData.estimated_delivery_days ?? null,
+      },
+    });
+
+    try {
+      await prisma.$executeRaw`
+        UPDATE products
+        SET search_vector =
+          setweight(to_tsvector('english', COALESCE(name, '')), 'A') ||
+          setweight(to_tsvector('english', COALESCE(description, '')), 'B') ||
+          setweight(to_tsvector('english', COALESCE(sku, '')), 'A')
+        WHERE id = ${product.id}::uuid
+      `;
+    } catch (e) {
+      console.warn('[Mobile product POST] search_vector', e);
+    }
+
+    try {
+      revalidateTag(`products-${tenantId}`);
+      revalidateTag(`products-count-${tenantId}`);
+      for (const pattern of getProductCachePatterns(tenantId)) {
+        await deleteCachePattern(pattern);
+      }
+    } catch (e) {
+      console.warn('[Mobile product POST] cache', e);
+    }
+
+    return NextResponse.json(
+      mobileSuccess({ product, message: 'Product created successfully' }),
+      { status: 201 },
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        mobileError(
+          'VALIDATION_ERROR',
+          'Validation error',
+          error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+        ),
+        { status: 400 },
+      );
+    }
+    console.error('[Mobile Dashboard Products POST]', error);
+    return NextResponse.json(mobileError('INTERNAL_ERROR', 'Failed to create product'), { status: 500 });
   }
 }
 
