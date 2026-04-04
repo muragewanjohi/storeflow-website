@@ -51,9 +51,14 @@ async function updateBlog(request: NextRequest, params: Promise<{ id: string }>)
       return NextResponse.json(mobileError('NOT_FOUND', 'Blog not found'), { status: 404 });
     }
 
-    let slug = validatedData.slug;
-    if (validatedData.title && !validatedData.slug) {
+    const { slug: parsedSlug, ...blogFields } = validatedData;
+
+    let slug = parsedSlug;
+    if (validatedData.title && parsedSlug === undefined) {
       slug = generateSlug(validatedData.title);
+    }
+
+    if (slug !== undefined) {
       const slugConflict = await prisma.blogs.findFirst({
         where: { tenant_id: tenantId, slug, id: { not: id } },
       });
@@ -67,8 +72,8 @@ async function updateBlog(request: NextRequest, params: Promise<{ id: string }>)
     const blog = await prisma.blogs.update({
       where: { id },
       data: {
-        ...validatedData,
-        ...(slug && { slug }),
+        ...blogFields,
+        ...(slug !== undefined ? { slug } : {}),
         updated_at: new Date(),
       },
       include: { blog_categories: { select: { id: true, name: true, slug: true } } },

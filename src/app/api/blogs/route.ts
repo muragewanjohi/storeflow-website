@@ -155,8 +155,9 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const validatedData = createBlogSchema.parse(body);
 
-    // Generate slug if not provided
-    const slug = validatedData.slug || generateSlug(validatedData.title);
+    // Slug from schema is already sanitized; fall back to title (hyphens only, no colons/punctuation).
+    const slug =
+      (validatedData.slug ?? generateSlug(validatedData.title)) || `blog-${Date.now()}`;
 
     // Check if slug already exists for this tenant
     const existingBlog = await prisma.blogs.findFirst({

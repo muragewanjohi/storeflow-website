@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = createBlogSchema.parse(body);
-    const slug = validatedData.slug || generateSlug(validatedData.title);
+    const slug =
+      (validatedData.slug ?? generateSlug(validatedData.title)) || `blog-${Date.now()}`;
 
     const existingBlog = await prisma.blogs.findFirst({
       where: { tenant_id: tenantId, slug },

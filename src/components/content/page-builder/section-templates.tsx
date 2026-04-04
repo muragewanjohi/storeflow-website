@@ -3238,7 +3238,11 @@ function BlogCard({
   if (layout === 'list') {
     return (
       <Link
-        href={blog.slug ? `/blog/${blog.slug}` : `/blog/${blog.id}`}
+        href={
+          blog.slug
+            ? `/blog/${encodeURIComponent(blog.slug)}`
+            : `/blog/${blog.id}`
+        }
         className="group flex gap-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
       >
         <div className="relative w-64 h-48 flex-shrink-0 bg-[#e7e9eb] overflow-hidden">
@@ -3297,7 +3301,11 @@ function BlogCard({
 
   return (
     <Link
-      href={blog.slug ? `/blog/${blog.slug}` : `/blog/${blog.id}`}
+      href={
+        blog.slug
+          ? `/blog/${encodeURIComponent(blog.slug)}`
+          : `/blog/${blog.id}`
+      }
       className={`group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden ${className}`}
     >
       {/* Post Image */}
