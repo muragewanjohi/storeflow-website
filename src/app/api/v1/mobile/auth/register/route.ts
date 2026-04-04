@@ -7,7 +7,6 @@ type RegisterJson = {
   message?: string;
   tenant?: unknown;
   loginUrl?: string;
-  postRegistrationAuthUrl?: string | null;
   errors?: Array<{ field: string; message: string }>;
 };
 
@@ -27,7 +26,6 @@ export async function POST(request: NextRequest) {
           message: body.message ?? 'Tenant registered successfully',
           tenant: body.tenant,
           loginUrl: body.loginUrl,
-          postRegistrationAuthUrl: body.postRegistrationAuthUrl ?? null,
         }),
         { status: 201 },
       );

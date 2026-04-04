@@ -804,9 +804,9 @@ function TenantRegisterForm() {
       utm_medium: utmMedium || undefined,
       utm_campaign: utmCampaign || undefined,
     });
-    const redirectAfterRegister = data.postRegistrationAuthUrl || data.loginUrl;
+    const redirectAfterRegister = data.loginUrl;
     if (redirectAfterRegister) {
-      // Prefer magic link → dashboard when API returns it; otherwise tenant login page.
+      // Send the merchant to the tenant dashboard login page.
       // Keep progress UI until the browser navigates — do not setShowProgress(false) first
       // or the registration form flashes briefly before redirect.
       window.location.assign(redirectAfterRegister);

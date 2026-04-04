@@ -1657,7 +1657,7 @@ export async function POST(request: NextRequest) {
       // Non-critical - store can still function with default USD
     }
 
-    // Tenant host, storefront, login, and optional one-click dashboard entry (Supabase magic link)
+    // Tenant host, storefront, and login URL for post-registration redirect
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
 
@@ -1670,29 +1670,8 @@ export async function POST(request: NextRequest) {
       tenantHost = `https://${tenant.subdomain}.${baseDomain}`;
     }
 
-    const dashboardUrl = `${tenantHost}/dashboard`;
     const loginUrl = `${tenantHost}/dashboard/login`;
     const storeUrl = `${tenantHost}/`;
-    const postRegistrationRedirect = `${tenantHost}/auth/callback?next=${encodeURIComponent('/dashboard')}`;
-
-    let postRegistrationAuthUrl: string | null = null;
-    try {
-      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-        type: 'magiclink',
-        email: validatedData.adminEmail,
-        options: {
-          // Callback exchanges the code on the tenant host (session scoped to subdomain).
-          redirectTo: postRegistrationRedirect,
-        },
-      });
-      if (linkError) {
-        console.warn('[Registration] Post-registration magic link failed (user can use login page):', linkError.message);
-      } else if (linkData?.properties?.action_link) {
-        postRegistrationAuthUrl = linkData.properties.action_link;
-      }
-    } catch (magicLinkError) {
-      console.warn('[Registration] Post-registration magic link exception:', magicLinkError);
-    }
 
     // Automatically add subdomain to Vercel
     // IMPORTANT: We await this to ensure domain is added before user tries to access it
@@ -3194,8 +3173,6 @@ export async function POST(request: NextRequest) {
         subdomain: tenant.subdomain,
       },
       loginUrl,
-      /** When set, redirect the browser here to open a logged-in session on the tenant host and land on /dashboard (add redirect URL in Supabase Auth settings). */
-      postRegistrationAuthUrl,
       demoContentCreated,
       demoProductsCreated,
       demoCategoriesCreated,

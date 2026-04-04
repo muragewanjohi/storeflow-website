@@ -22,7 +22,7 @@ Companion docs: [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) (pagi
 2. **Responses** — Parse **`success` + `data`** (and **`pagination`** on list endpoints). On errors use **`error.code`** / **`error.message`**.
 3. **New store has no products** — Registration must send **`includeDemoContent: true`**, **`businessType`**, **`selling`**, etc. Same rule for **`POST /api/v1/mobile/auth/register`** and **`POST /api/tenants/register`** (see starter-content checklist in API_MULTI_STORE_CHANGES).
 4. **Cold start** — Call **`GET /auth/me`** with the access token to restore **`user`** + **`tenant`** context; use **`POST /auth/refresh`** when the access token expires.
-5. **After store registration** — On **`201`** from **`POST /auth/register`**, read **`data.postRegistrationAuthUrl`** and **`data.loginUrl`** (see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect*). Prefer opening **`postRegistrationAuthUrl`** when present (browser / in-app WebView) so the merchant lands on the tenant **`/dashboard`** without retyping credentials; otherwise use **`loginUrl`**. For an in-app API-only session, ignore both URLs and call **`POST /auth/login`** with the same email/password as usual.
+5. **After store registration** — On **`201`** from **`POST /auth/register`**, read **`data.loginUrl`** (see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect*). Open it in a browser or in-app WebView when you want the merchant to use the web dashboard login on the tenant host. For an in-app API-only session, ignore **`loginUrl`** and call **`POST /auth/login`** with the same email/password as usual.
 
 ---
 
@@ -33,7 +33,7 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | Method | Path | Notes |
 |--------|------|--------|
 | POST | `/auth/login` | Email/password; MFA flow per response |
-| POST | `/auth/register` | Same body as tenant register; **`data`** may include **`postRegistrationAuthUrl`** (prefer for “open dashboard”) and **`loginUrl`** (fallback to login page) — see below |
+| POST | `/auth/register` | Same body as tenant register; **`data.loginUrl`** points at tenant **`/dashboard/login`** after **201** — see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect* |
 | POST | `/auth/google` | Google `idToken` (+ `accessToken` if required) |
 | POST | `/auth/refresh` | Rotate session |
 | POST | `/auth/logout` | Invalidate server-side session if applicable |
@@ -215,7 +215,7 @@ Legend: **Exists** = available on the StoreFlow mobile API (and ideally wired in
 | Status | Method | Path | Purpose |
 |--------|--------|------|---------|
 | Exists | POST | `/auth/login` | Email/password (MFA challenge as per server) |
-| Exists | POST | `/auth/register` | Mobile registration envelope; **`data.postRegistrationAuthUrl`** (optional) + **`data.loginUrl`** — see API_MULTI_STORE_CHANGES *Post-registration redirect* |
+| Exists | POST | `/auth/register` | Mobile registration envelope; **`data.loginUrl`** (tenant login) — see API_MULTI_STORE_CHANGES *Post-registration redirect* |
 | Parity | POST | `/auth/google` | Google id token exchange |
 | Parity | * | `/auth/mfa/*`, refresh, logout | As implemented server-side |
 | Exists | GET | `/auth/me` | Restore session: `data.user`, `data.tenant` (tenant roles); landlord gets `tenant: null` |
