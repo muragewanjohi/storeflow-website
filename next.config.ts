@@ -66,6 +66,22 @@ const nextConfig: NextConfig = {
         hostname: '*.supabase.co',
         pathname: '/**',
       },
+      // Vercel preview deployments (placeholder/media URLs sometimes stored with VERCEL_URL)
+      {
+        protocol: 'https',
+        hostname: '**.vercel.app',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storeflow.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.storeflow.com',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
