@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { prisma } from '@/lib/prisma/client';
+import { getSharedAuthCookieDomain } from '@/lib/supabase/auth-cookie-domain';
 
 const ALLOWED_DOMAINS = [
   'dukanest.com',
@@ -44,6 +45,59 @@ function resolveRedirectTarget(
   return `${fallbackOrigin}/`;
 }
 
+function buildTenantDashboardAbsoluteUrl(subdomain: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const isLocalhost =
+    baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+  if (isLocalhost) {
+    const url = new URL(baseUrl);
+    return `${url.protocol}//${subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}/dashboard`;
+  }
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+  return `https://${subdomain}.${baseDomain}/dashboard`;
+}
+
+function isMarketingSiteHostname(hostname: string): boolean {
+  const h = hostname.split(':')[0];
+  const hasDefaultTenant = Boolean(process.env.DEFAULT_TENANT_SUBDOMAIN?.trim());
+  if (h === 'localhost' || h === '127.0.0.1') {
+    return !hasDefaultTenant;
+  }
+  if (h.includes('.localhost')) {
+    return false;
+  }
+  return (
+    h === 'www' ||
+    h === 'marketing' ||
+    h === 'www.dukanest.com' ||
+    h === 'dukanest.com' ||
+    h === 'www.storeflow.com' ||
+    h === 'storeflow.com' ||
+    h.includes('vercel.app') ||
+    h === process.env.MARKETING_DOMAIN?.split(':')[0]
+  );
+}
+
+function shouldRedirectTenantUserFromMarketingHomeToDashboard(
+  requestUrl: URL,
+  redirectTarget: string,
+): boolean {
+  let target: URL;
+  try {
+    target = new URL(redirectTarget);
+  } catch {
+    return false;
+  }
+  if (!isMarketingSiteHostname(requestUrl.hostname)) {
+    return false;
+  }
+  if (!isMarketingSiteHostname(target.hostname)) {
+    return false;
+  }
+  const path = target.pathname.replace(/\/+$/, '') || '/';
+  return path === '/' || path === '/dashboard';
+}
+
 /**
  * OAuth callback handler.
  * Exchanges auth code for session server-side, then redirects to intended path.
@@ -85,19 +139,31 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const redirectTarget = resolveRedirectTarget(
+  let redirectTarget = resolveRedirectTarget(
     nextParam,
     nextCookie,
     requestUrl.origin,
   );
 
+  if (
+    tenantSubdomainForCookie &&
+    shouldRedirectTenantUserFromMarketingHomeToDashboard(
+      requestUrl,
+      redirectTarget,
+    )
+  ) {
+    redirectTarget = buildTenantDashboardAbsoluteUrl(tenantSubdomainForCookie);
+  }
+
   const response = NextResponse.redirect(redirectTarget);
+  const cookieDomain = getSharedAuthCookieDomain(request.headers.get('host'));
   if (tenantSubdomainForCookie) {
     response.cookies.set('tenant-subdomain', tenantSubdomainForCookie, {
       path: '/',
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30, // 30 days
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
   }
   response.cookies.set('dukanest_oauth_next', '', {

@@ -18,18 +18,22 @@ import {
   isMobileOrPublicRegistrationApiPath,
   mobileApiCorsPreflight,
 } from './lib/api/mobile-cors';
+import { getSharedAuthCookieDomain } from './lib/supabase/auth-cookie-domain';
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
   const code = request.nextUrl.searchParams.get('code');
-  const oauthNextCookie = request.cookies.get('dukanest_oauth_next')?.value;
 
-  if ((pathname === '/' || pathname === '/index') && code && oauthNextCookie) {
+  if ((pathname === '/' || pathname === '/index') && code) {
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = '/auth/callback';
     callbackUrl.search = '';
     callbackUrl.searchParams.set('code', code);
+    const nextOnRoot = request.nextUrl.searchParams.get('next');
+    if (nextOnRoot) {
+      callbackUrl.searchParams.set('next', nextOnRoot);
+    }
     return NextResponse.redirect(callbackUrl);
   }
 
@@ -185,6 +189,8 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
+    const authCookieDomain = getSharedAuthCookieDomain(hostname);
+
     const supabase = createServerClient(
       supabaseUrl,
       supabaseAnonKey,
@@ -204,6 +210,7 @@ export async function middleware(request: NextRequest) {
                 sameSite: 'lax',
                 // Path should be root for auth cookies
                 path: '/',
+                ...(authCookieDomain ? { domain: authCookieDomain } : {}),
               });
             });
           },

@@ -21,7 +21,25 @@ const nextConfig: NextConfig = {
   
   // Optimize images - critical for performance (Amazon/Shopify use CDN + optimization)
   images: {
+    // Next.js 16+ will require explicit qualities when using the quality prop
+    qualities: [75, 90, 100],
     remotePatterns: [
+      // Local dev: onboarding placeholder and other same-origin URLs stored as absolute (NEXT_PUBLIC_APP_URL)
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'localhost',
+        pathname: '/**',
+      },
       // Storefront/domain-hosted assets (tenant subdomains and CDN paths)
       {
         protocol: 'https',

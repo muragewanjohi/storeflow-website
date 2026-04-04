@@ -9,13 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
-import { z } from 'zod';
-
-const createAttributeSchema = z.object({
-  name: z.string().min(1).max(255),
-  slug: z.string().max(255).optional().nullable(),
-  type: z.enum(['color', 'size', 'text', 'number']).optional().nullable(),
-});
+import { createAttributeSchema } from '@/lib/attributes/validation';
 
 /**
  * GET /api/attributes

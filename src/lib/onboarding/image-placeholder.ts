@@ -23,3 +23,14 @@ export function getOnboardingImagePlaceholderUrl(): string {
 
   return DEFAULT_PLACEHOLDER_PATH;
 }
+
+/** True if URL is the global onboarding placeholder (so we can overwrite with real assets). */
+export function isOnboardingPlaceholderUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim().toLowerCase();
+  if (u.length === 0) return false;
+  if (u.includes('onboarding-product-placeholder')) return true;
+  const envUrl = process.env.NEXT_PUBLIC_ONBOARDING_PLACEHOLDER_IMAGE_URL?.trim().toLowerCase();
+  if (envUrl && u === envUrl) return true;
+  return false;
+}

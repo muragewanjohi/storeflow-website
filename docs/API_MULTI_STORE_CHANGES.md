@@ -150,7 +150,7 @@ Response includes `Cache-Control: no-store`.
 |--|--|
 | **Auth** | None (public) |
 | **Body** | Same JSON as `POST /api/tenants/register` (see table below) |
-| **Response** | `{ "success": true, "data": { "message", "tenant", "loginUrl?" } }` on **201**; `{ "success": false, "error": { "code", "message", "details?" } }` on errors (`VALIDATION_ERROR`, `CONFLICT`, etc.) |
+| **Response** | `{ "success": true, "data": { "message", "tenant", "loginUrl?", "postRegistrationAuthUrl?" } }` on **201**; `{ "success": false, "error": { "code", "message", "details?" } }` on errors (`VALIDATION_ERROR`, `CONFLICT`, etc.) |
 
 Server implementation delegates to the web register handler (`src/app/api/v1/mobile/auth/register/route.ts`).
 
@@ -228,18 +228,40 @@ For `authProvider: "google"`, server validates identity via either:
 
 ### Success (201)
 
+**Web** (`POST /api/tenants/register`) returns a flat JSON body (no `data` wrapper). **Mobile** (`POST /api/v1/mobile/auth/register`) wraps the same fields inside **`data`**.
+
+Shared fields include:
+
+| Field | Description |
+|-------|-------------|
+| `tenant` | `{ id, name, subdomain }` |
+| `loginUrl` | Tenant admin login page, e.g. `https://{subdomain}.{base}/dashboard/login` |
+| `postRegistrationAuthUrl` | **Optional.** One-time Supabase magic link. When present, open this URL (browser / WebView) to establish a session on the **tenant host** and land on **`/dashboard`** without typing the password again. If absent (e.g. `generateLink` failed), use `loginUrl`. |
+| `storeUrl` | Public storefront root (optional in some clients) |
+| `demoContentCreated`, … | Other optional telemetry fields |
+
+Example (web-style top-level keys):
+
 ```json
 {
   "success": true,
   "message": "Tenant registered successfully",
   "tenant": { "id": "…", "name": "…", "subdomain": "…" },
-  "loginUrl": "…",
-  "demoContentCreated": false,
-  "…": "other optional fields"
+  "loginUrl": "https://mystore.example.com/dashboard/login",
+  "postRegistrationAuthUrl": "https://….supabase.co/auth/v1/verify?token=…",
+  "demoContentCreated": false
 }
 ```
 
-Use the returned `tenant` as context for UI if needed; then sign the user in with **`POST /api/v1/mobile/auth/login`** using the same email/password (and MFA if enabled)—same as any returning merchant.
+#### Post-registration redirect (web + Flutter)
+
+1. **Web** (`src/app/register/page.tsx`): redirects to **`postRegistrationAuthUrl`**, else **`loginUrl`**.
+2. **Flutter (recommended):** After **201**, if **`data.postRegistrationAuthUrl`** is non-null, open it (in-app browser / `url_launcher` / WebView). Otherwise open **`data.loginUrl`**. This matches the web “straight to dashboard” behavior.
+3. **Flutter (API-only app):** You may ignore both URLs and sign in with **`POST /api/v1/mobile/auth/login`** using the same email/password; that path is unchanged.
+
+**Supabase configuration:** Add tenant dashboard URLs to **Authentication → URL Configuration → Redirect URLs** (e.g. `https://*.yourdomain.com/dashboard`, `http://*.localhost:3000/dashboard`), or magic link generation can fail and `postRegistrationAuthUrl` will be omitted. See `.env.example` under Supabase.
+
+Use the returned `tenant` as context for UI if needed. For returning merchants, **`POST /api/v1/mobile/auth/login`** with email/password (and MFA if enabled) is unchanged.
 
 ### Errors
 
@@ -251,7 +273,8 @@ Use the returned `tenant` as context for UI if needed; then sign the user in wit
 
 1. Call **`check-subdomain`** while the user types; call **`POST /api/v1/mobile/auth/register`** (or web register) on submit.
 2. If you use the **mobile** register URL, parse the usual **`data`** envelope like other `/api/v1/mobile/*` routes.
-3. **CORS (Flutter Web):** In production set **`MOBILE_CORS_ORIGINS`** to your app origins (comma-separated). In **development** any `Origin` is reflected for mobile + registration paths. Native Android/iOS does not use CORS.
+3. **After successful registration:** implement **`data.postRegistrationAuthUrl ?? data.loginUrl`** when opening the tenant admin in a browser (see **Post-registration redirect** above). Keep **`POST /auth/login`** for in-app token-based sessions.
+4. **CORS (Flutter Web):** In production set **`MOBILE_CORS_ORIGINS`** to your app origins (comma-separated). In **development** any `Origin` is reflected for mobile + registration paths. Native Android/iOS does not use CORS.
 
 ---
 

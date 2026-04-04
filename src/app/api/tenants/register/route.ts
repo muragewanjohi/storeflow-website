@@ -26,7 +26,10 @@ import {
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
-import { getOnboardingImagePlaceholderUrl } from '@/lib/onboarding/image-placeholder';
+import {
+  getOnboardingImagePlaceholderUrl,
+  isOnboardingPlaceholderUrl,
+} from '@/lib/onboarding/image-placeholder';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
@@ -857,12 +860,23 @@ async function applyStarterPackImagesToTenant(
     categoriesUpdated += 1;
   }
 
+  const salesOrderedByCreation = await prisma.sales.findMany({
+    where: { tenant_id: tenantId },
+    orderBy: { created_at: 'asc' },
+    take: 12,
+    select: { id: true, banner_image: true, name: true },
+  });
+  const fullPromotionsList = starterPack.salesPromotions ?? [];
+
   for (const promotion of promotions) {
     const imageUrl = promotion.imageUrl!.trim();
-    const existingSale = await prisma.sales.findFirst({
+    const saleLookupName = sanitizeSaleName(promotion.title?.trim() || '');
+    if (!saleLookupName) continue;
+
+    let existingSale = await prisma.sales.findFirst({
       where: {
         tenant_id: tenantId,
-        name: { equals: promotion.title, mode: 'insensitive' },
+        name: { equals: saleLookupName, mode: 'insensitive' },
       },
       orderBy: { created_at: 'desc' },
       select: {
@@ -870,6 +884,28 @@ async function applyStarterPackImagesToTenant(
         banner_image: true,
       },
     });
+
+    if (!existingSale && promotion.title?.trim()) {
+      existingSale = await prisma.sales.findFirst({
+        where: {
+          tenant_id: tenantId,
+          name: { equals: promotion.title.trim(), mode: 'insensitive' },
+        },
+        orderBy: { created_at: 'desc' },
+        select: { id: true, banner_image: true },
+      });
+    }
+
+    if (!existingSale) {
+      const promoIndex = fullPromotionsList.findIndex((p) => {
+        const t = p.title?.trim() || '';
+        return sanitizeSaleName(t) === saleLookupName || t.toLowerCase() === promotion.title?.trim().toLowerCase();
+      });
+      if (promoIndex >= 0 && salesOrderedByCreation[promoIndex]) {
+        existingSale = salesOrderedByCreation[promoIndex];
+      }
+    }
+
     if (!existingSale) continue;
 
     if (existingSale.banner_image !== imageUrl) {
@@ -881,7 +917,7 @@ async function applyStarterPackImagesToTenant(
     }
   }
 
-  const blogImagePool = Array.from(
+  const generatedImagePool = Array.from(
     new Set(
       [
         ...products.map((item) => item.imageUrl?.trim()).filter((item): item is string => Boolean(item)),
@@ -890,7 +926,7 @@ async function applyStarterPackImagesToTenant(
     )
   );
 
-  if (blogImagePool.length > 0) {
+  if (generatedImagePool.length > 0) {
     const starterPackBlogs = starterPack.blogPosts ?? [];
     for (let index = 0; index < starterPackBlogs.length; index += 1) {
       const blog = starterPackBlogs[index];
@@ -906,9 +942,15 @@ async function applyStarterPackImagesToTenant(
         select: { id: true, image: true },
       });
       if (!existingBlog) continue;
-      if (existingBlog.image && existingBlog.image.trim().length > 0) continue;
 
-      const imageUrl = blogImagePool[index % blogImagePool.length];
+      const currentImg = existingBlog.image?.trim() ?? '';
+      const needsImage =
+        currentImg.length === 0 || isOnboardingPlaceholderUrl(existingBlog.image);
+      if (!needsImage) continue;
+
+      const imageUrl = generatedImagePool[index % generatedImagePool.length];
+      if (existingBlog.image === imageUrl) continue;
+
       await prisma.blogs.update({
         where: { id: existingBlog.id },
         data: { image: imageUrl },
@@ -919,16 +961,23 @@ async function applyStarterPackImagesToTenant(
     const remainingBlogs = await prisma.blogs.findMany({
       where: {
         tenant_id: tenantId,
-        OR: [{ image: null }, { image: '' }],
+        OR: [
+          { image: null },
+          { image: '' },
+          { image: { contains: 'onboarding-product-placeholder', mode: 'insensitive' } },
+        ],
       },
-      select: { id: true },
+      select: { id: true, image: true },
       orderBy: { created_at: 'desc' },
-      take: Math.max(4, blogImagePool.length),
+      take: Math.max(4, generatedImagePool.length),
     });
 
     for (let index = 0; index < remainingBlogs.length; index += 1) {
       const blog = remainingBlogs[index];
-      const imageUrl = blogImagePool[index % blogImagePool.length];
+      const currentImg = blog.image?.trim() ?? '';
+      if (currentImg.length > 0 && !isOnboardingPlaceholderUrl(blog.image)) continue;
+
+      const imageUrl = generatedImagePool[index % generatedImagePool.length];
       await prisma.blogs.update({
         where: { id: blog.id },
         data: { image: imageUrl },
@@ -968,23 +1017,21 @@ async function applyStarterPackImagesToTenant(
             const existingBanners = section.banners as Array<Record<string, unknown>>;
             const nextBanners = [...existingBanners];
             const fullPromotions = starterPack.salesPromotions ?? [];
+            const pool = generatedImagePool;
             for (let i = 0; i < nextBanners.length; i += 1) {
               const promotionAtIndex = fullPromotions[i];
-              const imageUrl =
+              const fromPromo =
                 promotionAtIndex && typeof promotionAtIndex.imageUrl === 'string'
                   ? promotionAtIndex.imageUrl.trim()
                   : '';
-              if (imageUrl) {
-                nextBanners[i] = {
-                  ...nextBanners[i],
-                  image: imageUrl,
-                };
-              } else if (!promotionAtIndex) {
-                nextBanners[i] = {
-                  ...nextBanners[i],
-                  image: placeholderImageUrl,
-                };
-              }
+              const chosen =
+                fromPromo ||
+                (pool.length > 0 ? pool[i % pool.length] : '') ||
+                placeholderImageUrl;
+              nextBanners[i] = {
+                ...nextBanners[i],
+                image: chosen,
+              };
             }
             return {
               ...section,
@@ -1610,22 +1657,41 @@ export async function POST(request: NextRequest) {
       // Non-critical - store can still function with default USD
     }
 
-    // Generate login URL and public storefront URL (subdomain)
-    let loginUrl: string;
-    let storeUrl: string;
+    // Tenant host, storefront, login, and optional one-click dashboard entry (Supabase magic link)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
-    
+
+    let tenantHost: string;
     if (isLocalhost) {
       const url = new URL(baseUrl);
-      const tenantHost = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}`;
-      loginUrl = `${tenantHost}/dashboard/login`;
-      storeUrl = `${tenantHost}/`;
+      tenantHost = `${url.protocol}//${tenant.subdomain}.${url.hostname}${url.port ? `:${url.port}` : ''}`;
     } else {
       const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
-      const tenantHost = `https://${tenant.subdomain}.${baseDomain}`;
-      loginUrl = `${tenantHost}/dashboard/login`;
-      storeUrl = `${tenantHost}/`;
+      tenantHost = `https://${tenant.subdomain}.${baseDomain}`;
+    }
+
+    const dashboardUrl = `${tenantHost}/dashboard`;
+    const loginUrl = `${tenantHost}/dashboard/login`;
+    const storeUrl = `${tenantHost}/`;
+    const postRegistrationRedirect = `${tenantHost}/auth/callback?next=${encodeURIComponent('/dashboard')}`;
+
+    let postRegistrationAuthUrl: string | null = null;
+    try {
+      const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: 'magiclink',
+        email: validatedData.adminEmail,
+        options: {
+          // Callback exchanges the code on the tenant host (session scoped to subdomain).
+          redirectTo: postRegistrationRedirect,
+        },
+      });
+      if (linkError) {
+        console.warn('[Registration] Post-registration magic link failed (user can use login page):', linkError.message);
+      } else if (linkData?.properties?.action_link) {
+        postRegistrationAuthUrl = linkData.properties.action_link;
+      }
+    } catch (magicLinkError) {
+      console.warn('[Registration] Post-registration magic link exception:', magicLinkError);
     }
 
     // Automatically add subdomain to Vercel
@@ -3128,6 +3194,8 @@ export async function POST(request: NextRequest) {
         subdomain: tenant.subdomain,
       },
       loginUrl,
+      /** When set, redirect the browser here to open a logged-in session on the tenant host and land on /dashboard (add redirect URL in Supabase Auth settings). */
+      postRegistrationAuthUrl,
       demoContentCreated,
       demoProductsCreated,
       demoCategoriesCreated,

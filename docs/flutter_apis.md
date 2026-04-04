@@ -22,6 +22,7 @@ Companion docs: [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) (pagi
 2. **Responses** — Parse **`success` + `data`** (and **`pagination`** on list endpoints). On errors use **`error.code`** / **`error.message`**.
 3. **New store has no products** — Registration must send **`includeDemoContent: true`**, **`businessType`**, **`selling`**, etc. Same rule for **`POST /api/v1/mobile/auth/register`** and **`POST /api/tenants/register`** (see starter-content checklist in API_MULTI_STORE_CHANGES).
 4. **Cold start** — Call **`GET /auth/me`** with the access token to restore **`user`** + **`tenant`** context; use **`POST /auth/refresh`** when the access token expires.
+5. **After store registration** — On **`201`** from **`POST /auth/register`**, read **`data.postRegistrationAuthUrl`** and **`data.loginUrl`** (see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect*). Prefer opening **`postRegistrationAuthUrl`** when present (browser / in-app WebView) so the merchant lands on the tenant **`/dashboard`** without retyping credentials; otherwise use **`loginUrl`**. For an in-app API-only session, ignore both URLs and call **`POST /auth/login`** with the same email/password as usual.
 
 ---
 
@@ -32,7 +33,7 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | Method | Path | Notes |
 |--------|------|--------|
 | POST | `/auth/login` | Email/password; MFA flow per response |
-| POST | `/auth/register` | Same body as tenant register; mobile `{ success, data }` envelope |
+| POST | `/auth/register` | Same body as tenant register; **`data`** may include **`postRegistrationAuthUrl`** (prefer for “open dashboard”) and **`loginUrl`** (fallback to login page) — see below |
 | POST | `/auth/google` | Google `idToken` (+ `accessToken` if required) |
 | POST | `/auth/refresh` | Rotate session |
 | POST | `/auth/logout` | Invalidate server-side session if applicable |
@@ -68,6 +69,20 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | GET | `/dashboard/blogs/:id` | Detail |
 | PUT/PATCH | `/dashboard/blogs/:id` | Update |
 | DELETE | `/dashboard/blogs/:id` | Delete |
+| GET | `/dashboard/attributes` | List attributes + values (`data.items`) |
+| POST | `/dashboard/attributes` | Create attribute |
+| GET | `/dashboard/attributes/:id` | Detail + values |
+| PUT/PATCH | `/dashboard/attributes/:id` | Update (body must include ≥1 of `name`, `slug`, `type`) |
+| DELETE | `/dashboard/attributes/:id` | Delete (cascades values) |
+| GET | `/dashboard/attributes/:id/values` | List values for attribute |
+| POST | `/dashboard/attributes/:id/values` | Create value (`value`, optional `color_code` `#RRGGBB`) |
+| PUT/PATCH | `/dashboard/attributes/:id/values/:valueId` | Update value |
+| DELETE | `/dashboard/attributes/:id/values/:valueId` | Delete value |
+| GET | `/dashboard/pages` | Paginated list (`data.items`, `pagination`) — query like web `pageQuerySchema` |
+| POST | `/dashboard/pages` | Create page (`createPageSchema`); plan limit via `canCreatePage` |
+| GET | `/dashboard/pages/:id` | Full page row (incl. `content`, `published_content`) |
+| PUT/PATCH | `/dashboard/pages/:id` | Update page (`updatePageSchema`); revalidates storefront paths |
+| DELETE | `/dashboard/pages/:id` | Delete; **blocked** for slugs `home`, `about`, `contact` |
 | GET | `/dashboard/analytics` | Optional `?days=` (1–365, default **30**) |
 | GET | `/dashboard/sales` | **List** promotions/sales (paginated) |
 | POST | `/dashboard/sales` | Create sale |
@@ -94,7 +109,7 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | POST | `/api/tenants/register` |
 | POST | `/api/v1/mobile/auth/register` | *(recommended mobile envelope)* |
 
-**Still out of scope on mobile (use web tenant APIs if needed):** storefront **pages/hero** CRUD, **order packing-slip / invoice** download, **attributes/facets** CRUD, dedicated **`PATCH /dashboard/onboarding-progress`** (use **`/dashboard/getting-started`** instead). **CMS:** blogs are covered; **theme page builder** is not.
+**Still out of scope or optional:** **order packing-slip / invoice** download, dedicated **`PATCH /dashboard/onboarding-progress`** (use **`/dashboard/getting-started`** instead). **CMS:** blogs and **pages** (page builder JSON / hero via `home` page `content`) are on mobile; **theme template** switching is not a dedicated mobile route. **Facets** in this codebase map to **attributes** + **attribute values** (no separate `/facets` path).
 
 **Settings write parity:** `PATCH /dashboard/settings` updates `static_options` + `tenants` (`name`, `contact_email`, `data.business_type` / `data.selling`) for fields the mobile GET exposes. At least one of cash or M-Pesa must remain enabled if the client sends `payment` fields.
 
@@ -200,7 +215,7 @@ Legend: **Exists** = available on the StoreFlow mobile API (and ideally wired in
 | Status | Method | Path | Purpose |
 |--------|--------|------|---------|
 | Exists | POST | `/auth/login` | Email/password (MFA challenge as per server) |
-| Exists | POST | `/auth/register` | Mobile registration envelope (see API_MULTI_STORE_CHANGES) |
+| Exists | POST | `/auth/register` | Mobile registration envelope; **`data.postRegistrationAuthUrl`** (optional) + **`data.loginUrl`** — see API_MULTI_STORE_CHANGES *Post-registration redirect* |
 | Parity | POST | `/auth/google` | Google id token exchange |
 | Parity | * | `/auth/mfa/*`, refresh, logout | As implemented server-side |
 | Exists | GET | `/auth/me` | Restore session: `data.user`, `data.tenant` (tenant roles); landlord gets `tenant: null` |
@@ -275,8 +290,10 @@ Exact split between one coarse `PATCH /dashboard/settings` vs fine-grained route
 | Exists | POST | `/dashboard/categories` | Create | `CategoryEditorScreen` |
 | Exists | PUT/PATCH | `/dashboard/categories/:id` | Update | `CategoryEditorScreen` |
 | Exists | DELETE | `/dashboard/categories/:id` | Delete (with guards) | Management screen |
-| Required | GET | `/dashboard/attributes` or `/dashboard/facets` | List attributes/facets | `AttributesManagementScreen` |
-| Required | POST/PATCH/DELETE | *(attribute routes)* | CRUD | `AttributeEditorScreen` |
+| Exists | GET | `/dashboard/attributes` | List attributes + embedded values | `AttributesManagementScreen` |
+| Exists | POST/PUT/PATCH/DELETE | `/dashboard/attributes`, `/dashboard/attributes/:id` | Attribute CRUD | `AttributeEditorScreen` |
+| Exists | GET/POST | `/dashboard/attributes/:id/values` | List / create values | Value editor |
+| Exists | PUT/PATCH/DELETE | `/dashboard/attributes/:id/values/:valueId` | Value CRUD | Value editor |
 
 ---
 
@@ -289,7 +306,8 @@ Exact split between one coarse `PATCH /dashboard/settings` vs fine-grained route
 | Exists | GET | `/dashboard/blogs/:id` | Detail | `BlogPostEditorScreen` |
 | Exists | PUT/PATCH | `/dashboard/blogs/:id` | Update | `BlogPostEditorScreen` |
 | Exists | DELETE | `/dashboard/blogs/:id` | Delete | `BlogPostEditorScreen` |
-| Required | GET/PATCH | pages / hero routes | Storefront page & hero | `PageEditorScreen`, `HeroSectionEditorScreen` |
+| Exists | GET/POST | `/dashboard/pages` | List / create pages | `PageEditorScreen` |
+| Exists | GET/PUT/PATCH/DELETE | `/dashboard/pages/:id` | Page CRUD; hero/home = edit **`home`** page **`content`** JSON | `PageEditorScreen`, `HeroSectionEditorScreen` |
 
 ---
 
