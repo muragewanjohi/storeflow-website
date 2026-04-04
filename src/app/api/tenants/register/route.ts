@@ -6,7 +6,7 @@
  * Allows public users to register a new tenant (no auth required)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -2113,7 +2113,7 @@ export async function POST(request: NextRequest) {
                     },
                   });
 
-                  void (async () => {
+                  after(async () => {
                     const startedAt = Date.now();
                     try {
                       const imageResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
@@ -2219,7 +2219,7 @@ export async function POST(request: NextRequest) {
                         },
                       });
                     }
-                  })();
+                  });
                 }
               }
             } catch (starterPackApplyError: any) {
@@ -2276,7 +2276,7 @@ export async function POST(request: NextRequest) {
               jobId: setupJob.id,
             });
 
-            void (async () => {
+            after(async () => {
               const startedAt = Date.now();
               try {
                 let backgroundStarterPackPayload: StarterPackPayload | null = null;
@@ -2435,7 +2435,7 @@ export async function POST(request: NextRequest) {
                   },
                 });
               }
-            })();
+            });
           }
         } else {
           console.log(`[Registration] Demo content not requested (includeDemoContent: false)`);

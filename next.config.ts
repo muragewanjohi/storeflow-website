@@ -40,7 +40,8 @@ const nextConfig: NextConfig = {
         hostname: 'localhost',
         pathname: '/**',
       },
-      // Storefront/domain-hosted assets (tenant subdomains and CDN paths)
+      // Storefront/domain-hosted assets (tenant subdomains and CDN paths).
+      // Use ** so nested hosts match (e.g. shop.dev.dukanest.com — single * only matches shop.dukanest.com).
       {
         protocol: 'https',
         hostname: 'dukanest.com',
@@ -48,7 +49,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.dukanest.com',
+        hostname: '**.dukanest.com',
         pathname: '/**',
       },
       {
@@ -58,12 +59,12 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.dukanest.co.ke',
+        hostname: '**.dukanest.co.ke',
         pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
+        hostname: '**.supabase.co',
         pathname: '/**',
       },
       // Vercel preview deployments (placeholder/media URLs sometimes stored with VERCEL_URL)
@@ -79,7 +80,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.storeflow.com',
+        hostname: '**.storeflow.com',
         pathname: '/**',
       },
       {
