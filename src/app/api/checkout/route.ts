@@ -19,6 +19,8 @@ import { getSessionId } from '@/lib/cart/session';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
 import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
+import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -393,11 +395,19 @@ export async function POST(request: NextRequest) {
     });
 
     const { sendNewOrderSmsToMerchant } = await import('@/lib/sms/tenant-notifications');
+    const currencyCode = ((tenant as any).currency || 'KES').toUpperCase();
+    const amount = Number(order.total_amount);
+    const totalLabel = currencyCode === 'KES'
+      ? `KSh ${new Intl.NumberFormat('en-KE', { maximumFractionDigits: 0 }).format(amount)}`
+      : `${currencyCode} ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
+
     void sendNewOrderSmsToMerchant({
       tenantId: tenant.id,
       countryIso2: tenant.country,
       orderNumber: order.order_number,
-      totalLabel: Number(order.total_amount).toFixed(2),
+      storeName: tenant.name || tenant.subdomain || 'your store',
+      totalLabel,
+      ordersUrl: getTenantStoreUrl(tenant as any, '/orders'),
     }).catch((error) => {
       console.error('[Checkout] Failed to send new-order SMS:', error);
     });
@@ -406,22 +416,34 @@ export async function POST(request: NextRequest) {
     (async () => {
       try {
         const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+        const notification = {
+          id: `order-${order.id}`,
+          type: (order.payment_status === 'pending' ? 'pending_payment' : 'new_order') as
+            | 'pending_payment'
+            | 'new_order',
+          title: order.payment_status === 'pending' ? 'Pending Payment' : 'New Order',
+          message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)}`,
+          link: `/dashboard/orders/${order.id}`,
+          created_at: order.created_at || new Date(),
+          read: false,
+          metadata: {
+            order_id: order.id,
+            order_number: order.order_number,
+            amount: Number(order.total_amount),
+          },
+        };
+
         await sendImmediateNotificationEmail({
           tenant,
-          notification: {
-            id: `order-${order.id}`,
-            type: 'new_order',
-            title: 'New Order',
-            message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)}`,
-            link: `/dashboard/orders/${order.id}`,
-            created_at: order.created_at || new Date(),
-            read: false,
-            metadata: {
-              order_id: order.id,
-              order_number: order.order_number,
-              amount: Number(order.total_amount),
-            },
-          },
+          notification,
+        });
+
+        await dispatchNotificationToTenantDevices({
+          tenantId: tenant.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          link: notification.link,
         });
       } catch (error) {
         console.error('Error sending notification email:', error);

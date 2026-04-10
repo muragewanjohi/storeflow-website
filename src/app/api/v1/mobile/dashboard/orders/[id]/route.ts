@@ -12,6 +12,7 @@ import {
   sendOrderStatusUpdateEmail,
   sendPaymentStatusUpdateEmail,
 } from '@/lib/orders/emails';
+import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
 import type { Tenant } from '@/lib/tenant-context';
 
 export async function GET(
@@ -264,22 +265,34 @@ export async function PATCH(
       if (payment_status === 'failed' || (payment_status === 'pending' && existingOrder.payment_status !== 'pending')) {
         (async () => {
           const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+          const notification = {
+            id: `payment-${payment_status}-${order.id}`,
+            type: (payment_status === 'failed' ? 'failed_payment' : 'pending_payment') as
+              | 'failed_payment'
+              | 'pending_payment',
+            title: payment_status === 'failed' ? 'Failed Payment' : 'Pending Payment',
+            message:
+              payment_status === 'failed'
+                ? `Payment failed for order ${order.order_number}`
+                : `Order ${order.order_number} is awaiting payment`,
+            link: `/dashboard/orders/${order.id}`,
+            created_at: new Date(),
+            read: false,
+            metadata: { order_id: order.id, order_number: order.order_number },
+          };
+
           await sendImmediateNotificationEmail({
             tenant: tenant as Tenant,
-            notification: {
-              id: `payment-${payment_status}-${order.id}`,
-              type: payment_status === 'failed' ? 'failed_payment' : 'pending_payment',
-              title: payment_status === 'failed' ? 'Failed Payment' : 'Pending Payment',
-              message:
-                payment_status === 'failed'
-                  ? `Payment failed for order ${order.order_number}`
-                  : `Order ${order.order_number} is awaiting payment`,
-              link: `/dashboard/orders/${order.id}`,
-              created_at: new Date(),
-              read: false,
-              metadata: { order_id: order.id, order_number: order.order_number },
-            },
+            notification,
           }).catch((err) => console.error('sendImmediateNotificationEmail', err));
+
+          await dispatchNotificationToTenantDevices({
+            tenantId,
+            type: notification.type,
+            title: notification.title,
+            message: notification.message,
+            link: notification.link,
+          }).catch((err) => console.error('dispatchNotificationToTenantDevices', err));
         })();
       }
 

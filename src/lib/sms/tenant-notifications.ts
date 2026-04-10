@@ -173,9 +173,11 @@ export async function sendNewOrderSmsToMerchant(params: {
   tenantId: string;
   countryIso2: string | null | undefined;
   orderNumber: string;
+  storeName: string;
   totalLabel: string;
+  ordersUrl: string;
 }): Promise<boolean> {
-  const msg = `New order ${params.orderNumber} on ${appName()}. Total: ${params.totalLabel}.`;
+  const msg = `New order: ${params.orderNumber} at ${params.storeName}. Amount: ${params.totalLabel}. Manage it here: ${params.ordersUrl}`;
   return sendUjumbeToMerchantPhones({
     tenantId: params.tenantId,
     countryIso2: params.countryIso2,
