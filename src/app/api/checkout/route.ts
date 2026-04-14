@@ -416,13 +416,12 @@ export async function POST(request: NextRequest) {
     (async () => {
       try {
         const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+        const paymentStatusLabel = order.payment_status === 'pending' ? 'Pending payment' : 'Paid';
         const notification = {
           id: `order-${order.id}`,
-          type: (order.payment_status === 'pending' ? 'pending_payment' : 'new_order') as
-            | 'pending_payment'
-            | 'new_order',
-          title: order.payment_status === 'pending' ? 'Pending Payment' : 'New Order',
-          message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)}`,
+          type: 'new_order' as const,
+          title: 'New Order',
+          message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)} (${paymentStatusLabel})`,
           link: `/dashboard/orders/${order.id}`,
           created_at: order.created_at || new Date(),
           read: false,

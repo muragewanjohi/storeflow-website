@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
 import type { NotificationType } from '@/lib/notifications/types';
+import { JWT } from 'google-auth-library';
 
 interface PushMessagePayload {
   title: string;
@@ -8,6 +9,7 @@ interface PushMessagePayload {
 }
 
 type PushPlatform = 'android' | 'ios' | 'web';
+const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
 const DEFAULT_PREFS = {
   notify_new_order: true,
@@ -55,27 +57,51 @@ function shouldSendByPreference(
 }
 
 async function sendViaFcm(token: string, payload: PushMessagePayload): Promise<void> {
-  const serverKey = process.env.FCM_SERVER_KEY;
-  if (!serverKey) {
-    return;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId) {
+    throw new Error('FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID) is not configured');
+  }
+  if (!clientEmail || !privateKeyRaw) {
+    throw new Error('FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY are required for FCM v1');
   }
 
-  await fetch('https://fcm.googleapis.com/fcm/send', {
+  const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+  const jwtClient = new JWT({
+    email: clientEmail,
+    key: privateKey,
+    scopes: [FCM_SCOPE],
+  });
+  const tokenResult = await jwtClient.authorize();
+  const accessToken = tokenResult.access_token;
+  if (!accessToken) {
+    throw new Error('Failed to obtain Firebase access token');
+  }
+
+  const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
     method: 'POST',
     headers: {
-      Authorization: `key=${serverKey}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      to: token,
-      notification: {
-        title: payload.title,
-        body: payload.body,
+      message: {
+        token,
+        notification: {
+          title: payload.title,
+          body: payload.body,
+        },
+        data: payload.data ?? {},
       },
-      data: payload.data ?? {},
-      priority: 'high',
     }),
   });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`FCM request failed (${response.status}): ${body}`);
+  }
 }
 
 async function sendViaApns(token: string, payload: PushMessagePayload): Promise<void> {
@@ -83,11 +109,11 @@ async function sendViaApns(token: string, payload: PushMessagePayload): Promise<
   // Set APNS_PUSH_URL to an internal service that signs and forwards APNs payloads.
   const apnsUrl = process.env.APNS_PUSH_URL;
   if (!apnsUrl) {
-    return;
+    throw new Error('APNS_PUSH_URL is not configured');
   }
 
   const authToken = process.env.APNS_AUTH_TOKEN;
-  await fetch(apnsUrl, {
+  const response = await fetch(apnsUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -102,6 +128,11 @@ async function sendViaApns(token: string, payload: PushMessagePayload): Promise<
       data: payload.data ?? {},
     }),
   });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`APNS relay request failed (${response.status}): ${body}`);
+  }
 }
 
 export async function dispatchNotificationToTenantDevices(params: {
