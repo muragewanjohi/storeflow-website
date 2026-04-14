@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/currency-context';
+import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/format-server';
 import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 // Decimal type from Prisma

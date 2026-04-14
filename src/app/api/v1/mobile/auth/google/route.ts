@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       data.user,
       data.session,
       data.user.email ?? '',
+      { skipEmailOtpForTenantRoles: true },
     );
 
     return NextResponse.json(outcome.payload, { status: outcome.status });

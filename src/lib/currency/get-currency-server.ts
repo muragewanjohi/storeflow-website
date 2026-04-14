@@ -5,16 +5,9 @@
 
 import { prisma } from '@/lib/prisma/client';
 import { cache } from '@/lib/cache/simple-cache';
-import type { CurrencySettings } from './currency-context';
+import { DEFAULT_CURRENCY_SETTINGS, type CurrencySettings } from './format-server';
 
-const DEFAULT_CURRENCY: CurrencySettings = {
-  code: 'USD',
-  symbol: '$',
-  symbolPosition: 'left',
-  thousandSeparator: ',',
-  decimalSeparator: '.',
-  decimalPlaces: 2,
-};
+const DEFAULT_CURRENCY: CurrencySettings = DEFAULT_CURRENCY_SETTINGS;
 
 /**
  * Get currency settings for a tenant (server-only).

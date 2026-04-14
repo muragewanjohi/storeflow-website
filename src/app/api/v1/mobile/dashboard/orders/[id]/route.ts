@@ -15,6 +15,10 @@ import {
 import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
 import type { Tenant } from '@/lib/tenant-context';
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -23,10 +27,14 @@ export async function GET(
   if (!gate.ok) return gate.response;
   const { tenantId } = gate.ctx;
   const { id } = await params;
+  const orderLookup: Prisma.ordersWhereInput = {
+    tenant_id: tenantId,
+    ...(isUuid(id) ? { id } : { order_number: id }),
+  };
 
   try {
     const order = await prisma.orders.findFirst({
-      where: { id, tenant_id: tenantId },
+      where: orderLookup,
       include: {
         order_products: {
           include: {
@@ -110,11 +118,15 @@ export async function PATCH(
   const { tenant, tenantId } = gate.ctx;
 
   const { id } = await params;
+  const orderLookup: Prisma.ordersWhereInput = {
+    tenant_id: tenantId,
+    ...(isUuid(id) ? { id } : { order_number: id }),
+  };
 
   try {
     const body = await request.json();
     const existingOrder = await prisma.orders.findFirst({
-      where: { id, tenant_id: tenantId },
+      where: orderLookup,
     });
 
     if (!existingOrder) {
@@ -158,7 +170,7 @@ export async function PATCH(
       }
 
       const order = await prisma.orders.update({
-        where: { id },
+        where: { id: existingOrder.id },
         data: {
           status,
           message: notes || existingOrder.message,
@@ -240,7 +252,7 @@ export async function PATCH(
       });
 
       const order = await prisma.orders.update({
-        where: { id },
+        where: { id: existingOrder.id },
         data: {
           payment_status,
           transaction_id: transaction_id || existingOrder.transaction_id,

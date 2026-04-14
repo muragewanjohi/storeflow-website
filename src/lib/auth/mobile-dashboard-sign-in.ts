@@ -18,6 +18,9 @@ export async function finalizeMobileDashboardSignIn(
   user: User,
   session: Session,
   emailFallback: string,
+  options?: Readonly<{
+    skipEmailOtpForTenantRoles?: boolean;
+  }>,
 ): Promise<MobileDashboardSignInOutcome> {
   const role = ((user.user_metadata?.role as UserRole | undefined) ?? 'customer');
   const isDashboardRole = role === 'tenant_admin' || role === 'tenant_staff' || role === 'landlord';
@@ -93,25 +96,45 @@ export async function finalizeMobileDashboardSignIn(
       };
     }
 
-    const tenantNameForMfa = tenant.name || tenant.subdomain;
-    await generateAndSendOTP(user.id, email, tenantNameForMfa);
+    const skipEmailOtp = options?.skipEmailOtpForTenantRoles === true;
+    if (!skipEmailOtp) {
+      const tenantNameForMfa = tenant.name || tenant.subdomain;
+      await generateAndSendOTP(user.id, email, tenantNameForMfa);
+
+      return {
+        status: 200,
+        payload: mobileSuccess({
+          requiresMfa: true,
+          mfaMethod: 'email_otp',
+          message: `A 6-digit code has been sent to ${email}`,
+          user: {
+            id: user.id,
+            email,
+            role,
+            tenantId: tenant.id,
+          },
+          tempSession: {
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token,
+            expiresAt: session.expires_at,
+          },
+        }),
+      };
+    }
 
     return {
       status: 200,
       payload: mobileSuccess({
-        requiresMfa: true,
-        mfaMethod: 'email_otp',
-        message: `A 6-digit code has been sent to ${email}`,
+        requiresMfa: false,
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        expiresAt: session.expires_at,
+        tokenType: 'Bearer',
         user: {
           id: user.id,
           email,
           role,
           tenantId: tenant.id,
-        },
-        tempSession: {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: session.expires_at,
         },
       }),
     };

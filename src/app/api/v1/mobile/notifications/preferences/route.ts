@@ -20,9 +20,53 @@ type NotificationPreferences = {
   deliveryUpdates: boolean;
 };
 
-const deviceParamSchema = z.object({
-  deviceId: z.string().min(1, 'deviceId is required'),
-});
+async function resolveDeviceId(params: {
+  tenantId: string;
+  userId: string;
+  requestedDeviceId: string | null;
+}): Promise<string | null> {
+  const explicit = params.requestedDeviceId?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const latestActive = await prisma.mobile_push_devices.findFirst({
+    where: {
+      tenant_id: params.tenantId,
+      user_id: params.userId,
+      active: true,
+    },
+    select: {
+      device_id: true,
+    },
+    orderBy: [
+      { last_seen_at: 'desc' },
+      { updated_at: 'desc' },
+      { created_at: 'desc' },
+    ],
+  });
+
+  if (latestActive?.device_id) {
+    return latestActive.device_id;
+  }
+
+  const latestAny = await prisma.mobile_push_devices.findFirst({
+    where: {
+      tenant_id: params.tenantId,
+      user_id: params.userId,
+    },
+    select: {
+      device_id: true,
+    },
+    orderBy: [
+      { last_seen_at: 'desc' },
+      { updated_at: 'desc' },
+      { created_at: 'desc' },
+    ],
+  });
+
+  return latestAny?.device_id ?? null;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,9 +80,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const { deviceId } = deviceParamSchema.parse({
-      deviceId: searchParams.get('deviceId') ?? undefined,
+    const deviceId = await resolveDeviceId({
+      tenantId: user.tenant_id,
+      userId: user.id,
+      requestedDeviceId: searchParams.get('deviceId'),
     });
+
+    if (!deviceId) {
+      return NextResponse.json(
+        mobileError(
+          'NOT_FOUND',
+          'No registered device found. Register device first via /notifications/register-device',
+        ),
+        { status: 404 },
+      );
+    }
 
     const device = await prisma.mobile_push_devices.findUnique({
       where: {
@@ -110,9 +166,21 @@ export async function PUT(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const { deviceId } = deviceParamSchema.parse({
-      deviceId: searchParams.get('deviceId') ?? undefined,
+    const deviceId = await resolveDeviceId({
+      tenantId: user.tenant_id,
+      userId: user.id,
+      requestedDeviceId: searchParams.get('deviceId'),
     });
+
+    if (!deviceId) {
+      return NextResponse.json(
+        mobileError(
+          'NOT_FOUND',
+          'No registered device found. Register device first via /notifications/register-device',
+        ),
+        { status: 404 },
+      );
+    }
     const body = await request.json();
     const patch = preferenceSchema.parse(body);
 
