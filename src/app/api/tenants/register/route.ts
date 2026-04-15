@@ -79,6 +79,66 @@ function toTitleCase(value: string): string {
     .join(' ');
 }
 
+const FALLBACK_PRODUCT_IMAGES = [
+  'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=1200&fit=crop',
+  'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=1200&fit=crop',
+  'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=1200&h=1200&fit=crop',
+  'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=1200&fit=crop',
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&h=1200&fit=crop',
+  'https://images.unsplash.com/photo-1521334884684-d80222895322?w=1200&h=1200&fit=crop',
+];
+
+const FALLBACK_PROMOTION_IMAGES = [
+  'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=1600&h=900&fit=crop',
+  'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=1600&h=900&fit=crop',
+  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1600&h=900&fit=crop',
+  'https://images.unsplash.com/photo-1481437156560-3205f6a55735?w=1600&h=900&fit=crop',
+];
+
+function pickDeterministicImage(seed: string, pool: ReadonlyArray<string>): string {
+  if (pool.length === 0) return '';
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return pool[hash % pool.length];
+}
+
+function ensureStarterPackImageUrls(payload: StarterPackPayload, selling: string): StarterPackPayload {
+  const niche = toTitleCase(selling) || 'Specialty';
+  const demoProducts = (payload.demoProducts || []).map((item, index) => {
+    const existing = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
+    if (existing.length > 0) return item;
+    const name = item.name?.trim() || `${niche} Product ${index + 1}`;
+    return {
+      ...item,
+      imageUrl: pickDeterministicImage(
+        `${niche}-${name}-product-${index + 1}`,
+        FALLBACK_PRODUCT_IMAGES
+      ),
+    };
+  });
+
+  const salesPromotions = (payload.salesPromotions || []).map((item, index) => {
+    const existing = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
+    if (existing.length > 0) return item;
+    const title = item.title?.trim() || `${niche} Promotion ${index + 1}`;
+    return {
+      ...item,
+      imageUrl: pickDeterministicImage(
+        `${niche}-${title}-promotion-${index + 1}`,
+        FALLBACK_PROMOTION_IMAGES
+      ),
+    };
+  });
+
+  return {
+    ...payload,
+    demoProducts,
+    salesPromotions,
+  };
+}
+
 function buildSellingFallbackStarterPack(selling: string): StarterPackPayload {
   const niche = toTitleCase(selling) || 'Specialty';
 
@@ -1546,6 +1606,8 @@ export async function POST(request: NextRequest) {
           preservedSalesPromotions: starterPackPayload.salesPromotions?.length ?? 0,
         });
       }
+
+      starterPackPayload = ensureStarterPackImageUrls(starterPackPayload, finalSelling);
     }
 
     // Create tenant in database

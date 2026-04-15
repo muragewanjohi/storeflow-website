@@ -8,7 +8,6 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -266,6 +265,13 @@ export default function ProductsListClient({
     });
   };
 
+  const resolveSafeProductImage = (product: Pick<Product, 'name' | 'image'>): string | null => {
+    const raw = typeof product.image === 'string' ? product.image.trim() : '';
+    if (!raw) return null;
+    if (raw.startsWith('blob:')) return null;
+    return raw;
+  };
+
   const mobileFilteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return initialProducts.filter((product: any) => {
@@ -492,13 +498,19 @@ export default function ProductsListClient({
                 </CardContent>
               </Card>
             ) : (
-              mobileFilteredProducts.map((product: any) => (
+              mobileFilteredProducts.map((product: any) => {
+                const productImageSrc = resolveSafeProductImage(product);
+                return (
                 <Card key={product.id} className="border-[#e5e7eb]">
                   <CardContent className="p-3">
                     <div className="flex items-start gap-3">
-                      {product.image ? (
+                      {productImageSrc ? (
                         <div className="relative h-14 w-14 overflow-hidden rounded-md border border-[#e5e7eb] bg-white">
-                          <Image src={product.image} alt={product.name} fill className="object-cover" sizes="56px" />
+                          <img
+                            src={productImageSrc}
+                            alt={product.name}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[10px] text-muted-foreground">
@@ -544,7 +556,7 @@ export default function ProductsListClient({
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              )})
             )}
           </div>
         </section>
@@ -683,18 +695,17 @@ export default function ProductsListClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {initialProducts.map((product: any) => (
+                    {initialProducts.map((product: any) => {
+                      const productImageSrc = resolveSafeProductImage(product);
+                      return (
                       <TableRow key={product.id}>
                         <TableCell>
-                          {product.image ? (
+                          {productImageSrc ? (
                             <div className="relative h-12 w-12 overflow-hidden rounded">
-                              <Image
-                                src={product.image}
+                              <img
+                                src={productImageSrc}
                                 alt={product.name}
-                                fill
-                                className="object-cover"
-                                sizes="48px"
-                                priority={false}
+                                className="h-full w-full object-cover"
                               />
                             </div>
                           ) : (
@@ -801,7 +812,7 @@ export default function ProductsListClient({
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
               </div>

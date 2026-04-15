@@ -14,6 +14,8 @@ export function isRenderableImageUrl(value: string | null | undefined): value is
   const trimmed = value.trim();
   if (!trimmed) return false;
   if (trimmed.startsWith('blob:')) return false;
+  // Guard against legacy onboarding fallback URLs that may fail Next/Image host checks.
+  if (trimmed.includes('picsum.photos/seed/')) return false;
   return true;
 }
 
