@@ -262,8 +262,14 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - images/ (public static images, e.g. the onboarding placeholder SVG
+     *   — these must never go through tenant resolution, otherwise the
+     *   next/image optimizer's internal fetch gets redirected to /404
+     *   and returns `received null`)
+     * - fonts/ (public static fonts)
+     * - static assets with common extensions served from /public
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|robots.txt|sitemap.xml|manifest.json).*)',
   ],
 };
 

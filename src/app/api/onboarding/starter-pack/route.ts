@@ -22,6 +22,8 @@ const starterPackRequestSchema = z.object({
   selling: z.string().optional(),
   niche: z.string().optional(),
   storeName: z.string().optional(),
+  tenantId: z.string().optional(),
+  variationSeed: z.string().optional(),
   themeId: z.string().uuid().optional(),
   themeSlug: z.string().min(1).optional(),
   locale: z.string().default('en-KE'),
@@ -525,11 +527,13 @@ async function loadStarterPackFromExistingBusiness(params: {
       return {
         sourceTenantId: cachedPack.source_tenant_id || null,
         sourceKind: 'cache' as const,
-        starterPack: ensureStarterPackCompleteness(parsedCached, {
-          niche: params.niche,
-          categoriesCount: params.categoriesCount,
-          productsCount: params.productsCount,
-        }),
+        starterPack: stripReusedImageUrls(
+          ensureStarterPackCompleteness(parsedCached, {
+            niche: params.niche,
+            categoriesCount: params.categoriesCount,
+            productsCount: params.productsCount,
+          })
+        ),
       };
     } catch (error) {
       console.warn('[StarterPack][Trace] Cached starter pack parse failed, trying tenant fallback', {
@@ -659,7 +663,29 @@ async function loadStarterPackFromExistingBusiness(params: {
   return {
     sourceTenantId: source.id,
     sourceKind: 'tenant-match' as const,
-    starterPack: parsed,
+    starterPack: stripReusedImageUrls(parsed),
+  };
+}
+
+/**
+ * Remove `imageUrl` from products and promotions that we inherit from another
+ * tenant's starter pack, while preserving image prompts. This forces Nano Banana
+ * to regenerate fresh imagery per-tenant instead of every new store rendering
+ * identical photos from the first tenant in that niche.
+ */
+function stripReusedImageUrls(
+  pack: z.infer<typeof generatedStarterPackSchema>
+): z.infer<typeof generatedStarterPackSchema> {
+  return {
+    ...pack,
+    demoProducts: pack.demoProducts.map((product) => ({
+      ...product,
+      imageUrl: undefined,
+    })),
+    salesPromotions: pack.salesPromotions.map((promotion) => ({
+      ...promotion,
+      imageUrl: undefined,
+    })) as typeof pack.salesPromotions,
   };
 }
 
@@ -907,14 +933,34 @@ async function executeGeminiJsonWithFallback(params: {
   throw lastError instanceof Error ? lastError : new Error('Gemini request failed for all fallback models');
 }
 
-function buildNanoBananaJobs(starterPack: z.infer<typeof generatedStarterPackSchema>) {
+/**
+ * Append a tenant/store specific "variation seed" to each Nano Banana prompt so
+ * that two stores with identical prompts (e.g. same niche, same product names)
+ * get visually distinct images instead of near-duplicates. The seed is opaque to
+ * the model; it simply forces a different random walk through the latent space.
+ */
+function withVariationSeed(prompt: string, salt: string, jobKey: string): string {
+  const trimmedSalt = (salt || '').trim();
+  const trimmedKey = (jobKey || '').trim();
+  if (!trimmedSalt && !trimmedKey) return prompt;
+  const composite = [trimmedSalt, trimmedKey].filter(Boolean).join(':');
+  return `${prompt}\n\nUnique composition seed (do not render as text, just use it to vary framing, angle, lighting, props, and color accents so this image is visually distinct from other stores): ${composite}`;
+}
+
+function buildNanoBananaJobs(
+  starterPack: z.infer<typeof generatedStarterPackSchema>,
+  options?: { salt?: string }
+) {
+  const salt = options?.salt?.trim() || '';
   const productJobs = starterPack.demoProducts
     .map((product, index) => {
       const promptRaw = product.imagePrompt || product.nanoBananaPrompt;
-      const prompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
-      if (!prompt) {
+      const basePrompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
+      if (!basePrompt) {
         return null;
       }
+      const jobKey = `product-${index + 1}-${product.name}`;
+      const prompt = salt ? withVariationSeed(basePrompt, salt, jobKey) : basePrompt;
 
       return {
         index: index + 1,
@@ -933,10 +979,12 @@ function buildNanoBananaJobs(starterPack: z.infer<typeof generatedStarterPackSch
   const promoJobs = starterPack.salesPromotions
     .map((promotion, index) => {
       const promptRaw = promotion.imagePrompt || promotion.nanoBananaPrompt;
-      const prompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
-      if (!prompt) {
+      const basePrompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
+      if (!basePrompt) {
         return null;
       }
+      const jobKey = `promotion-${index + 1}-${promotion.title}`;
+      const prompt = salt ? withVariationSeed(basePrompt, salt, jobKey) : basePrompt;
 
       return {
         index: productJobs.length + index + 1,
@@ -1175,28 +1223,35 @@ export async function POST(request: NextRequest) {
           products: parsedStarterPack.demoProducts.length,
         });
 
+        // Image URLs are intentionally stripped by `stripReusedImageUrls` so
+        // that Nano Banana regenerates fresh, per-tenant imagery rather than
+        // every store in this niche sharing the same photos. We therefore gate
+        // "reuse completeness" on text content (theme + prompts), not on
+        // whether the source tenant had images.
         const hasThemeConfig = Boolean(
           parsedStarterPack.themeConfig && Object.keys(parsedStarterPack.themeConfig).length > 0
         );
-        const productsWithImageUrl = parsedStarterPack.demoProducts.filter(
-          (item) => typeof item.imageUrl === 'string' && item.imageUrl.length > 0
-        ).length;
-        const promotionsWithImageUrl = parsedStarterPack.salesPromotions.filter(
-          (item) => typeof item.imageUrl === 'string' && item.imageUrl.length > 0
-        ).length;
+        const productsWithPrompt = parsedStarterPack.demoProducts.filter((item) => {
+          const prompt = item.imagePrompt || item.nanoBananaPrompt;
+          return typeof prompt === 'string' && prompt.trim().length > 0;
+        }).length;
+        const promotionsWithPrompt = parsedStarterPack.salesPromotions.filter((item) => {
+          const prompt = item.imagePrompt || item.nanoBananaPrompt;
+          return typeof prompt === 'string' && prompt.trim().length > 0;
+        }).length;
 
         const reuseIsCompleteEnough =
           hasThemeConfig &&
-          productsWithImageUrl >= Math.max(1, Math.floor(Math.min(input.productsCount, 8) * 0.5)) &&
-          promotionsWithImageUrl >= 1;
+          productsWithPrompt >= Math.max(1, Math.floor(Math.min(input.productsCount, 8) * 0.5)) &&
+          promotionsWithPrompt >= 1;
 
         if (!reuseIsCompleteEnough) {
           console.log('[StarterPack][Trace] Existing business content incomplete, switching to external generation', {
             traceId,
             sourceTenantId: reused.sourceTenantId,
             hasThemeConfig,
-            productsWithImageUrl,
-            promotionsWithImageUrl,
+            productsWithPrompt,
+            promotionsWithPrompt,
           });
           parsedStarterPack = null;
           reusedExistingBusiness = false;
@@ -1371,13 +1426,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const nanoBananaJobs = parsedStarterPack ? buildNanoBananaJobs(parsedStarterPack) : [];
+    const nanoBananaSalt =
+      (input.variationSeed && input.variationSeed.trim()) ||
+      (input.tenantId && input.tenantId.trim()) ||
+      (input.storeName && input.storeName.trim()) ||
+      traceId;
+    const nanoBananaJobs = parsedStarterPack
+      ? buildNanoBananaJobs(parsedStarterPack, { salt: nanoBananaSalt })
+      : [];
     let nanoBananaExecution: Awaited<ReturnType<typeof executeNanoBananaJobs>> | null = null;
     let nanoBananaSkippedReason: string | null = null;
 
-    if (reusedExistingBusiness) {
-      nanoBananaSkippedReason = 'Reused existing business content';
-    } else if (input.includeNanoBananaCall && parsedStarterPack && nanoBananaJobs.length > 0) {
+    // NOTE: We used to skip Nano Banana entirely when `reusedExistingBusiness`
+    // was true. That caused every tenant in the same niche to share identical
+    // images. We now always regenerate images (with a tenant-specific salt) so
+    // reused text content does not imply reused photos.
+    if (input.includeNanoBananaCall && parsedStarterPack && nanoBananaJobs.length > 0) {
       const nanoBananaApiKey =
         process.env.NANO_BANANA_API_KEY ||
         process.env.GEMINI_API_KEY ||

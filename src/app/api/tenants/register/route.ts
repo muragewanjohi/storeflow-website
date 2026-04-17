@@ -79,56 +79,34 @@ function toTitleCase(value: string): string {
     .join(' ');
 }
 
-const FALLBACK_PRODUCT_IMAGES = [
-  'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=1200&fit=crop',
-  'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=1200&fit=crop',
-  'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=1200&h=1200&fit=crop',
-  'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=1200&fit=crop',
-  'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&h=1200&fit=crop',
-  'https://images.unsplash.com/photo-1521334884684-d80222895322?w=1200&h=1200&fit=crop',
-];
-
-const FALLBACK_PROMOTION_IMAGES = [
-  'https://images.unsplash.com/photo-1607082349566-187342175e2f?w=1600&h=900&fit=crop',
-  'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=1600&h=900&fit=crop',
-  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1600&h=900&fit=crop',
-  'https://images.unsplash.com/photo-1481437156560-3205f6a55735?w=1600&h=900&fit=crop',
-];
-
-function pickDeterministicImage(seed: string, pool: ReadonlyArray<string>): string {
-  if (pool.length === 0) return '';
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return pool[hash % pool.length];
-}
-
-function ensureStarterPackImageUrls(payload: StarterPackPayload, selling: string): StarterPackPayload {
-  const niche = toTitleCase(selling) || 'Specialty';
-  const demoProducts = (payload.demoProducts || []).map((item, index) => {
+/**
+ * Ensure starter-pack images are filled with the global onboarding placeholder
+ * when a real generated image is not yet available.
+ *
+ * Historically this used a tiny Unsplash pool keyed by a deterministic hash of
+ * niche+name, which caused many stores to render the same 6 product / 4 promo
+ * photos. We now always fall back to the onboarding placeholder SVG so that
+ * duplicates are clearly a "pending" state rather than looking like real assets,
+ * and the background Nano Banana job is responsible for filling in unique
+ * per-tenant imagery.
+ */
+function ensureStarterPackImageUrls(payload: StarterPackPayload): StarterPackPayload {
+  const placeholder = getOnboardingImagePlaceholderUrl();
+  const demoProducts = (payload.demoProducts || []).map((item) => {
     const existing = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
     if (existing.length > 0) return item;
-    const name = item.name?.trim() || `${niche} Product ${index + 1}`;
     return {
       ...item,
-      imageUrl: pickDeterministicImage(
-        `${niche}-${name}-product-${index + 1}`,
-        FALLBACK_PRODUCT_IMAGES
-      ),
+      imageUrl: placeholder,
     };
   });
 
-  const salesPromotions = (payload.salesPromotions || []).map((item, index) => {
+  const salesPromotions = (payload.salesPromotions || []).map((item) => {
     const existing = typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
     if (existing.length > 0) return item;
-    const title = item.title?.trim() || `${niche} Promotion ${index + 1}`;
     return {
       ...item,
-      imageUrl: pickDeterministicImage(
-        `${niche}-${title}-promotion-${index + 1}`,
-        FALLBACK_PROMOTION_IMAGES
-      ),
+      imageUrl: placeholder,
     };
   });
 
@@ -805,7 +783,12 @@ async function applyStarterPackToTenant(
                 nextBanners[i] = {
                   ...nextBanners[i],
                   title: promotion.title || nextBanners[i]?.title,
-                  subtitle: promotion.subtitle || nextBanners[i]?.subtitle,
+                  // Intentionally omit subtitle: onboarding banners should
+                  // render clean (title + CTA only). The promotion subtitle
+                  // is still persisted on the `sales` row (as description)
+                  // for the sales detail page; merchants can re-enable the
+                  // banner subtitle from the page builder if they want.
+                  subtitle: '',
                   cta_text: promotion.ctaText || nextBanners[i]?.cta_text,
                   image: promotion.imageUrl?.trim() || placeholderImageUrl,
                 };
@@ -1607,7 +1590,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      starterPackPayload = ensureStarterPackImageUrls(starterPackPayload, finalSelling);
+      starterPackPayload = ensureStarterPackImageUrls(starterPackPayload);
     }
 
     // Create tenant in database
@@ -2187,6 +2170,9 @@ export async function POST(request: NextRequest) {
                         body: JSON.stringify({
                           businessType: validatedData.businessType,
                           selling: finalSelling,
+                          storeName: validatedData.name,
+                          tenantId: tenant.id,
+                          variationSeed: tenant.id,
                           themeId: effectiveThemeId,
                           locale: 'en-KE',
                           currency: 'KES',
@@ -2211,6 +2197,51 @@ export async function POST(request: NextRequest) {
                         throw new Error('Image generation returned invalid starter-pack payload');
                       }
 
+                      // Detect cases where the starter-pack endpoint returned
+                      // success but Nano Banana was skipped or produced no
+                      // images. These manifest as duplicate placeholders for
+                      // the merchant, so surface them loudly.
+                      const nanoBananaInfo = isRecord(imageData?.data?.nanoBanana)
+                        ? (imageData.data.nanoBanana as Record<string, unknown>)
+                        : null;
+                      const nanoBananaSkippedReason =
+                        nanoBananaInfo && typeof nanoBananaInfo.skippedReason === 'string'
+                          ? nanoBananaInfo.skippedReason
+                          : null;
+                      const nanoBananaExecuted = isRecord(nanoBananaInfo?.executed)
+                        ? (nanoBananaInfo!.executed as Record<string, unknown>)
+                        : null;
+                      const nanoBananaSucceeded =
+                        typeof nanoBananaExecuted?.succeeded === 'number'
+                          ? (nanoBananaExecuted.succeeded as number)
+                          : 0;
+                      const nanoBananaFailed =
+                        typeof nanoBananaExecuted?.failed === 'number'
+                          ? (nanoBananaExecuted.failed as number)
+                          : 0;
+                      const nanoBananaAlert =
+                        Boolean(nanoBananaSkippedReason) ||
+                        (nanoBananaExecuted !== null && nanoBananaSucceeded === 0);
+
+                      if (nanoBananaAlert) {
+                        console.warn('[Registration][NanoBanana] ⚠️ Image generation produced no usable images', {
+                          traceId: registrationTraceId,
+                          tenantId: tenant.id,
+                          tenantName: validatedData.name,
+                          selling: finalSelling,
+                          skippedReason: nanoBananaSkippedReason,
+                          succeeded: nanoBananaSucceeded,
+                          failed: nanoBananaFailed,
+                          hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY),
+                          hasNanoBananaApiKey: Boolean(process.env.NANO_BANANA_API_KEY),
+                          hasSupabaseServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+                          hint:
+                            nanoBananaSkippedReason === 'Missing API key for image generation'
+                              ? 'Set NANO_BANANA_API_KEY or GEMINI_API_KEY in the environment running the background job.'
+                              : 'Check the cron_job_logs row for this tenant and inspect the starter-pack trace logs.',
+                        });
+                      }
+
                       const imageResult = await applyStarterPackImagesToTenant(tenant.id, imagePack);
 
                       const latestTenant = await prisma.tenants.findUnique({
@@ -2218,16 +2249,20 @@ export async function POST(request: NextRequest) {
                         select: { data: true },
                       });
                       const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
+                      const finalStatus = nanoBananaAlert ? 'skipped' : 'completed';
                       await prisma.tenants.update({
                         where: { id: tenant.id },
                         data: {
                           data: {
                             ...latestTenantData,
                             onboarding_setup: {
-                              status: 'completed',
+                              status: finalStatus,
                               jobId: imageJob.id,
                               completedAt: new Date().toISOString(),
                               stage: 'images',
+                              nanoBananaSkippedReason: nanoBananaSkippedReason || undefined,
+                              nanoBananaSucceeded,
+                              nanoBananaFailed,
                               result: imageResult,
                             },
                           } as unknown as Prisma.InputJsonValue,
@@ -2237,10 +2272,18 @@ export async function POST(request: NextRequest) {
                       await prisma.cron_job_logs.update({
                         where: { id: imageJob.id },
                         data: {
-                          status: 'success',
+                          status: nanoBananaAlert ? 'failed' : 'success',
                           completed_at: new Date(),
                           duration_ms: Date.now() - startedAt,
-                          result: imageResult as Prisma.InputJsonValue,
+                          result: {
+                            ...(imageResult as object),
+                            nanoBananaSkippedReason,
+                            nanoBananaSucceeded,
+                            nanoBananaFailed,
+                          } as Prisma.InputJsonValue,
+                          error: nanoBananaAlert
+                            ? nanoBananaSkippedReason || 'Nano Banana produced no images'
+                            : null,
                         },
                       });
                     } catch (backgroundImageError) {
@@ -2352,6 +2395,9 @@ export async function POST(request: NextRequest) {
                     body: JSON.stringify({
                       businessType: validatedData.businessType,
                       selling: finalSelling,
+                      storeName: validatedData.name,
+                      tenantId: tenant.id,
+                      variationSeed: tenant.id,
                       themeId: effectiveThemeId,
                       locale: 'en-KE',
                       currency: 'KES',
