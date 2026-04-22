@@ -24,6 +24,12 @@ const createVariantSchema = z.object({
     .optional()
     .nullable()
     .or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
+  cost_price: z
+    .number()
+    .min(0)
+    .optional()
+    .nullable()
+    .or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   stock_quantity: z.number().int().min(0).default(0).optional(),
   sku: z.string().max(100).optional().nullable(),
   image: z.string().url().optional().nullable(),
@@ -146,6 +152,7 @@ export async function POST(
           attribute_id: validatedData.attribute_id || null,
           attribute_value_id: validatedData.attribute_value_id || null,
           price: validatedData.price || null,
+          cost_price: validatedData.cost_price || null,
           stock_quantity: validatedData.stock_quantity || 0,
           sku: sku || null,
           image: validatedData.image || null,

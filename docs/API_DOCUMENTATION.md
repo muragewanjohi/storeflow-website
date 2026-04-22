@@ -1957,6 +1957,101 @@ Response includes pagination metadata:
 
 ---
 
+## Finance (COGS, Expenses, P&L)
+
+### Product and Variant Cost Fields
+
+Product and variant payloads now support `cost_price` (nullable, `>= 0`) to track cost of goods.
+
+- Product create/update endpoints:
+  - `POST /api/products`
+  - `PUT/PATCH /api/products/:id`
+  - `POST /api/v1/mobile/dashboard/products`
+  - `PUT/PATCH /api/v1/mobile/dashboard/products/:id`
+- Variant create/update endpoints:
+  - `POST /api/products/:id/variants`
+  - `PUT/PATCH /api/products/:id/variants/:variantId`
+  - `POST /api/v1/mobile/dashboard/products/:id/variants`
+  - `PUT/PATCH /api/v1/mobile/dashboard/products/:id/variants/:variantId`
+
+When an order is created, checkout snapshots COGS into `order_products`:
+
+- `unit_cost_at_sale`
+- `cogs_total`
+
+This preserves historical margin accuracy even if product costs change later.
+
+### Expenses API (Web)
+
+#### List Expenses
+```http
+GET /api/expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-01-31&category=ads_marketing
+```
+
+#### Create Expense
+```http
+POST /api/expenses
+Content-Type: application/json
+```
+
+```json
+{
+  "expense_date": "2026-01-18",
+  "category": "ads_marketing",
+  "amount": 1250,
+  "tax_amount": 0,
+  "payment_method": "mpesa",
+  "reference": "META-ADS-001",
+  "notes": "January boosted posts"
+}
+```
+
+#### Update/Delete Expense
+```http
+PATCH /api/expenses/:id
+DELETE /api/expenses/:id
+```
+
+Supported categories:
+- `ads_marketing`
+- `shipping_fulfillment`
+- `packaging`
+- `software_apps`
+- `salaries_contractors`
+- `rent_utilities`
+- `misc`
+
+### P&L API (Web)
+
+```http
+GET /api/analytics/pnl?start_date=2026-01-01&end_date=2026-01-31
+```
+
+Response fields:
+- `grossRevenue`
+- `refundsDiscounts`
+- `netRevenue`
+- `cogs`
+- `grossProfit`
+- `operatingExpenses`
+- `netProfit`
+- `grossMarginPercent`
+- `netMarginPercent`
+
+### Mobile Finance APIs
+
+- `GET /api/v1/mobile/dashboard/analytics/pnl`
+- `GET /api/v1/mobile/dashboard/expenses`
+- `POST /api/v1/mobile/dashboard/expenses`
+- `PATCH /api/v1/mobile/dashboard/expenses/:id`
+- `DELETE /api/v1/mobile/dashboard/expenses/:id`
+
+These use the standard mobile envelope:
+- success: `{ \"success\": true, \"data\": {...}, \"pagination\"?: {...} }`
+- error: `{ \"success\": false, \"error\": { \"code\", \"message\", \"details?\" } }`
+
+---
+
 ## Date Formats
 
 All dates are in ISO 8601 format:

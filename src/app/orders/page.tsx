@@ -8,6 +8,7 @@ import { requireAuthOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
+import { linkGuestOrdersToCustomer } from '@/lib/orders/link-guest-orders';
 import OrdersListClient from './orders-list-client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
@@ -31,6 +32,14 @@ export default async function OrdersPage({
   // Get customer ID
   const customerId = await getOrCreateCustomer(user, tenant.id);
 
+  // Ensure guest orders are linked on first authenticated visit.
+  // This keeps Google OAuth and email/password flows consistent.
+  try {
+    await linkGuestOrdersToCustomer(customerId, user.email, tenant.id);
+  } catch (error) {
+    console.error('Error auto-linking guest orders on /orders:', error);
+  }
+
   // Parse search params
   const params = await searchParams;
   const page = typeof params.page === 'string' ? parseInt(params.page, 10) : 1;
@@ -41,7 +50,16 @@ export default async function OrdersPage({
   // Build where clause
   const baseWhere = {
     tenant_id: tenant.id,
-    user_id: customerId,
+    OR: [
+      { user_id: customerId },
+      {
+        user_id: null,
+        email: {
+          equals: user.email,
+          mode: 'insensitive' as const,
+        },
+      },
+    ],
   };
 
   // Add filter for orders requiring action (pending delivery quotes)

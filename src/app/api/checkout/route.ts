@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
       variant_id: string | null;
       quantity: number;
       price: number;
+      unit_cost_at_sale: number;
+      cogs_total: number;
       total: number;
     }> = [];
     let totalAmount = 0;
@@ -99,6 +101,7 @@ export async function POST(request: NextRequest) {
           id: true,
           name: true,
           price: true,
+          cost_price: true,
           sale_price: true,
           stock_quantity: true,
         },
@@ -111,8 +114,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let variant: { id: string; price: any; stock_quantity: number | null } | null = null;
+      let variant: { id: string; price: any; cost_price: any; stock_quantity: number | null } | null = null;
       let finalPrice = Number(product.sale_price || product.price);
+      let unitCostAtSale = Number(product.cost_price || 0);
       let stockQuantity = product.stock_quantity;
 
       if (item.variant_id) {
@@ -125,6 +129,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             price: true,
+            cost_price: true,
             stock_quantity: true,
           },
         });
@@ -137,6 +142,7 @@ export async function POST(request: NextRequest) {
         }
 
         finalPrice = variant.price ? Number(variant.price) : finalPrice;
+        unitCostAtSale = variant.cost_price != null ? Number(variant.cost_price) : unitCostAtSale;
         stockQuantity = variant.stock_quantity;
       }
 
@@ -156,6 +162,8 @@ export async function POST(request: NextRequest) {
         variant_id: variant?.id || null,
         quantity: item.quantity,
         price: finalPrice,
+        unit_cost_at_sale: unitCostAtSale,
+        cogs_total: unitCostAtSale * item.quantity,
         total: itemTotal,
       });
     }
@@ -281,6 +289,8 @@ export async function POST(request: NextRequest) {
             user_id: customerId, // null for guest orders
             quantity: item.quantity,
             price: item.price,
+            unit_cost_at_sale: item.unit_cost_at_sale,
+            cogs_total: item.cogs_total,
             total: item.total,
           })),
         },

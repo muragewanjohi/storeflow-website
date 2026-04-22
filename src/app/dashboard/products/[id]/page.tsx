@@ -94,6 +94,7 @@ export default async function ProductDetailPage({
     description: product.description,
     short_description: product.short_description,
     price: Number(product.price),
+    cost_price: product.cost_price ? Number(product.cost_price) : null,
     sale_price: product.sale_price ? Number(product.sale_price) : null,
     stock_quantity: product.stock_quantity || 0,
     status: (product.status || 'active') as 'active' | 'inactive' | 'draft' | 'archived',
@@ -110,6 +111,7 @@ export default async function ProductDetailPage({
     product_id: v.product_id,
     sku: v.sku || '',
     price: v.price ? Number(v.price) : null,
+    cost_price: v.cost_price ? Number(v.cost_price) : null,
     stock_quantity: v.stock_quantity || 0,
     image: v.image,
     variant_attributes: v.product_variant_attributes.map((pva) => ({

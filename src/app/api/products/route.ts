@@ -342,6 +342,7 @@ export async function GET(request: NextRequest) {
                 name: true,
                 slug: true,
                 price: true,
+                cost_price: true,
                 image: true,
                 stock_quantity: true, // Already synced with variant totals
                 category_id: true,
@@ -659,6 +660,7 @@ export async function POST(request: NextRequest) {
       // Explicitly check for any unexpected fields that might have slipped through
       const allowedFields = [
         'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+        'cost_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id',
         'brand_id', 'metadata'
       ];
@@ -836,6 +838,7 @@ export async function POST(request: NextRequest) {
       short_description: validatedData.short_description ? String(validatedData.short_description) : null,
       price: Number(validatedData.price), // Prisma will convert number to Decimal
       sale_price: validatedData.sale_price ? Number(validatedData.sale_price) : null,
+      cost_price: validatedData.cost_price != null ? Number(validatedData.cost_price) : null,
       sku: String(finalSKU), // Always use generated SKU
       stock_quantity: Number(validatedData.stock_quantity || 0),
       status: String(validatedData.status || 'active'),
@@ -851,6 +854,7 @@ export async function POST(request: NextRequest) {
     // Final safety check: ensure no unexpected keys exist
     const allowedProductFields = [
       'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+      'cost_price',
       'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
       'created_by', 'metadata', 'estimated_delivery_days'
     ];
@@ -889,6 +893,7 @@ export async function POST(request: NextRequest) {
         short_description: string | null;
         price: number;
         sale_price: number | null;
+        cost_price: number | null;
         sku: string;
         stock_quantity: number;
         status: string;
@@ -907,6 +912,7 @@ export async function POST(request: NextRequest) {
         short_description: productData.short_description,
         price: productData.price,
         sale_price: productData.sale_price,
+        cost_price: productData.cost_price,
         sku: productData.sku,
         stock_quantity: productData.stock_quantity,
         status: productData.status,
@@ -923,6 +929,7 @@ export async function POST(request: NextRequest) {
       const finalKeys = Object.keys(finalProductData);
       const allowedFinalFields = [
         'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
+        'cost_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
         'created_by', 'metadata', 'estimated_delivery_days'
       ];
@@ -980,6 +987,7 @@ export async function POST(request: NextRequest) {
         short_description: ultraCleanData.short_description ? String(ultraCleanData.short_description) : null,
         price: Number(ultraCleanData.price),
         sale_price: ultraCleanData.sale_price ? Number(ultraCleanData.sale_price) : null,
+        cost_price: ultraCleanData.cost_price != null ? Number(ultraCleanData.cost_price) : null,
         sku: String(ultraCleanData.sku),
         stock_quantity: Number(ultraCleanData.stock_quantity),
         status: String(ultraCleanData.status),

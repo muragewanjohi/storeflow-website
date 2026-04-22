@@ -96,12 +96,14 @@ export default async function EditProductPage({
       slug: product.slug || '',
       sku: product.sku || '',
       price: Number(product.price),
+      cost_price: product.cost_price ? Number(product.cost_price) : null,
       sale_price: product.sale_price ? Number(product.sale_price) : null,
     } as any;
 
     const variantsData = variants.map((v: any) => ({
       ...v,
       price: v.price ? Number(v.price) : null,
+      cost_price: v.cost_price ? Number(v.cost_price) : null,
       stock_quantity: v.stock_quantity ?? 0,
       // Rename product_variant_attributes to variant_attributes for client compatibility
       variant_attributes: v.product_variant_attributes,

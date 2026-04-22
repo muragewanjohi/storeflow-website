@@ -51,6 +51,7 @@ Update these variables in the environment:
 - **`cron_secret_token`** - Secret token for cron endpoints (set manually)
 - **`product_id`** - Product ID (auto-set by product requests)
 - **`variant_id`** - Product variant ID (auto-set by variant requests)
+- **`expense_id`** - Expense ID (set manually or from expense create/list response)
 - **`category_id`** - Category ID (auto-set by category requests)
 - **`product_image_url`** - Product image URL (auto-set by upload request)
 - **`onboarding_business_type`** - Business type for onboarding starter pack tests (e.g., `Pets`)
@@ -116,6 +117,8 @@ Update these variables in the environment:
 - **Mobile Dashboard Settings** - Core store settings for mobile app
 - **Mobile Dashboard Sales** - Sales/promotions list with pagination
 - **Mobile Dashboard Analytics** - Revenue/trends/top products (`days` query)
+- **Mobile Dashboard P&L** - Profit & loss summary (`start_date`, `end_date`)
+- **Mobile Dashboard Expenses (List/Create/Update/Delete)** - Tenant expense ledger for P&L
 - **Mobile Media Upload** - Multipart image upload (`file` field)
 - **Mobile M-Pesa Initiate** / **Mobile M-Pesa Status** - STK push + poll (`checkoutRequestId`)
 - **Mobile Notifications List** - Derived in-app notifications feed

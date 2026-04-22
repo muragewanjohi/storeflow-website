@@ -79,6 +79,67 @@ function toTitleCase(value: string): string {
     .join(' ');
 }
 
+async function triggerOnboardingImageRepair(params: {
+  origin: string;
+  tenantId: string;
+  traceId: string;
+  reason: string;
+}): Promise<void> {
+  const cronToken = process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN || '';
+  if (!cronToken) {
+    console.warn('[Registration][ImageRepair] Skipping repair trigger: missing CRON_SECRET', {
+      traceId: params.traceId,
+      tenantId: params.tenantId,
+      reason: params.reason,
+    });
+    return;
+  }
+
+  try {
+    const repairResponse = await fetch(
+      `${params.origin}/api/admin/tenants/${params.tenantId}/starter-pack-image-repair`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cronToken}`,
+          'x-vercel-cron': '1',
+        },
+        body: JSON.stringify({ dryRun: false }),
+      }
+    );
+
+    const repairPayload = await repairResponse.json().catch(() => ({}));
+    if (!repairResponse.ok || !repairPayload?.success) {
+      console.warn('[Registration][ImageRepair] Repair trigger failed', {
+        traceId: params.traceId,
+        tenantId: params.tenantId,
+        reason: params.reason,
+        status: repairResponse.status,
+        error: repairPayload?.error?.message || 'Unknown repair trigger error',
+      });
+      return;
+    }
+
+    console.log('[Registration][ImageRepair] Repair trigger completed', {
+      traceId: params.traceId,
+      tenantId: params.tenantId,
+      reason: params.reason,
+      productsUpdated: Number(repairPayload?.data?.productsUpdated ?? 0),
+      salesUpdated: Number(repairPayload?.data?.salesUpdated ?? 0),
+      blogsUpdated: Number(repairPayload?.data?.blogsUpdated ?? 0),
+      homepageSectionsUpdated: Number(repairPayload?.data?.homepageSectionsUpdated ?? 0),
+    });
+  } catch (error) {
+    console.warn('[Registration][ImageRepair] Repair trigger exception', {
+      traceId: params.traceId,
+      tenantId: params.tenantId,
+      reason: params.reason,
+      error: error instanceof Error ? error.message : 'Unknown repair trigger exception',
+    });
+  }
+}
+
 /**
  * Ensure starter-pack images are filled with the global onboarding placeholder
  * when a real generated image is not yet available.
@@ -2286,6 +2347,15 @@ export async function POST(request: NextRequest) {
                             : null,
                         },
                       });
+
+                      if (nanoBananaAlert) {
+                        await triggerOnboardingImageRepair({
+                          origin: request.nextUrl.origin,
+                          tenantId: tenant.id,
+                          traceId: registrationTraceId,
+                          reason: nanoBananaSkippedReason || 'nano-banana-produced-no-images',
+                        });
+                      }
                     } catch (backgroundImageError) {
                       const latestTenant = await prisma.tenants.findUnique({
                         where: { id: tenant.id },
@@ -2322,6 +2392,16 @@ export async function POST(request: NextRequest) {
                               ? backgroundImageError.message
                               : 'Unknown image enrichment error',
                         },
+                      });
+
+                      await triggerOnboardingImageRepair({
+                        origin: request.nextUrl.origin,
+                        tenantId: tenant.id,
+                        traceId: registrationTraceId,
+                        reason:
+                          backgroundImageError instanceof Error
+                            ? backgroundImageError.message
+                            : 'background-image-enrichment-error',
                       });
                     }
                   });

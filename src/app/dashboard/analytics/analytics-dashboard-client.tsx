@@ -228,6 +228,18 @@ interface ComparisonData {
   };
 }
 
+interface PnlData {
+  grossRevenue: number;
+  refundsDiscounts: number;
+  netRevenue: number;
+  cogs: number;
+  grossProfit: number;
+  operatingExpenses: number;
+  netProfit: number;
+  grossMarginPercent: number;
+  netMarginPercent: number;
+}
+
 export default function AnalyticsDashboardClient({ 
   currentPlanName 
 }: Readonly<AnalyticsDashboardClientProps>) {
@@ -252,6 +264,7 @@ export default function AnalyticsDashboardClient({
   const [realtime, setRealtime] = useState<RealTimeData | null>(null);
   const [trafficSources, setTrafficSources] = useState<any>(null);
   const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [pnl, setPnl] = useState<PnlData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [realtimePolling, setRealtimePolling] = useState(false);
@@ -263,12 +276,13 @@ export default function AnalyticsDashboardClient({
       const endDate = dateRange.to?.toISOString().split('T')[0];
 
       // Fetch basic analytics
-      const [overviewRes, revenueRes, salesRes, customersRes, inventoryRes] = await Promise.all([
+      const [overviewRes, revenueRes, salesRes, customersRes, inventoryRes, pnlRes] = await Promise.all([
         fetch('/api/analytics/overview'),
         fetch(`/api/analytics/revenue?startDate=${startDate}&endDate=${endDate}&groupBy=day`),
         fetch(`/api/analytics/sales?startDate=${startDate}&endDate=${endDate}`),
         fetch(`/api/analytics/customers?startDate=${startDate}&endDate=${endDate}`),
         fetch('/api/analytics/inventory'),
+        fetch(`/api/analytics/pnl?start_date=${startDate}&end_date=${endDate}`),
       ]);
 
       // Fetch advanced analytics only if user has access
@@ -308,6 +322,11 @@ export default function AnalyticsDashboardClient({
       if (inventoryRes.ok) {
         const inventoryData = await inventoryRes.json();
         setInventory(inventoryData.data);
+      }
+
+      if (pnlRes.ok) {
+        const pnlData = await pnlRes.json();
+        setPnl(pnlData.data);
       }
 
       // Process advanced analytics if available
@@ -619,6 +638,26 @@ export default function AnalyticsDashboardClient({
 
           <Card className="border-[#e5e7eb]">
             <CardHeader className="pb-3">
+              <CardTitle className="text-[16px]">Profit & Loss</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">COGS</p>
+                <p className="mt-1 text-[28px] font-bold leading-tight">{formatCurrency(pnl?.cogs ?? 0)}</p>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Expenses</p>
+                <p className="mt-1 text-[28px] font-bold leading-tight">{formatCurrency(pnl?.operatingExpenses ?? 0)}</p>
+              </div>
+              <div className="rounded-lg border border-[#f3f4f6] bg-white p-3">
+                <p className="text-xs text-muted-foreground">Net Profit</p>
+                <p className="mt-1 text-[28px] font-bold leading-tight">{formatCurrency(pnl?.netProfit ?? 0)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#e5e7eb]">
+            <CardHeader className="pb-3">
               <CardTitle className="text-[16px]">Customer Insights</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -690,7 +729,7 @@ export default function AnalyticsDashboardClient({
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -746,6 +785,32 @@ export default function AnalyticsDashboardClient({
               {overview?.overview.totalProducts.toLocaleString() || '-'}
             </div>
             <p className="text-xs text-muted-foreground">In catalog</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">COGS</CardTitle>
+            <CubeIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(pnl?.cogs ?? 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">Selected period</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Expenses</CardTitle>
+            <CurrencyDollarIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(pnl?.operatingExpenses ?? 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">Selected period</p>
           </CardContent>
         </Card>
       </div>
@@ -882,6 +947,31 @@ export default function AnalyticsDashboardClient({
                     No data available
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Profit & Loss Snapshot</CardTitle>
+                <CardDescription>COGS, expenses and profit for selected dates</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">COGS</span>
+                  <span className="text-sm font-semibold">{formatCurrency(pnl?.cogs ?? 0)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Operating Expenses</span>
+                  <span className="text-sm font-semibold">{formatCurrency(pnl?.operatingExpenses ?? 0)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Gross Profit</span>
+                  <span className="text-sm font-semibold">{formatCurrency(pnl?.grossProfit ?? 0)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-3">
+                  <span className="text-sm font-medium">Net Profit</span>
+                  <span className="text-base font-bold">{formatCurrency(pnl?.netProfit ?? 0)}</span>
+                </div>
               </CardContent>
             </Card>
           </div>

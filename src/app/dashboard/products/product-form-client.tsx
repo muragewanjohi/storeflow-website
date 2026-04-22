@@ -31,6 +31,7 @@ interface Product {
   description?: string | null;
   short_description?: string | null;
   price: number;
+  cost_price?: number | null;
   sale_price?: number | null;
   stock_quantity: number;
   status: 'active' | 'inactive' | 'draft' | 'archived';
@@ -62,6 +63,7 @@ interface Variant {
   id: string;
   sku: string | null;
   price: number | null;
+  cost_price?: number | null;
   stock_quantity: number;
   image: string | null;
   variant_attributes?: Array<{
@@ -161,6 +163,7 @@ export default function ProductFormClient({
     short_description: product?.short_description || '',
     description: product?.description || '',
     price: product?.price?.toString() || '',
+    cost_price: product?.cost_price?.toString() || '',
     sale_price: product?.sale_price?.toString() || '',
     stock_quantity: product?.stock_quantity?.toString() || '0',
     status: product?.status || ('draft' as 'active' | 'inactive' | 'draft' | 'archived'),
@@ -174,6 +177,7 @@ export default function ProductFormClient({
     id?: string;
     sku: string;
     price: string;
+    cost_price: string;
     stock_quantity: string;
     image: string;
     attributes: Array<{ attribute_id: string; attribute_value_id: string }>;
@@ -184,6 +188,7 @@ export default function ProductFormClient({
         id: variant.id,
         sku: variant.sku || '',
         price: variant.price?.toString() || '',
+        cost_price: variant.cost_price?.toString() || '',
         stock_quantity: variant.stock_quantity.toString(),
         image: variant.image || '',
         attributes: variant.variant_attributes?.map((attr: any) => ({
@@ -303,6 +308,13 @@ export default function ProductFormClient({
       }
     }
 
+    if (formData.cost_price) {
+      const costPrice = parseFloat(formData.cost_price);
+      if (isNaN(costPrice) || costPrice < 0) {
+        errors.cost_price = 'Cost price must be zero or a positive number';
+      }
+    }
+
     // Only validate product-level stock if no variants exist
     if (variants.length === 0) {
       const stockQuantity = parseInt(formData.stock_quantity, 10);
@@ -347,6 +359,16 @@ export default function ProductFormClient({
           return;
         }
       }
+
+      // Parse cost price if provided
+      let parsedCostPrice: number | null = null;
+      if (formData.cost_price && formData.cost_price.trim()) {
+        parsedCostPrice = parseFloat(formData.cost_price);
+        if (isNaN(parsedCostPrice) || parsedCostPrice < 0) {
+          setValidationErrors({ cost_price: 'Cost price must be zero or a positive number' });
+          return;
+        }
+      }
       
       // Validate category_id - ensure it's either null or a valid UUID
       let categoryId: string | null = null;
@@ -383,6 +405,9 @@ export default function ProductFormClient({
 
       if (parsedSalePrice !== null) {
         payload.sale_price = parsedSalePrice;
+      }
+      if (parsedCostPrice !== null) {
+        payload.cost_price = parsedCostPrice;
       }
 
       if (formData.image) {
@@ -444,6 +469,7 @@ export default function ProductFormClient({
             const variantPayload: any = {
               sku: variant.sku || null,
               price: variant.price ? parseFloat(variant.price) : null,
+              cost_price: variant.cost_price ? parseFloat(variant.cost_price) : null,
               stock_quantity: parseInt(variant.stock_quantity, 10) || 0,
               image: variant.image || null,
             };
@@ -653,7 +679,7 @@ export default function ProductFormClient({
                 <CardDescription>Set product price and stock levels</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="price">
                       Regular Price <span className="text-destructive">*</span>
@@ -670,6 +696,29 @@ export default function ProductFormClient({
                     />
                     {validationErrors.price && (
                       <p className="text-sm text-destructive">{validationErrors.price}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="cost_price">Cost Price</Label>
+                      <ContextualHelp
+                        title="Cost Price (COGS)"
+                        description="Your internal unit cost for this product. Used to calculate gross and net profit in P&L reports."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <Input
+                      id="cost_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                      placeholder="0.00"
+                    />
+                    {validationErrors.cost_price && (
+                      <p className="text-sm text-destructive">{validationErrors.cost_price}</p>
                     )}
                   </div>
 
@@ -964,7 +1013,7 @@ export default function ProductFormClient({
                     </div>
 
                     {/* Variant Details */}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <div className="space-y-2">
                         <Label htmlFor={`variant-sku-${index}`}>SKU</Label>
                         <Input
@@ -996,6 +1045,22 @@ export default function ProductFormClient({
                         />
                       </div>
                       <div className="space-y-2">
+                        <Label htmlFor={`variant-cost-price-${index}`}>Cost Price</Label>
+                        <Input
+                          id={`variant-cost-price-${index}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.cost_price}
+                          onChange={(e) => {
+                            const newVariants = [...variants];
+                            newVariants[index].cost_price = e.target.value;
+                            setVariants(newVariants);
+                          }}
+                          placeholder="COGS override"
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
                         <Input
                           id={`variant-stock-${index}`}
@@ -1022,6 +1087,7 @@ export default function ProductFormClient({
                       {
                         sku: '',
                         price: '',
+                        cost_price: '',
                         stock_quantity: '0',
                         image: '',
                         attributes: [],

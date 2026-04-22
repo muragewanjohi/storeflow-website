@@ -4766,6 +4766,164 @@
 					"response": []
 				},
 				{
+					"name": "Mobile Dashboard P&L",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"P&L response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('grossRevenue');",
+									"    pm.expect(jsonData.data).to.have.property('netProfit');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/analytics/pnl?start_date=2026-01-01&end_date=2026-01-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"analytics",
+								"pnl"
+							],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2026-01-31"
+								}
+							]
+						},
+						"description": "Profit and Loss summary for the selected period."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (List)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses?page=1&limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "List expense ledger records for the tenant."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (Create)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"expense_date\": \"2026-01-18\",\n  \"category\": \"ads_marketing\",\n  \"amount\": 1250,\n  \"tax_amount\": 0,\n  \"payment_method\": \"mpesa\",\n  \"reference\": \"META-ADS-001\",\n  \"notes\": \"January boosted posts\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses"
+							]
+						},
+						"description": "Create a tenant expense record for P&L."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (Update)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 1320,\n  \"notes\": \"Updated spend\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses/{{expense_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses",
+								"{{expense_id}}"
+							]
+						},
+						"description": "Update an existing expense record."
+					},
+					"response": []
+				},
+				{
 					"name": "Mobile Media Upload",
 					"event": [
 						{

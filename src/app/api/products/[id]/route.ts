@@ -44,6 +44,7 @@ export async function GET(
             attribute_id: true,
             attribute_value_id: true,
             price: true,
+            cost_price: true,
             stock_quantity: true,
             sku: true,
             image: true,
@@ -152,6 +153,7 @@ export async function PUT(
     if (validatedData.description !== undefined) updateData.description = validatedData.description;
     if (validatedData.short_description !== undefined) updateData.short_description = validatedData.short_description;
     if (validatedData.price !== undefined) updateData.price = validatedData.price;
+    if (validatedData.cost_price !== undefined) updateData.cost_price = validatedData.cost_price;
     if (validatedData.sale_price !== undefined) updateData.sale_price = validatedData.sale_price;
     if (validatedData.sku !== undefined) updateData.sku = validatedData.sku;
     if (validatedData.stock_quantity !== undefined) updateData.stock_quantity = validatedData.stock_quantity;

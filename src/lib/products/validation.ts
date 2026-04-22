@@ -16,6 +16,8 @@ export const createProductSchema = z.object({
   description: z.string().nullable().optional().or(z.literal('').transform(() => null)),
   short_description: z.string().max(500, 'Short description must be less than 500 characters').optional().nullable(),
   price: z.number().positive('Price must be positive').or(z.string().transform((val) => parseFloat(val))),
+  cost_price: z.number().min(0, 'Cost price cannot be negative').optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sale_price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   sku: z.string().max(100, 'SKU must be less than 100 characters').optional().nullable(),
   stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').default(0).optional(),

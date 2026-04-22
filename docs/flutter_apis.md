@@ -88,6 +88,11 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | PUT/PATCH | `/dashboard/pages/:id` | Update page (`updatePageSchema`); revalidates storefront paths |
 | DELETE | `/dashboard/pages/:id` | Delete; **blocked** for slugs `home`, `about`, `contact` |
 | GET | `/dashboard/analytics` | Optional `?days=` (1–365, default **30**) |
+| GET | `/dashboard/analytics/pnl` | Profit & Loss summary (`start_date`, `end_date`) |
+| GET | `/dashboard/expenses` | Paginated expense ledger list |
+| POST | `/dashboard/expenses` | Create expense |
+| PATCH | `/dashboard/expenses/:id` | Update expense |
+| DELETE | `/dashboard/expenses/:id` | Delete expense |
 | GET | `/dashboard/sales` | **List** promotions/sales (paginated) |
 | POST | `/dashboard/sales` | Create sale |
 | GET | `/dashboard/sales/:id` | Sale + `product_sales` |
@@ -269,6 +274,14 @@ Public (non-mobile base): `GET /api/tenants/check-subdomain`, `POST /api/tenants
 - **No variants:** send/edit `stock_quantity` on the product (`POST`/`PATCH /dashboard/products`).
 - **Has variants:** treat product-level `stock_quantity` as read-only and manage stock on variant rows.
 - Backend auto-syncs product stock from variant totals after variant create/update/delete.
+
+#### Product cost fields for P&L
+
+- `cost_price` is now supported for both products and variants.
+- Flutter should send/read:
+  - product: `cost_price` in create/update payloads
+  - variant: `cost_price` in create/update payloads
+- Backend snapshots COGS at checkout (`unit_cost_at_sale`, `cogs_total`) so historical margins remain correct.
 
 ---
 

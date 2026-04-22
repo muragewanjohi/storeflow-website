@@ -724,6 +724,14 @@ Use filters to find specific orders:
 - Use data to make decisions
 - Export reports for record-keeping
 
+### Finance (COGS + P&L)
+- Set `cost_price` for products and variants to improve profit accuracy.
+- Log operating expenses regularly (ads, shipping, software, utilities, etc.).
+- Review P&L monthly using:
+  - `GET /api/analytics/pnl` (web)
+  - `GET /api/v1/mobile/dashboard/analytics/pnl` (mobile)
+- If costs are missing, margins will be overstated; prioritize filling cost on top-selling SKUs first.
+
 ---
 
 ## Related Documentation
