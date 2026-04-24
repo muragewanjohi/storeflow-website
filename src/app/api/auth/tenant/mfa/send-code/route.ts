@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { generateAndSendOTP } from '@/lib/mfa/email-otp';
 import { z } from 'zod';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 const sendCodeSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -23,6 +24,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = sendCodeSchema.parse(body);
     const { email, userId } = validatedData;
+    const clientIp = getClientIp(request);
+
+    const ipLimit = await checkRateLimit(`ratelimit:auth:mfa-send:ip:${clientIp}`, 10, 60);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many OTP requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const userLimit = await checkRateLimit(`ratelimit:auth:mfa-send:user:${userId}`, 3, 300);
+    if (!userLimit.allowed) {
+      return NextResponse.json(
+        { error: 'OTP resend limit reached. Please wait before requesting another code.' },
+        { status: 429, headers: { 'Retry-After': String(userLimit.retryAfterSeconds) } }
+      );
+    }
 
     // Generate and send OTP
     await generateAndSendOTP(userId, email, tenant.name);

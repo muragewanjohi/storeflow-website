@@ -19,6 +19,7 @@ import ProductReviewsSection from '@/components/storefront/product-reviews-secti
 import { RatingDisplay } from '@/components/storefront/rating-display';
 import ProductShareButtons from '@/components/storefront/product-share-buttons';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { sanitizeHtmlForDisplay } from '@/lib/security/sanitize-html';
 
 interface ProductVariant {
   id: string;
@@ -215,6 +216,9 @@ export default function ProductDetailClient({
     product.image,
     ...galleryImages.filter((img: string) => img && img !== product.image),
   ].filter(Boolean) as string[];
+  const safeProductDescription = product.description
+    ? sanitizeHtmlForDisplay(product.description)
+    : null;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -528,12 +532,12 @@ export default function ProductDetailClient({
           </Button>
 
           {/* Full Description */}
-          {product.description && (
+          {safeProductDescription && (
             <div className="pt-6 border-t">
               <h2 className="text-base font-semibold mb-2">Full Description</h2>
               <div
                 className="text-muted-foreground prose prose-sm max-w-none text-sm"
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                dangerouslySetInnerHTML={{ __html: safeProductDescription }}
               />
             </div>
           )}

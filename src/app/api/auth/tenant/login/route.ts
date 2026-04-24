@@ -12,6 +12,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { shouldBypassMfaForReviewer } from '@/lib/auth/reviewer-mfa-bypass';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -59,9 +61,27 @@ export async function POST(request: NextRequest) {
     console.log('[Login API] Input validated', { email, hasDeviceFingerprint: !!deviceFingerprint });
     
     // Get client IP address
-    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                     request.headers.get('x-real-ip') ||
-                     null;
+    const ipAddress = getClientIp(request);
+
+    const loginIpLimit = await checkRateLimit(`ratelimit:auth:login:ip:${ipAddress}`, 20, 60);
+    if (!loginIpLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(loginIpLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const loginEmailLimit = await checkRateLimit(
+      `ratelimit:auth:login:email:${email.toLowerCase()}`,
+      8,
+      60
+    );
+    if (!loginEmailLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts for this account. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(loginEmailLimit.retryAfterSeconds) } }
+      );
+    }
 
     // Get tenant from middleware
     console.log('[Login API] Step 3: Getting tenant from context');
@@ -246,35 +266,16 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    // TEMPORARY: Check if 2FA bypass is enabled (development/testing only)
-    // ⚠️ WARNING: Only use this while waiting for email service setup
-    // Remove this flag once SendGrid is properly configured
-    const disableMFA = process.env.DISABLE_MFA_TEMPORARILY;
-    const nodeEnv = process.env.NODE_ENV;
-    
-    // Debug logging to help diagnose bypass issues
-    console.log('========================================');
-    console.log('[LOGIN API] BYPASS CHECK');
-    console.log('[LOGIN API] DISABLE_MFA_TEMPORARILY:', disableMFA);
-    console.log('[LOGIN API] NODE_ENV:', nodeEnv);
-    console.log('[LOGIN API] disableMFA === "true":', disableMFA === 'true');
-    console.log('[LOGIN API] nodeEnv is dev/test:', nodeEnv === 'development' || nodeEnv === 'test');
-    console.log('[LOGIN API] BYPASS WILL BE:', disableMFA === 'true' && (nodeEnv === 'development' || nodeEnv === 'test'));
-    console.log('========================================');
-    
-    const bypassMFA = disableMFA === 'true' && 
-                      (nodeEnv === 'development' || nodeEnv === 'test');
-    
+    const bypassMFA = shouldBypassMfaForReviewer(authData.user.email);
     if (bypassMFA) {
-      console.warn('[Login API] ⚠️ 2FA BYPASS ENABLED - This should only be used temporarily while email service is unavailable');
-      console.warn('[Login API] Set DISABLE_MFA_TEMPORARILY=false and remove this flag once SendGrid is configured');
-      
+      console.warn('[Login API] Reviewer MFA bypass applied for Play Store review account');
+
       // Complete login without 2FA
       const response = NextResponse.json({
         success: true,
         requiresMFA: false,
-        message: 'Login successful (2FA temporarily disabled)',
-        warning: '2FA is currently bypassed. Re-enable it once email service is configured.',
+        message: 'Login successful',
+        warning: 'Reviewer MFA bypass is currently active for this account.',
         user: {
           id: authData.user.id,
           email: authData.user.email,
@@ -282,7 +283,7 @@ export async function POST(request: NextRequest) {
       });
       
       setTenantSubdomainCookie(response, tenant.subdomain);
-      console.log('[Login API] Login completed with 2FA bypass (temporary flag enabled)');
+      console.log('[Login API] Login completed with reviewer MFA bypass');
       return response;
     }
 

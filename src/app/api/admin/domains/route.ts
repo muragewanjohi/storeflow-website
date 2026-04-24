@@ -8,6 +8,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import {
+  requireAnyRole,
+  requireAuth,
+  requireTenantAccess,
+} from '@/lib/auth/server';
+import {
   addTenantDomain,
   removeTenantDomain,
   verifyDomain,
@@ -21,6 +26,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+async function authorizeDomainAdmin(tenantId: string): Promise<NextResponse | null> {
+  try {
+    const user = await requireAuth();
+    requireAnyRole(user, ['tenant_admin', 'landlord']);
+    requireTenantAccess(user, tenantId);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Access denied';
+    const status = message.toLowerCase().includes('authentication') ? 401 : 403;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
 /**
  * POST /api/admin/domains
  * 
@@ -29,6 +47,8 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const tenant = await requireTenant();
+    const authError = await authorizeDomainAdmin(tenant.id);
+    if (authError) return authError;
     const body = await request.json();
     const { domain } = body;
 
@@ -93,6 +113,8 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const tenant = await requireTenant();
+    const authError = await authorizeDomainAdmin(tenant.id);
+    if (authError) return authError;
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get('domain');
 
@@ -154,6 +176,8 @@ export async function DELETE(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const tenant = await requireTenant();
+    const authError = await authorizeDomainAdmin(tenant.id);
+    if (authError) return authError;
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get('domain') || tenant.custom_domain;
 

@@ -64,7 +64,17 @@ export function getPesapalIpnUrl(): string {
   const isLocalhost = /^https?:\/\/localhost(:\d+)?(\/|$)/i.test(base);
   const scheme = isLocalhost ? (base.startsWith('https') ? 'https' : 'http') : 'https';
   const withoutScheme = base.replace(/^https?:\/\//i, '');
-  return `${scheme}://${withoutScheme}/api/pesapal/subscription/ipn`;
+  const ipnUrl = `${scheme}://${withoutScheme}/api/pesapal/subscription/ipn`;
+  const webhookToken = process.env.PAYMENT_WEBHOOK_TOKEN?.trim();
+  if (!webhookToken) {
+    return ipnUrl;
+  }
+
+  const parsed = new URL(ipnUrl);
+  if (!parsed.searchParams.has('token')) {
+    parsed.searchParams.set('token', webhookToken);
+  }
+  return parsed.toString();
 }
 
 /**

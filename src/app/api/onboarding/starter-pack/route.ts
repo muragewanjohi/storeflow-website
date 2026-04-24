@@ -7,6 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getThemeColorSettingsWithDefaults } from '@/lib/themes/color-settings';
 import { buildSellingMatchKeys, checkSellingExists, isSellingEquivalent, normalizeSellingKey } from '@/lib/onboarding/selling-check';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -1136,6 +1137,63 @@ export async function POST(request: NextRequest) {
     const requestStartedAt = Date.now();
     const body = await request.json();
     const input = starterPackRequestSchema.parse(body);
+    const clientIp = getClientIp(request);
+
+    const ipLimit = await checkRateLimit(`ratelimit:ai:starter-pack:ip:${clientIp}`, 20, 60 * 60);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'RATE_LIMITED',
+            message: 'Too many starter-pack requests. Please try again later.',
+          },
+        },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const shouldUseExternalAi = input.includeGeminiCall || input.includeNanoBananaCall;
+    if (shouldUseExternalAi) {
+      const expensiveCallLimit = await checkRateLimit(
+        `ratelimit:ai:starter-pack:external:${clientIp}`,
+        10,
+        60 * 60
+      );
+      if (!expensiveCallLimit.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'AI_USAGE_LIMIT_EXCEEDED',
+              message: 'AI generation rate limit reached. Please try again later.',
+            },
+          },
+          { status: 429, headers: { 'Retry-After': String(expensiveCallLimit.retryAfterSeconds) } }
+        );
+      }
+    }
+
+    if (input.tenantId && shouldUseExternalAi) {
+      const tenantDailyLimit = Number(process.env.AI_STARTER_PACK_DAILY_LIMIT || '50');
+      const tenantLimit = await checkRateLimit(
+        `ratelimit:ai:starter-pack:tenant:${input.tenantId}`,
+        tenantDailyLimit,
+        60 * 60 * 24
+      );
+      if (!tenantLimit.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'TENANT_AI_QUOTA_EXCEEDED',
+              message: 'Tenant AI starter-pack daily quota reached.',
+            },
+          },
+          { status: 429, headers: { 'Retry-After': String(tenantLimit.retryAfterSeconds) } }
+        );
+      }
+    }
 
     const niche = (input.niche || input.selling || input.businessType).trim();
     const sellingPrecheck = input.checkSellingExists

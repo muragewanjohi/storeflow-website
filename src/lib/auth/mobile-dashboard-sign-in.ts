@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma/client';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import type { UserRole } from '@/lib/auth/types';
 import { generateAndSendOTP } from '@/lib/mfa/email-otp';
+import { shouldBypassMfaForReviewer } from '@/lib/auth/reviewer-mfa-bypass';
 
 export type MobileDashboardSignInOutcome = {
   status: number;
@@ -96,7 +97,9 @@ export async function finalizeMobileDashboardSignIn(
       };
     }
 
-    const skipEmailOtp = options?.skipEmailOtpForTenantRoles === true;
+    const skipEmailOtp =
+      options?.skipEmailOtpForTenantRoles === true ||
+      shouldBypassMfaForReviewer(email);
     if (!skipEmailOtp) {
       const tenantNameForMfa = tenant.name || tenant.subdomain;
       await generateAndSendOTP(user.id, email, tenantNameForMfa);

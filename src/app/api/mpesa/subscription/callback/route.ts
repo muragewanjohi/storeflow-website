@@ -18,6 +18,7 @@ import {
   calculateUpgradeProration,
   getPlanChangeType,
 } from '@/lib/subscriptions/proration';
+import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest) {
   let callbackProcessed = false;
 
   try {
+    const auth = verifyPaymentWebhookRequest(request);
+    if (!auth.ok) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     const body = await request.json();
     
     // M-Pesa callback structure

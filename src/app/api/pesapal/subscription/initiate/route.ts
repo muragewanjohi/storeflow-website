@@ -21,6 +21,7 @@ import {
   getPlanChangeType,
 } from '@/lib/subscriptions/proration';
 import { getLocalizedPrice } from '@/lib/pricing/location';
+import { buildWebhookUrlWithToken } from '@/lib/payments/webhook-auth';
 
 const initiateSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
     const callbackPath = embed
       ? '/api/pesapal/subscription/callback?embed=1'
       : '/api/pesapal/subscription/callback';
-    const callbackUrl = `${appUrl}${callbackPath}`;
+    const callbackUrl = buildWebhookUrlWithToken(`${appUrl}${callbackPath}`);
     const cancellationUrl = embed
       ? `${appUrl}/dashboard/subscription/pesapal-done?cancelled=1`
       : `${appUrl}/dashboard/subscription`;

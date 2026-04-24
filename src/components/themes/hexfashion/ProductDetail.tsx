@@ -15,6 +15,7 @@ import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon } from '@heroic
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import HexFashionProductCard from './ProductCard';
+import { sanitizeHtmlForDisplay } from '@/lib/security/sanitize-html';
 
 interface ProductVariant {
   id: string;
@@ -117,6 +118,9 @@ export default function HexFashionProductDetail({
     product.image,
     ...galleryImages.filter((img: string) => img && img !== product.image),
   ].filter(Boolean) as string[];
+  const safeProductDescription = product.description
+    ? sanitizeHtmlForDisplay(product.description)
+    : null;
 
   const handleAddToCart = async () => {
     setAddingToCart(true);
@@ -459,11 +463,11 @@ export default function HexFashionProductDetail({
 
         {/* Tab Content */}
         <div className="min-h-[400px]">
-          {activeTab === 'details' && product.description && (
+          {activeTab === 'details' && safeProductDescription && (
             <div className="prose max-w-none">
               <div
                 className="text-[16px] text-[rgba(0,0,0,0.6)] leading-[22px]"
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                dangerouslySetInnerHTML={{ __html: safeProductDescription }}
               />
             </div>
           )}

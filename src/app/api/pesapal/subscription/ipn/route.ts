@@ -13,6 +13,7 @@ import {
   isTransactionCompleted,
 } from '@/lib/pesapal/pesapal-service';
 import { sendSubscriptionActivatedEmail } from '@/lib/subscriptions/emails';
+import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,11 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleIpn(request: NextRequest): Promise<NextResponse> {
+  const auth = verifyPaymentWebhookRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { orderTrackingId, orderMerchantReference, orderNotificationType } =
     await getIpnParams(request);
 

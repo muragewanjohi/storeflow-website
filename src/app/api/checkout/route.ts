@@ -257,9 +257,9 @@ export async function POST(request: NextRequest) {
         phone: customerInfo.phone,
         total_amount: finalTotal,
         status: 'pending',
-        payment_status: validatedData.payment_method === 'mpesa' && validatedData.payment_verification 
-          ? 'paid' 
-          : 'pending',
+        // Never trust client-submitted payment verification payloads for paid status.
+        // Payment state is promoted to "paid" only from verified provider callbacks.
+        payment_status: 'pending',
         payment_gateway: validatedData.payment_method,
         transaction_id: validatedData.payment_verification?.transaction_id || null,
         payment_meta: validatedData.payment_verification ? JSON.parse(JSON.stringify({

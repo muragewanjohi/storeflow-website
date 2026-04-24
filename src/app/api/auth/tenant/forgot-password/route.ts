@@ -11,6 +11,7 @@ import { getTenant } from '@/lib/tenant-context/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -31,6 +32,27 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validatedData = forgotPasswordSchema.parse(body);
+    const clientIp = getClientIp(request);
+
+    const ipLimit = await checkRateLimit(`ratelimit:auth:forgot-password:ip:${clientIp}`, 10, 60);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { success: false, message: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const emailLimit = await checkRateLimit(
+      `ratelimit:auth:forgot-password:email:${validatedData.email.toLowerCase()}`,
+      3,
+      300
+    );
+    if (!emailLimit.allowed) {
+      return NextResponse.json(
+        { success: false, message: 'Too many reset attempts for this account. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfterSeconds) } }
+      );
+    }
 
     // Get the base URL for redirect (tenant-specific)
     // Priority: Use the redirectTo from client (which includes tenant subdomain), or get from request

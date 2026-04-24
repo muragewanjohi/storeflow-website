@@ -40,7 +40,8 @@
     "deploy:verify-ssl": "tsx scripts/verify-ssl-certificates.ts",
     "test:subscriptions": "tsx scripts/test-subscription-reminders.ts",
     "test:email": "tsx scripts/test-email-sending.ts",
-    "test:mpesa": "node scripts/test-mpesa-stk-push.js"
+    "test:mpesa": "node scripts/test-mpesa-stk-push.js",
+    "test:security": "tsx scripts/security-regression-checks.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

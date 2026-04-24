@@ -21,6 +21,7 @@ import {
   calculateUpgradeProration,
   getPlanChangeType,
 } from '@/lib/subscriptions/proration';
+import { buildWebhookUrlWithToken } from '@/lib/payments/webhook-auth';
 
 const initiatePaymentSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
@@ -131,10 +132,11 @@ export async function POST(request: NextRequest) {
     const mpesaService = getMpesaService();
 
     // Get callback URL (use configured URL or fallback to dukanest.com)
-    const callbackUrl = process.env.MPESA_CALLBACK_URL || 
+    const callbackUrlBase = process.env.MPESA_CALLBACK_URL || 
                        (process.env.NEXT_PUBLIC_APP_URL 
                          ? `${process.env.NEXT_PUBLIC_APP_URL}/api/mpesa/subscription/callback`
                          : 'https://dukanest.com/api/mpesa/subscription/callback');
+    const callbackUrl = buildWebhookUrlWithToken(callbackUrlBase);
 
     // Initiate STK Push
     const stkResponse = await mpesaService.initiateStkPush({

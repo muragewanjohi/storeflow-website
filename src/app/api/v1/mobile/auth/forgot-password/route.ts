@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -23,6 +24,27 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, redirectTo } = forgotPasswordSchema.parse(body);
+    const clientIp = getClientIp(request);
+    const ipLimit = await checkRateLimit(`ratelimit:mobile:auth:forgot-password:ip:${clientIp}`, 10, 60);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        mobileError('RATE_LIMITED', 'Too many requests. Please try again later.'),
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } },
+      );
+    }
+
+    const emailLimit = await checkRateLimit(
+      `ratelimit:mobile:auth:forgot-password:email:${email.toLowerCase()}`,
+      3,
+      300
+    );
+    if (!emailLimit.allowed) {
+      return NextResponse.json(
+        mobileError('RATE_LIMITED', 'Too many reset attempts for this account. Please try again later.'),
+        { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfterSeconds) } },
+      );
+    }
+
     const supabase = getSupabaseClient();
 
     const defaultRedirectBase = process.env.NEXT_PUBLIC_APP_URL;

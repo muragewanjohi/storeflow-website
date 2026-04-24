@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import FurnitureProductCard from './ProductCard';
 import { ShareIcon } from '@heroicons/react/24/outline';
+import { sanitizeHtmlForDisplay } from '@/lib/security/sanitize-html';
 
 interface ProductVariant {
   id: string;
@@ -113,6 +114,9 @@ export default function FurnitureProductDetail({
     product.image,
     ...galleryImages.filter((img: string) => img && img !== product.image),
   ].filter(Boolean) as string[];
+  const safeProductDescription = product.description
+    ? sanitizeHtmlForDisplay(product.description)
+    : null;
 
   // Default to first 4 images for thumbnails
   const thumbnailImages = allImages.slice(0, 4);
@@ -498,12 +502,12 @@ export default function FurnitureProductDetail({
 
         {/* Tab Content */}
         <div className="min-h-[400px]">
-          {activeTab === 'description' && product.description && (
+          {activeTab === 'description' && safeProductDescription && (
             <div className="prose max-w-none">
               <div
                 className="text-[16px] text-[#9f9f9f] leading-normal text-justify"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                dangerouslySetInnerHTML={{ __html: safeProductDescription }}
               />
             </div>
           )}

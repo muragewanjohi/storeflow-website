@@ -16,6 +16,7 @@ import {
   sendPlanUpgradeConfirmationEmail,
 } from '@/lib/subscriptions/emails';
 import { getPlanChangeType } from '@/lib/subscriptions/proration';
+import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,13 @@ function redirectUrl(request: NextRequest, path: string, params: Record<string, 
 }
 
 export async function GET(request: NextRequest) {
+  const auth = verifyPaymentWebhookRequest(request);
+  if (!auth.ok) {
+    return NextResponse.redirect(
+      redirectUrl(request, subscriptionPagePath, { error: 'invalid_webhook_token' })
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const orderTrackingId = searchParams.get('OrderTrackingId');
   const orderMerchantReference = searchParams.get('OrderMerchantReference');

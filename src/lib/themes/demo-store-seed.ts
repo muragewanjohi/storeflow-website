@@ -22,6 +22,16 @@ import { getHomepageTemplateData, getHomepageLayout, convertLegacyLayoutToPageBu
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { setStaticOption } from '@/lib/settings/static-options';
 
+function getDemoSeedPassword(): string {
+  const configured = process.env.DEMO_SEED_PASSWORD?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  // Fallback avoids static credentials in code while keeping local seed usable.
+  return crypto.randomBytes(18).toString('base64url');
+}
+
 // Business types for demo stores
 const BUSINESS_TYPES = [
   'Grocery Store / Supermarket',
@@ -472,7 +482,7 @@ async function createAdminUser(
 ): Promise<string> {
   const adminClient = createAdminClient();
   const email = 'storeadmin@dukanest.com';
-  const password = 'Avatar.12';
+  const password = getDemoSeedPassword();
 
   // Check if user exists
   const { data: { users } } = await adminClient.auth.admin.listUsers();
@@ -531,7 +541,7 @@ async function createStaffUser(
 ): Promise<string> {
   const adminClient = createAdminClient();
   const email = 'tester@dukanest.com';
-  const password = 'Avatar.12';
+  const password = getDemoSeedPassword();
 
   // Check if user exists
   const { data: { users } } = await adminClient.auth.admin.listUsers();
@@ -987,11 +997,11 @@ export async function createDemoStore(businessType: string): Promise<void> {
     where: { id: tenant.id },
     data: { user_id: adminUserId },
   });
-  console.log(`[Demo Store] Linked admin user: storeadmin@dukanest.com (password: Avatar.12)`);
+  console.log('[Demo Store] Linked admin user: storeadmin@dukanest.com (password sourced from DEMO_SEED_PASSWORD or randomized fallback)');
 
   // Create staff user (shared across all demo stores)
   await createStaffUser(tenant.id);
-  console.log(`[Demo Store] Linked staff user: tester@dukanest.com (password: Avatar.12)`);
+  console.log('[Demo Store] Linked staff user: tester@dukanest.com (password sourced from DEMO_SEED_PASSWORD or randomized fallback)');
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Demo Store] ✅ Completed: ${businessType} in ${duration}s`);
