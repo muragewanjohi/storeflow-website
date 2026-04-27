@@ -70,6 +70,17 @@ interface StarterPackPayload {
   blogPosts?: StarterPackBlogPost[];
 }
 
+type OnboardingImageRepairResult =
+  | {
+      success: true;
+      data: Record<string, unknown>;
+    }
+  | {
+      success: false;
+      status?: number;
+      error: string;
+    };
+
 function toTitleCase(value: string): string {
   return value
     .trim()
@@ -84,7 +95,7 @@ async function triggerOnboardingImageRepair(params: {
   tenantId: string;
   traceId: string;
   reason: string;
-}): Promise<void> {
+}): Promise<OnboardingImageRepairResult> {
   const cronToken = process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN || '';
   if (!cronToken) {
     console.warn('[Registration][ImageRepair] Skipping repair trigger: missing CRON_SECRET', {
@@ -92,7 +103,10 @@ async function triggerOnboardingImageRepair(params: {
       tenantId: params.tenantId,
       reason: params.reason,
     });
-    return;
+    return {
+      success: false,
+      error: 'Missing CRON_SECRET for image repair trigger',
+    };
   }
 
   try {
@@ -110,34 +124,70 @@ async function triggerOnboardingImageRepair(params: {
     );
 
     const repairPayload = await repairResponse.json().catch(() => ({}));
+    const repairData = isRecord(repairPayload?.data) ? repairPayload.data : {};
     if (!repairResponse.ok || !repairPayload?.success) {
+      const errorMessage = repairPayload?.error?.message || 'Unknown repair trigger error';
       console.warn('[Registration][ImageRepair] Repair trigger failed', {
         traceId: params.traceId,
         tenantId: params.tenantId,
         reason: params.reason,
         status: repairResponse.status,
-        error: repairPayload?.error?.message || 'Unknown repair trigger error',
+        error: errorMessage,
       });
-      return;
+      return {
+        success: false,
+        status: repairResponse.status,
+        error: errorMessage,
+      };
     }
 
     console.log('[Registration][ImageRepair] Repair trigger completed', {
       traceId: params.traceId,
       tenantId: params.tenantId,
       reason: params.reason,
-      productsUpdated: Number(repairPayload?.data?.productsUpdated ?? 0),
-      salesUpdated: Number(repairPayload?.data?.salesUpdated ?? 0),
-      blogsUpdated: Number(repairPayload?.data?.blogsUpdated ?? 0),
-      homepageSectionsUpdated: Number(repairPayload?.data?.homepageSectionsUpdated ?? 0),
+      productsUpdated: Number(repairData.productsUpdated ?? 0),
+      salesUpdated: Number(repairData.salesUpdated ?? 0),
+      blogsUpdated: Number(repairData.blogsUpdated ?? 0),
+      homepageSectionsUpdated: Number(repairData.homepageSectionsUpdated ?? 0),
     });
+
+    return {
+      success: true,
+      data: repairData,
+    };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown repair trigger exception';
     console.warn('[Registration][ImageRepair] Repair trigger exception', {
       traceId: params.traceId,
       tenantId: params.tenantId,
       reason: params.reason,
-      error: error instanceof Error ? error.message : 'Unknown repair trigger exception',
+      error: errorMessage,
     });
+    return {
+      success: false,
+      error: errorMessage,
+    };
   }
+}
+
+function starterPackNeedsImageEnrichment(starterPack: StarterPackPayload): boolean {
+  const isMissingOrPlaceholder = (value: string | undefined): boolean => {
+    const imageUrl = typeof value === 'string' ? value.trim() : '';
+    return imageUrl.length === 0 || isOnboardingPlaceholderUrl(imageUrl);
+  };
+
+  return Boolean(
+    (starterPack.demoProducts ?? []).some(
+      (item) =>
+        isMissingOrPlaceholder(item.imageUrl) &&
+        Boolean(item.imagePrompt || item.nanoBananaPrompt)
+    ) ||
+      (starterPack.salesPromotions ?? []).some(
+        (item) =>
+          isMissingOrPlaceholder(item.imageUrl) &&
+          Boolean(item.imagePrompt)
+      )
+  );
 }
 
 /**
@@ -2162,21 +2212,7 @@ export async function POST(request: NextRequest) {
                 });
 
                 const starterPackForImages = starterPackPayload;
-                const needsImageEnrichment = Boolean(
-                  starterPackForImages &&
-                    (
-                      (starterPackForImages.demoProducts ?? []).some(
-                        (item) =>
-                          (!item.imageUrl || item.imageUrl.trim().length === 0) &&
-                          Boolean(item.imagePrompt || item.nanoBananaPrompt)
-                      ) ||
-                      (starterPackForImages.salesPromotions ?? []).some(
-                        (item) =>
-                          (!item.imageUrl || item.imageUrl.trim().length === 0) &&
-                          Boolean(item.imagePrompt)
-                      )
-                    )
-                );
+                const needsImageEnrichment = starterPackNeedsImageEnrichment(starterPackForImages);
 
                 if (needsImageEnrichment && starterPackForImages) {
                   const imageJob = await prisma.cron_job_logs.create({
@@ -2221,110 +2257,31 @@ export async function POST(request: NextRequest) {
 
                   after(async () => {
                     const startedAt = Date.now();
-                    try {
-                      const imageResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'X-Registration-Trace-Id': registrationTraceId,
-                        },
-                        body: JSON.stringify({
-                          businessType: validatedData.businessType,
-                          selling: finalSelling,
-                          storeName: validatedData.name,
-                          tenantId: tenant.id,
-                          variationSeed: tenant.id,
-                          themeId: effectiveThemeId,
-                          locale: 'en-KE',
-                          currency: 'KES',
-                          productsCount: 8,
-                          categoriesCount: 8,
-                          blogPostsCount: 2,
-                          includeGeminiCall: false,
-                          includeNanoBananaCall: true,
-                          checkSellingExists: false,
-                          forceExternalGeneration: false,
-                          geminiModel: 'gemini-2.5-flash',
-                          geminiResult: starterPackForImages,
-                        }),
-                      });
-                      const imageData = await imageResponse.json();
-                      if (!imageResponse.ok || !imageData?.success) {
-                        throw new Error(imageData?.error?.message || 'Background image generation failed');
-                      }
+                    const repairResult = await triggerOnboardingImageRepair({
+                      origin: request.nextUrl.origin,
+                      tenantId: tenant.id,
+                      traceId: registrationTraceId,
+                      reason: 'initial-onboarding-image-population',
+                    });
 
-                      const imagePack = extractStarterPackPayload(imageData);
-                      if (!imagePack) {
-                        throw new Error('Image generation returned invalid starter-pack payload');
-                      }
+                    const latestTenant = await prisma.tenants.findUnique({
+                      where: { id: tenant.id },
+                      select: { data: true },
+                    });
+                    const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
 
-                      // Detect cases where the starter-pack endpoint returned
-                      // success but Nano Banana was skipped or produced no
-                      // images. These manifest as duplicate placeholders for
-                      // the merchant, so surface them loudly.
-                      const nanoBananaInfo = isRecord(imageData?.data?.nanoBanana)
-                        ? (imageData.data.nanoBanana as Record<string, unknown>)
-                        : null;
-                      const nanoBananaSkippedReason =
-                        nanoBananaInfo && typeof nanoBananaInfo.skippedReason === 'string'
-                          ? nanoBananaInfo.skippedReason
-                          : null;
-                      const nanoBananaExecuted = isRecord(nanoBananaInfo?.executed)
-                        ? (nanoBananaInfo!.executed as Record<string, unknown>)
-                        : null;
-                      const nanoBananaSucceeded =
-                        typeof nanoBananaExecuted?.succeeded === 'number'
-                          ? (nanoBananaExecuted.succeeded as number)
-                          : 0;
-                      const nanoBananaFailed =
-                        typeof nanoBananaExecuted?.failed === 'number'
-                          ? (nanoBananaExecuted.failed as number)
-                          : 0;
-                      const nanoBananaAlert =
-                        Boolean(nanoBananaSkippedReason) ||
-                        (nanoBananaExecuted !== null && nanoBananaSucceeded === 0);
-
-                      if (nanoBananaAlert) {
-                        console.warn('[Registration][NanoBanana] ⚠️ Image generation produced no usable images', {
-                          traceId: registrationTraceId,
-                          tenantId: tenant.id,
-                          tenantName: validatedData.name,
-                          selling: finalSelling,
-                          skippedReason: nanoBananaSkippedReason,
-                          succeeded: nanoBananaSucceeded,
-                          failed: nanoBananaFailed,
-                          hasGeminiApiKey: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY),
-                          hasNanoBananaApiKey: Boolean(process.env.NANO_BANANA_API_KEY),
-                          hasSupabaseServiceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-                          hint:
-                            nanoBananaSkippedReason === 'Missing API key for image generation'
-                              ? 'Set NANO_BANANA_API_KEY or GEMINI_API_KEY in the environment running the background job.'
-                              : 'Check the cron_job_logs row for this tenant and inspect the starter-pack trace logs.',
-                        });
-                      }
-
-                      const imageResult = await applyStarterPackImagesToTenant(tenant.id, imagePack);
-
-                      const latestTenant = await prisma.tenants.findUnique({
-                        where: { id: tenant.id },
-                        select: { data: true },
-                      });
-                      const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
-                      const finalStatus = nanoBananaAlert ? 'skipped' : 'completed';
+                    if (repairResult.success) {
                       await prisma.tenants.update({
                         where: { id: tenant.id },
                         data: {
                           data: {
                             ...latestTenantData,
                             onboarding_setup: {
-                              status: finalStatus,
+                              status: 'completed',
                               jobId: imageJob.id,
                               completedAt: new Date().toISOString(),
                               stage: 'images',
-                              nanoBananaSkippedReason: nanoBananaSkippedReason || undefined,
-                              nanoBananaSucceeded,
-                              nanoBananaFailed,
-                              result: imageResult,
+                              result: repairResult.data,
                             },
                           } as unknown as Prisma.InputJsonValue,
                         },
@@ -2333,77 +2290,41 @@ export async function POST(request: NextRequest) {
                       await prisma.cron_job_logs.update({
                         where: { id: imageJob.id },
                         data: {
-                          status: nanoBananaAlert ? 'failed' : 'success',
+                          status: 'success',
                           completed_at: new Date(),
                           duration_ms: Date.now() - startedAt,
-                          result: {
-                            ...(imageResult as object),
-                            nanoBananaSkippedReason,
-                            nanoBananaSucceeded,
-                            nanoBananaFailed,
-                          } as Prisma.InputJsonValue,
-                          error: nanoBananaAlert
-                            ? nanoBananaSkippedReason || 'Nano Banana produced no images'
-                            : null,
+                          result: repairResult.data as Prisma.InputJsonValue,
+                          error: null,
                         },
                       });
-
-                      if (nanoBananaAlert) {
-                        await triggerOnboardingImageRepair({
-                          origin: request.nextUrl.origin,
-                          tenantId: tenant.id,
-                          traceId: registrationTraceId,
-                          reason: nanoBananaSkippedReason || 'nano-banana-produced-no-images',
-                        });
-                      }
-                    } catch (backgroundImageError) {
-                      const latestTenant = await prisma.tenants.findUnique({
-                        where: { id: tenant.id },
-                        select: { data: true },
-                      });
-                      const latestTenantData = isRecord(latestTenant?.data) ? latestTenant.data : {};
-                      await prisma.tenants.update({
-                        where: { id: tenant.id },
-                        data: {
-                          data: {
-                            ...latestTenantData,
-                            onboarding_setup: {
-                              status: 'failed',
-                              jobId: imageJob.id,
-                              failedAt: new Date().toISOString(),
-                              stage: 'images',
-                              error:
-                                backgroundImageError instanceof Error
-                                  ? backgroundImageError.message
-                                  : 'Unknown image enrichment error',
-                            },
-                          } as unknown as Prisma.InputJsonValue,
-                        },
-                      });
-
-                      await prisma.cron_job_logs.update({
-                        where: { id: imageJob.id },
-                        data: {
-                          status: 'failed',
-                          completed_at: new Date(),
-                          duration_ms: Date.now() - startedAt,
-                          error:
-                            backgroundImageError instanceof Error
-                              ? backgroundImageError.message
-                              : 'Unknown image enrichment error',
-                        },
-                      });
-
-                      await triggerOnboardingImageRepair({
-                        origin: request.nextUrl.origin,
-                        tenantId: tenant.id,
-                        traceId: registrationTraceId,
-                        reason:
-                          backgroundImageError instanceof Error
-                            ? backgroundImageError.message
-                            : 'background-image-enrichment-error',
-                      });
+                      return;
                     }
+
+                    await prisma.tenants.update({
+                      where: { id: tenant.id },
+                      data: {
+                        data: {
+                          ...latestTenantData,
+                          onboarding_setup: {
+                            status: 'failed',
+                            jobId: imageJob.id,
+                            failedAt: new Date().toISOString(),
+                            stage: 'images',
+                            error: repairResult.error,
+                          },
+                        } as unknown as Prisma.InputJsonValue,
+                      },
+                    });
+
+                    await prisma.cron_job_logs.update({
+                      where: { id: imageJob.id },
+                      data: {
+                        status: 'failed',
+                        completed_at: new Date(),
+                        duration_ms: Date.now() - startedAt,
+                        error: repairResult.error,
+                      },
+                    });
                   });
                 }
               }
@@ -2562,6 +2483,26 @@ export async function POST(request: NextRequest) {
                     attributesCreated: demoResult.attributesCreated ?? 0,
                   };
                 }
+
+                const imageRepairResult = await triggerOnboardingImageRepair({
+                  origin: request.nextUrl.origin,
+                  tenantId: tenant.id,
+                  traceId: registrationTraceId,
+                  reason: `post-content-setup:${appliedSource}`,
+                });
+                resultPayload = {
+                  ...resultPayload,
+                  imageRepair: imageRepairResult.success
+                    ? {
+                        success: true,
+                        ...imageRepairResult.data,
+                      }
+                    : {
+                        success: false,
+                        status: imageRepairResult.status ?? null,
+                        error: imageRepairResult.error,
+                      },
+                };
 
                 const latestTenant = await prisma.tenants.findUnique({
                   where: { id: tenant.id },
