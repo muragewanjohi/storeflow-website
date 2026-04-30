@@ -38,6 +38,7 @@ import {
   FireIcon,
   TruckIcon,
   ArrowUpTrayIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import {
   LineChart,
@@ -124,6 +125,7 @@ interface GettingStartedItem {
   completed: boolean;
   href: string;
   cta?: string;
+  priority?: number;
 }
 
 interface GettingStartedData {
@@ -143,6 +145,7 @@ interface DashboardNotificationsResponse {
 
 const ONBOARDING_INLINE_HINTS: Partial<Record<string, string>> = {
   product: '⏱ Takes 2 minutes',
+  demo_products: 'Keep these until your real catalog is ready',
 };
 
 const formatNumber = (num: number) => {
@@ -163,6 +166,7 @@ export default function DashboardClient({
   startDate,
 }: Readonly<DashboardClientProps>) {
   const { formatCurrency, currency } = useCurrency();
+  const [isRemovingDemoProducts, setIsRemovingDemoProducts] = useState(false);
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
 
@@ -297,6 +301,39 @@ export default function DashboardClient({
         body: JSON.stringify({ action: 'preview_done' }),
       });
       refetchGettingStarted();
+    }
+  };
+
+  const handleRemoveDemoProducts = async () => {
+    try {
+      setIsRemovingDemoProducts(true);
+      const response = await fetch('/api/products/demo', { method: 'DELETE' });
+      const json = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(json?.error || 'Failed to remove demo products');
+      }
+
+      const data = json?.data;
+      const removedCount = Number(data?.removedCount ?? 0);
+      const deletedCount = Number(data?.deletedCount ?? 0);
+      const archivedCount = Number(data?.archivedCount ?? 0);
+
+      if (removedCount > 0) {
+        toast.success(
+          archivedCount > 0
+            ? `Removed ${deletedCount} demo product${deletedCount === 1 ? '' : 's'} and archived ${archivedCount} used in orders.`
+            : `Removed ${deletedCount} demo product${deletedCount === 1 ? '' : 's'}.`,
+        );
+      } else {
+        toast.info('No active demo products found.');
+      }
+
+      refetchGettingStarted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove demo products');
+    } finally {
+      setIsRemovingDemoProducts(false);
     }
   };
 
@@ -924,6 +961,17 @@ export default function DashboardClient({
                             <EyeIcon className="h-3 w-3 mr-1" />
                             {gettingStarted.nextAction.cta}
                           </Button>
+                        ) : gettingStarted.nextAction.id === 'demo_products' ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={handleRemoveDemoProducts}
+                            disabled={isRemovingDemoProducts}
+                            className="h-7 text-xs"
+                          >
+                            <TrashIcon className="h-3 w-3 mr-1" />
+                            {isRemovingDemoProducts ? 'Removing...' : gettingStarted.nextAction.cta}
+                          </Button>
                         ) : (
                           <Button variant="default" size="sm" asChild className="h-7 text-xs">
                             <Link href={gettingStarted.nextAction.href}>{gettingStarted.nextAction.cta}</Link>
@@ -982,6 +1030,17 @@ export default function DashboardClient({
                               >
                                 <EyeIcon className="h-3 w-3 mr-1" />
                                 {item.cta}
+                              </Button>
+                            ) : item.id === 'demo_products' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRemoveDemoProducts}
+                                disabled={isRemovingDemoProducts}
+                                className="h-7 text-xs"
+                              >
+                                <TrashIcon className="h-3 w-3 mr-1" />
+                                {isRemovingDemoProducts ? 'Removing...' : item.cta}
                               </Button>
                             ) : (
                               <Button variant="outline" size="sm" asChild className="h-7 text-xs">

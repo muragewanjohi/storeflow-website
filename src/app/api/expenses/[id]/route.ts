@@ -3,20 +3,16 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
-
-const expenseCategoryValues = [
-  'ads_marketing',
-  'shipping_fulfillment',
-  'packaging',
-  'software_apps',
-  'salaries_contractors',
-  'rent_utilities',
-  'misc',
-] as const;
+import {
+  ExpenseCategoryValidationError,
+  formatExpense,
+  resolveExpenseCategoryForTenant,
+} from '@/lib/finance/expense-categories';
 
 const updateExpenseSchema = z.object({
   expense_date: z.string().optional(),
-  category: z.enum(expenseCategoryValues).optional(),
+  category_id: z.string().uuid().optional().nullable(),
+  category: z.string().min(1).max(80).optional(),
   amount: z.coerce.number().min(0).optional(),
   tax_amount: z.coerce.number().min(0).optional().nullable(),
   payment_method: z.string().max(50).optional().nullable(),
@@ -34,6 +30,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const input = updateExpenseSchema.parse(body);
+    const resolvedCategory = await resolveExpenseCategoryForTenant(tenant.id, input, { required: false });
 
     const existing = await prisma.expenses.findFirst({
       where: { id, tenant_id: tenant.id },
@@ -45,9 +42,11 @@ export async function PATCH(
 
     const updated = await prisma.expenses.update({
       where: { id },
+      include: { expense_categories: true },
       data: {
         ...(input.expense_date !== undefined ? { expense_date: new Date(input.expense_date) } : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(resolvedCategory.category !== undefined ? { category: resolvedCategory.category } : {}),
+        ...(resolvedCategory.category_id !== undefined ? { category_id: resolvedCategory.category_id } : {}),
         ...(input.amount !== undefined ? { amount: input.amount } : {}),
         ...(input.tax_amount !== undefined ? { tax_amount: input.tax_amount } : {}),
         ...(input.payment_method !== undefined ? { payment_method: input.payment_method } : {}),
@@ -58,16 +57,18 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...updated,
-        amount: Number(updated.amount),
-        tax_amount: updated.tax_amount != null ? Number(updated.tax_amount) : null,
-      },
+      data: formatExpense(updated),
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, error: { message: 'Validation error', details: error.issues } },
+        { status: 400 },
+      );
+    }
+    if (error instanceof ExpenseCategoryValidationError) {
+      return NextResponse.json(
+        { success: false, error: { message: error.message, details: [{ field: error.field, message: error.message }] } },
         { status: 400 },
       );
     }

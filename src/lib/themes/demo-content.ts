@@ -11,6 +11,7 @@ import { PrismaClient } from '@prisma/client';
 import type { ThemeIndustry } from './theme-registry';
 import { generateSlug, generateSKU } from '@/lib/products/validation';
 import { createContactPageTemplate } from './additional-pages';
+import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 
 /**
  * Demo Product type for preview/demo purposes
@@ -1812,7 +1813,7 @@ export async function createDemoProducts(
         category_id: categoryId,
         brand_id: null, // No brand for demo products
         created_by: null, // Demo products don't have a specific creator
-        metadata: {}, // Empty metadata object
+        metadata: buildDemoProductMetadata('theme_demo_content', 'theme_install_demo_content'),
       };
       
       const createdProduct = await prisma.products.create({

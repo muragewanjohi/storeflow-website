@@ -14,6 +14,7 @@ import {
   buildGettingStartedProgress,
   GETTING_STARTED_OPTION_NAMES,
 } from '@/lib/onboarding/getting-started-progress';
+import { countActiveDemoProducts } from '@/lib/products/demo-products';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,10 +37,11 @@ export async function GET() {
     const storeUrl = `https://${tenant.subdomain}.${baseDomain}`;
 
     // Fetch data in parallel
-    const [productCount, deliveryZoneCount, settings] = await Promise.all([
+    const [productCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: tenant.id, status: 'active', created_by: { not: null } },
       }),
+      countActiveDemoProducts(tenant.id),
       prisma.delivery_zones.count({
         where: { tenant_id: tenant.id, is_active: true },
       }),
@@ -48,6 +50,7 @@ export async function GET() {
 
     const progress = buildGettingStartedProgress({
       productCount,
+      activeDemoProductCount,
       deliveryZoneCount,
       settings,
     });
@@ -72,6 +75,15 @@ export async function GET() {
         href: storeUrl,
         cta: 'Preview store',
         priority: 2,
+      },
+      {
+        id: 'demo_products',
+        label: 'Remove demo products',
+        description: 'Clear sample products once your real catalog is ready',
+        completed: completionById.get('demo_products') ?? false,
+        href: '/dashboard/products',
+        cta: 'Remove demo products',
+        priority: 8,
       },
       {
         id: 'share',

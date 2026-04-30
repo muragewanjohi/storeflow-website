@@ -32,6 +32,7 @@ type SettingsMap = Record<string, string | null | undefined>;
 
 interface BuildProgressInput {
   productCount: number;
+  activeDemoProductCount?: number;
   deliveryZoneCount: number;
   settings: SettingsMap;
 }
@@ -41,7 +42,7 @@ function hasValue(value: string | null | undefined): boolean {
 }
 
 export function buildGettingStartedProgress(input: BuildProgressInput): GettingStartedProgressSummary {
-  const { productCount, deliveryZoneCount, settings } = input;
+  const { productCount, activeDemoProductCount = 0, deliveryZoneCount, settings } = input;
 
   const hasLogo = hasValue(settings.store_logo);
   const hasContactPhone = hasValue(settings.store_phone);
@@ -74,6 +75,12 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
       label: 'Preview your store',
       description: 'Open your storefront in a new tab and confirm it looks right',
       completed: settings.getting_started_previewed_store === 'true',
+    },
+    {
+      id: 'demo_products',
+      label: 'Remove demo products',
+      description: 'Clear sample products once your real catalog is ready',
+      completed: activeDemoProductCount === 0,
     },
     {
       id: 'share',

@@ -21,6 +21,7 @@ import { generateOrderNumber } from '@/lib/orders/utils';
 import { getHomepageTemplateData, getHomepageLayout, convertLegacyLayoutToPageBuilder, createDefaultHomepageTemplate } from './homepage-templates';
 import { addTenantDomain } from '@/lib/vercel-domains';
 import { setStaticOption } from '@/lib/settings/static-options';
+import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 
 function getDemoSeedPassword(): string {
   const configured = process.env.DEMO_SEED_PASSWORD?.trim();
@@ -304,7 +305,7 @@ async function createExtendedDemoContent(
           category_id: categoryId,
           brand_id: null,
           created_by: null,
-          metadata: {},
+          metadata: buildDemoProductMetadata('admin_demo_store', 'admin_demo_store_seed'),
         },
       });
       productIds.push(product.id);

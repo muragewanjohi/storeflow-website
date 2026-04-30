@@ -7,6 +7,7 @@ import {
   buildGettingStartedProgress,
   GETTING_STARTED_OPTION_NAMES,
 } from '@/lib/onboarding/getting-started-progress';
+import { countActiveDemoProducts } from '@/lib/products/demo-products';
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
 
@@ -55,10 +56,11 @@ export async function GET(request: NextRequest) {
 
     const storeUrl = `https://${tenant.subdomain}.${BASE_DOMAIN}`;
 
-    const [productCount, deliveryZoneCount, settings] = await Promise.all([
+    const [productCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: tenantId, status: 'active', created_by: { not: null } },
       }),
+      countActiveDemoProducts(tenantId),
       prisma.delivery_zones.count({
         where: { tenant_id: tenantId, is_active: true },
       }),
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
 
     const progress = buildGettingStartedProgress({
       productCount,
+      activeDemoProductCount,
       deliveryZoneCount,
       settings,
     });
@@ -92,6 +95,15 @@ export async function GET(request: NextRequest) {
         href: storeUrl,
         cta: 'Preview store',
         priority: 2,
+      },
+      {
+        id: 'demo_products',
+        label: 'Remove demo products',
+        description: 'Clear sample products once your real catalog is ready',
+        completed: completionById.get('demo_products') ?? false,
+        href: '/dashboard/products',
+        cta: 'Remove demo products',
+        priority: 8,
       },
       {
         id: 'share',

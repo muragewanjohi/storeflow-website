@@ -447,6 +447,30 @@ DELETE /api/products/{id}
 
 **Authentication:** Tenant admin/staff
 
+### Remove Demo Products
+```http
+DELETE /api/products/demo
+DELETE /api/v1/mobile/dashboard/products/demo
+```
+
+**Authentication:** Tenant admin/staff
+
+Removes products marked with `metadata.is_demo = true` for the current tenant. Products that have never appeared in orders are deleted. Demo products already referenced by orders are archived instead so historical order records remain intact.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "matchedCount": 10,
+    "deletedCount": 8,
+    "archivedCount": 2,
+    "removedCount": 10,
+    "message": "Demo products removed successfully"
+  }
+}
+```
+
 ### Upload Product Image
 ```http
 POST /api/products/upload
@@ -1985,7 +2009,28 @@ This preserves historical margin accuracy even if product costs change later.
 
 #### List Expenses
 ```http
-GET /api/expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-01-31&category=ads_marketing
+GET /api/expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-01-31&category=fuel
+```
+
+Optional filters: `start_date`, `end_date`, `category`, `category_id`.
+
+#### Expense Categories
+```http
+GET /api/expense-categories
+POST /api/expense-categories
+GET /api/expense-categories/:id
+PATCH /api/expense-categories/:id
+DELETE /api/expense-categories/:id
+```
+
+Create category body:
+
+```json
+{
+  "name": "Fuel",
+  "slug": "fuel",
+  "description": "Fuel and transport costs"
+}
 ```
 
 #### Create Expense
@@ -1997,7 +2042,7 @@ Content-Type: application/json
 ```json
 {
   "expense_date": "2026-01-18",
-  "category": "ads_marketing",
+  "category_id": "expense-category-uuid",
   "amount": 1250,
   "tax_amount": 0,
   "payment_method": "mpesa",
@@ -2012,14 +2057,7 @@ PATCH /api/expenses/:id
 DELETE /api/expenses/:id
 ```
 
-Supported categories:
-- `ads_marketing`
-- `shipping_fulfillment`
-- `packaging`
-- `software_apps`
-- `salaries_contractors`
-- `rent_utilities`
-- `misc`
+Use `category_id` for tenant-specific categories. For backwards compatibility, `category` can also be sent as an existing category slug.
 
 ### P&L API (Web)
 
@@ -2041,6 +2079,11 @@ Response fields:
 ### Mobile Finance APIs
 
 - `GET /api/v1/mobile/dashboard/analytics/pnl`
+- `GET /api/v1/mobile/dashboard/expense-categories`
+- `POST /api/v1/mobile/dashboard/expense-categories`
+- `GET /api/v1/mobile/dashboard/expense-categories/:id`
+- `PATCH /api/v1/mobile/dashboard/expense-categories/:id`
+- `DELETE /api/v1/mobile/dashboard/expense-categories/:id`
 - `GET /api/v1/mobile/dashboard/expenses`
 - `POST /api/v1/mobile/dashboard/expenses`
 - `PATCH /api/v1/mobile/dashboard/expenses/:id`

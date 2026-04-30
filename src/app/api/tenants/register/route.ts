@@ -34,6 +34,7 @@ import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
 import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
+import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 
 interface StarterPackProduct {
   name: string;
@@ -622,10 +623,9 @@ async function applyStarterPackToTenant(
         image: resolvedProductImage,
         category_id: categoryId,
         sku: `SP-${String(index + 1).padStart(3, '0')}-${Date.now().toString().slice(-6)}`,
-        metadata: {
-          source: 'starter_pack_ai',
+        metadata: buildDemoProductMetadata('starter_pack_ai', 'onboarding_starter_pack', {
           generated_image_prompt: product.imagePrompt ?? product.nanoBananaPrompt ?? null,
-        },
+        }),
       },
     });
     createdProductIds.push(createdProduct.id);

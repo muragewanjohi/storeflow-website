@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '@/lib/prisma/client';
+import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 
 interface DemoProduct {
   name: string;
@@ -128,6 +129,7 @@ export async function seedDemoStoreData(tenantId: string): Promise<void> {
           status: 'active',
           category_id: categoryId || null,
           image: product.image || `https://images.unsplash.com/photo-${Math.random().toString(36).substring(7)}?w=800&h=600&fit=crop`,
+          metadata: buildDemoProductMetadata('demo_store_seed', 'demo_store_seed'),
         },
       });
       console.log(`✅ Created product: ${product.name}`);
