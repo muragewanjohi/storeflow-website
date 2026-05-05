@@ -60,6 +60,10 @@ export default function GroceryProductCard({ product, className, imagePriority =
   };
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
   const discountPercent = isOnSale && product.compareAtPrice 
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : 0;
@@ -78,6 +82,10 @@ export default function GroceryProductCard({ product, className, imagePriority =
     e.stopPropagation();
     
     if (isPreview) return;
+    if (isDemoProduct) {
+      toast.error('This is a demo product and cannot be purchased');
+      return;
+    }
     if (isOutOfStock) {
       toast.error('Product is out of stock');
       return;
@@ -167,6 +175,11 @@ export default function GroceryProductCard({ product, className, imagePriority =
                   <Badge variant="secondary" className="text-lg px-4 py-2">Out of Stock</Badge>
                 </div>
               )}
+              {isDemoProduct && (
+                <Badge className="absolute bottom-3 left-3 z-10" variant="secondary">
+                  Demo
+                </Badge>
+              )}
               {/* Organic badge overlay */}
               <div className="absolute top-3 right-3 z-10">
                 <Badge className="bg-primary/10 text-primary border-primary/30 font-semibold">
@@ -196,6 +209,11 @@ export default function GroceryProductCard({ product, className, imagePriority =
                 <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
                   <Badge variant="secondary" className="text-lg px-4 py-2">Out of Stock</Badge>
                 </div>
+              )}
+              {isDemoProduct && (
+                <Badge className="absolute bottom-3 left-3 z-10" variant="secondary">
+                  Demo
+                </Badge>
               )}
               {/* Organic badge overlay */}
               <div className="absolute top-3 right-3 z-10">
@@ -265,10 +283,11 @@ export default function GroceryProductCard({ product, className, imagePriority =
           
           <Button
             size="sm"
-            disabled={isOutOfStock || isAddingToCart}
+            disabled={isOutOfStock || isAddingToCart || isDemoProduct}
             variant="ghost"
             className="text-primary hover:bg-primary/10 hover:text-primary"
             onClick={handleAddToCart}
+            title={isDemoProduct ? 'Demo products cannot be purchased' : 'Add to cart'}
           >
             <ShoppingCartIcon className="h-4 w-4" />
           </Button>

@@ -29,6 +29,10 @@ interface MinimalProductCardProps {
 export default function MinimalProductCard({ product, className }: MinimalProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -83,6 +87,11 @@ export default function MinimalProductCard({ product, className }: MinimalProduc
                   <span className="text-xs font-light tracking-widest uppercase text-muted-foreground">Out of Stock</span>
                 </div>
               )}
+              {isDemoProduct && (
+                <div className="absolute top-2 right-2 rounded-full bg-background/90 px-2 py-1">
+                  <span className="text-[10px] font-light tracking-widest uppercase text-muted-foreground">Demo</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -115,6 +124,11 @@ export default function MinimalProductCard({ product, className }: MinimalProduc
               {isOutOfStock && (
                 <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
                   <span className="text-xs font-light tracking-widest uppercase text-muted-foreground">Out of Stock</span>
+                </div>
+              )}
+              {isDemoProduct && (
+                <div className="absolute top-2 right-2 rounded-full bg-background/90 px-2 py-1">
+                  <span className="text-[10px] font-light tracking-widest uppercase text-muted-foreground">Demo</span>
                 </div>
               )}
             </div>

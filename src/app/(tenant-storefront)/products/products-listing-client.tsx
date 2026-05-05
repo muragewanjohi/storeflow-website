@@ -28,6 +28,7 @@ interface Product {
   image: string | null;
   stock_quantity: number | null;
   category_id: string | null;
+  metadata?: Record<string, unknown>;
   averageRating?: number;
   totalReviews?: number;
 }
@@ -159,6 +160,8 @@ function ProductsListingClient({
         compareAtPrice: p.compareAtPrice ? (typeof p.compareAtPrice === 'number' ? p.compareAtPrice : Number(p.compareAtPrice)) : undefined,
         image: p.image,
         stock_quantity: p.stock_quantity,
+        category_id: p.category_id ?? null,
+        metadata: p.metadata && typeof p.metadata === 'object' ? p.metadata : undefined,
         averageRating: p.averageRating !== undefined ? (typeof p.averageRating === 'number' ? p.averageRating : Number(p.averageRating)) : undefined,
         totalReviews: p.totalReviews !== undefined ? (typeof p.totalReviews === 'number' ? p.totalReviews : Number(p.totalReviews)) : undefined,
       }));

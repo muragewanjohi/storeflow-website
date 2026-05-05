@@ -345,6 +345,7 @@ export async function GET(request: NextRequest) {
                 cost_price: true,
                 image: true,
                 stock_quantity: true, // Already synced with variant totals
+                metadata: true,
                 category_id: true,
                 created_at: true, // Include for sorting by newest
               },

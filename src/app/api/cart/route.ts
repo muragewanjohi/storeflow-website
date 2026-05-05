@@ -185,11 +185,25 @@ export async function POST(request: NextRequest) {
         image: true,
         sku: true,
         slug: true,
+        metadata: true,
       },
     });
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+
+    const productMetadata = (product.metadata ?? {}) as Record<string, unknown>;
+    const isDemoProduct =
+      productMetadata.is_demo === true ||
+      productMetadata.is_demo === 'true' ||
+      productMetadata.source === 'starter_pack_ai';
+
+    if (isDemoProduct) {
+      return NextResponse.json(
+        { error: 'This is a demo product and cannot be purchased' },
+        { status: 400 },
+      );
     }
 
     // If variant is specified, fetch variant details

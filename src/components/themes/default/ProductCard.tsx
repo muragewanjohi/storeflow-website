@@ -49,6 +49,10 @@ export default function DefaultProductCard({ product, className, imagePriority =
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
   
   // Format currency with space between symbol and amount
   const formatCurrencyWithSpace = (amount: number): string => {
@@ -82,6 +86,10 @@ export default function DefaultProductCard({ product, className, imagePriority =
     e.stopPropagation();
     
     if (isPreview) return;
+    if (isDemoProduct) {
+      toast.error('This is a demo product and cannot be purchased');
+      return;
+    }
     if (isOutOfStock) {
       toast.error('Product is out of stock');
       return;
@@ -193,6 +201,11 @@ export default function DefaultProductCard({ product, className, imagePriority =
                   <Badge variant="secondary">Out of Stock</Badge>
                 </div>
               )}
+              {isDemoProduct && (
+                <Badge className="absolute top-2 right-2 z-10" variant="secondary">
+                  Demo
+                </Badge>
+              )}
             </div>
           </div>
         ) : (
@@ -238,6 +251,11 @@ export default function DefaultProductCard({ product, className, imagePriority =
                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                   <Badge variant="secondary">Out of Stock</Badge>
                 </div>
+              )}
+              {isDemoProduct && (
+                <Badge className="absolute top-2 right-2 z-10" variant="secondary">
+                  Demo
+                </Badge>
               )}
             </div>
           </Link>
@@ -294,8 +312,9 @@ export default function DefaultProductCard({ product, className, imagePriority =
           <Button
             size="sm"
             variant="outline"
-            disabled={isOutOfStock || isAddingToCart}
+            disabled={isOutOfStock || isAddingToCart || isDemoProduct}
             onClick={handleAddToCart}
+            title={isDemoProduct ? 'Demo products cannot be purchased' : 'Add to cart'}
           >
             <ShoppingCartIcon className="h-4 w-4" />
           </Button>

@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
           cost_price: true,
           sale_price: true,
           stock_quantity: true,
+          metadata: true,
         },
       });
 
@@ -111,6 +112,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: `Product ${item.product_id} not found` },
           { status: 404 }
+        );
+      }
+
+      const productMetadata = (product.metadata ?? {}) as Record<string, unknown>;
+      const isDemoProduct =
+        productMetadata.is_demo === true ||
+        productMetadata.is_demo === 'true' ||
+        productMetadata.source === 'starter_pack_ai';
+
+      if (isDemoProduct) {
+        return NextResponse.json(
+          { error: `${product.name} is a demo product and cannot be purchased` },
+          { status: 400 },
         );
       }
 
