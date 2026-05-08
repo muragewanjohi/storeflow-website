@@ -77,15 +77,6 @@ export async function GET() {
         priority: 2,
       },
       {
-        id: 'demo_products',
-        label: 'Remove demo products',
-        description: 'Clear sample products once your real catalog is ready',
-        completed: completionById.get('demo_products') ?? false,
-        href: '/dashboard/products',
-        cta: 'Remove demo products',
-        priority: 8,
-      },
-      {
         id: 'share',
         label: 'Share your store 🔗',
         description: 'Copy and share your store URL with customers',
@@ -134,6 +125,19 @@ export async function GET() {
         priority: 7,
       },
     ];
+
+    // Show cleanup task only when demo products exist.
+    if (completionById.has('demo_products')) {
+      items.push({
+        id: 'demo_products',
+        label: 'Remove demo products',
+        description: 'Clear sample products once your real catalog is ready',
+        completed: completionById.get('demo_products') ?? false,
+        href: '/dashboard/products',
+        cta: 'Remove demo products',
+        priority: 8,
+      });
+    }
 
     const completedCount = progress.completedCount;
     const totalCount = progress.totalCount;

@@ -5,7 +5,7 @@
  * All email functions should use this service instead of calling sendEmail directly.
  * 
  * Features:
- * - Always uses verified sender email (SendGrid requirement)
+ * - Always uses verified sender email
  * - Consistent sender name formatting
  * - Automatic fallback handling
  * - Tenant-aware email configuration
@@ -26,12 +26,16 @@ export interface UnifiedEmailOptions {
 }
 
 /**
- * Get verified sender email address for SendGrid
+ * Get verified sender email address.
  * Always returns a verified sender address (noreply@dukanest.com)
  * This is used for the 'from' field in emails
  */
 function getVerifiedSenderEmail(): string {
-  return process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
+  return (
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SENDGRID_FROM_EMAIL ||
+    'noreply@dukanest.com'
+  );
 }
 
 /**
@@ -56,14 +60,14 @@ function getSenderName(tenant?: Tenant, customName?: string): string {
     }
   }
   
-  return process.env.SENDGRID_FROM_NAME || 'DukaNest';
+  return process.env.RESEND_FROM_NAME || process.env.SENDGRID_FROM_NAME || 'DukaNest';
 }
 
 /**
  * Unified Email Service
  * 
  * Sends emails with consistent configuration:
- * - Always uses verified sender email (SendGrid requirement)
+ * - Always uses verified sender email
  * - Uses tenant name for sender name (if tenant provided)
  * - Sets reply-to to tenant contact email (if tenant provided)
  * 

@@ -1,5 +1,4 @@
 import type { NextRequest } from 'next/server';
-import { Redis } from '@upstash/redis';
 
 type MemoryEntry = {
   count: number;
@@ -7,11 +6,6 @@ type MemoryEntry = {
 };
 
 const memoryStore = new Map<string, MemoryEntry>();
-let redisClient: Redis | null = null;
-
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redisClient = Redis.fromEnv();
-}
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -27,26 +21,6 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   if (limit <= 0) {
     return { allowed: true, limit, remaining: 0, retryAfterSeconds: 0 };
-  }
-
-  if (redisClient) {
-    try {
-      const count = await redisClient.incr(key);
-      if (count === 1) {
-        await redisClient.expire(key, windowSeconds);
-      }
-
-      const ttl = await redisClient.ttl(key);
-      const remaining = Math.max(0, limit - Number(count));
-      return {
-        allowed: Number(count) <= limit,
-        limit,
-        remaining,
-        retryAfterSeconds: Math.max(0, Number(ttl) || 0),
-      };
-    } catch (error) {
-      console.warn('[RateLimit] Redis check failed, falling back to memory:', error);
-    }
   }
 
   const now = Date.now();

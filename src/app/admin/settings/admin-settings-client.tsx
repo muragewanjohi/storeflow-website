@@ -28,8 +28,8 @@ interface AdminSettingsClientProps {
     supabaseAnonKey: boolean;
     supabaseServiceKey: boolean;
     databaseUrl: boolean;
-    sendgridApiKey: boolean;
-    sendgridFromEmail: boolean;
+    resendApiKey: boolean;
+    resendFromEmail: boolean;
     googleMapsApiKey: boolean;
     vercelUrl: boolean;
     cronSecret: boolean;
@@ -64,8 +64,12 @@ export default function AdminSettingsClient({
     { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', label: 'Supabase Anon Key', configured: envStatus.supabaseAnonKey },
     { key: 'SUPABASE_SERVICE_ROLE_KEY', label: 'Supabase Service Role Key', configured: envStatus.supabaseServiceKey },
     { key: 'DATABASE_URL', label: 'Database URL', configured: envStatus.databaseUrl },
-    { key: 'SENDGRID_API_KEY', label: 'SendGrid API Key', configured: envStatus.sendgridApiKey },
-    { key: 'SENDGRID_FROM_EMAIL', label: 'SendGrid From Email', configured: envStatus.sendgridFromEmail },
+    { key: 'RESEND_API_KEY (or legacy SENDGRID_API_KEY)', label: 'Resend API Key', configured: envStatus.resendApiKey },
+    {
+      key: 'RESEND_FROM_EMAIL (or legacy SENDGRID_FROM_EMAIL/SMTP_FROM)',
+      label: 'Email From Address',
+      configured: envStatus.resendFromEmail,
+    },
   ];
 
   const optionalEnvVars = [
@@ -260,12 +264,12 @@ export default function AdminSettingsClient({
               Supabase Documentation
             </a>
             <a
-              href="https://docs.sendgrid.com"
+              href="https://resend.com/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline block"
             >
-              SendGrid Documentation
+              Resend Documentation
             </a>
           </div>
         </CardContent>

@@ -32,8 +32,11 @@ export default async function AdminSettingsPage() {
     supabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     supabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     databaseUrl: !!process.env.DATABASE_URL,
-    sendgridApiKey: !!process.env.SENDGRID_API_KEY,
-    sendgridFromEmail: !!process.env.SENDGRID_FROM_EMAIL,
+    resendApiKey: !!process.env.RESEND_API_KEY || !!process.env.SENDGRID_API_KEY,
+    resendFromEmail:
+      !!process.env.RESEND_FROM_EMAIL ||
+      !!process.env.SENDGRID_FROM_EMAIL ||
+      !!process.env.SMTP_FROM,
     googleMapsApiKey: !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     vercelUrl: !!process.env.VERCEL_URL || !!process.env.NEXT_PUBLIC_VERCEL_URL,
     cronSecret: !!process.env.CRON_SECRET || !!process.env.CRON_SECRET_TOKEN,

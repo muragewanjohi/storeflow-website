@@ -35,6 +35,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
 import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
 import { buildDemoProductMetadata } from '@/lib/products/demo-products';
+import { queueTumiziProvisioningForTenant } from '@/lib/tumizi/provisioning';
 
 interface StarterPackProduct {
   name: string;
@@ -1269,6 +1270,7 @@ const registerTenantSchema = z.object({
   starterPackJobId: z.string().uuid().optional(),
   includeDemoContent: z.boolean().optional(),
   includeDemoAttributes: z.boolean().optional(),
+  includeMerchantStore: z.boolean().optional(),
   /** Optional for mobile Google sign-up: Supabase session access token */
   supabaseAccessToken: z.string().optional(),
   /** Optional for mobile Google sign-up: Google OIDC id_token (server exchanges via Supabase) */
@@ -1311,6 +1313,7 @@ export async function POST(request: NextRequest) {
       businessType: validatedData.businessType || null,
       selling: validatedData.selling || null,
       includeDemoContent: Boolean(validatedData.includeDemoContent),
+      includeMerchantStore: Boolean(validatedData.includeMerchantStore),
       starterPackJobId: validatedData.starterPackJobId || null,
       hasPlanId: Boolean(validatedData.planId),
     });
@@ -1811,6 +1814,22 @@ export async function POST(request: NextRequest) {
     } catch (currencyError) {
       console.error(`[Registration] ⚠️ Failed to initialize currency settings:`, currencyError);
       // Non-critical - store can still function with default USD
+    }
+
+    // Queue Tumizi merchant provisioning in non-blocking mode.
+    // The actual create-merchant call is handled by a cron worker for reliability/retries.
+    let tumiziProvisioningQueued = false;
+    if (
+      validatedData.includeMerchantStore &&
+      process.env.TUMIZI_BASE_URL &&
+      process.env.TUMIZI_PARTNER_API_KEY
+    ) {
+      try {
+        await queueTumiziProvisioningForTenant(tenant.id);
+        tumiziProvisioningQueued = true;
+      } catch (tumiziQueueError) {
+        console.error('[Registration] ⚠️ Failed to queue Tumizi provisioning:', tumiziQueueError);
+      }
     }
 
     // Tenant host, storefront, and login URL for post-registration redirect
@@ -3312,6 +3331,7 @@ export async function POST(request: NextRequest) {
       onboardingSetupJobId,
       onboardingSetupStatus,
       starterPackApplied,
+      tumiziProvisioningQueued,
       debugTraceId: registrationTraceId,
       contentSource,
     }, { status: 201 });

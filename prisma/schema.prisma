@@ -919,11 +919,56 @@ model tenants {
   sales                      sales[]
   product_sales              product_sales[]
   expense_categories         expense_categories[]
+  tenant_tumizi_integrations tenant_tumizi_integrations[]
+  tumizi_webhook_events      tumizi_webhook_events[]
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
   @@index([subdomain], map: "idx_tenants_subdomain")
   @@index([deleted_at], map: "idx_tenants_deleted_at")
+}
+
+/// Tenant-level Tumizi integration state (opt-in, merchant mapping, wallet sync).
+model tenant_tumizi_integrations {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  enabled               Boolean?  @default(false)
+  merchant_external_id  String?   @db.VarChar(120)
+  wallet_account_number String?   @db.VarChar(120)
+  wallet_currency       String?   @db.VarChar(10)
+  webhook_url           String?   @db.VarChar(500)
+  webhook_events        Json?     @default("[]")
+  metadata              Json?     @default("{}")
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id], map: "idx_tenant_tumizi_integrations_tenant_unique")
+  @@unique([merchant_external_id], map: "idx_tenant_tumizi_integrations_merchant_external_unique")
+  @@index([enabled], map: "idx_tenant_tumizi_integrations_enabled")
+  @@index([tenant_id], map: "idx_tenant_tumizi_integrations_tenant_id")
+}
+
+/// Raw Tumizi webhook events for idempotency, replay and audit.
+model tumizi_webhook_events {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String?   @db.Uuid
+  event_name          String    @db.VarChar(120)
+  external_reference  String?   @db.VarChar(255)
+  merchant_external_id String?  @db.VarChar(120)
+  payload             Json
+  processing_status   String    @default("received") @db.VarChar(40)
+  processing_error    String?
+  processed_at        DateTime? @db.Timestamp(6)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  tenants             tenants?  @relation(fields: [tenant_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([event_name, external_reference], map: "idx_tumizi_webhook_events_name_ref_unique")
+  @@index([tenant_id], map: "idx_tumizi_webhook_events_tenant_id")
+  @@index([event_name], map: "idx_tumizi_webhook_events_event_name")
+  @@index([processing_status], map: "idx_tumizi_webhook_events_processing_status")
+  @@index([merchant_external_id], map: "idx_tumizi_webhook_events_merchant_external_id")
 }
 
 /// Store expense ledger for profit and loss reporting.

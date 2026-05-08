@@ -1333,6 +1333,62 @@
 						"description": "Send payment reminder emails to tenants with upcoming or overdue payments.\n\n**Day 25-26:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs (daily or weekly), not manually\n\n**Actions:**\n- Finds tenants with subscriptions expiring in 7 days\n- Sends renewal reminder emails (7 days before expiry)\n- Sends payment due reminder emails\n\n**Response:**\n- Results object with checked, renewal_reminders_sent, payment_reminders_sent, errors"
 					},
 					"response": []
+				},
+				{
+					"name": "Tumizi Provision Pending Merchants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Tumizi provisioning result returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    pm.expect(jsonData).to.have.property('processed');",
+									"    pm.expect(jsonData).to.have.property('succeeded');",
+									"    pm.expect(jsonData).to.have.property('failed');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cron_secret_token}}",
+								"description": "CRON_SECRET_TOKEN for authentication"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/integrations/tumizi/provision-pending?limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"integrations",
+								"tumizi",
+								"provision-pending"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Max queued tenants to process in one run (1-100)"
+								}
+							]
+						},
+						"description": "Process pending Tumizi merchant provisioning tasks created during tenant registration.\n\n**Security:**\n- Requires CRON_SECRET/CRON_SECRET_TOKEN in Authorization header\n- Intended for scheduled cron execution and manual landlord-triggered retries\n\n**Response:**\n- processed: number of queued tenants evaluated\n- succeeded: successful merchant provisions\n- failed: failed provisions (inspect errors array)\n- errors: list of tenant-level provisioning errors"
+					},
+					"response": []
 				}
 			],
 			"description": "Admin tenant management endpoints for landlords (Day 13-14, 25-26)"
@@ -3952,6 +4008,46 @@
 				},
 				{
 					"name": "Mobile Register (create store)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200 or 201\", function () {",
+									"    pm.expect([200, 201]).to.include(pm.response.code);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Register returns success envelope\", function () {",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"});",
+									"",
+									"pm.test(\"Tumizi queue flag shape is valid when present\", function () {",
+									"    if (jsonData && jsonData.data && Object.prototype.hasOwnProperty.call(jsonData.data, 'tumiziProvisioningQueued')) {",
+									"        pm.expect(jsonData.data.tumiziProvisioningQueued).to.be.a('boolean');",
+									"    } else {",
+									"        pm.expect(true).to.eql(true);",
+									"    }",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data) {",
+									"    if (jsonData.data.tenant && jsonData.data.tenant.id) {",
+									"        pm.environment.set('tenant_id', jsonData.data.tenant.id);",
+									"    }",
+									"    if (jsonData.data.tenant && jsonData.data.tenant.subdomain) {",
+									"        pm.environment.set('tenant_subdomain', jsonData.data.tenant.subdomain);",
+									"    }",
+									"    if (Object.prototype.hasOwnProperty.call(jsonData.data, 'tumiziProvisioningQueued')) {",
+									"        pm.environment.set('tumizi_provisioning_queued', String(jsonData.data.tumiziProvisioningQueued));",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [

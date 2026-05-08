@@ -99,6 +99,13 @@ const CRON_JOBS = [
     schedule: 'Daily at 10 AM UTC',
     description: 'Sends warning emails to tenants before hard deletion (30, 7, and 1 day before)',
   },
+  {
+    name: 'Tumizi Provision Pending Merchants',
+    path: '/api/admin/integrations/tumizi/provision-pending',
+    schedule: 'Every 15 minutes',
+    description:
+      'Processes newly registered stores queued for Tumizi merchant provisioning and retries failed setups',
+  },
 ];
 
 export default function CronJobsClient() {

@@ -77,12 +77,6 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
       completed: settings.getting_started_previewed_store === 'true',
     },
     {
-      id: 'demo_products',
-      label: 'Remove demo products',
-      description: 'Clear sample products once your real catalog is ready',
-      completed: activeDemoProductCount === 0,
-    },
-    {
       id: 'share',
       label: 'Share your store link',
       description: 'Copy and share your store URL with customers',
@@ -113,6 +107,16 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
       completed: hasLogo,
     },
   ];
+
+  // Only show this step when sample/demo products actually exist.
+  if (activeDemoProductCount > 0) {
+    items.push({
+      id: 'demo_products',
+      label: 'Remove demo products',
+      description: 'Clear sample products once your real catalog is ready',
+      completed: false,
+    });
+  }
 
   const completedCount = items.filter((item) => item.completed).length;
   const totalCount = items.length;

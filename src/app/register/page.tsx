@@ -214,7 +214,8 @@ function TenantRegisterForm() {
   const [businessType, setBusinessType] = useState<string>('');
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [selling, setSelling] = useState<string>('');
-  const [includeDemoContent, setIncludeDemoContent] = useState(true); // Default to true for better UX
+  const [includeDemoContent, setIncludeDemoContent] = useState(false); // Empty store by default; demo content is opt-in
+  const [includeMerchantStore, setIncludeMerchantStore] = useState(true); // Enabled by default for faster payment verification setup
   const [adminPhoneCountry, setAdminPhoneCountry] = useState('KE');
   const [adminPhone, setAdminPhone] = useState('');
   const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
@@ -688,6 +689,7 @@ function TenantRegisterForm() {
       otherBusinessType?: string;
       selling?: string;
       includeDemoContent?: boolean;
+        includeMerchantStore?: boolean;
       adminPhone?: string;
       adminPhoneCountry?: string;
     };
@@ -698,6 +700,8 @@ function TenantRegisterForm() {
     const effectiveOtherBusinessType = options.overrides?.otherBusinessType ?? otherBusinessType;
     const effectiveSelling = options.overrides?.selling ?? selling;
     const effectiveIncludeDemoContent = options.overrides?.includeDemoContent ?? includeDemoContent;
+    const effectiveIncludeMerchantStore =
+      options.overrides?.includeMerchantStore ?? includeMerchantStore;
     const effectiveAdminPhone = options.overrides?.adminPhone ?? adminPhone;
     const effectiveAdminPhoneCountry = options.overrides?.adminPhoneCountry ?? adminPhoneCountry;
 
@@ -745,6 +749,7 @@ function TenantRegisterForm() {
         selling: effectiveSelling.trim() || undefined,
         includeDemoContent: effectiveIncludeDemoContent,
         includeDemoAttributes: effectiveIncludeDemoContent,
+        includeMerchantStore: effectiveIncludeMerchantStore,
         adminPhone: effectiveAdminPhone.trim(),
         adminPhoneCountry: effectiveAdminPhoneCountry || 'KE',
       }),
@@ -842,6 +847,7 @@ function TenantRegisterForm() {
         otherBusinessType,
         selling,
         includeDemoContent,
+        includeMerchantStore,
         adminPhone,
         adminPhoneCountry,
         utmSource,
@@ -1024,6 +1030,7 @@ function TenantRegisterForm() {
         setOtherBusinessType(pending.otherBusinessType ?? otherBusinessType);
         setSelling(pending.selling ?? '');
         setIncludeDemoContent(Boolean(pending.includeDemoContent));
+        setIncludeMerchantStore(Boolean(pending.includeMerchantStore));
         if (typeof pending.adminPhone === 'string') setAdminPhone(pending.adminPhone);
         if (typeof pending.adminPhoneCountry === 'string') setAdminPhoneCountry(pending.adminPhoneCountry);
 
@@ -1391,11 +1398,39 @@ function TenantRegisterForm() {
               disabled={isSubmitting}
             />
 
-            <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
-              <p className="text-sm font-semibold text-[#101828]">We will customize your store based on what you are selling</p>
-              <p className="mt-1 text-sm text-[#4a5565]">
-                We&apos;ll add demo products so you can see how your store looks right away
+            <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4 space-y-3">
+              <p className="text-sm font-semibold text-[#101828]">Choose your starting point</p>
+              <p className="text-sm text-[#4a5565]">
+                New stores start empty by default. You can optionally add demo catalog content based on your business type.
               </p>
+              <label className="flex items-start gap-3 rounded-xl border border-[#c7d2fe] bg-white/70 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeDemoContent}
+                  onChange={(e) => setIncludeDemoContent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-[#1f2937]">
+                  <span className="font-medium">Add demo content (optional)</span>
+                  <span className="block text-xs text-[#6b7280] mt-1">
+                    We&apos;ll use saved starter packs where available to create sample products/categories. You can remove them later.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 rounded-xl border border-[#c7d2fe] bg-white/70 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeMerchantStore}
+                  onChange={(e) => setIncludeMerchantStore(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-[#1f2937]">
+                  <span className="font-medium">Create store wallet for auto M-Pesa verification (you can turn this on or off anytime in Store Settings)</span>
+                  <span className="block text-xs text-[#6b7280] mt-1">
+                    We&apos;ll create a Tumizi virtual wallet for this store to enable automatic M-Pesa payment verification. You can withdraw your funds anytime and also use the wallet to pay store expenses, keeping business money separate from personal money.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <p className="px-2 text-center text-sm text-[#6a7282]">

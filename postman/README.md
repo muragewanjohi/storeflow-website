@@ -49,6 +49,8 @@ Update these variables in the environment:
 - **`mobile_mfa_code`** - OTP code for MFA verify (set manually while testing)
 - **`plan_id`** - Price plan ID (auto-set by Get Price Plans request)
 - **`cron_secret_token`** - Secret token for cron endpoints (set manually)
+- **`tumizi_base_url`** - Tumizi partner gateway base URL (e.g. `https://app.tumizi.africa`)
+- **`tumizi_partner_api_key`** - Tumizi partner bearer token
 - **`product_id`** - Product ID (auto-set by product requests)
 - **`variant_id`** - Product variant ID (auto-set by variant requests)
 - **`expense_id`** - Expense ID (set manually or from expense create/list response)
@@ -63,6 +65,7 @@ Update these variables in the environment:
 - **`mobile_device_id`** - Stable device id for register-device / notification preferences (default: `postman-device-1`)
 - **`mobile_push_token`** - FCM/APNs registration token for **Mobile Register Device**
 - **`mobile_mpesa_checkout_request_id`** - Set automatically by **Mobile M-Pesa Initiate** for **Mobile M-Pesa Status**
+- **`tumizi_provisioning_queued`** - Captures registration response flag indicating async Tumizi merchant provisioning was queued
 
 ---
 
@@ -82,6 +85,18 @@ Update these variables in the environment:
 - **Get Billing History** - View tenant billing history
 - **Get Price Plans** - List available price plans
 - **Subscription Expiry Checker** - Check for expired subscriptions (cron)
+
+### Tumizi Provisioning & Payments
+- **Register Tenant (mobile/web register endpoint)** - Creates tenant and queues Tumizi provisioning when Tumizi env is configured.
+- **Tumizi Provision Pending Merchants** (`/api/admin/integrations/tumizi/provision-pending`) - Cron worker that creates merchants for queued tenants.
+- **Tumizi Create Merchant** (`npm run tumizi:create-merchant ...`) - Script for manual create/validation.
+- **Tumizi Test Customer Payment** (`npm run tumizi:test-customer-payment ...`) - Script for live payment + status polling.
+
+Queue values written after registration:
+- `tenant_tumizi_integrations.metadata.autoProvision = true`
+- `tenant_tumizi_integrations.metadata.provisioning_status = "pending"`
+
+The merchant is created asynchronously by the provision-pending cron worker, not inline in registration.
 
 ### Products (Day 15)
 - **List Products** - List products with search, filtering, and pagination

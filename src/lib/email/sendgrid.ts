@@ -1,15 +1,11 @@
 /**
- * SendGrid Email Utility
- * 
- * Handles sending transactional emails via SendGrid
+ * Email Utility (Resend-backed)
+ *
+ * Keeps the historical `sendgrid.ts` module path for backward compatibility
+ * while using Resend as the delivery provider.
  */
 
-import sgMail from '@sendgrid/mail';
-
-// Initialize SendGrid with API key
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { Resend } from 'resend';
 
 export interface EmailOptions {
   to: string;
@@ -23,108 +19,91 @@ export interface EmailOptions {
   dynamicTemplateData?: Record<string, any>;
 }
 
+export interface EmailSendResult {
+  success: boolean;
+  skipped?: boolean;
+  usedFallback?: boolean;
+  error?: string;
+}
+
 /**
- * Send an email via SendGrid
+ * Send an email via Resend.
+ *
+ * Environment precedence:
+ * 1) RESEND_API_KEY (preferred)
+ * 2) SENDGRID_API_KEY (legacy fallback variable name for compatibility)
  */
-export async function sendEmail(options: EmailOptions) {
-  // Skip sending if API key is not configured (development)
-  if (!process.env.SENDGRID_API_KEY) {
-    console.warn('SendGrid API key not configured. Email not sent:', options);
-    return { success: true, skipped: true };
+export async function sendEmail(options: EmailOptions): Promise<EmailSendResult> {
+  const apiKey = process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY;
+
+  // Skip sending if API key is not configured (development/testing)
+  if (!apiKey) {
+    console.warn('Resend API key not configured. Email not sent:', options);
+    return { success: true, skipped: true, usedFallback: false };
   }
 
-  const defaultFromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@dukanest.com';
-  const defaultFromName = process.env.SENDGRID_FROM_NAME || 'Dukanest';
-  
-  // Try sending with the provided from address first
-  let fromEmail = options.from || defaultFromEmail;
-  let fromName = options.fromName || defaultFromName;
-  let useFallback = false;
+  const defaultFromEmail =
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.SENDGRID_FROM_EMAIL ||
+    'noreply@dukanest.com';
+  const defaultFromName =
+    process.env.RESEND_FROM_NAME ||
+    process.env.SENDGRID_FROM_NAME ||
+    'Dukanest';
 
-  // If using a custom from address that's not the default, we'll try it first
-  // and fall back to default if it fails due to sender identity verification
-  if (options.from && options.from !== defaultFromEmail) {
-    useFallback = true;
+  const fromEmail = options.from || defaultFromEmail;
+  const fromName = options.fromName || defaultFromName;
+
+  const resend = new Resend(apiKey);
+
+  // Resend does not use SendGrid-style template IDs, so ignore safely.
+  if (options.templateId) {
+    console.warn(
+      'templateId/dynamicTemplateData are not supported by Resend in this adapter; sending standard content instead.'
+    );
   }
 
-  // Build message object
-  const msg: any = {
+  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  const payload: Record<string, string> = {
+    from,
     to: options.to,
-    from: {
-      email: fromEmail,
-      name: fromName,
-    },
+    subject: options.subject || 'Notification from Dukanest',
   };
 
-  // Add reply-to if provided
-  if (options.replyTo) {
-    msg.replyTo = options.replyTo;
+  if (options.html) {
+    payload.html = options.html;
   }
 
-  // Use template if provided
-  if (options.templateId) {
-    msg.templateId = options.templateId;
-    msg.dynamicTemplateData = options.dynamicTemplateData || {};
-  } else {
-    // Use plain HTML/text
-    msg.subject = options.subject || 'Notification from Dukanest';
-    if (options.html) {
-      msg.html = options.html;
-    }
-    if (options.text) {
-      msg.text = options.text;
-    }
+  if (options.text) {
+    payload.text = options.text;
+  }
+
+  if (options.replyTo) {
+    payload.replyTo = options.replyTo;
   }
 
   try {
-    await sgMail.send(msg);
+    const { error } = await resend.emails.send(payload as any);
+    if (error) {
+      console.error('Resend error:', error);
+      return {
+        success: false,
+        usedFallback: false,
+        error: error.message || 'Failed to send email',
+      };
+    }
+
     console.log(`Email sent successfully to ${options.to} from ${fromEmail}`);
-    return { success: true };
-  } catch (error: any) {
-    console.error('SendGrid error:', error);
-    
-    // Log detailed error if available
-    if (error.response) {
-      console.error('SendGrid response error:', error.response.body);
-    }
-
-    // If the error is due to sender identity verification and we have a fallback, retry with default
-    if (useFallback && error.response?.body?.errors) {
-      const senderIdentityError = error.response.body.errors.find(
-        (e: any) => e.message?.includes('verified Sender Identity') || e.field === 'from'
-      );
-
-      if (senderIdentityError) {
-        console.warn(
-          `Sender identity not verified for ${fromEmail}. Falling back to default: ${defaultFromEmail}`
-        );
-        
-        // Retry with default verified email
-        try {
-          const fallbackMsg: any = {
-            ...msg,
-            from: {
-              email: defaultFromEmail,
-              name: fromName, // Keep the tenant name for branding
-            },
-          };
-
-          await sgMail.send(fallbackMsg);
-          console.log(`Email sent successfully to ${options.to} using fallback address ${defaultFromEmail}`);
-          return { success: true, usedFallback: true };
-        } catch (fallbackError: any) {
-          console.error('SendGrid fallback error:', fallbackError);
-          return { 
-            success: false, 
-            error: fallbackError.message || 'Failed to send email even with fallback' 
-          };
-        }
-      }
-    }
-    
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send email' 
+    return { success: true, usedFallback: false };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to send email';
+    console.error('Resend send error:', error);
+    return {
+      success: false,
+      usedFallback: false,
+      error: message,
     };
   }
 }
