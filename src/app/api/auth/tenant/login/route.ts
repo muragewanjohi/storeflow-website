@@ -14,6 +14,12 @@ import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { shouldBypassMfaForReviewer } from '@/lib/auth/reviewer-mfa-bypass';
+import {
+  getOtpEmailDeliveryFailureMessage,
+  getOtpEmailSendingLimitMessage,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+  OTP_SENDGRID_CREDITS_ERROR_CODE,
+} from '@/lib/mfa/otp-delivery-user-message';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -393,15 +399,12 @@ export async function POST(request: NextRequest) {
       // For production or other errors, require proper 2FA
       await supabase.auth.signOut();
 
-      // Provide more specific error message
-      let errorMessage = 'Unable to send verification code. Please try again.';
-      let errorCode = 'EMAIL_SERVICE_ERROR';
+      let errorMessage = getOtpEmailDeliveryFailureMessage();
+      let errorCode = OTP_EMAIL_SERVICE_ERROR_CODE;
 
       if (isSendGridCreditError) {
-        errorMessage = 'Email service temporarily unavailable due to sending limits exceeded. Please contact support or try again later.';
-        errorCode = 'SENDGRID_CREDITS_EXCEEDED';
-      } else if (isDevelopment && otpError.message) {
-        errorMessage = `Unable to send verification code: ${otpError.message}`;
+        errorMessage = getOtpEmailSendingLimitMessage();
+        errorCode = OTP_SENDGRID_CREDITS_ERROR_CODE;
       }
 
       return NextResponse.json(

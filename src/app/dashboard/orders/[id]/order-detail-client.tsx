@@ -65,6 +65,8 @@ interface Order {
   payment_gateway: string | null;
   transaction_id: string | null;
   payment_meta: any | null;
+  tumizi_refund_status: string | null;
+  tumizi_refund_reference: string | null;
   invoice_number: string | null;
   shipping_address: any;
   billing_address: any;
@@ -167,6 +169,22 @@ export default function OrderDetailClient({
         return 'destructive';
       case 'refunded':
         return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const getRefundStatusBadgeVariant = (status: string | null) => {
+    if (!status) return 'secondary';
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'success':
+      case 'successful':
+        return 'default';
+      case 'failed':
+      case 'cancelled':
+      case 'declined':
+        return 'destructive';
       default:
         return 'secondary';
     }
@@ -281,7 +299,14 @@ export default function OrderDetailClient({
       }
 
       const data = await response.json();
-      setOrder({ ...order, status: data.order.status, payment_status: data.order.payment_status });
+      const expectedTumiziRefundPending =
+        order.payment_gateway === 'tumizi' && order.payment_status === 'paid';
+      setOrder({
+        ...order,
+        status: data.order.status,
+        payment_status: data.order.payment_status,
+        tumizi_refund_status: expectedTumiziRefundPending ? 'pending' : order.tumizi_refund_status,
+      });
       setShowCancelDialog(false);
       setCancelReason('');
       setSuccessMessage('Order cancelled successfully');
@@ -885,6 +910,25 @@ export default function OrderDetailClient({
                 <div>
                   <Label>Transaction ID</Label>
                   <p className="text-sm text-muted-foreground mt-1 font-mono">{order.transaction_id}</p>
+                </div>
+              )}
+              {order.payment_gateway === 'tumizi' && order.tumizi_refund_status && (
+                <div>
+                  <Label>Tumizi Refund</Label>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant={getRefundStatusBadgeVariant(order.tumizi_refund_status)} className="text-sm">
+                      {order.tumizi_refund_status.toLowerCase() === 'completed'
+                        ? 'Refund Completed'
+                        : order.tumizi_refund_status.toLowerCase() === 'failed'
+                          ? 'Refund Failed'
+                          : 'Refund Pending'}
+                    </Badge>
+                    {order.tumizi_refund_reference && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {order.tumizi_refund_reference}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
               

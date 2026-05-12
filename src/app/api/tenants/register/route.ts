@@ -4,6 +4,8 @@
  * POST /api/tenants/register
  * 
  * Allows public users to register a new tenant (no auth required)
+ *
+ * New tenants get a clean catalog (no demo products, categories, sales, or blogs from this route).
  */
 
 import { NextRequest, NextResponse, after } from 'next/server';
@@ -1268,7 +1270,9 @@ const registerTenantSchema = z.object({
   businessType: z.string().optional(),
   selling: z.string().optional(),
   starterPackJobId: z.string().uuid().optional(),
+  /** Accepted for API compatibility; catalog/demo seeding is not performed at registration. */
   includeDemoContent: z.boolean().optional(),
+  /** Accepted for API compatibility; ignored at registration (clean catalog). */
   includeDemoAttributes: z.boolean().optional(),
   includeMerchantStore: z.boolean().optional(),
   /** Optional for mobile Google sign-up: Supabase session access token */
@@ -1288,6 +1292,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = registerTenantSchema.parse(body);
+    // Clean install: no demo products, categories, sales, blogs, or generic demo content.
+    // Optional starterPackJobId may still supply theme colors only; applyStarterPackToTenant never runs.
+    const includeDemoContent = false;
 
     const phoneCountry = (
       validatedData.adminPhoneCountry?.toUpperCase() &&
@@ -1312,7 +1319,7 @@ export async function POST(request: NextRequest) {
       authProvider: validatedData.authProvider,
       businessType: validatedData.businessType || null,
       selling: validatedData.selling || null,
-      includeDemoContent: Boolean(validatedData.includeDemoContent),
+      includeDemoContent,
       includeMerchantStore: Boolean(validatedData.includeMerchantStore),
       starterPackJobId: validatedData.starterPackJobId || null,
       hasPlanId: Boolean(validatedData.planId),
@@ -1608,7 +1615,7 @@ export async function POST(request: NextRequest) {
     // Run Gemini in foreground (fast) and defer image generation to background.
     if (
       !starterPackPayload &&
-      validatedData.includeDemoContent &&
+      includeDemoContent &&
       finalSelling &&
       validatedData.businessType
     ) {
@@ -1667,7 +1674,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Guarantee starter-pack content for registration even if Gemini fails.
-    if (!starterPackPayload && validatedData.includeDemoContent && finalSelling) {
+    if (!starterPackPayload && includeDemoContent && finalSelling) {
       starterPackPayload = buildSellingFallbackStarterPack(finalSelling);
       console.warn('[Registration] Starter-pack API unavailable; using deterministic selling fallback', {
         traceId: registrationTraceId,
@@ -1677,7 +1684,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (starterPackPayload && validatedData.includeDemoContent && finalSelling) {
+    if (starterPackPayload && includeDemoContent && finalSelling) {
       const hasCategories = Array.isArray(starterPackPayload.categories) && starterPackPayload.categories.length > 0;
       const hasProducts = Array.isArray(starterPackPayload.demoProducts) && starterPackPayload.demoProducts.length > 0;
       const hasSalesPromotions =
@@ -1809,6 +1816,16 @@ export async function POST(request: NextRequest) {
         currency_decimal_separator: currencyInfo.decimalSeparator,
         currency_decimal_places: String(currencyInfo.decimalPlaces),
         store_phone: validatedData.adminPhone.trim(),
+        ...(validatedData.includeMerchantStore
+          ? {
+              payment_method: 'tumizi',
+              default_payment_method: 'tumizi',
+              payment_cash_enabled: 'false',
+              payment_mpesa_enabled: 'false',
+              payment_tumizi_enabled: 'true',
+              payment_timing: 'before_delivery',
+            }
+          : {}),
       });
       console.log(`[Registration] ✅ Initialized currency settings: ${currencyInfo.code} (${currencyInfo.symbol}) for country ${countryCode}`);
     } catch (currencyError) {
@@ -1817,7 +1834,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Queue Tumizi merchant provisioning in non-blocking mode.
-    // The actual create-merchant call is handled by a cron worker for reliability/retries.
+    // Worker maps tenant name / contact_email / store_phone / subdomain → Tumizi Create Merchant
+    // (see `provisionSingleTenant` + `create-merchant-defaults`).
     let tumiziProvisioningQueued = false;
     if (
       validatedData.includeMerchantStore &&
@@ -1899,7 +1917,7 @@ export async function POST(request: NextRequest) {
         console.log(`[Registration] Starting theme installation for tenant ${tenant.subdomain}`, {
           themeId: effectiveThemeId,
           businessType: validatedData.businessType,
-          includeDemoContent: validatedData.includeDemoContent,
+          includeDemoContent,
         });
 
         const theme = await prisma.themes.findUnique({
@@ -2196,7 +2214,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create demo content if requested
-        if (validatedData.includeDemoContent) {
+        if (includeDemoContent) {
           let appliedFromStarterPack = false;
           if (starterPackPayload) {
             try {

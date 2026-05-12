@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -52,6 +53,7 @@ export default function CategoriesListClient({
   dbError,
 }: Readonly<CategoriesListClientProps>) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState(initialCategories);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -73,6 +75,7 @@ export default function CategoriesListClient({
       });
 
       if (response.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['dashboard-getting-started'] });
         router.refresh();
       } else {
         const error = await response.json();

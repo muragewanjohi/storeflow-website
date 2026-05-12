@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CheckCircle2, Check, Store, Palette, Package, Settings, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle2, Check, Store, Palette, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { identifyTikTokPixelUser } from '@/lib/analytics/tiktok-pixel';
 import { trackMarketingFunnelEvent } from '@/lib/analytics/google-analytics';
@@ -49,15 +49,12 @@ interface ProgressStep {
   status: 'pending' | 'active' | 'complete';
 }
 
-function getProgressSteps(storeName: string, hasDemoContent: boolean): ProgressStep[] {
+function getProgressSteps(storeName: string): ProgressStep[] {
   const steps: ProgressStep[] = [
     { id: 'account', label: 'Creating your account', icon: <Settings className="w-5 h-5" />, status: 'pending' },
-    { id: 'store', label: `Setting up ${storeName || 'your store'}`, icon: <Store className="w-5 h-5" />, status: 'pending' },
+    { id: 'store', label: `Preparing ${storeName || 'your store'}`, icon: <Store className="w-5 h-5" />, status: 'pending' },
     { id: 'theme', label: 'Configuring your theme', icon: <Palette className="w-5 h-5" />, status: 'pending' },
   ];
-  if (hasDemoContent) {
-    steps.push({ id: 'demo', label: 'Adding sample products', icon: <Package className="w-5 h-5" />, status: 'pending' });
-  }
   steps.push({ id: 'finalize', label: 'Finalizing everything', icon: <Sparkles className="w-5 h-5" />, status: 'pending' });
   return steps;
 }
@@ -191,11 +188,6 @@ function TenantRegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loginUrl, setLoginUrl] = useState<string | null>(null);
-  const [demoContentInfo, setDemoContentInfo] = useState<{
-    created: boolean;
-    products: number;
-    categories: number;
-  } | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -214,7 +206,6 @@ function TenantRegisterForm() {
   const [businessType, setBusinessType] = useState<string>('');
   const [otherBusinessType, setOtherBusinessType] = useState<string>('');
   const [selling, setSelling] = useState<string>('');
-  const [includeDemoContent, setIncludeDemoContent] = useState(false); // Empty store by default; demo content is opt-in
   const [includeMerchantStore, setIncludeMerchantStore] = useState(true); // Enabled by default for faster payment verification setup
   const [adminPhoneCountry, setAdminPhoneCountry] = useState('KE');
   const [adminPhone, setAdminPhone] = useState('');
@@ -688,7 +679,6 @@ function TenantRegisterForm() {
       businessType?: string;
       otherBusinessType?: string;
       selling?: string;
-      includeDemoContent?: boolean;
         includeMerchantStore?: boolean;
       adminPhone?: string;
       adminPhoneCountry?: string;
@@ -699,14 +689,13 @@ function TenantRegisterForm() {
     const effectiveBusinessType = options.overrides?.businessType ?? businessType;
     const effectiveOtherBusinessType = options.overrides?.otherBusinessType ?? otherBusinessType;
     const effectiveSelling = options.overrides?.selling ?? selling;
-    const effectiveIncludeDemoContent = options.overrides?.includeDemoContent ?? includeDemoContent;
     const effectiveIncludeMerchantStore =
       options.overrides?.includeMerchantStore ?? includeMerchantStore;
     const effectiveAdminPhone = options.overrides?.adminPhone ?? adminPhone;
     const effectiveAdminPhoneCountry = options.overrides?.adminPhoneCountry ?? adminPhoneCountry;
 
     // Start the animated progress screen
-    const steps = getProgressSteps(effectiveFormData.name, effectiveIncludeDemoContent);
+    const steps = getProgressSteps(effectiveFormData.name);
     startProgress(steps);
 
     // Detect location before submitting
@@ -747,8 +736,9 @@ function TenantRegisterForm() {
         planId: effectivePlanId || undefined,
         businessType: finalBusinessType || undefined,
         selling: effectiveSelling.trim() || undefined,
-        includeDemoContent: effectiveIncludeDemoContent,
-        includeDemoAttributes: effectiveIncludeDemoContent,
+        // Server policy: clean catalog at signup; dashboard onboarding guides merchants.
+        includeDemoContent: false,
+        includeDemoAttributes: false,
         includeMerchantStore: effectiveIncludeMerchantStore,
         adminPhone: effectiveAdminPhone.trim(),
         adminPhoneCountry: effectiveAdminPhoneCountry || 'KE',
@@ -802,7 +792,7 @@ function TenantRegisterForm() {
     });
     trackMarketingFunnelEvent('sign_up_completed', {
       plan_id: selectedPlanId,
-      include_demo_content: includeDemoContent,
+        include_demo_content: false,
       business_type: businessType || undefined,
       auth_method: options.authProvider,
       utm_source: utmSource || undefined,
@@ -820,13 +810,6 @@ function TenantRegisterForm() {
 
     setShowProgress(false);
     setSuccess(true);
-    if (data.demoContentCreated) {
-      setDemoContentInfo({
-        created: true,
-        products: data.demoProductsCreated || 0,
-        categories: data.demoCategoriesCreated || 0,
-      });
-    }
     return true;
   };
 
@@ -846,7 +829,6 @@ function TenantRegisterForm() {
         businessType,
         otherBusinessType,
         selling,
-        includeDemoContent,
         includeMerchantStore,
         adminPhone,
         adminPhoneCountry,
@@ -924,7 +906,7 @@ function TenantRegisterForm() {
 
       trackMarketingFunnelEvent('sign_up_started', {
         plan_id: selectedPlanId,
-        include_demo_content: includeDemoContent,
+      include_demo_content: false,
         business_type_selected: Boolean(businessType),
         auth_method: 'google',
         utm_source: utmSource || undefined,
@@ -980,7 +962,7 @@ function TenantRegisterForm() {
 
     trackMarketingFunnelEvent('sign_up_started', {
       plan_id: selectedPlanId,
-      include_demo_content: includeDemoContent,
+      include_demo_content: false,
       business_type_selected: Boolean(businessType),
       auth_method: 'email',
       utm_source: utmSource || undefined,
@@ -1029,7 +1011,6 @@ function TenantRegisterForm() {
         setBusinessType(pending.businessType ?? businessType);
         setOtherBusinessType(pending.otherBusinessType ?? otherBusinessType);
         setSelling(pending.selling ?? '');
-        setIncludeDemoContent(Boolean(pending.includeDemoContent));
         setIncludeMerchantStore(Boolean(pending.includeMerchantStore));
         if (typeof pending.adminPhone === 'string') setAdminPhone(pending.adminPhone);
         if (typeof pending.adminPhoneCountry === 'string') setAdminPhoneCountry(pending.adminPhoneCountry);
@@ -1085,21 +1066,6 @@ function TenantRegisterForm() {
             <p className="text-muted-foreground mb-4">
               Your store has been created successfully. You can now log in to your admin dashboard.
             </p>
-            {demoContentInfo?.created && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-4 mb-4 text-left">
-                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
-                  📦 Demo Content Installed
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  We&apos;ve added sample products and categories to help you learn the system. You can explore them in your dashboard and remove them anytime.
-                </p>
-                {demoContentInfo.products > 0 && demoContentInfo.categories > 0 && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    {demoContentInfo.products} sample product{demoContentInfo.products !== 1 ? 's' : ''} and {demoContentInfo.categories} categor{demoContentInfo.categories !== 1 ? 'ies' : 'y'} added.
-                  </p>
-                )}
-              </div>
-            )}
           </div>
           {loginUrl && (
             <div className="space-y-4">
@@ -1399,24 +1365,10 @@ function TenantRegisterForm() {
             />
 
             <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4 space-y-3">
-              <p className="text-sm font-semibold text-[#101828]">Choose your starting point</p>
+              <p className="text-sm font-semibold text-[#101828]">Store starts empty</p>
               <p className="text-sm text-[#4a5565]">
-                New stores start empty by default. You can optionally add demo catalog content based on your business type.
+                New stores now start without demo products or categories. We&apos;ll guide setup through onboarding tutorials.
               </p>
-              <label className="flex items-start gap-3 rounded-xl border border-[#c7d2fe] bg-white/70 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeDemoContent}
-                  onChange={(e) => setIncludeDemoContent(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-[#1f2937]">
-                  <span className="font-medium">Add demo content (optional)</span>
-                  <span className="block text-xs text-[#6b7280] mt-1">
-                    We&apos;ll use saved starter packs where available to create sample products/categories. You can remove them later.
-                  </span>
-                </span>
-              </label>
               <label className="flex items-start gap-3 rounded-xl border border-[#c7d2fe] bg-white/70 p-3 cursor-pointer">
                 <input
                   type="checkbox"

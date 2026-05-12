@@ -31,7 +31,10 @@ export const GETTING_STARTED_OPTION_NAMES = [
 type SettingsMap = Record<string, string | null | undefined>;
 
 interface BuildProgressInput {
+  /** Active merchant-created products (same semantics as dashboard count query). */
   productCount: number;
+  /** Product categories for this tenant (any row in `categories` for the tenant). */
+  categoryCount?: number;
   activeDemoProductCount?: number;
   deliveryZoneCount: number;
   settings: SettingsMap;
@@ -42,7 +45,7 @@ function hasValue(value: string | null | undefined): boolean {
 }
 
 export function buildGettingStartedProgress(input: BuildProgressInput): GettingStartedProgressSummary {
-  const { productCount, activeDemoProductCount = 0, deliveryZoneCount, settings } = input;
+  const { productCount, categoryCount = 0, activeDemoProductCount = 0, deliveryZoneCount, settings } = input;
 
   const hasLogo = hasValue(settings.store_logo);
   const hasContactPhone = hasValue(settings.store_phone);
@@ -64,6 +67,12 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
         hasValue(settings.payment_mpesa_paybill_number)));
 
   const items: GettingStartedItem[] = [
+    {
+      id: 'category',
+      label: 'Create your first category',
+      description: 'Organize your catalog so products are easy to find',
+      completed: categoryCount > 0,
+    },
     {
       id: 'product',
       label: 'Add your first product',

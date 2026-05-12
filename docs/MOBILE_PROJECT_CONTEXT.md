@@ -28,6 +28,7 @@ Payments-specific (recommended):
 - `docs/mpesa-integration-quick-start.md`
 - `docs/mpesa-stk-push-troubleshooting.md`
 - `docs/mpesa-callback-url-setup.md`
+- `docs/tumizi/TUMIZI_MOBILE_AND_SETTINGS.md` (Tumizi: mirror web Settings → Payments + Tumizi tab; storefront `payment_tumizi_ready`)
 
 ## Current Backend Status (March 2026)
 

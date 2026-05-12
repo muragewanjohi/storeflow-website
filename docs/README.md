@@ -13,6 +13,7 @@
 
 ### 🔌 **API & Integration**
 - **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Complete API reference and endpoints
+- **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)** - Tumizi: mobile app parity with web settings, checkout readiness, and API routes
 
 ### 🚀 **Deployment & Operations**
 - **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Production deployment and hosting

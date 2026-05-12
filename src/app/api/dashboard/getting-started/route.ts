@@ -37,9 +37,12 @@ export async function GET() {
     const storeUrl = `https://${tenant.subdomain}.${baseDomain}`;
 
     // Fetch data in parallel
-    const [productCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
+    const [productCount, categoryCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: tenant.id, status: 'active', created_by: { not: null } },
+      }),
+      prisma.categories.count({
+        where: { tenant_id: tenant.id },
       }),
       countActiveDemoProducts(tenant.id),
       prisma.delivery_zones.count({
@@ -50,6 +53,7 @@ export async function GET() {
 
     const progress = buildGettingStartedProgress({
       productCount,
+      categoryCount,
       activeDemoProductCount,
       deliveryZoneCount,
       settings,
@@ -59,13 +63,22 @@ export async function GET() {
     );
     const items: GettingStartedItem[] = [
       {
+        id: 'category',
+        label: 'Create your first category',
+        description: 'Organize your catalog so products are easy to find',
+        completed: completionById.get('category') ?? false,
+        href: '/dashboard/categories/new',
+        cta: 'Add category',
+        priority: 1,
+      },
+      {
         id: 'product',
         label: 'Add your first product',
         description: 'Create a product so customers can start buying',
         completed: completionById.get('product') ?? false,
         href: '/dashboard/products/new',
         cta: 'Add product',
-        priority: 1,
+        priority: 2,
       },
       {
         id: 'preview',
@@ -74,7 +87,7 @@ export async function GET() {
         completed: completionById.get('preview') ?? false,
         href: storeUrl,
         cta: 'Preview store',
-        priority: 2,
+        priority: 3,
       },
       {
         id: 'share',
@@ -83,7 +96,7 @@ export async function GET() {
         completed: completionById.get('share') ?? false,
         href: storeUrl,
         cta: 'Copy link',
-        priority: 3,
+        priority: 4,
       },
       {
         id: 'contact_phone',
@@ -92,7 +105,7 @@ export async function GET() {
         completed: completionById.get('contact_phone') ?? false,
         href: '/dashboard/settings',
         cta: 'Add phone',
-        priority: 4,
+        priority: 5,
       },
       {
         id: 'payment',
@@ -101,7 +114,7 @@ export async function GET() {
         completed: completionById.get('payment') ?? false,
         href: '/dashboard/settings',
         cta: 'Set up payments',
-        priority: 5,
+        priority: 6,
       },
       {
         id: 'delivery',
@@ -113,7 +126,7 @@ export async function GET() {
             ? '/dashboard/settings/delivery-zones'
             : '/dashboard/settings',
         cta: 'Configure shipping',
-        priority: 6,
+        priority: 7,
       },
       {
         id: 'logo',
@@ -122,7 +135,7 @@ export async function GET() {
         completed: completionById.get('logo') ?? false,
         href: '/dashboard/settings',
         cta: 'Add logo',
-        priority: 7,
+        priority: 8,
       },
     ];
 
@@ -135,7 +148,7 @@ export async function GET() {
         completed: completionById.get('demo_products') ?? false,
         href: '/dashboard/products',
         cta: 'Remove demo products',
-        priority: 8,
+        priority: 9,
       });
     }
 

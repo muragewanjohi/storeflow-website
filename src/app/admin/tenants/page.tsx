@@ -51,6 +51,18 @@ export default async function TenantsPage() {
       })
     : [];
 
+  const categoryCountsRaw = tenantIds.length
+    ? await prisma.categories.groupBy({
+        by: ['tenant_id'],
+        where: { tenant_id: { in: tenantIds } },
+        _count: { _all: true },
+      })
+    : [];
+
+  const categoryCountByTenantId = new Map(
+    categoryCountsRaw.map((item) => [item.tenant_id, item._count._all] as const),
+  );
+
   const productCountsRaw = tenantIds.length
     ? await prisma.products.groupBy({
         by: ['tenant_id'],
@@ -94,6 +106,7 @@ export default async function TenantsPage() {
     contact_phone: settingsByTenantId.get(tenant.id)?.store_phone ?? null,
     onboarding_progress_percent: buildGettingStartedProgress({
       productCount: productCountByTenantId.get(tenant.id) ?? 0,
+      categoryCount: categoryCountByTenantId.get(tenant.id) ?? 0,
       deliveryZoneCount: deliveryZoneCountByTenantId.get(tenant.id) ?? 0,
       settings: settingsByTenantId.get(tenant.id) ?? {},
     }).progressPercent,

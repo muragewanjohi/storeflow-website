@@ -1,6 +1,13 @@
 import { prisma } from '@/lib/prisma/client';
 import { tumiziClient } from '@/lib/tumizi/client';
 import { upsertTumiziTenantConfig } from '@/lib/tumizi/config';
+import { setStaticOptions } from '@/lib/settings/static-options';
+import {
+  buildTumiziMerchantDomainHostname,
+  buildTumiziMerchantRegistrationDescription,
+  TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+  TUMIZI_DEFAULT_WALLET_CURRENCY,
+} from '@/lib/tumizi/create-merchant-defaults';
 
 function normalizeMerchantPhone(raw: string | null | undefined): string {
   const digits = (raw || '').replace(/\D/g, '');
@@ -89,27 +96,29 @@ async function provisionSingleTenant(tenantId: string): Promise<{ success: boole
   });
 
   const merchantExternalId = `storeflow-${tenant.id}`;
-  const ownerEmail = tenant.contact_email || 'support@dukanest.com';
+  const merchantEmail = tenant.contact_email || 'support@dukanest.com';
+  const storeDisplayName = tenant.name.trim() || 'Store';
+  const storefrontHost = buildTumiziMerchantDomainHostname(tenant.subdomain);
   const webhook = getWebhookConfig();
 
   await tumiziClient.createMerchant({
     merchant_external_id: merchantExternalId,
     merchant: {
-      name: tenant.name,
-      email: ownerEmail,
+      name: storeDisplayName,
+      email: merchantEmail,
       phone: normalizeMerchantPhone(storePhoneOption?.option_value),
-      country: 'Kenya',
-      domain: `${tenant.subdomain}.dukanest.com`,
-      description: `Storeflow merchant for ${tenant.name}`,
+      country: TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+      domain: storefrontHost,
+      description: buildTumiziMerchantRegistrationDescription(storeDisplayName),
     },
     owner: {
-      name: tenant.name,
-      email: ownerEmail,
+      name: storeDisplayName,
+      email: merchantEmail,
     },
     wallet: {
       name: 'Main Wallet',
       account_number: merchantExternalId.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16),
-      currency: 'KES',
+      currency: TUMIZI_DEFAULT_WALLET_CURRENCY,
     },
     ...(webhook.url
       ? {
@@ -137,6 +146,8 @@ async function provisionSingleTenant(tenantId: string): Promise<{ success: boole
     webhookEvents: webhook.events,
     lastSyncedAt: new Date().toISOString(),
   });
+
+  await setStaticOptions(tenant.id, { payment_tumizi_enabled: 'true' });
 
   const integration = await prisma.tenant_tumizi_integrations.findUnique({
     where: { tenant_id: tenant.id },

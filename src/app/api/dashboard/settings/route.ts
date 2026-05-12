@@ -23,6 +23,7 @@ import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
+import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
 import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -81,8 +82,8 @@ const settingsUpdateSchema = z.object({
   payment_mpesa_paybill_number: z.string().optional().nullable(),
   payment_mpesa_paybill_account: z.string().optional().nullable(),
   payment_mpesa_pochi_phone: z.string().optional().nullable(),
-  payment_method: z.enum(['cash', 'mpesa']).optional(),
-  default_payment_method: z.enum(['cash', 'mpesa']).optional(), // Keep for backward compatibility
+  payment_method: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
+  default_payment_method: z.enum(['cash', 'mpesa', 'tumizi']).optional(), // Keep for backward compatibility
   payment_timing: z.enum(['before_delivery', 'after_delivery', 'user_choice']).optional(),
   
   // Tax Settings
@@ -149,7 +150,9 @@ export async function GET(request: NextRequest) {
       'payment_mpesa_paybill_number',
       'payment_mpesa_paybill_account',
       'payment_mpesa_pochi_phone',
+      'payment_method',
       'default_payment_method',
+      'payment_tumizi_enabled',
       
       // Tax Settings
       'tax_enabled',
@@ -170,6 +173,7 @@ export async function GET(request: NextRequest) {
       shipping_method_type: 'flat_rate',
       payment_cash_enabled: 'true',
       default_payment_method: 'cash',
+      payment_timing: 'before_delivery',
       tax_enabled: 'false',
       tax_included_in_price: 'false',
       tax_calculation_based_on: 'billing_address',
@@ -191,7 +195,11 @@ export async function GET(request: NextRequest) {
     // Convert string booleans to actual booleans
     const booleanFields = [
       'shipping_enabled',
+      'pickup_enabled',
       'free_shipping_enabled',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_tumizi_enabled',
       'payment_pesapal_enabled',
       'payment_paypal_enabled',
       'payment_cash_on_delivery_enabled',
@@ -477,19 +485,54 @@ export async function PUT(request: NextRequest) {
     const currentPaymentSettings = await getStaticOptions(tenant.id, [
       'payment_cash_enabled',
       'payment_mpesa_enabled',
+      'payment_tumizi_enabled',
+      'payment_method',
+      'default_payment_method',
     ]);
-    
+
+    const tumiziIntegration = await getTumiziTenantConfigByTenantId(tenant.id);
+    const tumiziLive =
+      tumiziIntegration?.enabled === true && !!tumiziIntegration?.merchantExternalId;
+
     const cashEnabled = validatedData.payment_cash_enabled !== undefined 
       ? validatedData.payment_cash_enabled 
       : (currentPaymentSettings.payment_cash_enabled === 'true' || currentPaymentSettings.payment_cash_enabled === null);
     const mpesaEnabled = validatedData.payment_mpesa_enabled !== undefined 
       ? validatedData.payment_mpesa_enabled 
       : (currentPaymentSettings.payment_mpesa_enabled === 'true');
-    
-    if (!cashEnabled && !mpesaEnabled) {
+    const tumiziOffered =
+      currentPaymentSettings.payment_tumizi_enabled === 'true' || tumiziLive;
+
+    if (!cashEnabled && !mpesaEnabled && !tumiziOffered) {
       return NextResponse.json(
         { error: 'At least one payment method must be enabled' },
         { status: 400 }
+      );
+    }
+
+    const effectivePaymentMethod =
+      validatedData.payment_method ??
+      validatedData.default_payment_method ??
+      currentPaymentSettings.payment_method ??
+      currentPaymentSettings.default_payment_method ??
+      'cash';
+
+    if (effectivePaymentMethod === 'cash' && !cashEnabled) {
+      return NextResponse.json(
+        { error: 'Cash payments are disabled. Pick another default payment method.' },
+        { status: 400 },
+      );
+    }
+    if (effectivePaymentMethod === 'mpesa' && !mpesaEnabled) {
+      return NextResponse.json(
+        { error: 'M-Pesa is disabled. Pick another default payment method.' },
+        { status: 400 },
+      );
+    }
+    if (effectivePaymentMethod === 'tumizi' && !tumiziOffered) {
+      return NextResponse.json(
+        { error: 'Tumizi checkout is not available for this store.' },
+        { status: 400 },
       );
     }
 

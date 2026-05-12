@@ -10,6 +10,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { generateAndSendOTP } from '@/lib/mfa/email-otp';
+import {
+  getOtpEmailDeliveryFailureMessage,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+} from '@/lib/mfa/otp-delivery-user-message';
 import { z } from 'zod';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
@@ -42,8 +46,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate and send OTP
-    await generateAndSendOTP(userId, email, tenant.name);
+    try {
+      await generateAndSendOTP(userId, email, tenant.name);
+    } catch (sendErr) {
+      console.error('Send OTP error:', sendErr);
+      return NextResponse.json(
+        {
+          error: 'Failed to send code',
+          message: getOtpEmailDeliveryFailureMessage(),
+          code: OTP_EMAIL_SERVICE_ERROR_CODE,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -64,11 +79,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Send OTP error:', error);
+    console.error('Send OTP route error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to send code',
-        message: error.message || 'An unexpected error occurred'
+        message: 'Something went wrong. Please try again.',
       },
       { status: 500 }
     );

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Menu, X, ChevronDown, BookOpen } from 'lucide-react';
+import { Menu, X, ChevronDown, BookOpen, WalletCards } from 'lucide-react';
 import { ImageWithFallback } from './image-with-fallback';
 
 export function Navigation() {
@@ -70,6 +70,14 @@ export function Navigation() {
                     <BookOpen className="w-4 h-4 text-[#0025cc]" />
                     Knowledge Center (Help)
                   </Link>
+                  <Link
+                    href="/tumizi"
+                    className="flex items-center gap-2 px-4 py-2 text-[#0c0528] hover:bg-[#0025cc]/10 transition-colors"
+                    onClick={() => setResourcesOpen(false)}
+                  >
+                    <WalletCards className="w-4 h-4 text-[#0025cc]" />
+                    Tumizi Virtual Wallet
+                  </Link>
                 </div>
               )}
             </div>
@@ -128,6 +136,17 @@ export function Navigation() {
                   >
                     <BookOpen className="w-4 h-4 text-[#0025cc]" />
                     Knowledge Center (Help)
+                  </Link>
+                  <Link
+                    href="/tumizi"
+                    className="flex items-center gap-2 text-sm font-medium text-[#0c0528] hover:text-[#0025cc] transition-colors"
+                    onClick={() => {
+                      setResourcesOpen(false);
+                      setMobileMenuOpen(false);
+                    }}
+                  >
+                    <WalletCards className="w-4 h-4 text-[#0025cc]" />
+                    Tumizi Virtual Wallet
                   </Link>
                 </div>
               )}

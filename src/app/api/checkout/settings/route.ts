@@ -7,7 +7,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { prisma } from '@/lib/prisma/client';
 import { getStaticOptions } from '@/lib/settings/static-options';
+import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
+import { getCheckoutShippingContext } from '@/lib/checkout/effective-shipping';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
       'pickup_hours',
       'shipping_enabled',
       'shipping_method_type',
+      'flat_rate_amount',
       'store_address',
       'store_city',
       'store_state',
@@ -60,6 +64,10 @@ export async function GET(request: NextRequest) {
     const pickupEnabled = settings.pickup_enabled === 'true' && hasPhysicalAddress;
     const shippingEnabled = settings.shipping_enabled !== 'false'; // Default to true
 
+    const tumiziIntegration = await getTumiziTenantConfigByTenantId(tenant.id);
+    const payment_tumizi_ready =
+      tumiziIntegration?.enabled === true && !!tumiziIntegration?.merchantExternalId;
+
     // Payment methods
     const payment_cash_enabled = settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null;
     const payment_mpesa_enabled = settings.payment_mpesa_enabled === 'true';
@@ -71,6 +79,16 @@ export async function GET(request: NextRequest) {
     const default_tax_rate = settings.default_tax_rate ? parseFloat(settings.default_tax_rate) : null;
     const tax_pricing_type = settings.tax_pricing_type || (settings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive');
 
+    const activeDeliveryZoneCount = await prisma.delivery_zones.count({
+      where: { tenant_id: tenant.id, is_active: true },
+    });
+
+    const shippingCtx = getCheckoutShippingContext({
+      shippingMethodTypeStored: settings.shipping_method_type,
+      activeDeliveryZoneCount,
+      flatRateAmountRaw: settings.flat_rate_amount,
+    });
+
     return NextResponse.json({
       success: true,
       settings: {
@@ -79,7 +97,11 @@ export async function GET(request: NextRequest) {
         pickup_instructions: settings.pickup_instructions || null,
         pickup_hours: settings.pickup_hours || null,
         shipping_enabled: shippingEnabled,
-        shipping_method_type: settings.shipping_method_type || 'flat_rate',
+        shipping_method_type: shippingCtx.effectiveMethod,
+        shipping_method_type_stored: shippingCtx.storedMethodType,
+        flat_rate_amount: shippingCtx.flatRateAmount,
+        shipping_customer_notice: shippingCtx.customerNotice,
+        shipping_fell_back_from_zones: shippingCtx.fellBackFromZonesToFlat,
         store_address: settings.store_address || null,
         store_city: settings.store_city || null,
         store_state: settings.store_state || null,
@@ -109,6 +131,7 @@ export async function GET(request: NextRequest) {
         payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || null,
         payment_method,
         default_payment_method: payment_method, // Keep for backward compatibility
+        payment_tumizi_ready,
         payment_timing,
         // Tax settings
         tax_enabled,

@@ -45,7 +45,8 @@
     "test:tumizi": "tsx scripts/test-tumizi-connection.ts",
     "tumizi:enable-store": "tsx scripts/enable-tumizi-store.ts",
     "tumizi:create-merchant": "tsx scripts/tumizi-create-merchant.ts",
-    "tumizi:test-customer-payment": "tsx scripts/tumizi-test-customer-payment.ts"
+    "tumizi:test-customer-payment": "tsx scripts/tumizi-test-customer-payment.ts",
+    "tumizi:test-refund": "tsx scripts/tumizi-test-refund.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

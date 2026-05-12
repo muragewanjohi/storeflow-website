@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -48,6 +49,7 @@ import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
 import { VersionInfo } from '@/components/dashboard/version-info';
+import TumiziDashboardClient from '../tumizi/tumizi-dashboard-client';
 import { RegistrationPhoneField } from '@/components/phone/registration-phone-field';
 import {
   parseStoredPhoneToParts,
@@ -194,6 +196,10 @@ const CURRENCIES = [
   { code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr' },
 ];
 
+/** Top Settings tabs: active label + underline use theme `--primary` (shadcn + tenant ThemeStylesServer). */
+const SETTINGS_TAB_TRIGGER_CLASS =
+  'relative rounded-none border-b-[3px] border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground focus-visible:ring-offset-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:!text-[hsl(var(--primary))] data-[state=active]:!border-b-[hsl(var(--primary))]';
+
 export default function TenantSettingsClient({
   tenant,
   initialSettings,
@@ -220,10 +226,83 @@ export default function TenantSettingsClient({
   const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
   const [showExtraPhonesUpgradeDialog, setShowExtraPhonesUpgradeDialog] = useState(false);
+  const [tumiziConfigState, setTumiziConfigState] = useState<{
+    enabled: boolean;
+    merchantExternalId?: string;
+  } | null>(null);
+  const [tumiziToggleLoading, setTumiziToggleLoading] = useState(false);
   const tenantData = tenant.data && typeof tenant.data === 'object' ? (tenant.data as Record<string, unknown>) : {};
   const initialBusinessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : '';
   const initialSelling = typeof tenantData.selling === 'string' ? tenantData.selling : '';
   const accountDeletionConfirmationPhrase = `DELETE ${tenant.subdomain}`;
+
+  const tumiziCheckoutReady =
+    Boolean(tumiziConfigState?.enabled && tumiziConfigState?.merchantExternalId);
+
+  const tumiziOfferedForValidation =
+    initialSettings.payment_tumizi_enabled === true || tumiziCheckoutReady;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/tumizi/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled || !d.success || !d.data) return;
+        setTumiziConfigState({
+          enabled: Boolean(d.data.enabled),
+          merchantExternalId:
+            typeof d.data.merchantExternalId === 'string' ? d.data.merchantExternalId : undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTumiziConfigState({ enabled: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleTumiziToggle = async (checked: boolean) => {
+    setSettingsError(null);
+    setSettingsSuccess(null);
+    setError(null);
+    setTumiziToggleLoading(true);
+    try {
+      const response = await fetch('/api/tumizi/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: checked,
+          createMerchantIfMissing: checked,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update Tumizi');
+      }
+      setTumiziConfigState({
+        enabled: Boolean(data.data?.enabled),
+        merchantExternalId:
+          typeof data.data?.merchantExternalId === 'string'
+            ? data.data.merchantExternalId
+            : undefined,
+      });
+      if (!checked && formData.payment_method === 'tumizi') {
+        setFormData((prev) => ({
+          ...prev,
+          payment_method: prev.payment_mpesa_enabled ? 'mpesa' : 'cash',
+        }));
+      }
+      setSettingsSuccess(
+        checked ? 'Tumizi enabled for automatic M-Pesa checkout.' : 'Tumizi checkout disabled.',
+      );
+      router.refresh();
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'Tumizi update failed');
+    } finally {
+      setTumiziToggleLoading(false);
+    }
+  };
 
   const getSupabaseClient = async () => {
     const { createClient } = await import('@/lib/supabase/client');
@@ -288,8 +367,11 @@ export default function TenantSettingsClient({
     payment_mpesa_paybill_number: initialSettings.payment_mpesa_paybill_number || '',
     payment_mpesa_paybill_account: initialSettings.payment_mpesa_paybill_account || '',
     payment_mpesa_pochi_phone: initialSettings.payment_mpesa_pochi_phone || '',
-    payment_method: initialSettings.payment_method || initialSettings.default_payment_method || 'cash',
-    payment_timing: initialSettings.payment_timing || 'user_choice',
+    payment_method:
+      initialSettings.payment_method ||
+      initialSettings.default_payment_method ||
+      (initialSettings.payment_tumizi_enabled ? 'tumizi' : 'cash'),
+    payment_timing: initialSettings.payment_timing || 'before_delivery',
     
     // Tax Settings
     tax_enabled: initialSettings.tax_enabled ?? false,
@@ -470,11 +552,15 @@ export default function TenantSettingsClient({
     setSuccess(null);
     
     // Validate that at least one payment method is enabled
-    if (!formData.payment_cash_enabled && !formData.payment_mpesa_enabled) {
+    if (
+      !formData.payment_cash_enabled &&
+      !formData.payment_mpesa_enabled &&
+      !tumiziOfferedForValidation
+    ) {
       setSettingsError('At least one payment method must be enabled');
       return;
     }
-    
+
     // Validate that payment method is one of the enabled methods
     if (formData.payment_method === 'cash' && !formData.payment_cash_enabled) {
       setSettingsError('Payment method must be one of the enabled payment methods');
@@ -482,6 +568,10 @@ export default function TenantSettingsClient({
     }
     if (formData.payment_method === 'mpesa' && !formData.payment_mpesa_enabled) {
       setSettingsError('Payment method must be one of the enabled payment methods');
+      return;
+    }
+    if (formData.payment_method === 'tumizi' && !tumiziOfferedForValidation) {
+      setSettingsError('Enable Tumizi wallet before using it as the default checkout method');
       return;
     }
     
@@ -667,41 +757,26 @@ export default function TenantSettingsClient({
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 bg-muted/50 border border-border">
-          <TabsTrigger 
-            value="general"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
+        <TabsList className="flex h-auto w-full flex-wrap items-end justify-start gap-0 rounded-none border-0 border-b border-border bg-transparent p-0 shadow-none">
+          <TabsTrigger value="general" className={SETTINGS_TAB_TRIGGER_CLASS}>
             General
           </TabsTrigger>
-          <TabsTrigger 
-            value="currency"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
+          <TabsTrigger value="currency" className={SETTINGS_TAB_TRIGGER_CLASS}>
             Currency
           </TabsTrigger>
-          <TabsTrigger 
-            value="shipping"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
+          <TabsTrigger value="shipping" className={SETTINGS_TAB_TRIGGER_CLASS}>
             Shipping
           </TabsTrigger>
-          <TabsTrigger 
-            value="payment"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
-            Payment
+          <TabsTrigger value="payment" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Payments
           </TabsTrigger>
-          <TabsTrigger 
-            value="tax"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
+          <TabsTrigger value="tumizi" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Tumizi
+          </TabsTrigger>
+          <TabsTrigger value="tax" className={SETTINGS_TAB_TRIGGER_CLASS}>
             Tax
           </TabsTrigger>
-          <TabsTrigger 
-            value="version"
-            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
-          >
+          <TabsTrigger value="version" className={SETTINGS_TAB_TRIGGER_CLASS}>
             Version
           </TabsTrigger>
         </TabsList>
@@ -1351,6 +1426,32 @@ export default function TenantSettingsClient({
             </div>
             {formData.shipping_enabled && (
               <>
+                <Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertTitle>Finish delivery pricing for checkout</AlertTitle>
+                  <AlertDescription className="text-sm mt-2 space-y-2 [&_p]:leading-relaxed">
+                    <p>
+                      When <strong>delivery</strong> is enabled, customers expect a clear shipping price at checkout.
+                      If delivery is not set up correctly yet, they may be <strong>unable to complete a delivery order</strong>,
+                      or shipping may only be confirmed <strong>after</strong> the order is placed.
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        <strong>Flat rate:</strong> enter a flat rate amount below so every delivery order has a fixed fee.
+                      </li>
+                      <li>
+                        <strong>Delivery zones:</strong> create at least one active zone in{' '}
+                        <Link href="/dashboard/settings/delivery-zones" className="font-medium underline underline-offset-2">
+                          Delivery Zones
+                        </Link>
+                        . If you choose zones but none exist, checkout falls back to flat rate—so you should still set a flat rate as a backup.
+                      </li>
+                    </ul>
+                    <p className="text-xs text-muted-foreground dark:text-amber-100/85">
+                      Not ready to ship? Turn off &quot;Enable Shipping&quot; above and use store pickup instead.
+                    </p>
+                  </AlertDescription>
+                </Alert>
                 <div className="space-y-4">
                   <Label>Shipping Method Type *</Label>
                   <RadioGroup
@@ -1608,15 +1709,20 @@ export default function TenantSettingsClient({
                         <SelectValue placeholder="Select payment method" />
                       </SelectTrigger>
                       <SelectContent>
+                        {tumiziOfferedForValidation && (
+                          <SelectItem value="tumizi">M-Pesa via Tumizi (STK + auto verify)</SelectItem>
+                        )}
                         {formData.payment_cash_enabled && (
                           <SelectItem value="cash">Cash</SelectItem>
                         )}
                         {formData.payment_mpesa_enabled && (
-                          <SelectItem value="mpesa">M-Pesa</SelectItem>
+                          <SelectItem value="mpesa">Manual M-PESA Verification</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
-                    {!formData.payment_cash_enabled && !formData.payment_mpesa_enabled && (
+                    {!formData.payment_cash_enabled &&
+                      !formData.payment_mpesa_enabled &&
+                      !tumiziOfferedForValidation && (
                       <p className="text-sm text-destructive mt-2">
                         Please enable at least one payment method
                       </p>
@@ -1669,6 +1775,36 @@ export default function TenantSettingsClient({
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <CardTitle>Tumizi wallet</CardTitle>
+                      <CardDescription>
+                        Customers pay with an M-Pesa STK prompt; payments confirm automatically when this is on.
+                      </CardDescription>
+                    </div>
+                    <Switch
+                      checked={
+                        initialSettings.payment_tumizi_enabled === true ||
+                        Boolean(tumiziConfigState?.enabled)
+                      }
+                      disabled={tumiziToggleLoading || tumiziConfigState === null}
+                      onCheckedChange={(checked) => void handleTumiziToggle(checked)}
+                      aria-label="Toggle Tumizi automatic M-Pesa checkout"
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  {tumiziToggleLoading && <p>Updating Tumizi…</p>}
+                  {initialSettings.payment_tumizi_enabled && !tumiziCheckoutReady && (
+                    <p>
+                      Wallet provisioning may still be running. Automatic checkout unlocks as soon as Tumizi is fully linked.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Cash Payment Method */}
               <Card>
                 <CardHeader>
@@ -1684,16 +1820,19 @@ export default function TenantSettingsClient({
                       checked={formData.payment_cash_enabled}
                       onCheckedChange={(checked) => {
                         const newValue = checked === true;
-                        // Ensure at least one payment method is enabled
-                        if (!newValue && !formData.payment_mpesa_enabled) {
+                        if (!newValue && !formData.payment_mpesa_enabled && !tumiziOfferedForValidation) {
                           setError('At least one payment method must be enabled');
                           return;
                         }
-                        setFormData({ 
-                          ...formData, 
+                        let nextMethod = formData.payment_method;
+                        if (!newValue) {
+                          if (formData.payment_mpesa_enabled) nextMethod = 'mpesa';
+                          else if (tumiziOfferedForValidation) nextMethod = 'tumizi';
+                        }
+                        setFormData({
+                          ...formData,
                           payment_cash_enabled: newValue,
-                          // If disabling cash and mpesa is enabled, set default to mpesa
-                          payment_method: !newValue && formData.payment_mpesa_enabled ? 'mpesa' : formData.payment_method
+                          payment_method: nextMethod,
                         });
                         setError(null);
                       }}
@@ -1707,7 +1846,7 @@ export default function TenantSettingsClient({
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>M-Pesa</CardTitle>
+                      <CardTitle>Manual M-PESA Verification</CardTitle>
                       <CardDescription>
                         Mobile money payment method
                       </CardDescription>
@@ -1717,16 +1856,19 @@ export default function TenantSettingsClient({
                       checked={formData.payment_mpesa_enabled}
                       onCheckedChange={(checked) => {
                         const newValue = checked === true;
-                        // Ensure at least one payment method is enabled
-                        if (!newValue && !formData.payment_cash_enabled) {
+                        if (!newValue && !formData.payment_cash_enabled && !tumiziOfferedForValidation) {
                           setError('At least one payment method must be enabled');
                           return;
                         }
-                        setFormData({ 
-                          ...formData, 
+                        let nextMethod = formData.payment_method;
+                        if (!newValue) {
+                          if (formData.payment_cash_enabled) nextMethod = 'cash';
+                          else if (tumiziOfferedForValidation) nextMethod = 'tumizi';
+                        }
+                        setFormData({
+                          ...formData,
                           payment_mpesa_enabled: newValue,
-                          // If disabling mpesa and cash is enabled, set default to cash
-                          payment_method: !newValue && formData.payment_cash_enabled ? 'cash' : formData.payment_method
+                          payment_method: nextMethod,
                         });
                         setError(null);
                       }}
@@ -1866,6 +2008,18 @@ export default function TenantSettingsClient({
               )}
             </div>
           </form>
+        </TabsContent>
+
+        {/* Tumizi Settings Tab */}
+        <TabsContent value="tumizi" className="space-y-6">
+          <TumiziDashboardClient
+            tenantName={tenant.name || tenant.subdomain}
+            isTumiziEnabled={
+              initialSettings.payment_tumizi_enabled === true ||
+              Boolean(tumiziConfigState?.enabled)
+            }
+            embedded
+          />
         </TabsContent>
 
         {/* Tax Settings Tab */}

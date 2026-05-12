@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma/client';
 import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 import { findTenantIdByTumiziMerchantExternalId } from '@/lib/tumizi/config';
 import {
-  mapTumiziStatusToOrderPaymentStatus,
+  mapTumiziEventToOrderPaymentStatus,
   normalizeTumiziEventPayload,
   shouldProcessTumiziWebhookEvent,
 } from '@/lib/tumizi/webhook';
@@ -107,13 +107,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ignored: true, reason: 'payment_log_not_found' });
     }
 
-    const mappedStatus = mapTumiziStatusToOrderPaymentStatus(normalized.status);
+    const mappedStatus = mapTumiziEventToOrderPaymentStatus(normalized.event, normalized.status);
+    const orderPaymentStatus =
+      normalized.event === 'partner.refund.updated' && mappedStatus !== 'refunded'
+        ? 'paid'
+        : mappedStatus;
     const metadata = (paymentLog.metadata ?? {}) as Record<string, unknown>;
 
     await prisma.payment_logs.update({
       where: { id: paymentLog.id },
       data: {
-        status: mappedStatus === 'paid' ? 'completed' : mappedStatus,
+        status: mappedStatus === 'paid' || mappedStatus === 'refunded' ? 'completed' : mappedStatus,
         transaction_id: normalized.transactionReference || paymentLog.transaction_id,
         metadata: {
           ...metadata,
@@ -130,7 +134,7 @@ export async function POST(request: NextRequest) {
       await prisma.orders.updateMany({
         where: { id: orderId, tenant_id: tenantId },
         data: {
-          payment_status: mappedStatus,
+          payment_status: orderPaymentStatus,
           transaction_id: normalized.transactionReference || paymentLog.transaction_id,
           payment_gateway: 'tumizi',
         },

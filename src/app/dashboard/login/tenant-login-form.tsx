@@ -14,6 +14,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { Mail, Lock, Loader2 } from 'lucide-react';
+import {
+  getOtpEmailDeliveryFailureLead,
+  getOtpEmailSendingLimitLead,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+  OTP_SENDGRID_CREDITS_ERROR_CODE,
+  OTP_SUPPORT_EMAIL,
+} from '@/lib/mfa/otp-delivery-user-message';
+
+type OtpHelpKind = 'delivery' | 'limits' | null;
+
+function otpHelpKindFromApiCode(code: unknown): OtpHelpKind {
+  if (code === OTP_SENDGRID_CREDITS_ERROR_CODE) return 'limits';
+  if (code === OTP_EMAIL_SERVICE_ERROR_CODE) return 'delivery';
+  return null;
+}
 
 export default function TenantLoginForm() {
   const router = useRouter();
@@ -23,6 +38,7 @@ export default function TenantLoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [otpHelpKind, setOtpHelpKind] = useState<OtpHelpKind>(null);
   const [requiresMFA, setRequiresMFA] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [tempSession, setTempSession] = useState<any>(null);
@@ -31,6 +47,7 @@ export default function TenantLoginForm() {
 
   const handleGoogleLogin = async () => {
     setError(null);
+    setOtpHelpKind(null);
     setIsLoading(true);
     try {
       const supabase = createSupabaseClient();
@@ -98,6 +115,7 @@ export default function TenantLoginForm() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setOtpHelpKind(null);
 
     try {
       // If 2FA is required, verify the code
@@ -125,6 +143,7 @@ export default function TenantLoginForm() {
         }
 
         const errorMsg = data.message || data.error || 'Invalid code. Please try again.';
+        setOtpHelpKind(null);
         if (errorMsg.includes('session') || errorMsg.includes('expired') || errorMsg.includes('try logging in again')) {
           setError('Your session has expired. Please log in again.');
           setRequiresMFA(false);
@@ -150,7 +169,13 @@ export default function TenantLoginForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || data.error || 'Login failed');
+        const kind = otpHelpKindFromApiCode(data.code);
+        setOtpHelpKind(kind);
+        if (kind) {
+          setError(null);
+        } else {
+          setError(data.message || data.error || 'Login failed');
+        }
         return;
       }
 
@@ -160,6 +185,7 @@ export default function TenantLoginForm() {
         setUserId(data.userId);
         setTempSession(data.tempSession);
         setError(null);
+        setOtpHelpKind(null);
         return;
       }
 
@@ -248,9 +274,35 @@ export default function TenantLoginForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
+            {(error || otpHelpKind) && (
               <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                <p className="text-sm text-red-700">{error}</p>
+                {otpHelpKind === 'delivery' && (
+                  <p className="text-sm leading-relaxed text-red-700">
+                    {getOtpEmailDeliveryFailureLead()}{' '}
+                    If you need help, email{' '}
+                    <a
+                      href={`mailto:${OTP_SUPPORT_EMAIL}`}
+                      className="font-semibold text-red-800 underline decoration-red-800/60 underline-offset-2 hover:text-red-900"
+                    >
+                      {OTP_SUPPORT_EMAIL}
+                    </a>
+                    .
+                  </p>
+                )}
+                {otpHelpKind === 'limits' && (
+                  <p className="text-sm leading-relaxed text-red-700">
+                    {getOtpEmailSendingLimitLead()}{' '}
+                    For assistance, email{' '}
+                    <a
+                      href={`mailto:${OTP_SUPPORT_EMAIL}`}
+                      className="font-semibold text-red-800 underline decoration-red-800/60 underline-offset-2 hover:text-red-900"
+                    >
+                      {OTP_SUPPORT_EMAIL}
+                    </a>
+                    .
+                  </p>
+                )}
+                {!otpHelpKind && error && <p className="text-sm text-red-700">{error}</p>}
               </div>
             )}
 
@@ -285,6 +337,7 @@ export default function TenantLoginForm() {
                       setTempSession(null);
                       setMfaCode('');
                       setError(null);
+                      setOtpHelpKind(null);
                     }}
                     className="font-semibold text-[#355cad] hover:underline"
                   >
@@ -303,11 +356,19 @@ export default function TenantLoginForm() {
                         const data = await response.json();
                         if (response.ok) {
                           setError(null);
+                          setOtpHelpKind(null);
                           alert('A new code has been sent to your email.');
                         } else {
-                          setError(data.message || 'Failed to resend code');
+                          const kind = otpHelpKindFromApiCode(data.code);
+                          setOtpHelpKind(kind);
+                          if (kind) {
+                            setError(null);
+                          } else {
+                            setError(data.message || data.error || 'Failed to resend code');
+                          }
                         }
                       } catch {
+                        setOtpHelpKind(null);
                         setError('Failed to resend code');
                       }
                     }}

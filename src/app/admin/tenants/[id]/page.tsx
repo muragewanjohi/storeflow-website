@@ -45,13 +45,16 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     redirect('/admin/tenants');
   }
 
-  const [productCount, deliveryZoneCount, onboardingSettingsRaw] = await Promise.all([
+  const [productCount, categoryCount, deliveryZoneCount, onboardingSettingsRaw] = await Promise.all([
     prisma.products.count({
       where: {
         tenant_id: tenant.id,
         status: 'active',
         created_by: { not: null },
       },
+    }),
+    prisma.categories.count({
+      where: { tenant_id: tenant.id },
     }),
     prisma.delivery_zones.count({
       where: {
@@ -81,6 +84,7 @@ export default async function TenantSettingsPage({ params }: PageProps) {
 
   const onboardingJourney = buildGettingStartedProgress({
     productCount,
+    categoryCount,
     deliveryZoneCount,
     settings: onboardingSettings,
   });

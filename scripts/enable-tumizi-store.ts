@@ -6,6 +6,12 @@ import {
   getTumiziTenantConfigByTenantId,
   upsertTumiziTenantConfig,
 } from '../src/lib/tumizi/config';
+import {
+  buildTumiziMerchantDomainHostname,
+  buildTumiziMerchantRegistrationDescription,
+  TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+  TUMIZI_DEFAULT_WALLET_CURRENCY,
+} from '../src/lib/tumizi/create-merchant-defaults';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -70,25 +76,26 @@ async function main() {
   });
 
   if (createMerchant) {
-    const ownerEmail = tenant.contact_email || 'support@dukanest.com';
+    const storeName = tenant.name.trim() || 'Store';
+    const merchantEmail = tenant.contact_email || 'support@dukanest.com';
     await tumiziClient.createMerchant({
       merchant_external_id: merchantExternalId,
       merchant: {
-        name: tenant.name,
-        email: ownerEmail,
+        name: storeName,
+        email: merchantEmail,
         phone: normalizeMerchantPhone(storePhoneOption?.option_value),
-        country: 'Kenya',
-        domain: `${tenant.subdomain}.dukanest.com`,
-        description: `Storeflow merchant for ${tenant.name}`,
+        country: TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+        domain: buildTumiziMerchantDomainHostname(tenant.subdomain),
+        description: buildTumiziMerchantRegistrationDescription(storeName),
       },
       owner: {
-        name: tenant.name,
-        email: ownerEmail,
+        name: storeName,
+        email: merchantEmail,
       },
       wallet: {
         name: 'Main Wallet',
         account_number: merchantExternalId.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16),
-        currency: 'KES',
+        currency: TUMIZI_DEFAULT_WALLET_CURRENCY,
       },
       ...(webhookUrl
         ? {

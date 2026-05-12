@@ -25,6 +25,7 @@ import { AddressAutocomplete } from '@/components/address/address-autocomplete';
 import { useAnalytics } from '@/lib/analytics/use-analytics';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { identifyTikTokPixelUser, trackTikTokPixelEvent } from '@/lib/analytics/tiktok-pixel';
+import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
 
 interface CartItem {
   product_id: string;
@@ -86,7 +87,7 @@ function getSavedAddressLine(address: SavedAddress): string {
   return [address.address, address.country].filter(Boolean).join(', ');
 }
 
-type PaymentMethod = 'cash' | 'mpesa';
+type PaymentMethod = 'cash' | 'mpesa' | 'tumizi';
 
 type DeliveryMethod = 'delivery' | 'pickup';
 
@@ -161,6 +162,10 @@ export default function CheckoutClient({
     pickup_hours?: string | null;
     shipping_enabled: boolean;
     shipping_method_type: string | null;
+    shipping_method_type_stored?: string | null;
+    flat_rate_amount?: number | null;
+    shipping_customer_notice?: string | null;
+    shipping_fell_back_from_zones?: boolean;
     store_full_address: string | null;
     store_phone: string | null;
     payment_cash_enabled: boolean;
@@ -173,6 +178,7 @@ export default function CheckoutClient({
     payment_mpesa_pochi_phone: string | null;
     payment_method: string;
     default_payment_method: string; // Keep for backward compatibility
+    payment_tumizi_ready?: boolean;
     payment_timing: 'before_delivery' | 'after_delivery' | 'user_choice';
     tax_enabled: boolean;
     default_tax_rate: number | null;
@@ -428,14 +434,24 @@ export default function CheckoutClient({
           setCheckoutSettings(data.settings);
           
           // Set default payment method
-          if (data.settings.payment_method) {
-            setPaymentMethod(data.settings.payment_method as PaymentMethod);
-          } else if (data.settings.default_payment_method) {
-            setPaymentMethod(data.settings.default_payment_method as PaymentMethod);
+          const preferred =
+            data.settings.payment_method || data.settings.default_payment_method;
+          if (preferred === 'tumizi' && data.settings.payment_tumizi_ready) {
+            setPaymentMethod('tumizi');
+          } else if (preferred === 'tumizi' && !data.settings.payment_tumizi_ready) {
+            if (data.settings.payment_mpesa_enabled) setPaymentMethod('mpesa');
+            else if (data.settings.payment_cash_enabled) setPaymentMethod('cash');
+            else setPaymentMethod('cash');
+          } else if (preferred === 'cash' || preferred === 'mpesa') {
+            setPaymentMethod(preferred);
           } else if (data.settings.payment_cash_enabled) {
             setPaymentMethod('cash');
           } else if (data.settings.payment_mpesa_enabled) {
             setPaymentMethod('mpesa');
+          } else if (data.settings.payment_tumizi_ready) {
+            setPaymentMethod('tumizi');
+          } else {
+            setPaymentMethod('cash');
           }
           
           // Set default delivery method based on available options
@@ -458,6 +474,10 @@ export default function CheckoutClient({
         pickup_enabled: false,
         shipping_enabled: true,
         shipping_method_type: 'flat_rate',
+        shipping_method_type_stored: 'flat_rate',
+        flat_rate_amount: null,
+        shipping_customer_notice: null,
+        shipping_fell_back_from_zones: false,
         store_full_address: null,
         store_phone: null,
         payment_cash_enabled: true,
@@ -470,6 +490,7 @@ export default function CheckoutClient({
         payment_mpesa_pochi_phone: null,
         payment_method: 'cash',
         default_payment_method: 'cash',
+        payment_tumizi_ready: false,
         payment_timing: 'user_choice',
         tax_enabled: false,
         default_tax_rate: null,
@@ -578,6 +599,17 @@ export default function CheckoutClient({
       setZoneDetectionStatus(null);
     }
   }, [deliveryMethod, fetchDeliveryZones]);
+
+  // Apply store flat-rate delivery fee when checkout uses flat-rate pricing (server-normalized settings).
+  useEffect(() => {
+    if (deliveryMethod !== 'delivery' || !checkoutSettings) return;
+    if (checkoutSettings.shipping_method_type === 'flat_rate' && checkoutSettings.flat_rate_amount != null) {
+      setDeliveryFee(checkoutSettings.flat_rate_amount);
+      setSelectedZoneId(null);
+      setSelectedZone(null);
+      setZoneDetectionStatus(null);
+    }
+  }, [deliveryMethod, checkoutSettings, checkoutSettings?.shipping_method_type, checkoutSettings?.flat_rate_amount]);
 
   // Auto-detect zone when address changes (debounced)
   useEffect(() => {
@@ -731,7 +763,18 @@ export default function CheckoutClient({
         toast.error('Please provide your M-Pesa Transaction ID / Receipt Number before proceeding');
         return;
       }
-      
+      if (paymentMethod === 'tumizi') {
+        if (!checkoutSettings?.payment_tumizi_ready) {
+          toast.error('Automatic M-Pesa checkout is not available for this store yet.');
+          return;
+        }
+        const msisdn = normalizeKenyaMsisdnForTumizi(shippingAddress.phone);
+        if (!msisdn) {
+          toast.error('Enter a valid Kenya M-Pesa mobile number on your shipping details.');
+          return;
+        }
+      }
+
       setCurrentStep('review');
       identifyTikTokPixelUser({
         email: shippingAddress.email,
@@ -769,6 +812,16 @@ export default function CheckoutClient({
     if (requiresMpesaVerification && !paymentTransactionId.trim()) {
       toast.error('Please provide your M-Pesa Transaction ID / Receipt Number');
       return;
+    }
+    if (paymentMethod === 'tumizi') {
+      if (!checkoutSettings?.payment_tumizi_ready) {
+        toast.error('Automatic M-Pesa checkout is not available for this store yet.');
+        return;
+      }
+      if (!normalizeKenyaMsisdnForTumizi(shippingAddress.phone)) {
+        toast.error('Enter a valid Kenya M-Pesa mobile number for payment.');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -825,14 +878,17 @@ export default function CheckoutClient({
               address: checkoutSettings.store_full_address,
             }
           : null,
-        delivery_zone_id: deliveryMethod === 'delivery' ? (selectedZoneId || null) : null,
-        delivery_zone_name: deliveryMethod === 'delivery' ? (selectedZone?.name || null) : null,
+        delivery_zone_id: deliveryMethod === 'delivery' && checkoutSettings?.shipping_method_type === 'delivery_zones' ? (selectedZoneId || null) : null,
+        delivery_zone_name: deliveryMethod === 'delivery' && checkoutSettings?.shipping_method_type === 'delivery_zones' ? (selectedZone?.name || null) : null,
         delivery_fee: deliveryMethod === 'delivery' ? (deliveryFee || null) : null,
-        delivery_fee_status: deliveryMethod === 'delivery' && !selectedZoneId 
-          ? 'pending' 
-          : deliveryMethod === 'delivery' && selectedZoneId 
-            ? 'approved' 
-            : null,
+        delivery_fee_status:
+          deliveryMethod !== 'delivery'
+            ? null
+            : checkoutSettings?.shipping_method_type === 'flat_rate' && deliveryFee != null
+              ? 'approved'
+              : checkoutSettings?.shipping_method_type === 'delivery_zones' && selectedZoneId
+                ? 'approved'
+                : 'pending',
         billing_address: useBillingSameAsShipping ? undefined : billingAddress,
         payment_method: paymentMethod,
         payment_verification: requiresMpesaVerification ? {
@@ -1090,6 +1146,14 @@ export default function CheckoutClient({
                   <CardTitle>Delivery Method</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {deliveryMethod === 'delivery' && checkoutSettings?.shipping_customer_notice && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                      <div className="flex gap-2">
+                        <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <p>{checkoutSettings.shipping_customer_notice}</p>
+                      </div>
+                    </div>
+                  )}
                   {/* Delivery Method Selection (if both options available) */}
                   {checkoutSettings && checkoutSettings.pickup_enabled && checkoutSettings.shipping_enabled && (
                     <div className="space-y-2">
@@ -1566,7 +1630,9 @@ export default function CheckoutClient({
                   <CardTitle>Payment Method</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {(!checkoutSettings?.payment_cash_enabled && !checkoutSettings?.payment_mpesa_enabled) ? (
+                  {(!checkoutSettings?.payment_cash_enabled &&
+                    !checkoutSettings?.payment_mpesa_enabled &&
+                    !checkoutSettings?.payment_tumizi_ready) ? (
                     <div className="p-4 border border-destructive rounded-lg bg-destructive/10">
                       <p className="text-sm text-destructive">
                         No payment methods are currently enabled. Please contact the store administrator.
@@ -1630,7 +1696,7 @@ export default function CheckoutClient({
                             <RadioGroupItem value="mpesa" id="payment_mpesa" className="mt-1" />
                             <Label htmlFor="payment_mpesa" className="flex-1 cursor-pointer">
                               <div>
-                                <div className="font-semibold">M-Pesa</div>
+                                <div className="font-semibold">M-Pesa (manual)</div>
                                 <div className="text-sm text-muted-foreground">
                                   {checkoutSettings.payment_mpesa_option === 'send_money' && checkoutSettings.payment_mpesa_send_money_number && (
                                     <>Send money to {checkoutSettings.payment_mpesa_send_money_number}</>
@@ -1658,9 +1724,33 @@ export default function CheckoutClient({
                             </Label>
                           </div>
                         )}
+
+                        {checkoutSettings?.payment_tumizi_ready && (
+                          <div className="flex min-h-11 items-start space-x-3 rounded-lg border p-4 transition-colors hover:bg-accent/50">
+                            <RadioGroupItem value="tumizi" id="payment_tumizi" className="mt-1" />
+                            <Label htmlFor="payment_tumizi" className="flex-1 cursor-pointer">
+                              <div>
+                                <div className="font-semibold">M-Pesa (automatic)</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Pay with an STK push to the phone number on your order. Confirmation is automatic.
+                                </div>
+                              </div>
+                            </Label>
+                          </div>
+                        )}
                       </div>
                     </RadioGroup>
                     </>
+                  )}
+
+                  {paymentMethod === 'tumizi' && checkoutSettings?.payment_tumizi_ready && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                      <p className="font-medium">M-Pesa STK push</p>
+                      <p className="mt-1 text-emerald-900/90 dark:text-emerald-100/90">
+                        After you place the order, Safaricom will prompt{' '}
+                        <span className="font-medium">{shippingAddress.phone || 'your phone'}</span>. Approve the payment on your handset; this store receives confirmation automatically.
+                      </p>
+                    </div>
                   )}
 
                   <Separator />
@@ -1925,7 +2015,11 @@ export default function CheckoutClient({
                   <div>
                     <h3 className="font-semibold mb-2">Payment Method</h3>
                     <div className="text-sm text-muted-foreground">
-                      {paymentMethod === 'cash' ? 'Cash' : 'M-Pesa'}
+                      {paymentMethod === 'cash'
+                        ? 'Cash'
+                        : paymentMethod === 'tumizi'
+                          ? 'M-Pesa (Tumizi — STK push, auto-verified)'
+                          : 'M-Pesa'}
                       {paymentMethod === 'mpesa' && checkoutSettings?.payment_mpesa_option && (
                         <div className="text-xs mt-1">
                           {checkoutSettings.payment_mpesa_option === 'send_money' && checkoutSettings.payment_mpesa_send_money_number && (
@@ -2101,13 +2195,15 @@ export default function CheckoutClient({
                       {deliveryMethod === 'pickup' 
                         ? 'Free (Store Pickup)' 
                         : checkoutSettings?.shipping_method_type === 'delivery_zones'
-                          ? (deliveryFee 
-                              ? formatPrice(deliveryFee) 
+                          ? (deliveryFee
+                              ? formatPrice(deliveryFee)
                               : !selectedZoneId && zoneDetectionStatus === 'not_matched'
-                                ? 'Excluded'
-                                : 'Calculated at checkout')
+                                ? 'Quoted after order'
+                                : 'Select or detect zone')
                           : checkoutSettings?.shipping_method_type === 'flat_rate'
-                            ? 'Flat rate'
+                            ? (deliveryFee != null
+                                ? formatPrice(deliveryFee)
+                                : 'To be confirmed')
                             : 'Calculated at checkout'}
                     </span>
                   </div>
@@ -2145,9 +2241,12 @@ export default function CheckoutClient({
                       Includes delivery fee: {formatPrice(deliveryFee)}
                     </p>
                   )}
-                  {deliveryMethod === 'delivery' && !deliveryFee && selectedZoneId === null && (
+                  {deliveryMethod === 'delivery' &&
+                    !deliveryFee &&
+                    checkoutSettings?.shipping_method_type === 'delivery_zones' &&
+                    zoneDetectionStatus === 'not_matched' && (
                     <p className="text-xs text-yellow-600 dark:text-yellow-400 text-right">
-                      ⚠️ Delivery fee will be calculated and quoted
+                      Delivery fee will be quoted and confirmed by the store after you order.
                     </p>
                   )}
                 </div>

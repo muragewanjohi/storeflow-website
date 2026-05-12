@@ -39,6 +39,25 @@ export function mapTumiziStatusToOrderPaymentStatus(status?: string): 'paid' | '
   return 'pending';
 }
 
+export function mapTumiziEventToOrderPaymentStatus(
+  event: string | undefined,
+  status: string | undefined,
+): 'paid' | 'pending' | 'failed' | 'refunded' {
+  const normalizedEvent = event?.toLowerCase();
+  if (normalizedEvent === 'partner.refund.updated') {
+    const normalizedStatus = status?.toLowerCase();
+    if (['successful', 'success', 'completed', 'paid', 'refunded'].includes(normalizedStatus || '')) {
+      return 'refunded';
+    }
+    if (['failed', 'cancelled', 'reversed', 'declined', 'expired'].includes(normalizedStatus || '')) {
+      return 'failed';
+    }
+    return 'pending';
+  }
+
+  return mapTumiziStatusToOrderPaymentStatus(status);
+}
+
 function toObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};

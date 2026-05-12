@@ -32,6 +32,8 @@ function createPrismaClient() {
       pool = new Pool({
         connectionString: databaseUrl,
         max: 10, // Maximum number of clients in the pool
+        // Fail fast instead of hanging the root layout / ThemeStylesServer
+        connectionTimeoutMillis: Number(process.env.PG_CONNECTION_TIMEOUT_MS) || 8_000,
       });
       adapter = new PrismaPg(pool);
     } else {

@@ -111,7 +111,9 @@ export async function middleware(request: NextRequest) {
 
   // Prevent redirect loops - if we're already on a 404 or error page, don't redirect again
   if (pathname === '/404' || pathname === '/tenant-suspended' || pathname === '/tenant-expired') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
   }
 
   try {

@@ -78,6 +78,7 @@ export default async function TenantSettingsPage() {
       'payment_mpesa_pochi_phone',
       'payment_method',
       'default_payment_method', // Keep for backward compatibility
+      'payment_tumizi_enabled',
       'payment_timing',
       
       // Tax Settings
@@ -164,7 +165,8 @@ export default async function TenantSettingsPage() {
     payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || '',
     payment_method: settings.payment_method || settings.default_payment_method || 'cash',
     default_payment_method: settings.default_payment_method || settings.payment_method || 'cash', // Keep for backward compatibility
-    payment_timing: settings.payment_timing || 'user_choice',
+    payment_tumizi_enabled: settings.payment_tumizi_enabled === 'true',
+    payment_timing: settings.payment_timing || 'before_delivery',
     
     // Tax Settings
     tax_enabled: settings.tax_enabled === 'true',

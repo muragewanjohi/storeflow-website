@@ -18,9 +18,14 @@ import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 import { getSessionId } from '@/lib/cart/session';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
+import { getCheckoutShippingContext } from '@/lib/checkout/effective-shipping';
 import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
 import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
 import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
+import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
+import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+import { initiateTumiziCustomerPaymentForOrder } from '@/lib/tumizi/initiate-order-payment';
+import { rollbackCheckoutAfterFailedTumizi } from '@/lib/checkout/rollback-after-failed-tumizi';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -34,6 +39,41 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     const validatedData = checkoutSchema.parse(body);
+
+    const checkoutPaySettings = await getStaticOptions(tenant.id, [
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+    ]);
+    const tumiziCfgCheckout = await getTumiziTenantConfigByTenantId(tenant.id);
+    const tumiziCheckoutLive =
+      tumiziCfgCheckout?.enabled === true && !!tumiziCfgCheckout?.merchantExternalId;
+
+    const cashAllowed =
+      checkoutPaySettings.payment_cash_enabled === 'true' ||
+      checkoutPaySettings.payment_cash_enabled === null;
+    const mpesaAllowed = checkoutPaySettings.payment_mpesa_enabled === 'true';
+
+    if (validatedData.payment_method === 'cash' && !cashAllowed) {
+      return NextResponse.json(
+        { error: 'Cash payments are not enabled for this store.' },
+        { status: 400 },
+      );
+    }
+    if (validatedData.payment_method === 'mpesa' && !mpesaAllowed) {
+      return NextResponse.json(
+        { error: 'M-Pesa is not enabled for this store.' },
+        { status: 400 },
+      );
+    }
+    if (validatedData.payment_method === 'tumizi' && !tumiziCheckoutLive) {
+      return NextResponse.json(
+        {
+          error:
+            'Automatic M-Pesa checkout is not ready for this store yet. Choose another payment method or try again later.',
+        },
+        { status: 400 },
+      );
+    }
 
     // Check tenant access level - block checkout for expired/suspended tenants
     const accessRestriction = getTenantAccessRestriction(tenant);
@@ -207,6 +247,74 @@ export async function POST(request: NextRequest) {
     // Determine delivery method and address
     const deliveryMethod = validatedData.delivery_method || 'delivery';
     const isPickup = deliveryMethod === 'pickup';
+
+    const shippingOpts = await getStaticOptions(tenant.id, ['shipping_method_type', 'flat_rate_amount', 'shipping_enabled']);
+    const shippingEnabled = shippingOpts.shipping_enabled !== 'false';
+    if (!isPickup && !shippingEnabled) {
+      return NextResponse.json(
+        { error: 'Delivery is not available for this store. Choose store pickup if offered, or contact the store.' },
+        { status: 400 },
+      );
+    }
+
+    const activeDeliveryZoneCount = await prisma.delivery_zones.count({
+      where: { tenant_id: tenant.id, is_active: true },
+    });
+    const shippingCtx = getCheckoutShippingContext({
+      shippingMethodTypeStored: shippingOpts.shipping_method_type,
+      activeDeliveryZoneCount,
+      flatRateAmountRaw: shippingOpts.flat_rate_amount,
+    });
+
+    let resolvedDeliveryFee: number | null = null;
+    let resolvedDeliveryZoneId: string | null = null;
+    let resolvedDeliveryZoneName: string | null = null;
+    let resolvedDeliveryFeeStatus: 'pending' | 'quoted' | 'approved' | 'rejected' | null = null;
+
+    if (!isPickup) {
+      if (shippingCtx.effectiveMethod === 'flat_rate') {
+        if (shippingCtx.flatRateAmount != null) {
+          resolvedDeliveryFee = shippingCtx.flatRateAmount;
+          resolvedDeliveryFeeStatus = 'approved';
+        } else {
+          resolvedDeliveryFee =
+            validatedData.delivery_fee != null && validatedData.delivery_fee > 0
+              ? validatedData.delivery_fee
+              : null;
+          resolvedDeliveryFeeStatus = 'pending';
+        }
+        resolvedDeliveryZoneId = null;
+        resolvedDeliveryZoneName = null;
+      } else {
+        if (validatedData.delivery_zone_id) {
+          const zone = await prisma.delivery_zones.findFirst({
+            where: {
+              id: validatedData.delivery_zone_id,
+              tenant_id: tenant.id,
+              is_active: true,
+            },
+          });
+          if (!zone) {
+            return NextResponse.json(
+              { error: 'Selected delivery zone is not valid for this store.' },
+              { status: 400 },
+            );
+          }
+          resolvedDeliveryFee = Number(zone.price);
+          resolvedDeliveryZoneId = zone.id;
+          resolvedDeliveryZoneName = zone.name;
+          resolvedDeliveryFeeStatus = 'approved';
+        } else {
+          resolvedDeliveryFee =
+            validatedData.delivery_fee != null && validatedData.delivery_fee > 0
+              ? validatedData.delivery_fee
+              : null;
+          resolvedDeliveryZoneId = null;
+          resolvedDeliveryZoneName = validatedData.delivery_zone_name ?? null;
+          resolvedDeliveryFeeStatus = 'pending';
+        }
+      }
+    }
     
     // Get customer info from appropriate address
     const customerInfo = isPickup && validatedData.pickup_address
@@ -214,6 +322,20 @@ export async function POST(request: NextRequest) {
       : validatedData.shipping_address
         ? validatedData.shipping_address
         : { name: '', email: '', phone: '' };
+
+    let tumiziPayerPhone: string | null = null;
+    if (validatedData.payment_method === 'tumizi') {
+      tumiziPayerPhone = normalizeKenyaMsisdnForTumizi(customerInfo.phone);
+      if (!tumiziPayerPhone) {
+        return NextResponse.json(
+          {
+            error:
+              'Enter a valid Kenya M-Pesa mobile number in your contact details for payment.',
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     // Get tax settings
     const taxSettings = await getStaticOptions(tenant.id, [
@@ -250,8 +372,8 @@ export async function POST(request: NextRequest) {
     }
     // If inclusive, tax is already in subtotal
     
-    if (!isPickup && validatedData.delivery_fee) {
-      finalTotal += validatedData.delivery_fee;
+    if (!isPickup && resolvedDeliveryFee != null && resolvedDeliveryFee > 0) {
+      finalTotal += resolvedDeliveryFee;
     }
 
     // Generate invoice number
@@ -274,15 +396,26 @@ export async function POST(request: NextRequest) {
         // Never trust client-submitted payment verification payloads for paid status.
         // Payment state is promoted to "paid" only from verified provider callbacks.
         payment_status: 'pending',
-        payment_gateway: validatedData.payment_method,
-        transaction_id: validatedData.payment_verification?.transaction_id || null,
-        payment_meta: validatedData.payment_verification ? JSON.parse(JSON.stringify({
-          transaction_id: validatedData.payment_verification.transaction_id,
-          reference: validatedData.payment_verification.reference,
-          notes: validatedData.payment_verification.notes,
-          submitted_at: new Date().toISOString(),
-          verification_status: 'pending', // pending, verified, rejected
-        })) : null,
+        payment_gateway:
+          validatedData.payment_method === 'tumizi'
+            ? 'tumizi'
+            : validatedData.payment_method,
+        transaction_id:
+          validatedData.payment_method === 'tumizi'
+            ? null
+            : validatedData.payment_verification?.transaction_id || null,
+        payment_meta:
+          validatedData.payment_method === 'tumizi'
+            ? null
+            : validatedData.payment_verification
+              ? JSON.parse(JSON.stringify({
+                  transaction_id: validatedData.payment_verification.transaction_id,
+                  reference: validatedData.payment_verification.reference,
+                  notes: validatedData.payment_verification.notes,
+                  submitted_at: new Date().toISOString(),
+                  verification_status: 'pending', // pending, verified, rejected
+                }))
+              : null,
         shipping_address: isPickup 
           ? (validatedData.pickup_address as any)
           : (validatedData.shipping_address as any),
@@ -291,10 +424,10 @@ export async function POST(request: NextRequest) {
         coupon_discounted: couponDiscounted,
         message: validatedData.notes || null,
         checkout_type: isPickup ? 'pickup' : 'delivery',
-        delivery_zone_id: validatedData.delivery_zone_id || null,
-        delivery_zone_name: validatedData.delivery_zone_name || null,
-        delivery_fee: validatedData.delivery_fee || null,
-        delivery_fee_status: validatedData.delivery_fee_status || null,
+        delivery_zone_id: resolvedDeliveryZoneId,
+        delivery_zone_name: resolvedDeliveryZoneName,
+        delivery_fee: resolvedDeliveryFee,
+        delivery_fee_status: resolvedDeliveryFeeStatus,
         order_products: {
           create: orderItems.map((item: any) => ({
             tenant_id: tenant.id,
@@ -359,6 +492,41 @@ export async function POST(request: NextRequest) {
     // Product-level stock should equal the sum of all variant stocks
     for (const productId of productsWithVariants) {
       await syncProductStockFromVariants(productId, tenant.id);
+    }
+
+    if (validatedData.payment_method === 'tumizi' && tumiziPayerPhone) {
+      try {
+        await initiateTumiziCustomerPaymentForOrder({
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          order: {
+            id: order.id,
+            order_number: order.order_number,
+            invoice_number: order.invoice_number,
+            total_amount: order.total_amount,
+            name: order.name,
+            email: order.email,
+          },
+          phoneNumber: tumiziPayerPhone,
+          userId: customerId,
+        });
+      } catch (tumiziError: unknown) {
+        console.error('[Checkout] Tumizi initiate failed:', tumiziError);
+        await rollbackCheckoutAfterFailedTumizi({
+          tenantId: tenant.id,
+          orderId: order.id,
+          orderItems: orderItems.map((item) => ({
+            product_id: item.product_id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+          })),
+        });
+        const message =
+          tumiziError instanceof Error
+            ? tumiziError.message
+            : 'Could not start M-Pesa payment. Please try again or choose another payment method.';
+        return NextResponse.json({ error: message }, { status: 502 });
+      }
     }
 
     // Clear cart items from database

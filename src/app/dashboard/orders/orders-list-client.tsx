@@ -49,6 +49,7 @@ interface Order {
   status: string | null;
   payment_status: string | null;
   payment_gateway: string | null;
+  tumizi_refund_status: string | null;
   order_details: any | null; // Contains tracking_number and shipping_carrier
   item_count: number;
   created_at: string;
@@ -327,6 +328,22 @@ export default function OrdersListClient({
     }
   };
 
+  const getRefundStatusBadgeVariant = (status: string | null) => {
+    if (!status) return 'secondary';
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'success':
+      case 'successful':
+        return 'default';
+      case 'failed':
+      case 'cancelled':
+      case 'declined':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
+
   // Readable pending badge: light amber background, dark text (avoids dark-on-dark from secondary variant)
   const pendingBadgeClass =
     'bg-amber-100 text-amber-900 border-amber-200 hover:bg-amber-100';
@@ -569,6 +586,22 @@ export default function OrdersListClient({
 
                       <div className="flex items-center gap-2">
                         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">{formatPaymentStatus(paymentStatus)}</Badge>
+                        {order.payment_gateway === 'tumizi' && order.tumizi_refund_status && (
+                          <Badge
+                            variant={getRefundStatusBadgeVariant(order.tumizi_refund_status)}
+                            className={
+                              order.tumizi_refund_status.toLowerCase() === 'pending'
+                                ? pendingBadgeClass
+                                : undefined
+                            }
+                          >
+                            {order.tumizi_refund_status.toLowerCase() === 'completed'
+                              ? 'Refunded'
+                              : order.tumizi_refund_status.toLowerCase() === 'failed'
+                                ? 'Refund Failed'
+                                : 'Refund Pending'}
+                          </Badge>
+                        )}
                         <Badge
                           className={
                             orderStatus === 'pending'
@@ -1000,16 +1033,36 @@ export default function OrdersListClient({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={getPaymentStatusBadgeVariant(order.payment_status)}
-                            className={
-                              order.payment_status?.toLowerCase() === 'pending'
-                                ? pendingBadgeClass
-                                : undefined
-                            }
-                          >
-                            {formatPaymentStatus(order.payment_status || 'pending')}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge
+                              variant={getPaymentStatusBadgeVariant(order.payment_status)}
+                              className={
+                                order.payment_status?.toLowerCase() === 'pending'
+                                  ? pendingBadgeClass
+                                  : undefined
+                              }
+                            >
+                              {formatPaymentStatus(order.payment_status || 'pending')}
+                            </Badge>
+                            {order.payment_gateway === 'tumizi' && order.tumizi_refund_status && (
+                              <div>
+                                <Badge
+                                  variant={getRefundStatusBadgeVariant(order.tumizi_refund_status)}
+                                  className={
+                                    order.tumizi_refund_status.toLowerCase() === 'pending'
+                                      ? pendingBadgeClass
+                                      : undefined
+                                  }
+                                >
+                                  {order.tumizi_refund_status.toLowerCase() === 'completed'
+                                    ? 'Refunded'
+                                    : order.tumizi_refund_status.toLowerCase() === 'failed'
+                                      ? 'Refund Failed'
+                                      : 'Refund Pending'}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {new Date(order.created_at).toLocaleDateString()}

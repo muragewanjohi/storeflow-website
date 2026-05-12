@@ -8,6 +8,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +96,7 @@ export default function ProductFormClient({
   categories,
 }: Readonly<ProductFormClientProps>) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!product;
@@ -505,6 +507,7 @@ export default function ProductFormClient({
         }
       }
 
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-getting-started'] });
       router.push(`/dashboard/products/${productId}`);
     } catch (err: any) {
       setError(err.message || `Failed to ${isEditing ? 'update' : 'create'} product`);

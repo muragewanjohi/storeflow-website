@@ -10,6 +10,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { cancelOrderSchema } from '@/lib/orders/validation';
 import { sendOrderCancelledEmail } from '@/lib/orders/emails';
+import { initiateTumiziRefundForOrder } from '@/lib/tumizi/refund-order-payment';
 
 /**
  * POST /api/orders/[id]/cancel - Cancel an order
@@ -101,12 +102,34 @@ export async function POST(
       await syncProductStockFromVariants(productId, tenant.id);
     }
 
+    const shouldInitiateTumiziRefund =
+      refund === true && order.payment_status === 'paid' && order.payment_gateway === 'tumizi';
+
+    if (shouldInitiateTumiziRefund) {
+      await initiateTumiziRefundForOrder({
+        tenantId: tenant.id,
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+          payment_track: order.payment_track,
+          transaction_id: order.transaction_id,
+        },
+        reason,
+        userId: user.id,
+      });
+    }
+
     // Update order status
     const updatedOrder = await prisma.orders.update({
       where: { id },
       data: {
         status: 'cancelled',
-        payment_status: refund ? 'refunded' : order.payment_status,
+        payment_status:
+          shouldInitiateTumiziRefund || order.payment_status !== 'paid'
+            ? order.payment_status
+            : refund
+              ? 'refunded'
+              : order.payment_status,
         message: notes || order.message,
       },
       include: {

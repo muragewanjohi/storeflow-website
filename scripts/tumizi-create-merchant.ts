@@ -1,6 +1,11 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { tumiziClient } from '../src/lib/tumizi/client';
+import {
+  buildTumiziMerchantRegistrationDescription,
+  TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+  TUMIZI_DEFAULT_WALLET_CURRENCY,
+} from '../src/lib/tumizi/create-merchant-defaults';
 
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -51,9 +56,9 @@ async function main() {
       name: merchantName,
       email: ownerEmail,
       phone: merchantPhone,
-      country: 'Kenya',
+      country: TUMIZI_DEFAULT_MERCHANT_COUNTRY,
       domain: `${merchantExternalId}.dukanest.com`,
-      description: `Storeflow merchant for ${merchantName}`,
+      description: buildTumiziMerchantRegistrationDescription(merchantName),
     },
     owner: {
       name: ownerName,
@@ -62,7 +67,7 @@ async function main() {
     wallet: {
       name: 'Main Wallet',
       account_number: walletAccountNumber,
-      currency: 'KES',
+      currency: TUMIZI_DEFAULT_WALLET_CURRENCY,
     },
     ...(webhookUrl
       ? {

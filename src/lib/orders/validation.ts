@@ -65,7 +65,7 @@ export const checkoutSchema = z.object({
     postal_code: z.string().optional().nullable(),
     country: z.string().min(1, 'Country is required'),
   }).optional(),
-  payment_method: z.enum(['cash', 'mpesa']),
+  payment_method: z.enum(['cash', 'mpesa', 'tumizi']),
   payment_verification: z.object({
     transaction_id: z.string().min(1, 'Transaction ID is required'),
     reference: z.string().optional().nullable(),

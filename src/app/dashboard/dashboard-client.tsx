@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -144,6 +144,7 @@ interface DashboardNotificationsResponse {
 }
 
 const ONBOARDING_INLINE_HINTS: Partial<Record<string, string>> = {
+  category: '⏱ About a minute',
   product: '⏱ Takes 2 minutes',
   demo_products: 'Keep these until your real catalog is ready',
 };
@@ -258,7 +259,7 @@ export default function DashboardClient({
   const isLoading = overviewLoading || revenueLoading || ordersLoading || salesLoading || inventoryLoading;
 
   // Fetch getting started checklist
-  const { data: gettingStarted, refetch: refetchGettingStarted } = useQuery({
+  const { data: gettingStarted, isPending: gettingStartedPending, refetch: refetchGettingStarted } = useQuery({
     queryKey: ['dashboard-getting-started'],
     queryFn: async () => {
       const response = await fetch('/api/dashboard/getting-started');
@@ -267,6 +268,20 @@ export default function DashboardClient({
       return json.data as GettingStartedData;
     },
   });
+
+  const primaryCatalogCta = useMemo(() => {
+    const next = gettingStarted?.nextAction;
+    if (next && (next.id === 'category' || next.id === 'product')) {
+      return {
+        href: next.href,
+        label: next.cta || next.label,
+      };
+    }
+    if (isNewTenant && gettingStartedPending) {
+      return { href: '/dashboard/categories/new', label: 'Add category' };
+    }
+    return { href: '/dashboard/products/new', label: 'Add Product' };
+  }, [gettingStarted?.nextAction, isNewTenant, gettingStartedPending]);
 
   const effectiveStoreUrl = gettingStarted?.storeUrl ?? storeUrl;
   const welcomeStoreUrl = effectiveStoreUrl || `https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}`;
@@ -367,6 +382,14 @@ export default function DashboardClient({
   };
 
   const mobileSetupFallback: GettingStartedItem[] = [
+    {
+      id: 'category',
+      label: 'Create your first category',
+      description: 'Organize your catalog so products are easy to find',
+      completed: false,
+      href: '/dashboard/categories/new',
+      cta: 'Add category',
+    },
     {
       id: 'product',
       label: 'Add your first product',
@@ -733,13 +756,13 @@ export default function DashboardClient({
             <h2 className="mb-4 text-[18px] font-semibold leading-[27px] tracking-[-0.4395px] text-[#1f2937]">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-3">
               <Link
-                href="/dashboard/products/new"
+                href={primaryCatalogCta.href}
                 className="rounded-2xl border border-[#f3f4f6] bg-white p-5 shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_rgba(0,0,0,0.1)]"
               >
                 <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
                   <PlusIcon className="h-5 w-5" />
                 </span>
-                <p className="text-sm font-medium text-[#1f2937]">Add Product</p>
+                <p className="text-sm font-medium text-[#1f2937]">{primaryCatalogCta.label}</p>
               </Link>
               <Link
                 href="/dashboard/orders"
@@ -834,7 +857,7 @@ export default function DashboardClient({
                   Preview Store
                 </Button>
                 <Button asChild size="sm">
-                  <Link href="/dashboard/products/new">Add First Product</Link>
+                  <Link href={primaryCatalogCta.href}>{primaryCatalogCta.label}</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/dashboard/settings">Configure Store</Link>
@@ -863,9 +886,9 @@ export default function DashboardClient({
             </Link>
           </Button>
           <Button asChild>
-            <Link href="/dashboard/products/new">
+            <Link href={primaryCatalogCta.href}>
               <PlusIcon className="h-4 w-4 mr-2" />
-              Add Product
+              {primaryCatalogCta.label}
             </Link>
           </Button>
         </div>
@@ -1249,7 +1272,7 @@ export default function DashboardClient({
                 <ChartBarIcon className="h-12 w-12 mb-3 opacity-50" />
                 <p className="text-sm">No revenue data yet</p>
                 <Button variant="link" asChild className="mt-2">
-                  <Link href="/dashboard/products/new">Add your first product</Link>
+                  <Link href={primaryCatalogCta.href}>{primaryCatalogCta.label}</Link>
                 </Button>
               </div>
             )}
@@ -1370,9 +1393,9 @@ export default function DashboardClient({
                   <p className="text-xs mt-1 mb-4">Add products to start tracking sales</p>
                   <div className="flex flex-wrap gap-2 justify-center">
                     <Button variant="default" size="sm" asChild>
-                      <Link href="/dashboard/products/new">
+                      <Link href={primaryCatalogCta.href}>
                         <PlusIcon className="h-4 w-4 mr-1" />
-                        Add product
+                        {primaryCatalogCta.label}
                       </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>

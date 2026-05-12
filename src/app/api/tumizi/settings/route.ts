@@ -8,6 +8,13 @@ import {
   getTumiziTenantConfigByTenantId,
   upsertTumiziTenantConfig,
 } from '@/lib/tumizi/config';
+import { setStaticOptions } from '@/lib/settings/static-options';
+import {
+  buildTumiziMerchantDomainHostname,
+  buildTumiziMerchantRegistrationDescription,
+  TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+  TUMIZI_DEFAULT_WALLET_CURRENCY,
+} from '@/lib/tumizi/create-merchant-defaults';
 
 const settingsSchema = z.object({
   enabled: z.boolean(),
@@ -87,25 +94,27 @@ export async function POST(request: NextRequest) {
     ];
 
     if (payload.enabled && payload.createMerchantIfMissing && !current.merchantExternalId) {
-      const ownerEmail = tenantRecord?.contact_email || 'support@dukanest.com';
+      const sub = (tenantRecord?.subdomain || tenant.subdomain).trim();
+      const storeName = (tenantRecord?.name || tenant.name).trim() || 'Store';
+      const merchantEmail = tenantRecord?.contact_email || 'support@dukanest.com';
       await tumiziClient.createMerchant({
         merchant_external_id: merchantExternalId,
         merchant: {
-          name: tenantRecord?.name || tenant.name,
-          email: ownerEmail,
+          name: storeName,
+          email: merchantEmail,
           phone: normalizeMerchantPhone(storePhoneOption?.option_value),
-          country: 'Kenya',
-          domain: `${tenantRecord?.subdomain || tenant.subdomain}.dukanest.com`,
-          description: `Storeflow merchant for ${tenantRecord?.name || tenant.name}`,
+          country: TUMIZI_DEFAULT_MERCHANT_COUNTRY,
+          domain: buildTumiziMerchantDomainHostname(sub),
+          description: buildTumiziMerchantRegistrationDescription(storeName),
         },
         owner: {
-          name: tenantRecord?.name || tenant.name,
-          email: ownerEmail,
+          name: storeName,
+          email: merchantEmail,
         },
         wallet: {
           name: 'Main Wallet',
           account_number: merchantExternalId.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16),
-          currency: 'KES',
+          currency: TUMIZI_DEFAULT_WALLET_CURRENCY,
         },
         ...(webhookUrl
           ? {
@@ -139,6 +148,11 @@ export async function POST(request: NextRequest) {
     };
 
     const saved = await upsertTumiziTenantConfig(tenant.id, nextConfig);
+
+    await setStaticOptions(tenant.id, {
+      payment_tumizi_enabled:
+        saved.enabled && !!saved.merchantExternalId ? 'true' : 'false',
+    });
 
     return NextResponse.json({ success: true, data: saved });
   } catch (error: any) {

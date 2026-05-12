@@ -24,7 +24,9 @@ const SETTINGS_KEYS = [
   'free_shipping_threshold',
   'payment_cash_enabled',
   'payment_mpesa_enabled',
+  'payment_tumizi_enabled',
   'payment_mpesa_option',
+  'payment_method',
   'default_payment_method',
   'tax_enabled',
   'default_tax_rate',
@@ -82,7 +84,9 @@ type MobileSettingsPayload = {
   payment: {
     cashEnabled: boolean;
     mpesaEnabled: boolean;
+    tumiziEnabled: boolean;
     mpesaOption: string | null;
+    paymentMethod: string;
     defaultMethod: string;
   };
   tax: {
@@ -152,7 +156,9 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
     payment: {
       cashEnabled: asBoolean(options.payment_cash_enabled, true),
       mpesaEnabled: asBoolean(options.payment_mpesa_enabled, false),
+      tumiziEnabled: asBoolean(options.payment_tumizi_enabled, false),
       mpesaOption: options.payment_mpesa_option || null,
+      paymentMethod: options.payment_method || options.default_payment_method || 'cash',
       defaultMethod: options.default_payment_method || 'cash',
     },
     tax: {
@@ -203,8 +209,10 @@ const mobileSettingsPatchSchema = z.object({
     .object({
       cashEnabled: z.boolean().optional(),
       mpesaEnabled: z.boolean().optional(),
+      tumiziEnabled: z.boolean().optional(),
       mpesaOption: z.enum(['send_money', 'buy_goods', 'paybill', 'pochi']).nullable().optional(),
-      defaultMethod: z.enum(['cash', 'mpesa']).optional(),
+      paymentMethod: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
+      defaultMethod: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
     })
     .optional(),
   tax: z
@@ -374,8 +382,16 @@ export async function PATCH(request: NextRequest) {
       const pay = parsed.payment;
       if (pay.cashEnabled !== undefined) optionsToSave.payment_cash_enabled = String(pay.cashEnabled);
       if (pay.mpesaEnabled !== undefined) optionsToSave.payment_mpesa_enabled = String(pay.mpesaEnabled);
+      if (pay.tumiziEnabled !== undefined) optionsToSave.payment_tumizi_enabled = String(pay.tumiziEnabled);
       if (pay.mpesaOption !== undefined) optionsToSave.payment_mpesa_option = pay.mpesaOption;
-      if (pay.defaultMethod !== undefined) optionsToSave.default_payment_method = pay.defaultMethod;
+      if (pay.paymentMethod !== undefined) {
+        optionsToSave.payment_method = pay.paymentMethod;
+        // keep backward-compatible key in sync
+        optionsToSave.default_payment_method = pay.paymentMethod;
+      } else if (pay.defaultMethod !== undefined) {
+        optionsToSave.default_payment_method = pay.defaultMethod;
+        optionsToSave.payment_method = pay.defaultMethod;
+      }
     }
 
     if (parsed.tax) {
@@ -393,18 +409,62 @@ export async function PATCH(request: NextRequest) {
       const current = await getStaticOptions(user.tenant_id, [
         'payment_cash_enabled',
         'payment_mpesa_enabled',
+        'payment_tumizi_enabled',
+        'payment_method',
+        'default_payment_method',
       ]);
       const cashNow = asBoolean(current.payment_cash_enabled, true);
       const mpesaNow = asBoolean(current.payment_mpesa_enabled, false);
+      const tumiziNow = asBoolean(current.payment_tumizi_enabled, false);
       const nextCash =
         parsed.payment?.cashEnabled !== undefined ? parsed.payment.cashEnabled : cashNow;
       const nextMpesa =
         parsed.payment?.mpesaEnabled !== undefined ? parsed.payment.mpesaEnabled : mpesaNow;
-      if (!nextCash && !nextMpesa) {
+      const nextTumizi =
+        parsed.payment?.tumiziEnabled !== undefined ? parsed.payment.tumiziEnabled : tumiziNow;
+      if (!nextCash && !nextMpesa && !nextTumizi) {
         return NextResponse.json(
           mobileError('VALIDATION_ERROR', 'At least one payment method must be enabled', [
-            { field: 'payment', message: 'Enable cash or M-Pesa' },
+            { field: 'payment', message: 'Enable cash, M-Pesa, or Tumizi' },
           ]),
+          { status: 400 },
+        );
+      }
+
+      const effectiveDefaultMethod =
+        parsed.payment?.paymentMethod ??
+        parsed.payment?.defaultMethod ??
+        current.payment_method ??
+        current.default_payment_method ??
+        'cash';
+
+      if (effectiveDefaultMethod === 'cash' && !nextCash) {
+        return NextResponse.json(
+          mobileError(
+            'VALIDATION_ERROR',
+            'Cash payments are disabled. Pick another default payment method.',
+            [{ field: 'payment.defaultMethod', message: 'Cash is not enabled' }],
+          ),
+          { status: 400 },
+        );
+      }
+      if (effectiveDefaultMethod === 'mpesa' && !nextMpesa) {
+        return NextResponse.json(
+          mobileError(
+            'VALIDATION_ERROR',
+            'M-Pesa is disabled. Pick another default payment method.',
+            [{ field: 'payment.defaultMethod', message: 'M-Pesa is not enabled' }],
+          ),
+          { status: 400 },
+        );
+      }
+      if (effectiveDefaultMethod === 'tumizi' && !nextTumizi) {
+        return NextResponse.json(
+          mobileError(
+            'VALIDATION_ERROR',
+            'Tumizi is disabled. Pick another default payment method.',
+            [{ field: 'payment.defaultMethod', message: 'Tumizi is not enabled' }],
+          ),
           { status: 400 },
         );
       }

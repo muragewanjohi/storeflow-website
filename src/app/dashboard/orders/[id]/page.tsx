@@ -58,6 +58,15 @@ export default async function OrderDetailPage({
     if (!orderData) {
       error = 'Order not found';
     } else {
+      const tumiziRefundLog = await prisma.payment_logs.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          gateway: 'tumizi_refund',
+          payment_id: `refund-order-${orderData.id}`,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
       // Fetch product variants separately if needed
       const variantIds = orderData.order_products
         .filter((item: any) => item.variant_id)
@@ -90,6 +99,8 @@ export default async function OrderDetailPage({
         payment_gateway: orderData.payment_gateway,
         transaction_id: orderData.transaction_id,
         payment_meta: orderData.payment_meta,
+        tumizi_refund_status: tumiziRefundLog?.status || null,
+        tumizi_refund_reference: tumiziRefundLog?.transaction_id || null,
         invoice_number: orderData.invoice_number,
         shipping_address: orderData.shipping_address,
         billing_address: orderData.billing_address,

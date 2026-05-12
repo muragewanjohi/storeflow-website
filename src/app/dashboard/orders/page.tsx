@@ -114,6 +114,35 @@ export default async function OrdersPage({
       prisma.orders.count({ where }),
     ]);
 
+    const orderIds = ordersData.map((order: any) => order.id);
+    const refundPaymentIds = orderIds.map((orderId: string) => `refund-order-${orderId}`);
+    const refundLogs =
+      refundPaymentIds.length > 0
+        ? await prisma.payment_logs.findMany({
+            where: {
+              tenant_id: tenant.id,
+              gateway: 'tumizi_refund',
+              payment_id: { in: refundPaymentIds },
+            },
+            select: {
+              payment_id: true,
+              status: true,
+            },
+            orderBy: { created_at: 'desc' },
+          })
+        : [];
+    const refundStatusByOrderId = new Map<string, string>();
+    for (const log of refundLogs) {
+      const paymentId = log.payment_id || '';
+      if (!paymentId.startsWith('refund-order-')) {
+        continue;
+      }
+      const orderId = paymentId.replace('refund-order-', '');
+      if (!refundStatusByOrderId.has(orderId)) {
+        refundStatusByOrderId.set(orderId, log.status || 'pending');
+      }
+    }
+
     orders = ordersData.map((order: any) => ({
       id: order.id,
       order_number: order.order_number,
@@ -124,6 +153,7 @@ export default async function OrdersPage({
       status: order.status,
       payment_status: order.payment_status,
       payment_gateway: order.payment_gateway,
+      tumizi_refund_status: refundStatusByOrderId.get(order.id) || null,
       order_details: order.order_details || null,
       item_count: order.order_products.reduce((sum: any, item: any) => sum + item.quantity, 0),
       created_at: order.created_at?.toISOString() || '',
