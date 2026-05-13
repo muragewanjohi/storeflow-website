@@ -7,6 +7,7 @@
 ## 📦 Files
 
 - **`StoreFlow_API_Collection.json`** — Main Postman collection (import this file)
+- **`StoreFlow_Mobile_Tumizi_Collection.json`** — Focused native mobile Tumizi test collection
 - **`StoreFlow_Environment.json`** — Environment variables for different environments
 - **`README.md`** — This file
 
@@ -66,6 +67,11 @@ Update these variables in the environment:
 - **`mobile_push_token`** - FCM/APNs registration token for **Mobile Register Device**
 - **`mobile_mpesa_checkout_request_id`** - Set automatically by **Mobile M-Pesa Initiate** for **Mobile M-Pesa Status**
 - **`tumizi_provisioning_queued`** - Captures registration response flag indicating async Tumizi merchant provisioning was queued
+- **`tumizi_merchant_external_id`** - Set automatically by mobile Tumizi settings/merchant responses
+- **`tumizi_withdrawal_phone`** - Kenya M-Pesa phone used by the mobile Tumizi withdrawal test
+- **`tumizi_withdrawal_amount`** - Withdrawal test amount; keep low in live environments
+- **`tumizi_withdrawal_narration`** - Narration sent with withdrawal test
+- **`tumizi_withdrawal_external_reference`** - Set automatically after mobile Tumizi withdrawal request
 
 ---
 
@@ -139,6 +145,7 @@ The merchant is created asynchronously by the provision-pending cron worker, not
 - **Mobile Dashboard Expenses (List/Create/Update/Delete)** - Tenant expense ledger for P&L
 - **Mobile Media Upload** - Multipart image upload (`file` field)
 - **Mobile M-Pesa Initiate** / **Mobile M-Pesa Status** - STK push + poll (`checkoutRequestId`)
+- **Mobile Tumizi Settings/Merchant/Wallet/Refunds** - Import `StoreFlow_Mobile_Tumizi_Collection.json` for focused native mobile Tumizi route tests.
 - **Mobile Notifications List** - Derived in-app notifications feed
 - **Mobile Register Device** - Upsert push token + device metadata
 - **Mobile Notification Preferences (GET/PUT)** - Per-device notification toggles

@@ -87,19 +87,85 @@ Body: `phoneNumber` (required), optional `amount`, `narration`. Used from the **
 
 ---
 
-## Mobile app: mirroring web today
+## Mobile app: native Tumizi routes
 
-### 1) Authenticated Tumizi APIs = **session cookies**, not mobile Bearer
+### 1) Authenticated mobile Tumizi APIs = **Bearer token**
 
-`/api/tumizi/*` and `/api/dashboard/settings` use **`requireAuth`** (Supabase **cookie** session on the tenant host), **not** `Authorization: Bearer` from `POST /api/v1/mobile/auth/login`.
+Native Flutter screens should call the mobile dashboard Tumizi proxy routes with:
 
-**Practical options:**
+```text
+Authorization: Bearer <accessToken>
+```
 
-1. **WebView (fastest parity)** — Open `https://{subdomain}.{base}/dashboard/settings` (or deep-link to the Tumizi tab if you add a query hash later) so the merchant uses the **same** web flows and cookies.
-2. **Hybrid** — Keep **payment toggles / default method** in the native app (mobile settings now expose Tumizi payment fields); open **WebView only** for Tumizi wallet / withdrawals / refunds until native screens exist.
-3. **Future native parity** — Add **`/api/v1/mobile/.../tumizi/*`** proxies that call the same libs as web routes with `requireMobileAuth` (not implemented in this repo yet).
+Routes:
 
-### 2) Mobile settings coverage and remaining gap
+| Method | Path | Role |
+|--------|------|------|
+| `GET` | `/api/v1/mobile/dashboard/tumizi/settings` | `tenant_admin`, `tenant_staff` |
+| `POST` | `/api/v1/mobile/dashboard/tumizi/settings` | **`tenant_admin` only** |
+| `GET` | `/api/v1/mobile/dashboard/tumizi/merchant` | `tenant_admin`, `tenant_staff` |
+| `PATCH` | `/api/v1/mobile/dashboard/tumizi/merchant` | **`tenant_admin` only** |
+| `GET` | `/api/v1/mobile/dashboard/tumizi/wallet` | `tenant_admin`, `tenant_staff` |
+| `POST` | `/api/v1/mobile/dashboard/tumizi/wallet/withdrawals` | **`tenant_admin` only** |
+| `GET` | `/api/v1/mobile/dashboard/tumizi/refunds` | `tenant_admin`, `tenant_staff` |
+
+The backend resolves `tenant_id` and `merchant_external_id` server-side, reads the Tumizi partner API key from server env, calls `https://app.tumizi.africa/api/partner/v1/...` through `tumiziClient`, and returns the standard mobile envelope. Flutter must never store or send the Tumizi partner API key.
+
+### 2) Mobile registration / onboarding flow
+
+Use the Tumizi settings endpoint **after** registration and login, not inside the public registration request. The app needs a tenant admin Bearer token before it can provision Tumizi safely.
+
+Recommended Flutter flow when the merchant selects Tumizi:
+
+1. Register the store:
+
+```text
+POST /api/v1/mobile/auth/register
+```
+
+2. Login with the same credentials and store `data.accessToken`:
+
+```text
+POST /api/v1/mobile/auth/login
+```
+
+3. Enable/provision Tumizi:
+
+```http
+POST /api/v1/mobile/dashboard/tumizi/settings
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "enabled": true,
+  "createMerchantIfMissing": true
+}
+```
+
+4. Make Tumizi available in checkout/payment settings:
+
+```http
+PATCH /api/v1/mobile/dashboard/settings
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "payment": {
+    "cashEnabled": true,
+    "mpesaEnabled": false,
+    "tumiziEnabled": true,
+    "paymentMethod": "tumizi"
+  }
+}
+```
+
+Skip steps 3-4 when the merchant does not choose Tumizi. They can enable it later from the native Tumizi settings screen using the same routes.
+
+### 3) Mobile settings coverage
 
 `GET/PATCH /api/v1/mobile/dashboard/settings` now exposes payment parity fields:
 
@@ -107,14 +173,9 @@ Body: `phoneNumber` (required), optional `amount`, `narration`. Used from the **
 - `payment.paymentMethod` (maps to `payment_method`, supports `cash | mpesa | tumizi`)
 - `payment.defaultMethod` (backward-compatible key, also supports `tumizi`)
 
-Remaining gap for full web parity:
+Use the `/dashboard/tumizi/*` routes above for the Tumizi integration snapshot, wallet, withdrawals, and refunds.
 
-- No Tumizi integration snapshot in mobile settings (`merchantExternalId`, wallet account, currency)
-- No dedicated mobile Bearer routes for merchant/wallet/refunds (`/api/v1/mobile/.../tumizi/*`)
-
-For those flows, use WebView on the tenant host (dashboard session), or implement mobile proxy routes.
-
-### 3) Storefront checkout (customer app)
+### 4) Storefront checkout (customer app)
 
 - Host: **storefront tenant domain** (same as web checkout).
 - Read **`payment_tumizi_ready`** from `GET /api/checkout/settings`.
@@ -128,8 +189,8 @@ For those flows, use WebView on the tenant host (dashboard session), or implemen
 |-----|----------------|
 | Settings → Payments: enable/disable cash / M-Pesa / Tumizi + default method | `GET/PATCH /api/v1/mobile/dashboard/settings` (`payment.cashEnabled`, `payment.mpesaEnabled`, `payment.tumiziEnabled`, `payment.paymentMethod/defaultMethod`) |
 | Payments: default method `tumizi` only when offered | Same guard as `tumiziOfferedForValidation` |
-| Settings → Tumizi: master switch | `POST /api/tumizi/settings` `{ enabled, createMerchantIfMissing? }` — **admin only** |
-| Tumizi tab: merchant / wallet / refunds | `GET`/`PATCH` `/api/tumizi/merchant`, `GET`/`POST` `/api/tumizi/wallet`, `GET /api/tumizi/refunds` — session auth |
+| Settings → Tumizi: master switch | `GET/POST /api/v1/mobile/dashboard/tumizi/settings` `{ enabled, createMerchantIfMissing? }` — **admin only for POST** |
+| Tumizi tab: merchant / wallet / refunds | Native Bearer routes: `GET/PATCH /api/v1/mobile/dashboard/tumizi/merchant`, `GET /api/v1/mobile/dashboard/tumizi/wallet`, `POST /api/v1/mobile/dashboard/tumizi/wallet/withdrawals`, `GET /api/v1/mobile/dashboard/tumizi/refunds` |
 | Order detail: initiate Tumizi payment | `POST /api/orders/:id/tumizi/initiate-payment` |
 
 ---
@@ -142,6 +203,7 @@ For those flows, use WebView on the tenant host (dashboard session), or implemen
 | Checkout gate + initiate | `src/app/api/checkout/route.ts`, `src/lib/tumizi/initiate-order-payment.ts` |
 | Web settings + Tumizi tab | `src/app/dashboard/settings/tenant-settings-client.tsx` |
 | Tumizi dashboard | `src/app/dashboard/tumizi/tumizi-dashboard-client.tsx` |
+| Mobile Tumizi API routes | `src/app/api/v1/mobile/dashboard/tumizi/*` |
 | Webhook | `src/app/api/tumizi/webhook/route.ts` |
 
 ---
@@ -150,4 +212,4 @@ For those flows, use WebView on the tenant host (dashboard session), or implemen
 
 - **Checkout readiness** for customers = **`payment_tumizi_ready`** (`GET /api/checkout/settings`).
 - **Merchant configuration** = **`/api/tumizi/settings`** + **Payments** block in **`/api/dashboard/settings`**.
-- **Native mobile** can now mirror Tumizi payment toggles/default from **`/api/v1/mobile/dashboard/settings`**, and should use **WebView + tenant session** for Tumizi-heavy screens (merchant/wallet/refunds) until Bearer-based mobile Tumizi routes are added.
+- **Native mobile** can mirror Tumizi payment toggles/default from **`/api/v1/mobile/dashboard/settings`** and Tumizi settings/merchant/wallet/refunds from **`/api/v1/mobile/dashboard/tumizi/*`** with the existing mobile Bearer token.

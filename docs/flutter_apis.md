@@ -23,6 +23,7 @@ Companion docs: [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) (pagi
 3. **New store has no products** — Expected after registration: the server uses a **clean catalog** (no demo seeding). Send **`businessType`** / **`selling`** if you want better theme defaults; add products later from the dashboard or other APIs. Same behavior for **`POST /api/v1/mobile/auth/register`** and **`POST /api/tenants/register`** (see `docs/API_MULTI_STORE_CHANGES.md`).
 4. **Cold start** — Call **`GET /auth/me`** with the access token to restore **`user`** + **`tenant`** context; use **`POST /auth/refresh`** when the access token expires.
 5. **After store registration** — On **`201`** from **`POST /auth/register`**, read **`data.loginUrl`** (see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect*). Open it in a browser or in-app WebView when you want the merchant to use the web dashboard login on the tenant host. For an in-app API-only session, ignore **`loginUrl`** and call **`POST /auth/login`** with the same email/password as usual.
+6. **If the merchant chooses Tumizi during mobile onboarding** — First complete registration, then login and use the returned `accessToken`. Call **`POST /api/v1/mobile/dashboard/tumizi/settings`** with `{ "enabled": true, "createMerchantIfMissing": true }`, then optionally call **`PATCH /api/v1/mobile/dashboard/settings`** to set `payment.tumiziEnabled: true` and `payment.paymentMethod: "tumizi"`.
 
 ---
 
@@ -108,6 +109,13 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | GET | `/dashboard/settings` | Read store identity, currency, shipping, payment, tax snapshot (`tenant_admin` + `tenant_staff`) |
 | PATCH | `/dashboard/settings` | Partial update; body mirrors GET `data` shape (nested `store`, `currency`, `shipping`, `payment`, `tax`); **`tenant_admin` only** |
 | POST | `/dashboard/settings/delete-account` | Account deletion |
+| GET | `/dashboard/tumizi/settings` | Tumizi integration config snapshot |
+| POST | `/dashboard/tumizi/settings` | Enable/disable Tumizi; can create merchant if missing; **`tenant_admin` only** |
+| GET | `/dashboard/tumizi/merchant` | Tumizi merchant + wallet snapshot (`tenant_admin` + `tenant_staff`) |
+| PATCH | `/dashboard/tumizi/merchant` | Update Tumizi merchant/owner/wallet fields; **`tenant_admin` only** |
+| GET | `/dashboard/tumizi/wallet` | Wallet balance, withdrawal limits/charges, recent withdrawals |
+| POST | `/dashboard/tumizi/wallet/withdrawals` | Request wallet withdrawal to Kenya M-Pesa; **`tenant_admin` only** |
+| GET | `/dashboard/tumizi/refunds` | Tumizi refund log |
 | GET | `/notifications/list` | In-app notifications |
 | POST | `/notifications/register-device` | FCM token |
 | GET | `/notifications/preferences` | |
@@ -128,7 +136,37 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 
 **Settings write parity:** `PATCH /dashboard/settings` updates `static_options` + `tenants` (`name`, `contact_email`, `data.business_type` / `data.selling`) for fields the mobile GET exposes. At least one of cash or M-Pesa must remain enabled if the client sends `payment` fields.
 
-**Tumizi (M-Pesa via Tumizi) — web vs mobile:** Web exposes Tumizi under **Settings → Payments** (`payment_tumizi_enabled`, default method `tumizi`) and **Settings → Tumizi** (`/api/tumizi/settings`, `/api/tumizi/merchant`, wallet, refunds). Those Tumizi routes use **dashboard session cookies**, not the mobile Bearer token. Mobile `GET/PATCH /dashboard/settings` now includes Tumizi payment parity fields (`payment.tumiziEnabled`, `payment.paymentMethod`, and `payment.defaultMethod` supports `tumizi`), but does not include full Tumizi merchant/wallet/refund objects. For a full parity map (checkout `payment_tumizi_ready`, order initiate-payment, WebView option), see **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)**.
+**Tumizi (M-Pesa via Tumizi) — web vs mobile:** Web exposes Tumizi under **Settings → Payments** (`payment_tumizi_enabled`, default method `tumizi`) and **Settings → Tumizi** (`/api/tumizi/settings`, `/api/tumizi/merchant`, wallet, refunds). Mobile `GET/PATCH /dashboard/settings` includes Tumizi payment parity fields (`payment.tumiziEnabled`, `payment.paymentMethod`, and `payment.defaultMethod` supports `tumizi`). Native mobile Tumizi screens should use the Bearer-token routes under `/api/v1/mobile/dashboard/tumizi/*`; Flutter must never store or send the Tumizi partner API key. For a full parity map (checkout `payment_tumizi_ready`, order initiate-payment, native route contract), see **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)**.
+
+### Mobile registration + Tumizi onboarding flow
+
+If the merchant selects Tumizi during the mobile registration/onboarding flow:
+
+1. Register the store with **`POST /api/v1/mobile/auth/register`**.
+2. Login with **`POST /api/v1/mobile/auth/login`** and store `data.accessToken`.
+3. Enable/provision Tumizi with **`POST /api/v1/mobile/dashboard/tumizi/settings`**:
+
+```json
+{
+  "enabled": true,
+  "createMerchantIfMissing": true
+}
+```
+
+4. Set Tumizi as an offered/default payment method with **`PATCH /api/v1/mobile/dashboard/settings`**:
+
+```json
+{
+  "payment": {
+    "cashEnabled": true,
+    "mpesaEnabled": false,
+    "tumiziEnabled": true,
+    "paymentMethod": "tumizi"
+  }
+}
+```
+
+Use this only when the merchant explicitly wants Tumizi. If they choose Cash or direct M-Pesa only, skip the Tumizi settings call and configure those payment methods through `/dashboard/settings`.
 
 ### Mobile settings JSON examples (Flutter)
 
