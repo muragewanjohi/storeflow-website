@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
+import { getDaysUntil, getTrialDaysRemaining, isInTrialPeriod } from '@/lib/subscriptions/trial';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,6 +25,36 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const tenantRow = await prisma.tenants.findFirst({
+      where: { id: user.tenant_id, deleted_at: null },
+      select: {
+        status: true,
+        start_date: true,
+        expire_date: true,
+        plan_id: true,
+        price_plans: {
+          select: {
+            id: true,
+            name: true,
+            trial_days: true,
+          },
+        },
+      },
+    });
+
+    if (!tenantRow) {
+      return NextResponse.json(mobileError('NOT_FOUND', 'Tenant not found'), { status: 404 });
+    }
+
+    const trialDays = tenantRow.price_plans?.trial_days ?? null;
+    const startDateIso = tenantRow.start_date?.toISOString() ?? null;
+    const expireDateIso = tenantRow.expire_date?.toISOString() ?? null;
+    const trialDaysRemaining = getTrialDaysRemaining({
+      trialDays,
+      startDate: tenantRow.start_date,
+      expireDate: tenantRow.expire_date,
+    });
 
     const [
       totalProducts,
@@ -121,6 +152,21 @@ export async function GET(request: NextRequest) {
           paymentStatus: order.payment_status ?? 'pending',
           createdAt: order.created_at?.toISOString() ?? null,
         })),
+        subscription: {
+          status: tenantRow.status ?? 'active',
+          planId: tenantRow.plan_id,
+          planName: tenantRow.price_plans?.name ?? null,
+          trialDays,
+          trialDaysRemaining,
+          inTrial: isInTrialPeriod({
+            trialDays,
+            startDate: tenantRow.start_date,
+            expireDate: tenantRow.expire_date,
+          }),
+          startDate: startDateIso,
+          expireDate: expireDateIso,
+          daysUntilExpire: expireDateIso ? getDaysUntil(expireDateIso) : null,
+        },
       }),
       { status: 200 },
     );

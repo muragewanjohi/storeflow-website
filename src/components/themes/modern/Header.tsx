@@ -64,7 +64,7 @@ export default function ModernHeader() {
   const navigation = [
     { name: 'Home', href: '/' },
     { name: 'Products', href: '/products' },
-    { name: 'Categories', href: '/products?category=all' },
+    { name: 'Categories', href: '/products' },
     { name: 'Support', href: '/support' },
   ];
 

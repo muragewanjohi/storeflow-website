@@ -151,7 +151,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                           }}
                           onClick={(e) => {
                             e.preventDefault();
-                            onNavigate('/products?category=pure-fruits');
+                            onNavigate('/collections/pure-fruits');
                           }}
                         >
                           Buy Now
@@ -161,7 +161,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                           backgroundColor: 'hsl(var(--primary))',
                           color: 'hsl(var(--primary-foreground))',
                         }} asChild>
-                          <Link href="/products?category=pure-fruits">Buy Now</Link>
+                          <Link href="/collections/pure-fruits">Buy Now</Link>
                         </Button>
                       )}
                     </div>
@@ -193,7 +193,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                           }}
                           onClick={(e) => {
                             e.preventDefault();
-                            onNavigate('/products?category=vegetables');
+                            onNavigate('/collections/vegetables');
                           }}
                         >
                           Buy Now
@@ -203,7 +203,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                           backgroundColor: 'hsl(var(--primary))',
                           color: 'hsl(var(--primary-foreground))',
                         }} asChild>
-                          <Link href="/products?category=vegetables">Buy Now</Link>
+                          <Link href="/collections/vegetables">Buy Now</Link>
                         </Button>
                       )}
                     </div>
@@ -242,7 +242,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          onNavigate(`/products?category=${category.slug}`);
+                          onNavigate(`/collections/${category.slug}`);
                         }}
                         className="w-full text-center group"
                       >
@@ -266,7 +266,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                         </p>
                       </button>
                     ) : (
-                      <Link href={`/products?category=${category.slug}`} className="block text-center group">
+                      <Link href={`/collections/${category.slug}`} className="block text-center group">
                         <div className="relative mb-4">
                           <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-primary/20 group-hover:border-primary transition-colors relative">
                             <Image
@@ -323,7 +323,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     }}
                     onClick={(e) => {
                       e.preventDefault();
-                      onNavigate('/products?category=pure-fruits');
+                      onNavigate('/collections/pure-fruits');
                     }}
                   >
                     Buy Now
@@ -333,7 +333,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     backgroundColor: 'hsl(var(--primary))',
                     color: 'hsl(var(--primary-foreground))',
                   }} asChild>
-                    <Link href="/products?category=pure-fruits">Buy Now</Link>
+                    <Link href="/collections/pure-fruits">Buy Now</Link>
                   </Button>
                 )}
               </div>
@@ -363,7 +363,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     }}
                     onClick={(e) => {
                       e.preventDefault();
-                      onNavigate('/products?category=vegetables');
+                      onNavigate('/collections/vegetables');
                     }}
                   >
                     Buy Now
@@ -373,7 +373,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                     backgroundColor: 'hsl(var(--primary))',
                     color: 'hsl(var(--primary-foreground))',
                   }} asChild>
-                    <Link href="/products?category=vegetables">Buy Now</Link>
+                    <Link href="/collections/vegetables">Buy Now</Link>
                   </Button>
                 )}
               </div>
@@ -579,7 +579,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                       }}
                       onClick={(e) => {
                         e.preventDefault();
-                        onNavigate('/products?category=vegetables');
+                        onNavigate('/collections/vegetables');
                       }}
                     >
                       Order Now
@@ -589,7 +589,7 @@ function GroceryHomepage({ products = [], categories = [] }: GroceryHomepageProp
                       backgroundColor: 'hsl(var(--primary))',
                       color: 'hsl(var(--primary-foreground))',
                     }} asChild>
-                      <Link href="/products?category=vegetables">Order Now</Link>
+                      <Link href="/collections/vegetables">Order Now</Link>
                     </Button>
                   )}
                 </div>

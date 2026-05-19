@@ -1133,7 +1133,11 @@ function CategoriesSectionComponent({
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/products?category=${category.slug || category.id}`}
+                href={
+                  category.slug
+                    ? `/collections/${encodeURIComponent(category.slug)}`
+                    : `/products?category=${encodeURIComponent(category.id)}`
+                }
                 className="block text-center group"
               >
                 <div className="relative mb-4">

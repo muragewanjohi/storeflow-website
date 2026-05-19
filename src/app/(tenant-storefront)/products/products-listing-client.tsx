@@ -9,7 +9,13 @@
 
 import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  HomeIcon,
+} from '@heroicons/react/24/outline';
 import { loadThemeProductCard } from '@/lib/themes/theme-loader';
 import DefaultProductCard from '@/components/themes/default/ProductCard';
 import { Button } from '@/components/ui/button';
@@ -18,6 +24,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { useCurrency } from '@/lib/currency/currency-context';
+import {
+  appendQueryString,
+  getCategoryCollectionHref,
+  getCollectionPath,
+  type StorefrontCollectionRef,
+} from '@/lib/storefront/collection-urls';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -45,14 +58,20 @@ interface ProductsListingClientProps {
   initialSortOrder?: string;
   currentCategory?: any;
   themeSlug?: string;
+  /** When set, listing is scoped to this collection (/collections/:slug). */
+  collection?: StorefrontCollectionRef | null;
 }
 
 function ProductsListingClient({
   themeSlug = 'default',
+  collection = null,
 }: Readonly<ProductsListingClientProps>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currency } = useCurrency();
+
+  const listBasePath = collection ? getCollectionPath(collection.slug) : '/products';
+  const pageTitle = collection ? collection.name : 'Products';
   
   // Get pagination and sort params from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
@@ -176,21 +195,23 @@ function ProductsListingClient({
     }
   }, [searchParams]);
 
-  // Initialize filters from URL on mount
+  // Initialize filters from URL on mount (collection pages use path slug, not ?category=)
   useEffect(() => {
-    // Read category filters from URL
-    const categoryParam = searchParams.get('category');
-    if (categoryParam) {
-      const categoryIds = categoryParam.split(',').map(id => id.trim()).filter(Boolean);
-      setSelectedCategories(new Set(categoryIds));
+    if (collection) {
+      setSelectedCategories(new Set([collection.id]));
+    } else {
+      const categoryParam = searchParams.get('category');
+      if (categoryParam) {
+        const categoryIds = categoryParam.split(',').map((id) => id.trim()).filter(Boolean);
+        setSelectedCategories(new Set(categoryIds));
+      }
     }
-    
-    // Read attribute filters from URL
+
     const attrFilters: Record<string, Set<string>> = {};
     for (const [key, value] of searchParams.entries()) {
       if (key.startsWith('attr_')) {
         const attributeId = key.replace('attr_', '');
-        const valueIds = value.split(',').map(id => id.trim()).filter(Boolean);
+        const valueIds = value.split(',').map((id) => id.trim()).filter(Boolean);
         if (valueIds.length > 0) {
           attrFilters[attributeId] = new Set(valueIds);
         }
@@ -198,19 +219,28 @@ function ProductsListingClient({
     }
     setSelectedAttributes(attrFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount - searchParams is intentionally excluded
+  }, [collection?.id]);
 
   // Fetch products when page, limit, sort, or filters change
   useEffect(() => {
-    // Convert selected filters to arrays for API
-    const categoryIds = Array.from(selectedCategories);
+    const categoryIds = collection
+      ? [collection.id]
+      : Array.from(selectedCategories);
     const attributeFilters: Record<string, string[]> = {};
     for (const [attributeId, valueIds] of Object.entries(selectedAttributes)) {
       attributeFilters[attributeId] = Array.from(valueIds);
     }
     
     fetchProducts(currentPage, currentLimit, currentSort, categoryIds, attributeFilters);
-  }, [currentPage, currentLimit, currentSort, selectedCategories, selectedAttributes, fetchProducts]);
+  }, [
+    currentPage,
+    currentLimit,
+    currentSort,
+    selectedCategories,
+    selectedAttributes,
+    fetchProducts,
+    collection?.id,
+  ]);
 
   // Fetch categories and attributes on mount
   useEffect(() => {
@@ -291,39 +321,43 @@ function ProductsListingClient({
       params.delete('page');
     }
     
-    router.push(`/products?${params.toString()}`);
-  }, [searchParams, router]);
+    router.push(appendQueryString(listBasePath, params));
+  }, [searchParams, router, listBasePath]);
+
+  const buildFilterDestination = useCallback(
+    (categoryIds: string[], attributeFilters: Record<string, string[]>) => {
+      const params = new URLSearchParams();
+
+      for (const [attributeId, valueIds] of Object.entries(attributeFilters)) {
+        if (valueIds.length > 0) {
+          params.append(`attr_${attributeId}`, valueIds.join(','));
+        }
+      }
+
+      if (categoryIds.length === 0) {
+        return appendQueryString('/products', params);
+      }
+
+      if (categoryIds.length === 1) {
+        const cat = categories.find((c) => c.id === categoryIds[0]);
+        if (cat?.slug) {
+          return appendQueryString(getCollectionPath(cat.slug), params);
+        }
+      }
+
+      params.set('category', categoryIds.join(','));
+      return appendQueryString('/products', params);
+    },
+    [categories],
+  );
 
   // Update URL with filter changes
-  const updateFilters = useCallback((categoryIds: string[], attributeFilters: Record<string, string[]>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    // Update category filter
-    if (categoryIds.length > 0) {
-      params.set('category', categoryIds.join(','));
-    } else {
-      params.delete('category');
-    }
-    
-    // Remove all existing attribute filters
-    for (const key of params.keys()) {
-      if (key.startsWith('attr_')) {
-        params.delete(key);
-      }
-    }
-    
-    // Add new attribute filters
-    for (const [attributeId, valueIds] of Object.entries(attributeFilters)) {
-      if (valueIds.length > 0) {
-        params.append(`attr_${attributeId}`, valueIds.join(','));
-      }
-    }
-    
-    // Reset to page 1 when filters change
-    params.delete('page');
-    
-    router.push(`/products?${params.toString()}`);
-  }, [searchParams, router]);
+  const updateFilters = useCallback(
+    (categoryIds: string[], attributeFilters: Record<string, string[]>) => {
+      router.push(buildFilterDestination(categoryIds, attributeFilters));
+    },
+    [router, buildFilterDestination],
+  );
 
   // Handle category checkbox change
   const handleCategoryChange = useCallback((categoryId: string, checked: boolean) => {
@@ -421,7 +455,7 @@ function ProductsListingClient({
   if (isLoading && products.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6">Products</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6">{pageTitle}</h1>
         <div className="text-center py-12">
           <p className="text-lg text-muted-foreground">Loading products...</p>
         </div>
@@ -432,7 +466,7 @@ function ProductsListingClient({
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6">Products</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-6">{pageTitle}</h1>
         <div className="text-center py-12">
           <p className="text-lg text-red-600">Error: {error}</p>
           <Button 
@@ -529,7 +563,17 @@ function ProductsListingClient({
                             className="text-sm text-gray-700 cursor-pointer flex-1"
                             onClick={() => handleCategoryChange(category.id, !isChecked)}
                           >
-                            {category.name}
+                            {category.slug ? (
+                              <Link
+                                href={getCategoryCollectionHref(category)}
+                                className="hover:text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {category.name}
+                              </Link>
+                            ) : (
+                              category.name
+                            )}
                           </Label>
                         </div>
                       );
@@ -609,7 +653,24 @@ function ProductsListingClient({
           {/* Header with results count and per-page selector */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">Products</h1>
+          {collection && (
+            <nav
+              className="flex items-center gap-2 text-sm text-muted-foreground mb-3"
+              aria-label="Breadcrumb"
+            >
+              <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
+                <HomeIcon className="h-4 w-4" />
+                <span>Home</span>
+              </Link>
+              <ChevronRightIcon className="h-4 w-4" />
+              <Link href="/products" className="hover:text-foreground transition-colors">
+                Products
+              </Link>
+              <ChevronRightIcon className="h-4 w-4" />
+              <span className="text-foreground font-medium">{collection.name}</span>
+            </nav>
+          )}
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">{pageTitle}</h1>
           {total > 0 && (
             <p className="text-sm text-muted-foreground">
               Showing {startItem}-{endItem} of {total} products

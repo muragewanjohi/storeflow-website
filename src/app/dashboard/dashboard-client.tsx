@@ -56,6 +56,7 @@ import {
 import { format, subDays } from 'date-fns';
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { getTrialDaysRemaining } from '@/lib/subscriptions/trial';
 
 interface DashboardClientProps {
   tenantName: string;
@@ -352,16 +353,11 @@ export default function DashboardClient({
     }
   };
 
-  // Trial days remaining (only when in trial period)
-  const trialDaysRemaining = (() => {
-    const trialDays = planInfo?.trial_days;
-    if (!trialDays || trialDays <= 0 || !startDate) return null;
-    const start = new Date(startDate);
-    const now = new Date();
-    const daysSinceStart = Math.floor((now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    if (daysSinceStart >= trialDays) return null; // Trial over
-    return Math.max(0, trialDays - daysSinceStart);
-  })();
+  const trialDaysRemaining = getTrialDaysRemaining({
+    trialDays: planInfo?.trial_days,
+    startDate,
+    expireDate,
+  });
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {

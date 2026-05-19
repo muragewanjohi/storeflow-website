@@ -16,6 +16,7 @@ import { GET as cleanupGET } from '../cleanup/route';
 import { GET as hardDeleteTenantsGET } from '../cleanup/hard-delete-tenants/route';
 import { GET as salesAutomateGET } from '../sales/automate/route';
 import { GET as tumiziProvisionPendingGET } from '../integrations/tumizi/provision-pending/route';
+import { GET as tumiziSyncPendingPaymentsGET } from '../integrations/tumizi/sync-pending-payments/route';
 
 /**
  * GET /api/admin/cron-jobs
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
       },
       '/api/admin/sales/automate': salesAutomateGET,
       '/api/admin/integrations/tumizi/provision-pending': tumiziProvisionPendingGET,
+      '/api/admin/integrations/tumizi/sync-pending-payments': tumiziSyncPendingPaymentsGET,
     };
 
     const handler = jobHandlers[jobPath];

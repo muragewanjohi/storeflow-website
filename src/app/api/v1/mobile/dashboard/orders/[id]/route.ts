@@ -224,6 +224,16 @@ export async function PATCH(
     }
 
     if (body.payment_status) {
+      if (existingOrder.payment_gateway === 'tumizi') {
+        return NextResponse.json(
+          mobileError(
+            'BAD_REQUEST',
+            'Tumizi payment status is synced automatically from Tumizi. Refresh payment status instead of updating manually.',
+          ),
+          { status: 400 },
+        );
+      }
+
       if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
         return NextResponse.json(
           mobileError(

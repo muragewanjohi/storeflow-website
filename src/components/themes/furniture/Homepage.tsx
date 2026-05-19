@@ -98,7 +98,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
             {['Dining', 'Living', 'Bedroom'].map((category, index) => (
               <Link
                 key={category}
-                href={`/products?category=${category.toLowerCase()}`}
+                href={`/collections/${encodeURIComponent(category.toLowerCase())}`}
                 className="group"
               >
                 <div className="relative h-[550px] md:h-[600px] rounded-lg overflow-hidden mb-4">

@@ -7,11 +7,17 @@
  */
 
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import {
+  appendQueryString,
+  getCollectionPath,
+  parseSingleCategorySlugFromProductsQuery,
+} from '@/lib/storefront/collection-urls';
 
 /**
  * Caching Strategy: Dynamic Rendering with Response Caching
@@ -63,8 +69,28 @@ export default async function ProductsPage({
   let total = 0;
   let categories: any[] = [];
 
-  // Get initial products
   const params = await searchParams;
+
+  const categorySlug = parseSingleCategorySlugFromProductsQuery(
+    typeof params.category === 'string' ? params.category : undefined,
+  );
+  if (categorySlug) {
+    const redirectParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'category') {
+        continue;
+      }
+      if (typeof value === 'string') {
+        redirectParams.set(key, value);
+      } else if (Array.isArray(value)) {
+        for (const item of value) {
+          redirectParams.append(key, item);
+        }
+      }
+    }
+    redirect(appendQueryString(getCollectionPath(categorySlug), redirectParams));
+  }
+
   const page = parseInt(params.page as string) || 1;
   const limit = 12;
   const search = (params.search as string) || '';

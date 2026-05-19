@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 import { findTenantIdByTumiziMerchantExternalId } from '@/lib/tumizi/config';
+import { applyTumiziCustomerPaymentStatus } from '@/lib/tumizi/apply-payment-status';
 import {
-  mapTumiziEventToOrderPaymentStatus,
   normalizeTumiziEventPayload,
   shouldProcessTumiziWebhookEvent,
 } from '@/lib/tumizi/webhook';
@@ -77,67 +77,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ignored: true, reason: 'tenant_not_found' });
     }
 
-    const paymentLog = await prisma.payment_logs.findFirst({
-      where: {
-        tenant_id: tenantId,
-        gateway: {
-          in: ['tumizi_customer_payment', 'tumizi_withdrawal', 'tumizi_refund'],
-        },
-        OR: [
-          { payment_id: normalized.externalReference },
-          { transaction_id: normalized.externalReference },
-        ],
-      },
-      include: {
-        tenants: {
-          select: { id: true },
-        },
-      },
+    const applyResult = await applyTumiziCustomerPaymentStatus({
+      tenantId,
+      externalReference: normalized.externalReference,
+      tumiziStatus: normalized.status,
+      transactionReference: normalized.transactionReference,
+      event: normalized.event,
+      rawPayload: normalized.raw,
     });
 
-    if (!paymentLog) {
+    if (!applyResult.applied) {
       await prisma.tumizi_webhook_events.update({
         where: { id: webhookEvent.id },
         data: {
           processing_status: 'ignored',
-          processing_error: 'payment_log_not_found',
+          processing_error: applyResult.reason ?? 'payment_log_not_found',
           processed_at: new Date(),
         },
       });
-      return NextResponse.json({ success: true, ignored: true, reason: 'payment_log_not_found' });
-    }
-
-    const mappedStatus = mapTumiziEventToOrderPaymentStatus(normalized.event, normalized.status);
-    const orderPaymentStatus =
-      normalized.event === 'partner.refund.updated' && mappedStatus !== 'refunded'
-        ? 'paid'
-        : mappedStatus;
-    const metadata = (paymentLog.metadata ?? {}) as Record<string, unknown>;
-
-    await prisma.payment_logs.update({
-      where: { id: paymentLog.id },
-      data: {
-        status: mappedStatus === 'paid' || mappedStatus === 'refunded' ? 'completed' : mappedStatus,
-        transaction_id: normalized.transactionReference || paymentLog.transaction_id,
-        metadata: {
-          ...metadata,
-          tumizi_event: normalized.event,
-          tumizi_status: normalized.status,
-          tumizi_webhook_received_at: new Date().toISOString(),
-          tumizi_payload: normalized.raw,
-        } as any,
-      },
-    });
-
-    const orderId = typeof metadata.order_id === 'string' ? metadata.order_id : undefined;
-    if (orderId) {
-      await prisma.orders.updateMany({
-        where: { id: orderId, tenant_id: tenantId },
-        data: {
-          payment_status: orderPaymentStatus,
-          transaction_id: normalized.transactionReference || paymentLog.transaction_id,
-          payment_gateway: 'tumizi',
-        },
+      return NextResponse.json({
+        success: true,
+        ignored: true,
+        reason: applyResult.reason ?? 'payment_log_not_found',
       });
     }
 

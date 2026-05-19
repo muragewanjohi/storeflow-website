@@ -20,6 +20,8 @@ import { RatingDisplay } from '@/components/storefront/rating-display';
 import ProductShareButtons from '@/components/storefront/product-share-buttons';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { sanitizeHtmlForDisplay } from '@/lib/security/sanitize-html';
+import { getDefaultVariantLabel } from '@/lib/products/variant-helpers';
+import { getCollectionPath } from '@/lib/storefront/collection-urls';
 
 interface ProductVariant {
   id: string;
@@ -73,16 +75,23 @@ interface RelatedProduct {
   stock_quantity: number | null;
 }
 
+interface ProductCategoryBreadcrumb {
+  name: string;
+  slug: string;
+}
+
 interface ProductDetailClientProps {
   product: Product;
   relatedProducts: RelatedProduct[];
   defaultEstimatedDeliveryDays?: number | null;
+  category?: ProductCategoryBreadcrumb | null;
 }
 
 export default function ProductDetailClient({
   product,
   relatedProducts,
   defaultEstimatedDeliveryDays,
+  category = null,
 }: Readonly<ProductDetailClientProps>) {
   const { formatCurrency, currency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
@@ -232,6 +241,17 @@ export default function ProductDetailClient({
         <Link href="/products" className="hover:text-foreground transition-colors">
           Products
         </Link>
+        {category && (
+          <>
+            <ChevronRightIcon className="h-4 w-4" />
+            <Link
+              href={getCollectionPath(category.slug)}
+              className="hover:text-foreground transition-colors"
+            >
+              {category.name}
+            </Link>
+          </>
+        )}
         <ChevronRightIcon className="h-4 w-4" />
         <span className="text-foreground font-medium">{product.name}</span>
       </nav>
@@ -385,6 +405,7 @@ export default function ProductDetailClient({
                   const variantDetails = variant.variant_attributes
                     .map((va: any) => `${va.attributes.name}: ${va.attribute_values.value}`)
                     .join(', ');
+                  const defaultVariantLabel = getDefaultVariantLabel(variant.id);
 
                   return (
                     <button
@@ -414,7 +435,7 @@ export default function ProductDetailClient({
                           <div className="relative w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
                             <Image
                               src={variantImage}
-                              alt={variantDetails || `Variant ${variant.id.slice(0, 8)}`}
+                              alt={variantDetails || defaultVariantLabel}
                               fill
                               className="object-cover"
                               quality={90}
@@ -454,7 +475,7 @@ export default function ProductDetailClient({
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-sm font-medium">Variant {variant.id.slice(0, 8)}</span>
+                                <span className="text-sm font-medium">{defaultVariantLabel}</span>
                               )}
                               {variant.sku && (
                                 <p className="text-xs text-muted-foreground mt-1">SKU: {variant.sku}</p>

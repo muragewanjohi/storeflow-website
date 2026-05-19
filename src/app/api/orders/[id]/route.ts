@@ -251,6 +251,16 @@ export async function PUT(
 
     // Update payment status if provided
     if (body.payment_status) {
+      if (existingOrder.payment_gateway === 'tumizi') {
+        return NextResponse.json(
+          {
+            error:
+              'Tumizi payment status is updated automatically when the customer pays. Use "Refresh from Tumizi" on the order page.',
+          },
+          { status: 400 },
+        );
+      }
+
       // Prevent payment status updates for out-of-zone orders until delivery fee is approved
       if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
         return NextResponse.json(

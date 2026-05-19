@@ -102,6 +102,7 @@ export default function OrderConfirmationClient({
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState(order.payment_status);
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
@@ -110,7 +111,9 @@ export default function OrderConfirmationClient({
   const trackingNumber = order.order_details?.tracking_number || null;
   const shippingCarrier = order.order_details?.shipping_carrier || null;
   const isShipped = order.status?.toLowerCase() === 'shipped';
-  const isPaid = order.payment_status?.toLowerCase() === 'paid';
+  const isPaid = paymentStatus?.toLowerCase() === 'paid';
+  const isTumiziOrder = order.payment_gateway === 'tumizi';
+  const isTumiziPaymentPending = isTumiziOrder && paymentStatus === 'pending';
 
   // Handle approve delivery quote
   const handleApproveQuote = async () => {
@@ -205,6 +208,44 @@ export default function OrderConfirmationClient({
       setShowCancelDialog(false);
     }
   };
+
+  // Poll Tumizi for payment confirmation (STK push) after checkout
+  useEffect(() => {
+    if (!isTumiziOrder || paymentStatus === 'paid' || paymentStatus === 'failed') {
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 24;
+
+    const syncTumiziPayment = async () => {
+      const query = window.location.search.replace(/^\?/, '');
+      const url = `/api/orders/${order.id}/tumizi/sync-payment${query ? `?${query}` : ''}`;
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (response.ok && data.success && data.payment_status) {
+          setPaymentStatus(data.payment_status);
+          if (data.payment_status === 'paid') {
+            toast.success('Payment received. Thank you!');
+          }
+        }
+      } catch (error) {
+        console.error('[Order confirmation] Tumizi sync failed:', error);
+      }
+    };
+
+    void syncTumiziPayment();
+    const interval = setInterval(() => {
+      attempts += 1;
+      void syncTumiziPayment();
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [order.id, isTumiziOrder, paymentStatus]);
 
   // Check review status for all products in order
   useEffect(() => {
@@ -316,10 +357,23 @@ export default function OrderConfirmationClient({
                 <div>
                   <h1 className="text-2xl font-bold text-green-900">Order Confirmed!</h1>
                   <p className="text-green-700">
-                    Thank you for your order. We&apos;ve received your order and will begin processing it right away.
+                    {isTumiziPaymentPending
+                      ? 'Complete the M-Pesa prompt on your phone. We will confirm payment automatically.'
+                      : 'Thank you for your order. We&apos;ve received your order and will begin processing it right away.'}
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {isTumiziPaymentPending && (
+          <Card className="mb-6 border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <p className="text-sm text-amber-900">
+                Waiting for M-Pesa payment via Tumizi. This page updates automatically when payment is
+                confirmed—no need to enter a transaction code.
+              </p>
             </CardContent>
           </Card>
         )}
@@ -386,7 +440,7 @@ export default function OrderConfirmationClient({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Payment Status</p>
-                    <p className="font-semibold capitalize">{order.payment_status}</p>
+                    <p className="font-semibold capitalize">{paymentStatus}</p>
                   </div>
                 </div>
               </CardContent>

@@ -8,6 +8,7 @@ import { cache } from '@/lib/cache/simple-cache';
 
 const SETTINGS_KEYS = [
   'store_description',
+  'store_logo',
   'store_phone',
   'store_phone_2',
   'store_phone_3',
@@ -58,6 +59,7 @@ type MobileSettingsPayload = {
     domain: string;
     contactEmail: string | null;
     description: string | null;
+    logo: string | null;
     phone: string | null;
     phone2: string | null;
     phone3: string | null;
@@ -130,6 +132,10 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
       domain: tenant.custom_domain || `${tenant.subdomain}.dukanest.com`,
       contactEmail: tenant.contact_email,
       description: options.store_description,
+      logo:
+        options.store_logo && options.store_logo.trim() !== ''
+          ? options.store_logo.trim()
+          : null,
       phone: options.store_phone,
       phone2: options.store_phone_2 ?? null,
       phone3: options.store_phone_3 ?? null,
@@ -183,6 +189,7 @@ const mobileSettingsPatchSchema = z.object({
       name: z.string().min(1).optional(),
       contactEmail: z.string().email().optional(),
       description: z.string().nullable().optional(),
+      logo: z.string().nullable().optional(),
       phone: z.string().nullable().optional(),
       phone2: z.string().nullable().optional(),
       phone3: z.string().nullable().optional(),
@@ -331,6 +338,10 @@ export async function PATCH(request: NextRequest) {
       if (s.name !== undefined) tenantName = s.name;
       if (s.contactEmail !== undefined) tenantContactEmail = s.contactEmail;
       if (s.description !== undefined) optionsToSave.store_description = s.description;
+      if (s.logo !== undefined) {
+        optionsToSave.store_logo =
+          s.logo === null || s.logo.trim() === '' ? null : s.logo.trim();
+      }
       if (s.phone !== undefined) optionsToSave.store_phone = storePhoneDigitsOrNull(s.phone);
       if (s.phone2 !== undefined) optionsToSave.store_phone_2 = storePhoneDigitsOrNull(s.phone2);
       if (s.phone3 !== undefined) optionsToSave.store_phone_3 = storePhoneDigitsOrNull(s.phone3);

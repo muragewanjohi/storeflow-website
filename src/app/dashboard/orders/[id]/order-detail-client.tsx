@@ -117,6 +117,34 @@ export default function OrderDetailClient({
     order?.delivery_fee_notes || ''
   );
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+  const [isSyncingTumizi, setIsSyncingTumizi] = useState(false);
+
+  const isTumiziOrder = order?.payment_gateway === 'tumizi';
+
+  const handleTumiziPaymentSync = async () => {
+    if (!order) return;
+    setIsSyncingTumizi(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/tumizi/sync-payment`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setOrder({ ...order, payment_status: data.payment_status });
+        setNewPaymentStatus(data.payment_status || order.payment_status || 'pending');
+        toast.success(
+          data.payment_status === 'paid'
+            ? 'Payment confirmed via Tumizi'
+            : 'Payment status refreshed from Tumizi',
+        );
+        router.refresh();
+      } else {
+        toast.error(data.error || 'Failed to refresh payment from Tumizi');
+      }
+    } catch {
+      toast.error('Failed to refresh payment from Tumizi');
+    } finally {
+      setIsSyncingTumizi(false);
+    }
+  };
 
   if (error || !order) {
     return (
@@ -1052,6 +1080,32 @@ export default function OrderDetailClient({
               )}
               
               {order.payment_status !== 'refunded' && (
+                isTumiziOrder ? (
+                  <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Tumizi verifies M-Pesa payments automatically. The order updates when the customer
+                      pays or when Tumizi sends a webhook.
+                    </p>
+                    {(order.payment_status === 'pending' || order.payment_status === 'failed') && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={isSyncingTumizi}
+                        onClick={handleTumiziPaymentSync}
+                      >
+                        {isSyncingTumizi ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Checking Tumizi...
+                          </>
+                        ) : (
+                          'Refresh from Tumizi'
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
                 <>
                   <div>
                     <Label htmlFor="new_payment_status">Update Payment Status</Label>
@@ -1107,6 +1161,7 @@ export default function OrderDetailClient({
                     )}
                   </Button>
                 </>
+                )
               )}
             </CardContent>
           </Card>

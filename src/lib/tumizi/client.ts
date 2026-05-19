@@ -202,6 +202,11 @@ export const tumiziClient = {
       body: payload,
     });
   },
+  getCustomerPayment(externalReference: string) {
+    return tumiziRequest<Record<string, unknown>>(
+      `/api/partner/v1/customer-payments/${encodeURIComponent(externalReference)}`,
+    );
+  },
   createWithdrawal(payload: TumiziCreateWithdrawalPayload) {
     return tumiziRequest<Record<string, unknown>>('/api/partner/v1/withdrawals', {
       method: 'POST',

@@ -230,7 +230,7 @@ export default async function ProductDetailPage({
 
   // Parallel fetch: Convert product data AND fetch related products simultaneously
   // This reduces total wait time - Amazon/Shopify technique
-  const [productData, relatedProducts] = await Promise.all([
+  const [productData, relatedProducts, productCategory] = await Promise.all([
     // Convert in parallel (synchronous but allows Promise.all)
     Promise.resolve({
       ...product,
@@ -271,6 +271,19 @@ export default async function ProductDetailPage({
           },
         })
       : Promise.resolve([]),
+    product.category_id
+      ? prisma.categories.findFirst({
+          where: {
+            id: product.category_id,
+            tenant_id: tenant.id,
+            status: 'active',
+          },
+          select: {
+            name: true,
+            slug: true,
+          },
+        })
+      : Promise.resolve(null),
   ]);
 
   // Convert related products prices
@@ -317,6 +330,11 @@ export default async function ProductDetailPage({
         product={productData}
         relatedProducts={relatedProductsData}
         defaultEstimatedDeliveryDays={defaultDeliveryDays ? parseInt(defaultDeliveryDays, 10) : null}
+        category={
+          productCategory?.slug
+            ? { name: productCategory.name, slug: productCategory.slug }
+            : null
+        }
       />
     </>
   );

@@ -24,6 +24,7 @@ Companion docs: [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) (pagi
 4. **Cold start** — Call **`GET /auth/me`** with the access token to restore **`user`** + **`tenant`** context; use **`POST /auth/refresh`** when the access token expires.
 5. **After store registration** — On **`201`** from **`POST /auth/register`**, read **`data.loginUrl`** (see [API_MULTI_STORE_CHANGES.md](./API_MULTI_STORE_CHANGES.md) § *Post-registration redirect*). Open it in a browser or in-app WebView when you want the merchant to use the web dashboard login on the tenant host. For an in-app API-only session, ignore **`loginUrl`** and call **`POST /auth/login`** with the same email/password as usual.
 6. **If the merchant chooses Tumizi during mobile onboarding** — First complete registration, then login and use the returned `accessToken`. Call **`POST /api/v1/mobile/dashboard/tumizi/settings`** with `{ "enabled": true, "createMerchantIfMissing": true }`, then optionally call **`PATCH /api/v1/mobile/dashboard/settings`** to set `payment.tumiziEnabled: true` and `payment.paymentMethod: "tumizi"`.
+7. **Tumizi orders** — Customers pay on the **web storefront**, not in Flutter. The app only manages those orders; do not manually set `payment_status` for `payment_gateway: "tumizi"`. See **[Tumizi orders (merchant app)](#tumizi-orders-merchant-app)**.
 
 ---
 
@@ -48,7 +49,9 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | POST | `/dashboard/getting-started` | Body `{ "action": "preview_done" \| "share_done" }` → persists flags (see below) |
 | GET | `/dashboard/orders` | Paginated; see API_MULTI_STORE_CHANGES |
 | GET | `/dashboard/orders/:id` | Order detail + line items |
-| PATCH | `/dashboard/orders/:id` | Same as web `PUT /api/orders/:id`: `status` and/or `payment_status`, optional `notes`, tracking |
+| PATCH | `/dashboard/orders/:id` | `status`, optional `notes`, tracking; **`payment_status` only when `payment_gateway` ≠ `tumizi`** (see [Tumizi orders](#tumizi-orders-merchant-app)) |
+| GET | `/dashboard/orders/:id/tumizi/sync-payment` | **Required (proposed)** — Poll Tumizi + update order `payment_status` (Bearer) |
+| POST | `/dashboard/orders/:id/tumizi/initiate-payment` | **Required (proposed)** — Resend STK / initiate Tumizi customer payment (Bearer) |
 | GET | `/dashboard/products` | Paginated; see API_MULTI_STORE_CHANGES |
 | POST | `/dashboard/products` | Create product (`createProductSchema`); respects plan limits + `canEditData` |
 | DELETE | `/dashboard/products/demo` | Remove active demo products; ordered demo products are archived |
@@ -134,9 +137,17 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 
 **Still out of scope or optional:** **order packing-slip / invoice** download, dedicated **`PATCH /dashboard/onboarding-progress`** (use **`/dashboard/getting-started`** instead). **CMS:** blogs and **pages** (page builder JSON / hero via `home` page `content`) are on mobile; **theme template** switching is not a dedicated mobile route. **Facets** in this codebase map to **attributes** + **attribute values** (no separate `/facets` path).
 
-**Settings write parity:** `PATCH /dashboard/settings` updates `static_options` + `tenants` (`name`, `contact_email`, `data.business_type` / `data.selling`) for fields the mobile GET exposes. At least one of cash or M-Pesa must remain enabled if the client sends `payment` fields.
+**Settings write parity:** `PATCH /dashboard/settings` updates `static_options` + `tenants` (`name`, `contact_email`, `data.business_type` / `data.selling`) for fields the mobile GET exposes, including **`store.logo`** → `store_logo`. At least one of cash, M-Pesa, or Tumizi must remain enabled if the client sends `payment` fields.
 
-**Tumizi (M-Pesa via Tumizi) — web vs mobile:** Web exposes Tumizi under **Settings → Payments** (`payment_tumizi_enabled`, default method `tumizi`) and **Settings → Tumizi** (`/api/tumizi/settings`, `/api/tumizi/merchant`, wallet, refunds). Mobile `GET/PATCH /dashboard/settings` includes Tumizi payment parity fields (`payment.tumiziEnabled`, `payment.paymentMethod`, and `payment.defaultMethod` supports `tumizi`). Native mobile Tumizi screens should use the Bearer-token routes under `/api/v1/mobile/dashboard/tumizi/*`; Flutter must never store or send the Tumizi partner API key. For a full parity map (checkout `payment_tumizi_ready`, order initiate-payment, native route contract), see **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)**.
+**Store logo (two steps):** `POST /media/upload` only stores the file and returns `data.url`. Persist it with **`PATCH /dashboard/settings`**:
+
+```json
+{ "store": { "logo": "https://…/storage/v1/object/public/…" } }
+```
+
+Clear the logo with `{ "store": { "logo": null } }` or `{ "store": { "logo": "" } }`.
+
+**Tumizi (M-Pesa via Tumizi) — web vs mobile:** Web exposes Tumizi under **Settings → Payments** (`payment_tumizi_enabled`, default method `tumizi`) and **Settings → Tumizi** (`/api/tumizi/settings`, `/api/tumizi/merchant`, wallet, refunds). Mobile `GET/PATCH /dashboard/settings` includes Tumizi payment parity fields (`payment.tumiziEnabled`, `payment.paymentMethod`, and `payment.defaultMethod` supports `tumizi`). Native mobile Tumizi screens should use the Bearer-token routes under `/api/v1/mobile/dashboard/tumizi/*`; Flutter must never store or send the Tumizi partner API key. **Order payment verification** for Tumizi is automatic — see **[Tumizi orders (merchant app)](#tumizi-orders-merchant-app)**. Settings/wallet parity: **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)**.
 
 ### Mobile registration + Tumizi onboarding flow
 
@@ -182,7 +193,8 @@ Use this only when the merchant explicitly wants Tumizi. If they choose Cash or 
       "id": "tenant_123",
       "name": "Acme Store",
       "subdomain": "acme",
-      "domain": "acme.dukanest.com"
+      "domain": "acme.dukanest.com",
+      "logo": "https://example.supabase.co/storage/v1/object/public/product-images/media/tenant_123/logo.png"
     },
     "payment": {
       "cashEnabled": true,
@@ -327,6 +339,7 @@ class SettingsStoreDto {
   final String domain;
   final String? contactEmail;
   final String? description;
+  final String? logo;
   final String? phone;
   final String? phone2;
   final String? phone3;
@@ -341,6 +354,7 @@ class SettingsStoreDto {
     required this.domain,
     required this.contactEmail,
     required this.description,
+    required this.logo,
     required this.phone,
     required this.phone2,
     required this.phone3,
@@ -357,6 +371,7 @@ class SettingsStoreDto {
       domain: (json['domain'] ?? '').toString(),
       contactEmail: json['contactEmail'] as String?,
       description: json['description'] as String?,
+      logo: json['logo'] as String?,
       phone: json['phone'] as String?,
       phone2: json['phone2'] as String?,
       phone3: json['phone3'] as String?,
@@ -543,7 +558,7 @@ StoreFlow does **not** use a separate “onboarding table”. Completion is comp
 | `contact_phone` | `store_phone` static option non-empty (`PATCH /dashboard/settings` → `store.phone`). |
 | `payment` | Cash enabled and/or M-Pesa enabled **with** a configured M-Pesa number/till/paybill (see same lib). |
 | `delivery` | `shipping_enabled` and either delivery zones exist **or** flat rate amount set. |
-| `logo` | `store_logo` static option set (e.g. via media + web settings; extend mobile settings if needed). |
+| `logo` | `store_logo` static option set via **`PATCH /dashboard/settings`** → `store.logo` (after **`POST /media/upload`** if uploading a file). |
 | `demo_products` | *(Only in API response when sample products exist.)* Shown as incomplete cleanup — remove via web **DELETE `/api/products/demo`** or Products UI. |
 
 **Flutter:** Call **`GET /api/v1/mobile/dashboard/getting-started`** for the checklist (mobile envelope). After the user previews the storefront or shares the link, call **`POST`** on the same path with the actions above so **web and app stay in sync**.
@@ -642,8 +657,51 @@ Public (non-mobile base): `GET /api/tenants/check-subdomain`, `POST /api/tenants
 
 | Status | Method | Path | Purpose | Flutter surface |
 |--------|--------|------|---------|-----------------|
-| Exists | GET | `/dashboard/overview` | Metrics + recent orders | `DashboardScreen` |
+| Exists | GET | `/dashboard/overview` | Metrics, recent orders, **subscription/trial** snapshot | `DashboardScreen` |
 | Exists | GET | `/dashboard/analytics` | Metrics for last `days` (query `days`, 1–365, default 30) | `AnalyticsScreen` |
+
+#### Trial days remaining (same logic as web dashboard home)
+
+On **web**, the tenant dashboard home banner uses:
+
+- `price_plans.trial_days` (e.g. `14`)
+- `tenants.start_date` (set at registration)
+- **Formula:** `trialDaysRemaining = trial_days - floor((now - start_date) / 1 day)`; `null` when trial is over or the plan has no trial.
+
+The **subscription** page also shows trial copy when `daysUntilRenewal` (ceil days until `expire_date`) is `> 0` and `<= trial_days`. At signup, `expire_date` is set to `now + trial_days`, so both views usually agree.
+
+**Mobile:** read `data.subscription` from **`GET /api/v1/mobile/dashboard/overview`** (no extra call):
+
+```json
+"subscription": {
+  "status": "active",
+  "planId": "…",
+  "planName": "Basic",
+  "trialDays": 14,
+  "trialDaysRemaining": 9,
+  "inTrial": true,
+  "startDate": "2026-05-01T00:00:00.000Z",
+  "expireDate": "2026-05-15T00:00:00.000Z",
+  "daysUntilExpire": 9
+}
+```
+
+| Field | Use in Flutter |
+|-------|----------------|
+| `trialDaysRemaining` | Show “**N** days left in trial” when non-null and `> 0` (same as web home). |
+| `inTrial` | Convenience flag (`trialDaysRemaining > 0`). |
+| `daysUntilExpire` | Renewal / expiry countdown after trial (subscription page style). |
+| `trialDays` | Plan trial length from pricing (`0` or `null` = no trial). |
+
+```dart
+final sub = overview['subscription'] as Map<String, dynamic>?;
+final days = sub?['trialDaysRemaining'] as int?;
+if (days != null && days > 0) {
+  // "$days day(s) left in trial"
+}
+```
+
+Refresh on pull-to-refresh or when returning to the dashboard; no client-side date math required.
 
 ---
 
@@ -653,9 +711,204 @@ Public (non-mobile base): `GET /api/tenants/check-subdomain`, `POST /api/tenants
 |--------|--------|------|---------|-----------------|
 | Exists | GET | `/dashboard/orders` | Paginated list, `search`, `status`, `payment_status` | `OrdersListScreen` |
 | Exists | GET | `/dashboard/orders/:id` | Order detail | `OrderDetailScreen` |
-| Exists | PATCH | `/dashboard/orders/:id` | Status / payment; `notes` → order `message` | Order detail actions |
+| Exists | PATCH | `/dashboard/orders/:id` | Order `status`, `notes`; **not** `payment_status` for Tumizi | Order detail actions |
+| Required | GET | `/dashboard/orders/:id/tumizi/sync-payment` | Refresh payment from Tumizi API | Tumizi order detail |
+| Required | POST | `/dashboard/orders/:id/tumizi/initiate-payment` | Resend M-Pesa STK via Tumizi | Tumizi order detail |
 | Partial | POST | `/dashboard/orders/:id/notes` | Prefer **PATCH** with `notes` | Order notes |
 | Optional | GET | `/dashboard/orders/:id/packing-slip` | PDF or print URL | Print packing slip |
+
+---
+
+## Tumizi orders (merchant app)
+
+There is **no separate Flutter customer/storefront app** in this product. Customers pay on the **web storefront** (tenant host). The **shop-owner Flutter app** only **views and fulfills** those orders and configures Tumizi for the store.
+
+Tumizi checkout on the web creates orders with:
+
+| Field | Typical value |
+|-------|----------------|
+| `payment_gateway` | `"tumizi"` |
+| `payment_status` | `"pending"` until M-Pesa succeeds |
+| `payment_track` | Tumizi `external_reference` (e.g. `order-{uuid}-{timestamp}`) |
+
+Payment status is updated **on the server** — not by staff tapping “Mark paid” in the app.
+
+### How payment status is updated (server-side)
+
+| Mechanism | Purpose |
+|-----------|---------|
+| **Tumizi webhook** | `POST /api/tumizi/webhook` (configured in Tumizi settings; token in URL) |
+| **Sync from Tumizi API** | Polls `GET` Tumizi partner `customer-payments/{externalReference}` and writes DB |
+| **Cron backup** | `GET /api/admin/integrations/tumizi/sync-pending-payments` (host cron; not called from Flutter) |
+
+The Flutter app must **display** the latest `payment_status` and may **request a sync**; it must **not** call Tumizi partner APIs or store `TUMIZI_PARTNER_API_KEY`.
+
+### Core rules for Flutter
+
+| Do | Don't |
+|----|--------|
+| Read `payment_gateway`, `payment_status`, `transaction_id` from order APIs | `PATCH` with `payment_status` when `payment_gateway === "tumizi"` |
+| Show “Awaiting M-Pesa (Tumizi)” while `pending` | Treat `pending` as paid for fulfillment |
+| Call **sync** endpoint (below) or poll **GET order** while detail is open | Use manual M-Pesa “verify transaction ID” UX for Tumizi |
+| `PATCH` **order status** (`processing`, `shipped`, …) when appropriate | Call Tumizi partner API from the device |
+
+**Blocked mobile update** — `PATCH /dashboard/orders/:id` with `payment_status` returns **`400`** when `payment_gateway` is `tumizi`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Tumizi payment status is synced automatically from Tumizi. Refresh payment status instead of updating manually."
+  }
+}
+```
+
+### Detecting a Tumizi order
+
+```dart
+bool isTumiziOrder(Map<String, dynamic> order) =>
+    order['payment_gateway'] == 'tumizi';
+
+bool isTumiziPaymentPending(Map<String, dynamic> order) =>
+    isTumiziOrder(order) && order['payment_status'] == 'pending';
+```
+
+`GET /dashboard/orders` and `GET /dashboard/orders/:id` already expose `payment_gateway` and `payment_status` (camelCase in mobile envelope: `paymentGateway`, `paymentStatus` — confirm your client’s JSON mapping).
+
+### Order list UI
+
+- Badge **Tumizi + pending** → e.g. “Awaiting M-Pesa (Tumizi)”.
+- Badge **Tumizi + paid** → “Paid via Tumizi”.
+- Badge **Tumizi + failed** → “Payment failed”.
+- No “Mark as paid” swipe/action on Tumizi rows.
+- Use `GET /notifications/list` — `pending_payment` notifications still apply.
+
+### Order detail UI
+
+1. **Hide** manual payment-status dropdown when `paymentGateway == tumizi`.
+2. Show short copy: *Payment is confirmed automatically when the customer completes M-Pesa on their phone.*
+3. While **Tumizi + pending**:
+   - Waiting indicator.
+   - **Refresh from Tumizi** button → `GET .../tumizi/sync-payment` (proposed route below).
+   - Optional: poll every **5s** for up to **~2 minutes** while the screen is visible, then stop.
+4. When `paymentStatus` becomes `paid`, refresh UI and allow normal fulfillment (`PATCH` **status** only).
+5. Do **not** show M-Pesa manual verification fields for Tumizi (those are for `payment_gateway === "mpesa"` manual flow).
+
+### Required mobile APIs (proposed — implement on backend)
+
+Web already has session-based routes under `/api/orders/:id/tumizi/...`. Flutter needs **Bearer** equivalents under `/api/v1/mobile/dashboard/orders/:id/...`.
+
+#### Sync payment status
+
+```http
+GET /api/v1/mobile/dashboard/orders/{orderId}/tumizi/sync-payment
+Authorization: Bearer <accessToken>
+```
+
+**When:** User taps “Refresh from Tumizi”, or automatic poll on order detail while pending.
+
+**Success (example):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "synced": true,
+    "payment_status": "paid",
+    "tumizi_status": "successful",
+    "reason": null
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `synced` | Server called Tumizi and applied result |
+| `payment_status` | Updated order status (`pending` \| `paid` \| `failed`) |
+| `tumizi_status` | Raw status string from Tumizi |
+| `reason` | e.g. `already_final`, `missing_external_reference` if no change |
+
+**Errors:** `404` order not found; `400` not a Tumizi order.
+
+**Until this route exists:** Poll `GET /dashboard/orders/:id` only (webhook/cron may have updated the DB). Do not call `GET /api/orders/:id/tumizi/sync-payment` with Bearer — that web route uses **cookie session**, not mobile tokens.
+
+#### Initiate / resend customer payment (optional)
+
+```http
+POST /api/v1/mobile/dashboard/orders/{orderId}/tumizi/initiate-payment
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+
+```json
+{
+  "phoneNumber": "254712345678",
+  "amount": 1500,
+  "narration": "Payment for order ORD-123"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `phoneNumber` | Yes | Kenya MSISDN (`254...`) |
+| `amount` | No | Defaults to order total |
+| `narration` | No | STK description |
+
+Mirrors web `POST /api/orders/:id/tumizi/initiate-payment`. Use when staff must resend the STK push.
+
+### Polling pattern (order detail)
+
+```dart
+// Pseudocode — run only while Tumizi + pending and screen is mounted
+Timer.periodic(const Duration(seconds: 5), (_) async {
+  final res = await api.get(
+    '/dashboard/orders/$orderId/tumizi/sync-payment',
+  );
+  final status = res.data['payment_status'] as String?;
+  if (status == 'paid' || status == 'failed') {
+    cancelTimer();
+    updateLocalOrder(paymentStatus: status);
+  }
+});
+```
+
+On the **orders list**, rely on pull-to-refresh, returning from detail, or push notifications — avoid background polling every order.
+
+### Push notifications
+
+When Tumizi payment completes, tenants may receive notifications via `GET /notifications/list`. On tap, open order detail and call **sync** or **GET order** once to show final `payment_status`.
+
+### PATCH body reminder (non-Tumizi only)
+
+For **cash** or **manual M-Pesa** orders, `payment_status` via PATCH is still allowed:
+
+```json
+{
+  "payment_status": "paid",
+  "transaction_id": "optional",
+  "notes": "optional"
+}
+```
+
+For **Tumizi**, send only `status` / `notes` / tracking fields.
+
+### Related docs
+
+| Doc | Content |
+|-----|---------|
+| [tumizi/TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md) | Enable Tumizi, wallet, settings parity |
+| Web storefront checkout | Customers use `payment_method: "tumizi"` on tenant website (not documented here as a Flutter app) |
+
+### Tumizi orders — implementation checklist
+
+1. Map `paymentGateway` / `paymentStatus` on order models.
+2. Branch order detail UI: hide manual payment editor for Tumizi.
+3. Add **Refresh from Tumizi** → `GET .../tumizi/sync-payment` (after backend ships route).
+4. Poll sync or GET order while Tumizi + pending on detail screen.
+5. Handle `400` if legacy UI still sends `payment_status` PATCH for Tumizi.
+6. Optional: resend STK via `POST .../tumizi/initiate-payment` when backend ships route.
+7. Do not embed Tumizi partner API keys in the app.
 
 ---
 
@@ -1144,10 +1397,11 @@ Important:
 
 1. **Overview + progress steps** — Ensure `GET /dashboard/overview` returns checklist with authoritative `completed` flags; add **`PATCH /dashboard/onboarding-progress`** if inference is insufficient.
 2. **Settings bundle** — Single `GET/PATCH /dashboard/settings` (or split resources) so Store identity, Payments, Shipping, Tax persist.
-3. **Order mutations + product PATCH/DELETE** — Complete operational flows from list/detail screens.
-4. **Customers** — Replace `demo_data`.
-5. **Categories & attributes** — Replace in-memory repositories.
-6. **Analytics, CMS, Sales** — Align with web surface area.
+3. **Order mutations + Tumizi sync routes** — Fulfillment `PATCH` status; add `GET/POST .../orders/:id/tumizi/*` for payment refresh (see [Tumizi orders](#tumizi-orders-merchant-app)).
+4. **Product PATCH/DELETE** — Complete operational flows from list/detail screens.
+5. **Customers** — Replace `demo_data`.
+6. **Categories & attributes** — Replace in-memory repositories.
+7. **Analytics, CMS, Sales** — Align with web surface area.
 
 ---
 
