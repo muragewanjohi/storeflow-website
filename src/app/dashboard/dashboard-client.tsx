@@ -39,6 +39,7 @@ import {
   TruckIcon,
   ArrowUpTrayIcon,
   TrashIcon,
+  GiftIcon,
 } from '@heroicons/react/24/outline';
 import {
   LineChart,
@@ -138,6 +139,31 @@ interface GettingStartedData {
   storeUrl: string;
   nextAction?: GettingStartedItem | null;
   nextSteps?: GettingStartedItem[];
+}
+
+interface RewardChecklistItem extends GettingStartedItem {
+  priority: number;
+}
+
+interface RewardChecklistData {
+  items: RewardChecklistItem[];
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  allComplete: boolean;
+  nextAction?: RewardChecklistItem | null;
+  nextSteps?: RewardChecklistItem[];
+  homePageEditHref: string;
+  reward: {
+    enabled: boolean;
+    windowDays: number;
+    eligible: boolean;
+    daysRemainingInWindow: number;
+    eligibleUntil: string | null;
+    granted: boolean;
+    grantedAt: string | null;
+    bonusDays: number;
+  };
 }
 
 interface DashboardNotificationsResponse {
@@ -269,6 +295,21 @@ export default function DashboardClient({
       return json.data as GettingStartedData;
     },
   });
+
+  const { data: rewardChecklist } = useQuery({
+    queryKey: ['dashboard-reward-checklist'],
+    queryFn: async () => {
+      const response = await fetch('/api/dashboard/reward-checklist');
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json.data as RewardChecklistData;
+    },
+  });
+
+  const showRewardChecklist =
+    rewardChecklist &&
+    (rewardChecklist.reward.granted ||
+      (rewardChecklist.reward.enabled && rewardChecklist.reward.eligible));
 
   const primaryCatalogCta = useMemo(() => {
     const next = gettingStarted?.nextAction;
@@ -1066,6 +1107,115 @@ export default function DashboardClient({
                                 <Link href={item.href}>{item.cta}</Link>
                               </Button>
                             )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {showRewardChecklist && (
+        <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-transparent to-amber-500/5">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20">
+                    <GiftIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </span>
+                  Earn 1 month free
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {rewardChecklist.reward.granted
+                    ? `Bonus applied! You earned ${rewardChecklist.reward.bonusDays} extra days on your subscription.`
+                    : rewardChecklist.allComplete
+                      ? 'Completing reward grant...'
+                      : `Complete these steps within ${rewardChecklist.reward.daysRemainingInWindow} day${rewardChecklist.reward.daysRemainingInWindow === 1 ? '' : 's'} for ${rewardChecklist.reward.bonusDays} bonus days.`}
+                </CardDescription>
+              </div>
+              {!rewardChecklist.reward.granted && !rewardChecklist.allComplete && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 transition-all duration-500"
+                      style={{ width: `${rewardChecklist.progressPercent}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {Math.round(rewardChecklist.progressPercent)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {rewardChecklist.reward.granted ? (
+              <div className="flex items-center gap-3 py-2">
+                <CheckCircleIcon className="h-12 w-12 text-green-500" />
+                <div>
+                  <p className="font-medium">Reward unlocked!</p>
+                  <p className="text-sm text-muted-foreground">
+                    {rewardChecklist.reward.bonusDays} bonus days were added to your subscription
+                    {rewardChecklist.reward.grantedAt
+                      ? ` on ${new Date(rewardChecklist.reward.grantedAt).toLocaleDateString()}`
+                      : ''}
+                    .
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rewardChecklist.nextAction && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-1">
+                      Next reward step
+                    </p>
+                    <p className="text-sm font-medium">{rewardChecklist.nextAction.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {rewardChecklist.nextAction.description}
+                    </p>
+                    {rewardChecklist.nextAction.cta && (
+                      <div className="mt-2">
+                        <Button variant="default" size="sm" asChild className="h-7 text-xs">
+                          <Link href={rewardChecklist.nextAction.href}>{rewardChecklist.nextAction.cta}</Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {rewardChecklist.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        item.completed
+                          ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-900/10'
+                          : 'border-border hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {item.completed ? (
+                          <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-medium ${item.completed ? 'text-muted-foreground line-through' : ''}`}>
+                          {item.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                        {!item.completed && item.cta && (
+                          <div className="mt-2">
+                            <Button variant="outline" size="sm" asChild className="h-7 text-xs">
+                              <Link href={item.href}>{item.cta}</Link>
+                            </Button>
                           </div>
                         )}
                       </div>

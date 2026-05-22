@@ -5,6 +5,7 @@ import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import { cache } from '@/lib/cache/simple-cache';
+import { isValidE164DigitsString } from '@/lib/phone/parse';
 
 const SETTINGS_KEYS = [
   'store_description',
@@ -20,17 +21,34 @@ const SETTINGS_KEYS = [
   'currency_code',
   'currency_symbol',
   'currency_symbol_position',
+  'currency_thousand_separator',
+  'currency_decimal_separator',
+  'currency_decimal_places',
   'shipping_enabled',
+  'shipping_method_type',
+  'flat_rate_amount',
   'free_shipping_enabled',
   'free_shipping_threshold',
+  'pickup_enabled',
+  'pickup_location_name',
+  'pickup_instructions',
+  'pickup_hours',
   'payment_cash_enabled',
   'payment_mpesa_enabled',
   'payment_tumizi_enabled',
   'payment_mpesa_option',
+  'payment_mpesa_send_money_number',
+  'payment_mpesa_buy_goods_till',
+  'payment_mpesa_paybill_number',
+  'payment_mpesa_paybill_account',
+  'payment_mpesa_pochi_phone',
   'payment_method',
   'default_payment_method',
+  'payment_timing',
   'tax_enabled',
   'default_tax_rate',
+  'tax_pricing_type',
+  'tax_included_in_price',
   'tax_calculation_based_on',
 ] as const;
 
@@ -42,6 +60,12 @@ function asBoolean(value: string | null | undefined, fallback = false): boolean 
 function asNumber(value: string | null | undefined, fallback: number | null = null): number | null {
   if (value === null || value === undefined || value === '') return fallback;
   const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function asInt(value: string | null | undefined, fallback: number): number {
+  if (value === null || value === undefined || value === '') return fallback;
+  const parsed = parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -73,13 +97,25 @@ type MobileSettingsPayload = {
     businessType: string | null;
     selling: string | null;
   };
+  countries: Array<{ id: string; name: string; code: string }>;
   currency: {
     code: string;
     symbol: string;
     symbolPosition: string;
+    thousandSeparator: string;
+    decimalSeparator: string;
+    decimalPlaces: number;
+  };
+  pickup: {
+    enabled: boolean;
+    locationName: string | null;
+    instructions: string | null;
+    hours: string | null;
   };
   shipping: {
     enabled: boolean;
+    methodType: 'flat_rate' | 'delivery_zones';
+    flatRateAmount: number | null;
     freeShippingEnabled: boolean;
     freeShippingThreshold: number | null;
   };
@@ -88,18 +124,26 @@ type MobileSettingsPayload = {
     mpesaEnabled: boolean;
     tumiziEnabled: boolean;
     mpesaOption: string | null;
+    mpesaSendMoneyNumber: string | null;
+    mpesaBuyGoodsTill: string | null;
+    mpesaPaybillNumber: string | null;
+    mpesaPaybillAccount: string | null;
+    mpesaPochiPhone: string | null;
     paymentMethod: string;
     defaultMethod: string;
+    timing: string;
   };
   tax: {
     enabled: boolean;
     defaultRate: number | null;
+    pricingType: 'inclusive' | 'exclusive';
+    includedInPrice: boolean;
     calculationBasedOn: string;
   };
 };
 
 async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettingsPayload | null> {
-  const [tenant, options] = await Promise.all([
+  const [tenant, options, countries] = await Promise.all([
     prisma.tenants.findUnique({
       where: { id: tenantId },
       select: {
@@ -112,6 +156,13 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
       },
     }),
     getStaticOptions(tenantId, [...SETTINGS_KEYS]),
+    prisma.countries.findMany({
+      where: {
+        OR: [{ tenant_id: tenantId }, { tenant_id: null }],
+      },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: 'asc' },
+    }),
   ]);
 
   if (!tenant) return null;
@@ -123,6 +174,11 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
 
   const businessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : null;
   const selling = typeof tenantData.selling === 'string' ? tenantData.selling : null;
+  const taxPricingType =
+    options.tax_pricing_type === 'inclusive' ||
+    asBoolean(options.tax_included_in_price, false)
+      ? 'inclusive'
+      : 'exclusive';
 
   return {
     store: {
@@ -149,13 +205,30 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
       businessType,
       selling,
     },
+    countries: countries.map((c) => ({
+      id: c.id,
+      name: c.name,
+      code: c.code ?? '',
+    })),
     currency: {
       code: options.currency_code || 'USD',
       symbol: options.currency_symbol || '$',
       symbolPosition: options.currency_symbol_position || 'left',
+      thousandSeparator: options.currency_thousand_separator || ',',
+      decimalSeparator: options.currency_decimal_separator || '.',
+      decimalPlaces: asInt(options.currency_decimal_places, 2),
+    },
+    pickup: {
+      enabled: asBoolean(options.pickup_enabled, false),
+      locationName: options.pickup_location_name ?? null,
+      instructions: options.pickup_instructions ?? null,
+      hours: options.pickup_hours ?? null,
     },
     shipping: {
       enabled: asBoolean(options.shipping_enabled, true),
+      methodType:
+        options.shipping_method_type === 'delivery_zones' ? 'delivery_zones' : 'flat_rate',
+      flatRateAmount: asNumber(options.flat_rate_amount, null),
       freeShippingEnabled: asBoolean(options.free_shipping_enabled, false),
       freeShippingThreshold: asNumber(options.free_shipping_threshold, null),
     },
@@ -164,12 +237,20 @@ async function loadMobileSettingsPayload(tenantId: string): Promise<MobileSettin
       mpesaEnabled: asBoolean(options.payment_mpesa_enabled, false),
       tumiziEnabled: asBoolean(options.payment_tumizi_enabled, false),
       mpesaOption: options.payment_mpesa_option || null,
+      mpesaSendMoneyNumber: options.payment_mpesa_send_money_number ?? null,
+      mpesaBuyGoodsTill: options.payment_mpesa_buy_goods_till ?? null,
+      mpesaPaybillNumber: options.payment_mpesa_paybill_number ?? null,
+      mpesaPaybillAccount: options.payment_mpesa_paybill_account ?? null,
+      mpesaPochiPhone: options.payment_mpesa_pochi_phone ?? null,
       paymentMethod: options.payment_method || options.default_payment_method || 'cash',
       defaultMethod: options.default_payment_method || 'cash',
+      timing: options.payment_timing || 'before_delivery',
     },
     tax: {
       enabled: asBoolean(options.tax_enabled, false),
       defaultRate: asNumber(options.default_tax_rate, null),
+      pricingType: taxPricingType,
+      includedInPrice: taxPricingType === 'inclusive',
       calculationBasedOn: options.tax_calculation_based_on || 'billing_address',
     },
   };
@@ -203,11 +284,24 @@ const mobileSettingsPatchSchema = z.object({
       code: z.string().max(10).optional(),
       symbol: z.string().max(10).nullable().optional(),
       symbolPosition: z.enum(['left', 'right']).optional(),
+      thousandSeparator: z.string().max(5).nullable().optional(),
+      decimalSeparator: z.string().max(5).nullable().optional(),
+      decimalPlaces: z.number().int().min(0).max(4).optional(),
+    })
+    .optional(),
+  pickup: z
+    .object({
+      enabled: z.boolean().optional(),
+      locationName: z.string().nullable().optional(),
+      instructions: z.string().nullable().optional(),
+      hours: z.string().nullable().optional(),
     })
     .optional(),
   shipping: z
     .object({
       enabled: z.boolean().optional(),
+      methodType: z.enum(['flat_rate', 'delivery_zones']).optional(),
+      flatRateAmount: z.number().min(0).nullable().optional(),
       freeShippingEnabled: z.boolean().optional(),
       freeShippingThreshold: z.number().nullable().optional(),
     })
@@ -218,14 +312,22 @@ const mobileSettingsPatchSchema = z.object({
       mpesaEnabled: z.boolean().optional(),
       tumiziEnabled: z.boolean().optional(),
       mpesaOption: z.enum(['send_money', 'buy_goods', 'paybill', 'pochi']).nullable().optional(),
+      mpesaSendMoneyNumber: z.string().nullable().optional(),
+      mpesaBuyGoodsTill: z.string().nullable().optional(),
+      mpesaPaybillNumber: z.string().nullable().optional(),
+      mpesaPaybillAccount: z.string().nullable().optional(),
+      mpesaPochiPhone: z.string().nullable().optional(),
       paymentMethod: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
       defaultMethod: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
+      timing: z.enum(['before_delivery', 'after_delivery', 'user_choice']).optional(),
     })
     .optional(),
   tax: z
     .object({
       enabled: z.boolean().optional(),
       defaultRate: z.number().min(0).max(100).nullable().optional(),
+      pricingType: z.enum(['inclusive', 'exclusive']).optional(),
+      includedInPrice: z.boolean().optional(),
       calculationBasedOn: z
         .enum(['billing_address', 'shipping_address', 'store_address'])
         .optional(),
@@ -240,6 +342,7 @@ function patchHasContent(p: z.infer<typeof mobileSettingsPatchSchema>): boolean 
     if (address && Object.values(address).some((v) => v !== undefined)) return true;
   }
   if (p.currency && Object.values(p.currency).some((v) => v !== undefined)) return true;
+  if (p.pickup && Object.values(p.pickup).some((v) => v !== undefined)) return true;
   if (p.shipping && Object.values(p.shipping).some((v) => v !== undefined)) return true;
   if (p.payment && Object.values(p.payment).some((v) => v !== undefined)) return true;
   if (p.tax && Object.values(p.tax).some((v) => v !== undefined)) return true;
@@ -313,7 +416,7 @@ export async function PATCH(request: NextRequest) {
     if (!patchHasContent(parsed)) {
       return NextResponse.json(
         mobileError('VALIDATION_ERROR', 'No settings fields to update', [
-          { field: 'body', message: 'Provide at least one nested field under store, currency, shipping, payment, or tax' },
+          { field: 'body', message: 'Provide at least one nested field under store, currency, pickup, shipping, payment, or tax' },
         ]),
         { status: 400 },
       );
@@ -321,12 +424,20 @@ export async function PATCH(request: NextRequest) {
 
     const tenantRow = await prisma.tenants.findFirst({
       where: { id: user.tenant_id, deleted_at: null },
-      select: { id: true, name: true, contact_email: true, data: true },
+      select: { id: true, name: true, contact_email: true, data: true, plan_id: true },
     });
 
     if (!tenantRow) {
       return NextResponse.json(mobileError('NOT_FOUND', 'Tenant not found'), { status: 404 });
     }
+
+    const currentPlan = tenantRow.plan_id
+      ? await prisma.price_plans.findUnique({
+          where: { id: tenantRow.plan_id },
+          select: { name: true },
+        })
+      : null;
+    const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
 
     const optionsToSave: Record<string, string | null> = {};
     let tenantName: string | undefined;
@@ -342,9 +453,47 @@ export async function PATCH(request: NextRequest) {
         optionsToSave.store_logo =
           s.logo === null || s.logo.trim() === '' ? null : s.logo.trim();
       }
-      if (s.phone !== undefined) optionsToSave.store_phone = storePhoneDigitsOrNull(s.phone);
-      if (s.phone2 !== undefined) optionsToSave.store_phone_2 = storePhoneDigitsOrNull(s.phone2);
-      if (s.phone3 !== undefined) optionsToSave.store_phone_3 = storePhoneDigitsOrNull(s.phone3);
+      if (s.phone !== undefined) {
+        const d = storePhoneDigitsOrNull(s.phone);
+        if (d && !isValidE164DigitsString(d)) {
+          return NextResponse.json(
+            mobileError('VALIDATION_ERROR', 'Invalid store phone number', [
+              { field: 'store.phone', message: 'Use a valid phone number' },
+            ]),
+            { status: 400 },
+          );
+        }
+        optionsToSave.store_phone = d;
+      }
+      if (isBasicPlan) {
+        optionsToSave.store_phone_2 = null;
+        optionsToSave.store_phone_3 = null;
+      } else {
+        if (s.phone2 !== undefined) {
+          const d = storePhoneDigitsOrNull(s.phone2);
+          if (d && !isValidE164DigitsString(d)) {
+            return NextResponse.json(
+              mobileError('VALIDATION_ERROR', 'Invalid additional store phone (2)', [
+                { field: 'store.phone2', message: 'Use a valid phone number' },
+              ]),
+              { status: 400 },
+            );
+          }
+          optionsToSave.store_phone_2 = d;
+        }
+        if (s.phone3 !== undefined) {
+          const d = storePhoneDigitsOrNull(s.phone3);
+          if (d && !isValidE164DigitsString(d)) {
+            return NextResponse.json(
+              mobileError('VALIDATION_ERROR', 'Invalid additional store phone (3)', [
+                { field: 'store.phone3', message: 'Use a valid phone number' },
+              ]),
+              { status: 400 },
+            );
+          }
+          optionsToSave.store_phone_3 = d;
+        }
+      }
       if (s.businessType !== undefined || s.selling !== undefined) {
         const existing =
           tenantRow.data && typeof tenantRow.data === 'object' && !Array.isArray(tenantRow.data)
@@ -373,11 +522,64 @@ export async function PATCH(request: NextRequest) {
       if (c.code !== undefined) optionsToSave.currency_code = c.code;
       if (c.symbol !== undefined) optionsToSave.currency_symbol = c.symbol;
       if (c.symbolPosition !== undefined) optionsToSave.currency_symbol_position = c.symbolPosition;
+      if (c.thousandSeparator !== undefined) {
+        optionsToSave.currency_thousand_separator = c.thousandSeparator || null;
+      }
+      if (c.decimalSeparator !== undefined) {
+        optionsToSave.currency_decimal_separator = c.decimalSeparator || null;
+      }
+      if (c.decimalPlaces !== undefined) {
+        optionsToSave.currency_decimal_places = String(c.decimalPlaces);
+      }
+    }
+
+    if (parsed.pickup) {
+      const p = parsed.pickup;
+      if (p.enabled !== undefined) {
+        const currentAddress = await getStaticOptions(user.tenant_id, [
+          'store_address',
+          'store_city',
+          'store_country',
+        ]);
+        const patchAddress = parsed.store?.address;
+        const hasPhysicalAddress = !!(
+          patchAddress?.line1 ||
+          (patchAddress?.city && patchAddress?.country) ||
+          (currentAddress.store_address &&
+            currentAddress.store_city &&
+            currentAddress.store_country)
+        );
+        if (p.enabled && !hasPhysicalAddress) {
+          return NextResponse.json(
+            mobileError(
+              'VALIDATION_ERROR',
+              'Store pickup requires a physical address. Please add store address first.',
+              [{ field: 'pickup.enabled', message: 'Add store address before enabling pickup' }],
+            ),
+            { status: 400 },
+          );
+        }
+        optionsToSave.pickup_enabled = String(p.enabled);
+      }
+      if (p.locationName !== undefined) {
+        optionsToSave.pickup_location_name = p.locationName || null;
+      }
+      if (p.instructions !== undefined) {
+        optionsToSave.pickup_instructions = p.instructions || null;
+      }
+      if (p.hours !== undefined) {
+        optionsToSave.pickup_hours = p.hours || null;
+      }
     }
 
     if (parsed.shipping) {
       const sh = parsed.shipping;
       if (sh.enabled !== undefined) optionsToSave.shipping_enabled = String(sh.enabled);
+      if (sh.methodType !== undefined) optionsToSave.shipping_method_type = sh.methodType;
+      if (sh.flatRateAmount !== undefined) {
+        optionsToSave.flat_rate_amount =
+          sh.flatRateAmount === null ? null : String(sh.flatRateAmount);
+      }
       if (sh.freeShippingEnabled !== undefined) {
         optionsToSave.free_shipping_enabled = String(sh.freeShippingEnabled);
       }
@@ -395,6 +597,22 @@ export async function PATCH(request: NextRequest) {
       if (pay.mpesaEnabled !== undefined) optionsToSave.payment_mpesa_enabled = String(pay.mpesaEnabled);
       if (pay.tumiziEnabled !== undefined) optionsToSave.payment_tumizi_enabled = String(pay.tumiziEnabled);
       if (pay.mpesaOption !== undefined) optionsToSave.payment_mpesa_option = pay.mpesaOption;
+      if (pay.mpesaSendMoneyNumber !== undefined) {
+        optionsToSave.payment_mpesa_send_money_number = pay.mpesaSendMoneyNumber || null;
+      }
+      if (pay.mpesaBuyGoodsTill !== undefined) {
+        optionsToSave.payment_mpesa_buy_goods_till = pay.mpesaBuyGoodsTill || null;
+      }
+      if (pay.mpesaPaybillNumber !== undefined) {
+        optionsToSave.payment_mpesa_paybill_number = pay.mpesaPaybillNumber || null;
+      }
+      if (pay.mpesaPaybillAccount !== undefined) {
+        optionsToSave.payment_mpesa_paybill_account = pay.mpesaPaybillAccount || null;
+      }
+      if (pay.mpesaPochiPhone !== undefined) {
+        optionsToSave.payment_mpesa_pochi_phone = pay.mpesaPochiPhone || null;
+      }
+      if (pay.timing !== undefined) optionsToSave.payment_timing = pay.timing;
       if (pay.paymentMethod !== undefined) {
         optionsToSave.payment_method = pay.paymentMethod;
         // keep backward-compatible key in sync
@@ -413,6 +631,13 @@ export async function PATCH(request: NextRequest) {
       }
       if (t.calculationBasedOn !== undefined) {
         optionsToSave.tax_calculation_based_on = t.calculationBasedOn;
+      }
+      if (t.pricingType !== undefined) {
+        optionsToSave.tax_pricing_type = t.pricingType;
+        optionsToSave.tax_included_in_price = String(t.pricingType === 'inclusive');
+      } else if (t.includedInPrice !== undefined) {
+        optionsToSave.tax_included_in_price = String(t.includedInPrice);
+        optionsToSave.tax_pricing_type = t.includedInPrice ? 'inclusive' : 'exclusive';
       }
     }
 

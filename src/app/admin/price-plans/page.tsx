@@ -26,6 +26,8 @@ export default async function PricePlansPage() {
       price: true,
       duration_months: true,
       trial_days: true,
+      onboarding_reward_window_days: true,
+      onboarding_reward_bonus_days: true,
       features: true,
       status: true,
       created_at: true,

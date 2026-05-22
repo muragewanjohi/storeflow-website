@@ -1,435 +1,85 @@
 /**
  * Tenant Subscription Activation API Route
- * 
- * Allows tenants to activate or switch subscription plans
- * Implements best practices:
- * - Upgrades: Immediate effect with prorated billing
- * - Downgrades: Scheduled for next billing cycle
- * - Trial periods: Only for first-time free → paid upgrades
- * - Subscription change history tracking
- * 
- * Only tenant admins can activate plans for their own tenant
+ *
+ * POST /api/dashboard/subscription/activate
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, requireAnyRole } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
-import { prisma } from '@/lib/prisma/client';
 import {
-  sendSubscriptionActivatedEmail,
-  sendPlanUpgradeConfirmationEmail,
-  sendPlanDowngradeScheduledEmail,
-} from '@/lib/subscriptions/emails';
-import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
-import {
-  calculateUpgradeProration,
-  shouldOfferTrialOnUpgrade,
-  calculateDaysAsPayingCustomer,
-  getPlanChangeType,
-} from '@/lib/subscriptions/proration';
+  ActivatePlanError,
+  activateTenantSubscriptionPlan,
+} from '@/lib/subscriptions/activate-plan';
 
 const activatePlanSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
 });
 
-/**
- * POST /api/dashboard/subscription/activate
- * 
- * Activate or switch subscription plan for the current tenant
- * Following industry best practices for SaaS billing
- */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth();
-    // Only tenant admins can activate plans
     requireAnyRole(user, ['tenant_admin']);
 
     const tenant = await requireTenant();
 
-    // Verify user belongs to tenant
     if (user.tenant_id !== tenant.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const validatedData = activatePlanSchema.parse(body);
-    const { plan_id } = validatedData;
+    const { plan_id } = activatePlanSchema.parse(await request.json());
 
-    // Check if plan exists and is active
-    const newPlan = await prisma.price_plans.findUnique({
-      where: { id: plan_id },
+    const result = await activateTenantSubscriptionPlan({
+      tenantId: tenant.id,
+      planId: plan_id,
+      requestHeaders: request.headers,
     });
-
-    if (!newPlan) {
-      return NextResponse.json(
-        { error: 'Price plan not found' },
-        { status: 404 }
-      );
-    }
-
-    if (newPlan.status !== 'active') {
-      return NextResponse.json(
-        { error: 'Price plan is not active' },
-        { status: 400 }
-      );
-    }
-
-    // Get current plan for comparison
-    const currentPlan = tenant.plan_id
-      ? await prisma.price_plans.findUnique({
-          where: { id: tenant.plan_id },
-        })
-      : null;
-
-    // Detect user location for pricing
-    const locationInfo = detectUserLocation(request.headers);
-    const newPlanPrice = Number(newPlan.price);
-    const currentPlanPrice = currentPlan ? Number(currentPlan.price) : 0;
-
-    // Determine change type
-    const changeType = getPlanChangeType(currentPlanPrice, newPlanPrice);
-
-    // Check if this is the same plan
-    if (changeType === 'same' && currentPlan?.id === newPlan.id) {
-      return NextResponse.json(
-        { error: 'You are already on this plan' },
-        { status: 400 }
-      );
-    }
-
-    const now = new Date();
-    let updatedTenant;
-    let proratedAmount = 0;
-    let effectiveDate = now;
-    let newExpireDate: Date;
-    let shouldUseTrial = false;
-
-    // Check if user has upgraded before (for trial eligibility)
-    const previousUpgrades = await prisma.subscription_changes.count({
-      where: {
-        tenant_id: tenant.id,
-        change_type: 'upgrade',
-      },
-    });
-    const hasUpgradedBefore = previousUpgrades > 0;
-
-    // Calculate days as paying customer
-    const tenantStartDate = (tenant as any).start_date || tenant.created_at;
-    const daysAsPayingCustomer = calculateDaysAsPayingCustomer(
-      tenant.created_at,
-      tenantStartDate,
-      currentPlanPrice
-    );
-
-    if (changeType === 'upgrade' || !currentPlan) {
-      // ============================================
-      // UPGRADE: Immediate effect with proration
-      // ============================================
-      
-      // Calculate proration if upgrading mid-cycle
-      if (currentPlan && tenant.expire_date && tenant.expire_date > now) {
-        const tenantStartDate = (tenant as any).start_date || tenant.created_at;
-        const proration = calculateUpgradeProration(
-          currentPlanPrice,
-          newPlanPrice,
-          tenant.expire_date,
-          tenantStartDate
-        );
-        proratedAmount = proration.proratedAmount;
-      }
-
-      // Check trial eligibility (only for first-time free → paid)
-      shouldUseTrial = shouldOfferTrialOnUpgrade(
-        currentPlanPrice,
-        daysAsPayingCustomer,
-        hasUpgradedBefore
-      ) && newPlan.trial_days ? newPlan.trial_days > 0 : false;
-
-      // Calculate new expiration date
-      if (shouldUseTrial && newPlan.trial_days) {
-        // Use trial period
-        newExpireDate = new Date(now);
-        newExpireDate.setDate(newExpireDate.getDate() + newPlan.trial_days);
-      } else if (currentPlan && tenant.expire_date && tenant.expire_date > now) {
-        // Extend from current expiration date
-        newExpireDate = new Date(tenant.expire_date);
-        newExpireDate.setMonth(newExpireDate.getMonth() + newPlan.duration_months);
-      } else {
-        // New subscription or expired: start from now
-        newExpireDate = new Date(now);
-        newExpireDate.setMonth(newExpireDate.getMonth() + newPlan.duration_months);
-      }
-
-      effectiveDate = now;
-
-      // Get current tenant data to preserve existing settings
-      const tenantWithData = await prisma.tenants.findUnique({
-        where: { id: tenant.id },
-        select: { data: true },
-      });
-      const currentData = (tenantWithData?.data as any) || {};
-
-      // Update tenant subscription immediately
-      const updateData: any = {
-        plan_id: plan_id,
-        expire_date: newExpireDate,
-        status: 'active',
-        upgrade_prorated_amount: proratedAmount > 0 ? proratedAmount : null,
-        // Clear any scheduled downgrade
-        scheduled_plan_id: null,
-        scheduled_plan_change_date: null,
-        data: {
-          ...currentData,
-          subscription: {
-            currency: locationInfo.currency,
-            currencySymbol: locationInfo.currencySymbol,
-            price: getLocalizedPrice(newPlan.name, locationInfo.isKenya),
-            planName: newPlan.name,
-          },
-        },
-      };
-
-      // Only update start_date if using trial
-      if (shouldUseTrial) {
-        updateData.start_date = now;
-      } else if ((tenant as any).start_date) {
-        // Preserve existing start_date if not using trial
-        updateData.start_date = (tenant as any).start_date;
-      }
-
-      updatedTenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: updateData,
-        include: {
-          price_plans: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-              duration_months: true,
-            },
-          },
-        },
-      });
-
-      // Log subscription change
-      try {
-        await prisma.subscription_changes.create({
-          data: {
-            tenant_id: tenant.id,
-            from_plan_id: currentPlan?.id || null,
-            to_plan_id: newPlan.id,
-            change_type: currentPlan ? 'upgrade' : 'activation',
-            effective_date: effectiveDate,
-            prorated_amount: proratedAmount > 0 ? proratedAmount : 0,
-            status: 'completed',
-            metadata: {
-              trialUsed: shouldUseTrial,
-              daysAsPayingCustomer,
-              hasUpgradedBefore,
-            },
-          },
-        });
-      } catch (logError) {
-        // Log error but don't fail the request
-        console.error('Error logging subscription change:', logError);
-      }
-
-      // Send email notifications
-      const updatedPlan = updatedTenant.price_plans;
-
-      if (!currentPlan) {
-        // New subscription (manual activation; no payment log)
-        const isKenya = updatedTenant.country === 'KE';
-        sendSubscriptionActivatedEmail({
-          tenant: updatedTenant as any,
-          plan: updatedPlan
-            ? {
-                name: updatedPlan.name,
-                price: Number(updatedPlan.price),
-                duration_months: updatedPlan.duration_months,
-                currency: isKenya ? 'KES' : 'USD',
-                currencySymbol: isKenya ? 'Ksh' : '$',
-              }
-            : null,
-          expireDate: updatedTenant.expire_date || new Date(),
-        }).catch((error) => {
-          console.error('Error sending subscription activated email:', error);
-        });
-      } else if (changeType === 'upgrade') {
-        // Upgrade confirmation
-        sendPlanUpgradeConfirmationEmail({
-          tenant: updatedTenant as any,
-          oldPlan: {
-            name: currentPlan.name,
-            price: currentPlanPrice,
-          },
-          newPlan: {
-            name: updatedPlan?.name || newPlan.name,
-            price: newPlanPrice,
-            duration_months: newPlan.duration_months,
-          },
-          expireDate: updatedTenant.expire_date || new Date(),
-          proratedAmount: proratedAmount > 0 ? proratedAmount : undefined,
-        }).catch((error) => {
-          console.error('Error sending plan upgrade confirmation email:', error);
-        });
-      }
-
-    } else if (changeType === 'downgrade') {
-      // ============================================
-      // DOWNGRADE: Schedule for next billing cycle
-      // ============================================
-      
-      if (!tenant.expire_date || tenant.expire_date <= now) {
-        return NextResponse.json(
-          { error: 'Cannot schedule downgrade: subscription has expired' },
-          { status: 400 }
-        );
-      }
-
-      // Schedule downgrade for next billing cycle
-      const scheduledChangeDate = tenant.expire_date;
-
-      // Get current tenant data
-      const tenantWithData = await prisma.tenants.findUnique({
-        where: { id: tenant.id },
-        select: { data: true },
-      });
-      const currentData = (tenantWithData?.data as any) || {};
-
-      // Update tenant: schedule downgrade but keep current plan active
-      updatedTenant = await prisma.tenants.update({
-        where: { id: tenant.id },
-        data: {
-          scheduled_plan_id: plan_id,
-          scheduled_plan_change_date: scheduledChangeDate,
-          data: {
-            ...currentData,
-            subscription: {
-              ...currentData.subscription,
-              scheduledDowngrade: {
-                planId: plan_id,
-                planName: newPlan.name,
-                effectiveDate: scheduledChangeDate,
-              },
-            },
-          },
-        },
-        include: {
-          price_plans: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-              duration_months: true,
-            },
-          },
-        },
-      });
-
-      effectiveDate = scheduledChangeDate;
-
-      // Log scheduled downgrade
-      try {
-        await prisma.subscription_changes.create({
-          data: {
-            tenant_id: tenant.id,
-            from_plan_id: currentPlan?.id || null,
-            to_plan_id: newPlan.id,
-            change_type: 'downgrade',
-            effective_date: scheduledChangeDate,
-            scheduled_change_date: scheduledChangeDate,
-            status: 'scheduled',
-            metadata: {},
-          },
-        });
-      } catch (logError) {
-        console.error('Error logging subscription change:', logError);
-      }
-
-      // Send downgrade scheduled email
-      if (currentPlan) {
-        sendPlanDowngradeScheduledEmail({
-          tenant: updatedTenant as any,
-          currentPlan: {
-            name: currentPlan.name,
-            price: currentPlanPrice,
-          },
-          newPlan: {
-            name: newPlan.name,
-            price: newPlanPrice,
-            duration_months: newPlan.duration_months,
-          },
-          effectiveDate: scheduledChangeDate,
-        }).catch((error) => {
-          console.error('Error sending downgrade scheduled email:', error);
-        });
-      }
-    }
-
-    // Ensure updatedTenant is defined
-    if (!updatedTenant) {
-      return NextResponse.json(
-        { error: 'Failed to update subscription' },
-        { status: 500 }
-      );
-    }
-
-    // For downgrades, return the scheduled plan (new plan), not the current plan
-    let planData = updatedTenant.price_plans;
-    if (changeType === 'downgrade') {
-      // Fetch the scheduled plan for downgrades
-      const scheduledPlan = await prisma.price_plans.findUnique({
-        where: { id: plan_id },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          duration_months: true,
-        },
-      });
-      planData = scheduledPlan || null;
-    }
 
     return NextResponse.json({
-      message: changeType === 'downgrade'
-        ? 'Downgrade scheduled for next billing cycle'
-        : 'Subscription activated successfully',
+      message: result.message,
       tenant: {
-        id: updatedTenant.id,
-        plan_id: updatedTenant.plan_id,
-        scheduled_plan_id: updatedTenant.scheduled_plan_id || null,
-        expire_date: updatedTenant.expire_date,
-        status: updatedTenant.status,
+        id: result.tenant.id,
+        plan_id: result.tenant.planId,
+        scheduled_plan_id: result.tenant.scheduledPlanId,
+        expire_date: result.tenant.expireDate,
+        status: result.tenant.status,
       },
-      plan: planData,
-      changeType,
-      proratedAmount: changeType === 'upgrade' ? proratedAmount : 0,
-      effectiveDate: changeType === 'downgrade' ? effectiveDate : undefined,
-      trialUsed: shouldUseTrial,
+      plan: result.plan
+        ? {
+            id: result.plan.id,
+            name: result.plan.name,
+            price: result.plan.price,
+            duration_months: result.plan.durationMonths,
+          }
+        : null,
+      changeType: result.changeType,
+      proratedAmount: result.proratedAmount,
+      effectiveDate: result.effectiveDate,
+      trialUsed: result.trialUsed,
     });
   } catch (error) {
     console.error('Error activating subscription:', error);
 
+    if (error instanceof ActivatePlanError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Invalid request data', errors: error.issues },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     return NextResponse.json(
       {
-        error: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : 'Failed to activate subscription')
-          : 'Failed to activate subscription'
+        error:
+          process.env.NODE_ENV === 'development' && error instanceof Error
+            ? error.message
+            : 'Failed to activate subscription',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

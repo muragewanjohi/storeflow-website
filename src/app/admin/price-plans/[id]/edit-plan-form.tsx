@@ -21,6 +21,8 @@ interface PricePlan {
   price: number;
   duration_months: number;
   trial_days: number | null;
+  onboarding_reward_window_days: number | null;
+  onboarding_reward_bonus_days: number | null;
   features: any;
   status: string | null;
 }
@@ -38,6 +40,8 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
     price: pricePlan.price.toString(),
     duration_months: pricePlan.duration_months.toString(),
     trial_days: (pricePlan.trial_days || 0).toString(),
+    onboarding_reward_window_days: (pricePlan.onboarding_reward_window_days ?? 30).toString(),
+    onboarding_reward_bonus_days: (pricePlan.onboarding_reward_bonus_days ?? 30).toString(),
     status: pricePlan.status || 'active',
     features: {
       max_products: pricePlan.features?.max_products?.toString() || '',
@@ -79,6 +83,8 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
           price: parseFloat(formData.price),
           duration_months: parseInt(formData.duration_months, 10),
           trial_days: parseInt(formData.trial_days, 10) || 0,
+          onboarding_reward_window_days: parseInt(formData.onboarding_reward_window_days, 10) || 0,
+          onboarding_reward_bonus_days: parseInt(formData.onboarding_reward_bonus_days, 10) || 0,
           status: formData.status,
           features,
         }),
@@ -175,6 +181,40 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
               />
               <p className="text-xs text-muted-foreground">
                 Number of free trial days (0 = no trial)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onboarding_reward_window_days">Setup Reward Window (Days)</Label>
+              <Input
+                id="onboarding_reward_window_days"
+                type="number"
+                min="0"
+                value={formData.onboarding_reward_window_days}
+                onChange={(e) =>
+                  setFormData({ ...formData, onboarding_reward_window_days: e.target.value })
+                }
+                placeholder="30"
+              />
+              <p className="text-xs text-muted-foreground">
+                Days after signup to complete the reward checklist (0 = disabled)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onboarding_reward_bonus_days">Setup Reward Bonus (Days)</Label>
+              <Input
+                id="onboarding_reward_bonus_days"
+                type="number"
+                min="0"
+                value={formData.onboarding_reward_bonus_days}
+                onChange={(e) =>
+                  setFormData({ ...formData, onboarding_reward_bonus_days: e.target.value })
+                }
+                placeholder="30 (1 month free)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Extra subscription days when the reward checklist is completed (30 = 1 month free, 0 = no bonus)
               </p>
             </div>
 

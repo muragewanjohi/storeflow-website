@@ -24,6 +24,8 @@ export default function CreatePlanForm() {
     price: '',
     duration_months: '1',
     trial_days: '0',
+    onboarding_reward_window_days: '30',
+    onboarding_reward_bonus_days: '30',
     status: 'active',
     features: {
       max_products: '',
@@ -65,6 +67,8 @@ export default function CreatePlanForm() {
           price: parseFloat(formData.price),
           duration_months: parseInt(formData.duration_months, 10),
           trial_days: parseInt(formData.trial_days, 10) || 0,
+          onboarding_reward_window_days: parseInt(formData.onboarding_reward_window_days, 10) || 0,
+          onboarding_reward_bonus_days: parseInt(formData.onboarding_reward_bonus_days, 10) || 0,
           status: formData.status,
           features,
         }),
@@ -161,6 +165,40 @@ export default function CreatePlanForm() {
               />
               <p className="text-xs text-muted-foreground">
                 Number of free trial days (0 = no trial)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onboarding_reward_window_days">Setup Reward Window (Days)</Label>
+              <Input
+                id="onboarding_reward_window_days"
+                type="number"
+                min="0"
+                value={formData.onboarding_reward_window_days}
+                onChange={(e) =>
+                  setFormData({ ...formData, onboarding_reward_window_days: e.target.value })
+                }
+                placeholder="30"
+              />
+              <p className="text-xs text-muted-foreground">
+                Days after signup to complete the reward checklist (0 = disabled)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="onboarding_reward_bonus_days">Setup Reward Bonus (Days)</Label>
+              <Input
+                id="onboarding_reward_bonus_days"
+                type="number"
+                min="0"
+                value={formData.onboarding_reward_bonus_days}
+                onChange={(e) =>
+                  setFormData({ ...formData, onboarding_reward_bonus_days: e.target.value })
+                }
+                placeholder="30 (1 month free)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Extra subscription days when the reward checklist is completed (30 = 1 month free, 0 = no bonus)
               </p>
             </div>
 

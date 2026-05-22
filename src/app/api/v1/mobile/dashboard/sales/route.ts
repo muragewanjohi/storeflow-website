@@ -12,6 +12,18 @@ const salesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   status: z.string().trim().min(1).optional(),
   search: z.string().trim().min(1).optional(),
+  featured: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  is_featured: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  sortBy: z.enum(['name', 'start_date', 'end_date', 'created_at', 'updated_at']).optional(),
+  sort_by: z.enum(['name', 'start_date', 'end_date', 'created_at', 'updated_at']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  sort_order: z.enum(['asc', 'desc']).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -38,11 +50,20 @@ export async function GET(request: NextRequest) {
       limit: searchParams.get('limit') ?? undefined,
       status: searchParams.get('status') ?? undefined,
       search: searchParams.get('search') ?? undefined,
+      featured: searchParams.get('featured') ?? undefined,
+      is_featured: searchParams.get('is_featured') ?? undefined,
+      sortBy: searchParams.get('sortBy') ?? undefined,
+      sort_by: searchParams.get('sort_by') ?? undefined,
+      sortOrder: searchParams.get('sortOrder') ?? undefined,
+      sort_order: searchParams.get('sort_order') ?? undefined,
     });
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
+    const featuredFilter = query.featured ?? query.is_featured;
+    const sortBy = query.sortBy ?? query.sort_by ?? 'created_at';
+    const sortOrder = query.sortOrder ?? query.sort_order ?? 'desc';
 
     const where: Prisma.salesWhereInput = {
       tenant_id: user.tenant_id,
@@ -52,19 +73,26 @@ export async function GET(request: NextRequest) {
       where.status = query.status;
     }
 
+    if (featuredFilter !== undefined) {
+      where.is_featured = featuredFilter;
+    }
+
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
         { description: { contains: query.search, mode: 'insensitive' } },
+        { slug: { contains: query.search, mode: 'insensitive' } },
       ];
     }
+
+    const orderBy: Prisma.salesOrderByWithRelationInput = { [sortBy]: sortOrder };
 
     const [items, total] = await Promise.all([
       prisma.sales.findMany({
         where,
         skip,
         take: limit,
-        orderBy: [{ is_featured: 'desc' }, { created_at: 'desc' }],
+        orderBy,
         select: {
           id: true,
           name: true,

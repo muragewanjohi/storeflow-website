@@ -126,6 +126,12 @@ export async function PUT(
     if (validatedData.price !== undefined) updateData.price = validatedData.price;
     if (validatedData.duration_months !== undefined) updateData.duration_months = validatedData.duration_months;
     if (validatedData.trial_days !== undefined) updateData.trial_days = validatedData.trial_days;
+    if (validatedData.onboarding_reward_window_days !== undefined) {
+      updateData.onboarding_reward_window_days = validatedData.onboarding_reward_window_days;
+    }
+    if (validatedData.onboarding_reward_bonus_days !== undefined) {
+      updateData.onboarding_reward_bonus_days = validatedData.onboarding_reward_bonus_days;
+    }
     if (validatedData.features !== undefined) updateData.features = validatedData.features as any;
     if (validatedData.status !== undefined) updateData.status = validatedData.status;
 

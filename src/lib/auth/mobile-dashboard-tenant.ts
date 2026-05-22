@@ -107,3 +107,24 @@ export function mobileTenantMustAllowWrites(tenant: Tenant): NextResponse | null
   }
   return null;
 }
+
+export async function requireMobileTenantAdmin(
+  request: NextRequest,
+): Promise<
+  { ok: true; ctx: MobileTenantStaffContext } | { ok: false; response: NextResponse }
+> {
+  const gate = await requireMobileTenantStaff(request);
+  if (!gate.ok) return gate;
+
+  if (gate.ctx.user.role !== 'tenant_admin') {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        mobileError('FORBIDDEN', 'Only the store owner can manage subscription'),
+        { status: 403 },
+      ),
+    };
+  }
+
+  return gate;
+}

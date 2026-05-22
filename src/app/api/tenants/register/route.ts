@@ -32,6 +32,7 @@ import {
   getOnboardingImagePlaceholderUrl,
   isOnboardingPlaceholderUrl,
 } from '@/lib/onboarding/image-placeholder';
+import { persistHomepageInstallSnapshot } from '@/lib/onboarding/onboarding-reward';
 import { generateSlug } from '@/lib/content/validation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/phone/parse';
@@ -2007,6 +2008,7 @@ export async function POST(request: NextRequest) {
               title: createdHomepage.title,
               tenant_id: createdHomepage.tenant_id,
             });
+            await persistHomepageInstallSnapshot(tenant.id, pageBuilderData);
             
             // Verify the page was actually saved by querying it back
             const verifyHomepage = await prisma.pages.findUnique({
