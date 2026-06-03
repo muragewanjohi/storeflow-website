@@ -171,6 +171,7 @@ function TenantRegisterForm() {
   const GOOGLE_SIGNUP_STORAGE_KEY = 'dukanest:google-signup-pending';
   const searchParams = useSearchParams();
   const planIdFromUrl = searchParams.get('plan');
+  const referrerSubdomainFromUrl = searchParams.get('ref')?.trim().toLowerCase() ?? '';
   const utmSource = searchParams.get('utm_source');
   const utmMedium = searchParams.get('utm_medium');
   const utmCampaign = searchParams.get('utm_campaign');
@@ -209,6 +210,7 @@ function TenantRegisterForm() {
   const [includeMerchantStore, setIncludeMerchantStore] = useState(true); // Enabled by default for faster payment verification setup
   const [adminPhoneCountry, setAdminPhoneCountry] = useState('KE');
   const [adminPhone, setAdminPhone] = useState('');
+  const [referrerSubdomain, setReferrerSubdomain] = useState(referrerSubdomainFromUrl);
   const [subdomainManuallyEdited, setSubdomainManuallyEdited] = useState(false);
   const isHandlingGoogleCallback = useRef(false);
   const subdomainCheckCacheRef = useRef<Map<string, boolean>>(new Map());
@@ -309,7 +311,7 @@ function TenantRegisterForm() {
         const response = await fetch('/api/pricing', {
           signal: controller.signal,
           headers: {
-            'X-User-Country': locationInfo.isKenya ? 'KE' : 'US',
+            'X-User-Country': locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
             'X-User-Currency': locationInfo.currency,
           },
         });
@@ -436,6 +438,9 @@ function TenantRegisterForm() {
         return isPhoneValidForCountry(adminPhone.trim(), adminPhoneCountry as CountryCode)
           ? null
           : 'Enter a valid mobile number for the selected country';
+      case 'referrerSubdomain':
+        if (!referrerSubdomain.trim()) return null;
+        return getSubdomainFormatError(referrerSubdomain);
       default:
         return null;
     }
@@ -570,12 +575,19 @@ function TenantRegisterForm() {
       errors.adminPhone = 'Enter a valid mobile number for the selected country';
     }
 
+    if (referrerSubdomain.trim()) {
+      const referrerSubdomainError = getSubdomainFormatError(referrerSubdomain);
+      if (referrerSubdomainError) {
+        errors.referrerSubdomain = referrerSubdomainError;
+      }
+    }
+
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setError('Please fill in all required fields highlighted below.');
       const firstFieldOrder = useEmailSignup
-        ? ['adminEmail', 'adminPassword', 'name', 'subdomain', 'adminPhone', 'businessType', 'otherBusinessType']
-        : ['name', 'subdomain', 'adminPhone', 'businessType', 'otherBusinessType'];
+        ? ['adminEmail', 'adminPassword', 'name', 'subdomain', 'adminPhone', 'referrerSubdomain', 'businessType', 'otherBusinessType']
+        : ['name', 'subdomain', 'adminPhone', 'referrerSubdomain', 'businessType', 'otherBusinessType'];
       const firstInvalidKey = firstFieldOrder.find((field) => errors[field]);
       const firstInvalidIdMap: Record<string, string> = {
         adminEmail: 'adminEmail',
@@ -585,6 +597,7 @@ function TenantRegisterForm() {
         businessType: 'business-type',
         otherBusinessType: 'otherBusinessType',
         adminPhone: 'admin-phone-national',
+        referrerSubdomain: 'referrerSubdomain',
       };
       const firstInvalidId = firstInvalidKey ? firstInvalidIdMap[firstInvalidKey] : null;
       if (firstInvalidId && typeof window !== 'undefined') {
@@ -682,6 +695,7 @@ function TenantRegisterForm() {
         includeMerchantStore?: boolean;
       adminPhone?: string;
       adminPhoneCountry?: string;
+      referrerSubdomain?: string;
     };
   }) => {
     const effectiveFormData = options.overrides?.formData ?? formData;
@@ -693,6 +707,7 @@ function TenantRegisterForm() {
       options.overrides?.includeMerchantStore ?? includeMerchantStore;
     const effectiveAdminPhone = options.overrides?.adminPhone ?? adminPhone;
     const effectiveAdminPhoneCountry = options.overrides?.adminPhoneCountry ?? adminPhoneCountry;
+    const effectiveReferrerSubdomain = options.overrides?.referrerSubdomain ?? referrerSubdomain;
 
     // Start the animated progress screen
     const steps = getProgressSteps(effectiveFormData.name);
@@ -742,6 +757,8 @@ function TenantRegisterForm() {
         includeMerchantStore: effectiveIncludeMerchantStore,
         adminPhone: effectiveAdminPhone.trim(),
         adminPhoneCountry: effectiveAdminPhoneCountry || 'KE',
+        billingCountry: locationInfo.countryCode || (locationInfo.isKenya ? 'KE' : 'US'),
+        referrerSubdomain: effectiveReferrerSubdomain.trim().toLowerCase() || undefined,
       }),
     });
 
@@ -832,6 +849,7 @@ function TenantRegisterForm() {
         includeMerchantStore,
         adminPhone,
         adminPhoneCountry,
+        referrerSubdomain,
         utmSource,
         utmMedium,
         utmCampaign,
@@ -1014,6 +1032,7 @@ function TenantRegisterForm() {
         setIncludeMerchantStore(Boolean(pending.includeMerchantStore));
         if (typeof pending.adminPhone === 'string') setAdminPhone(pending.adminPhone);
         if (typeof pending.adminPhoneCountry === 'string') setAdminPhoneCountry(pending.adminPhoneCountry);
+        if (typeof pending.referrerSubdomain === 'string') setReferrerSubdomain(pending.referrerSubdomain);
 
         const supabase = createSupabaseClient();
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -1363,6 +1382,38 @@ function TenantRegisterForm() {
               error={fieldErrors.adminPhone}
               disabled={isSubmitting}
             />
+
+            <div>
+              <Label htmlFor="referrerSubdomain" className="text-sm font-bold text-[#101828]">
+                Referrer store subdomain (optional)
+              </Label>
+              <Input
+                id="referrerSubdomain"
+                type="text"
+                value={referrerSubdomain}
+                onChange={(e) => {
+                  setReferrerSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                  clearFieldError('referrerSubdomain');
+                }}
+                onBlur={() => handleBlur('referrerSubdomain')}
+                placeholder="e.g. my-friends-store"
+                aria-invalid={Boolean(fieldErrors.referrerSubdomain)}
+                aria-describedby={fieldErrors.referrerSubdomain ? 'referrerSubdomain-error' : 'referrerSubdomain-help'}
+                className={`mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af] ${
+                  fieldErrors.referrerSubdomain ? 'border-red-500 focus-visible:ring-red-500' : ''
+                }`}
+              />
+              {fieldErrors.referrerSubdomain ? (
+                <p id="referrerSubdomain-error" className="mt-1 text-xs text-red-600">
+                  {fieldErrors.referrerSubdomain}
+                </p>
+              ) : (
+                <p id="referrerSubdomain-help" className="mt-1 text-xs text-[#6a7282]">
+                  Friend shared their store subdomain with you? Enter it here, or use a link like{' '}
+                  <code>?ref=store-subdomain</code>.
+                </p>
+              )}
+            </div>
 
             <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4 space-y-3">
               <p className="text-sm font-semibold text-[#101828]">Store starts empty</p>

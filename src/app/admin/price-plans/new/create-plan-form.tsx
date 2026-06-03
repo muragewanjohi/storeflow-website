@@ -22,6 +22,7 @@ export default function CreatePlanForm() {
   const [formData, setFormData] = useState({
     name: '',
     price: '',
+    price_kes: '',
     duration_months: '1',
     trial_days: '0',
     onboarding_reward_window_days: '30',
@@ -65,6 +66,7 @@ export default function CreatePlanForm() {
         body: JSON.stringify({
           name: formData.name,
           price: parseFloat(formData.price),
+          price_kes: formData.price_kes.trim() ? parseFloat(formData.price_kes) : null,
           duration_months: parseInt(formData.duration_months, 10),
           trial_days: parseInt(formData.trial_days, 10) || 0,
           onboarding_reward_window_days: parseInt(formData.onboarding_reward_window_days, 10) || 0,
@@ -128,7 +130,7 @@ export default function CreatePlanForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Price (USD) *</Label>
+              <Label htmlFor="price">Monthly price (USD) *</Label>
               <Input
                 id="price"
                 type="number"
@@ -136,9 +138,25 @@ export default function CreatePlanForm() {
                 min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                placeholder="29.99"
+                placeholder="e.g. 10 for Basic, 30 for Pro"
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price_kes">Monthly price (KES)</Label>
+              <Input
+                id="price_kes"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.price_kes}
+                onChange={(e) => setFormData({ ...formData, price_kes: e.target.value })}
+                placeholder="e.g. 1000 for Basic, 3000 for Pro"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used for Kenya tenants. Optional; falls back to USD if empty.
+              </p>
             </div>
 
             <div className="space-y-2">

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import { getDaysUntil, getTrialDaysRemaining, isInTrialPeriod } from '@/lib/subscriptions/trial';
+import { getReferralsSummaryForTenant } from '@/lib/referrals/service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const now = new Date();
+    const registerBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || request.nextUrl.origin;
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
       totalCustomers,
       monthlyPaidRevenueAgg,
       recentOrders,
+      referralSummary,
     ] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: user.tenant_id },
@@ -119,6 +122,7 @@ export async function GET(request: NextRequest) {
           created_at: true,
         },
       }),
+      getReferralsSummaryForTenant(user.tenant_id),
     ]);
 
     return NextResponse.json(
@@ -166,6 +170,12 @@ export async function GET(request: NextRequest) {
           startDate: startDateIso,
           expireDate: expireDateIso,
           daysUntilExpire: expireDateIso ? getDaysUntil(expireDateIso) : null,
+        },
+        referrals: {
+          ...referralSummary.summary,
+          referralLink: referralSummary.summary.shareSubdomain
+            ? `${registerBaseUrl}/register?ref=${encodeURIComponent(referralSummary.summary.shareSubdomain)}`
+            : null,
         },
       }),
       { status: 200 },

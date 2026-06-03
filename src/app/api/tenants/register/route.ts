@@ -14,7 +14,13 @@ import type { Prisma } from '@prisma/client';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateSubdomain } from '@/lib/subdomain-validation';
 import { sendEmail } from '@/lib/email/sendgrid';
-import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
+import {
+  detectUserLocation,
+  getPricingInfoForCountry,
+  resolvePlanMonthlyPrice,
+  resolveTenantBillingCountry,
+} from '@/lib/pricing/location';
+import { getDefaultRegistrationPlan } from '@/lib/subscriptions/load-plans';
 import { getCurrencyForCountry } from '@/lib/pricing/country-currency-map';
 import { setStaticOptions } from '@/lib/settings/static-options';
 import { addTenantDomain } from '@/lib/vercel-domains';
@@ -39,6 +45,7 @@ import { isKnownCountryCode, parseToE164Digits, type CountryCode } from '@/lib/p
 import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
 import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 import { queueTumiziProvisioningForTenant } from '@/lib/tumizi/provisioning';
+import { createTenantReferralAttribution } from '@/lib/referrals/service';
 
 interface StarterPackProduct {
   name: string;
@@ -1286,6 +1293,12 @@ const registerTenantSchema = z.object({
   adminPhone: z.string().trim().min(1, 'Store phone number is required'),
   /** ISO 3166-1 alpha-2; defaults to KE on the server if omitted */
   adminPhoneCountry: z.string().length(2).optional(),
+  /** Billing region for subscription pricing (ISO 3166-1 alpha-2, e.g. KE, US) */
+  billingCountry: z.string().length(2).optional(),
+  /** Optional referrer store subdomain (unique public identifier). */
+  referrerSubdomain: z.string().min(3).max(63).regex(/^[a-z0-9-]+$/, {
+    message: 'Referrer subdomain can only contain lowercase letters, numbers, and hyphens',
+  }).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -1326,35 +1339,19 @@ export async function POST(request: NextRequest) {
       hasPlanId: Boolean(validatedData.planId),
     });
 
-    // Detect user location for pricing - check client-provided headers first, then server headers
-    let locationInfo = detectUserLocation(request.headers);
-    
-    // Check if client provided location info (from client-side detection)
     const clientCountry = request.headers.get('x-user-country');
-    const clientCurrency = request.headers.get('x-user-currency');
-    
-    if (clientCountry === 'KE' || clientCurrency === 'KES') {
-      locationInfo = {
-        currency: 'KES',
-        currencySymbol: 'Ksh',
-        isKenya: true,
-        countryCode: 'KE',
-      };
-    } else if (clientCountry && clientCountry !== 'KE') {
-      locationInfo = {
-        currency: 'USD',
-        currencySymbol: '$',
-        isKenya: false,
-        countryCode: clientCountry,
-      };
-    }
-    
-    // Get country code for storage (prioritize detected country code)
-    const countryCode = locationInfo.countryCode || 
-                       clientCountry || 
-                       request.headers.get('x-vercel-ip-country') ||
-                       request.headers.get('cf-ipcountry') ||
-                       null;
+    const geoCountry =
+      detectUserLocation(request.headers).countryCode ||
+      request.headers.get('x-vercel-ip-country') ||
+      request.headers.get('cf-ipcountry');
+
+    const countryCode = resolveTenantBillingCountry({
+      billingCountry: validatedData.billingCountry,
+      clientCountry,
+      geoCountry,
+      adminPhoneCountry: phoneCountry,
+    });
+    const locationInfo = getPricingInfoForCountry(countryCode);
 
     // Validate subdomain
     const subdomainValidation = validateSubdomain(validatedData.subdomain);
@@ -1394,6 +1391,12 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    if (!plan) {
+      plan = await getDefaultRegistrationPlan();
+    }
+
+    const effectivePlanId = plan?.id ?? null;
 
     // Calculate expiration date
     let expireDate: Date | null = null;
@@ -1518,9 +1521,11 @@ export async function POST(request: NextRequest) {
     let subscriptionCurrency: 'KES' | 'USD' = 'USD';
     let subscriptionCurrencySymbol: 'Ksh' | '$' = '$';
     
-    if (validatedData.planId && plan) {
-      // Get localized price based on location
-      subscriptionPrice = getLocalizedPrice(plan.name, locationInfo.isKenya);
+    if (plan) {
+      subscriptionPrice = resolvePlanMonthlyPrice(
+        { price: plan.price, price_kes: plan.price_kes },
+        locationInfo.isKenya,
+      );
       subscriptionCurrency = locationInfo.currency;
       subscriptionCurrencySymbol = locationInfo.currencySymbol;
     }
@@ -1723,7 +1728,7 @@ export async function POST(request: NextRequest) {
         contact_email: validatedData.contactEmail ?? validatedData.adminEmail,
         status: 'active',
         start_date: new Date(),
-        plan_id: validatedData.planId || null,
+        plan_id: effectivePlanId,
         expire_date: expireDate,
         country: countryCode, // Store country code
         data: {
@@ -1733,15 +1738,49 @@ export async function POST(request: NextRequest) {
           admin_phone: normalizedAdminPhoneE164,
           admin_phone_country: phoneCountry,
           // Store subscription pricing info for future payments
-          subscription: validatedData.planId ? {
-            currency: subscriptionCurrency,
-            currencySymbol: subscriptionCurrencySymbol,
-            price: subscriptionPrice,
-            planName: plan?.name || null,
-          } : null,
+          subscription: plan
+            ? {
+                currency: subscriptionCurrency,
+                currencySymbol: subscriptionCurrencySymbol,
+                price: subscriptionPrice,
+                priceUsd: Number(plan.price),
+                priceKes: plan.price_kes != null ? Number(plan.price_kes) : null,
+                planName: plan.name,
+                billingCountry: countryCode,
+              }
+            : null,
         },
       },
     });
+
+    if (validatedData.referrerSubdomain) {
+      const referrerSubdomainValidation = validateSubdomain(validatedData.referrerSubdomain);
+      if (!referrerSubdomainValidation.isValid) {
+        console.warn('[Registration] Referral attribution skipped', {
+          traceId: registrationTraceId,
+          referrerSubdomain: validatedData.referrerSubdomain,
+          reason: referrerSubdomainValidation.error ?? 'Invalid referrer subdomain',
+        });
+      } else {
+        try {
+          const referralResult = await createTenantReferralAttribution({
+            referrerSubdomain: validatedData.referrerSubdomain,
+            referredTenantId: tenant.id,
+            referredSubdomain: tenant.subdomain,
+          });
+          if (!referralResult.created) {
+            console.warn('[Registration] Referral attribution skipped', {
+              traceId: registrationTraceId,
+              referrerSubdomain: validatedData.referrerSubdomain,
+              referredTenantId: tenant.id,
+              reason: referralResult.reason ?? 'unknown',
+            });
+          }
+        } catch (referralError) {
+          console.error('[Registration] Failed to create referral attribution:', referralError);
+        }
+      }
+    }
 
     let userId: string;
     

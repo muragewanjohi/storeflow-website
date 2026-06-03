@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
 import { pesapalConfig } from '@/lib/pesapal/config';
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 import { loadActiveSubscriptionPlans, tenantPricingContext } from '@/lib/subscriptions/load-plans';
 import { planLimitsFromFeatures } from '@/lib/subscriptions/plan-limits';
 import { getDaysUntil, getTrialDaysRemaining } from '@/lib/subscriptions/trial';
@@ -9,6 +9,7 @@ function mapPlanRow(plan: {
   id: string;
   name: string;
   price: unknown;
+  price_kes?: unknown | null;
   duration_months: number;
   trial_days: number | null;
   features: unknown;
@@ -17,6 +18,7 @@ function mapPlanRow(plan: {
     id: plan.id,
     name: plan.name,
     price: Number(plan.price),
+    priceKes: plan.price_kes != null ? Number(plan.price_kes) : null,
     durationMonths: plan.duration_months,
     trialDays: plan.trial_days,
     features: plan.features,
@@ -34,10 +36,10 @@ export async function loadMobileSubscriptionSnapshot(tenantId: string) {
 
   if (!tenant) return null;
 
-  const { isKenya, isDemoStore } = tenantPricingContext(tenant);
+  const { isKenya } = tenantPricingContext(tenant);
 
   const [availablePlans, usage] = await Promise.all([
-    loadActiveSubscriptionPlans({ isKenya, isDemoStore }),
+    loadActiveSubscriptionPlans({ isKenya }),
     Promise.all([
       prisma.products.count({ where: { tenant_id: tenantId } }),
       prisma.orders.count({ where: { tenant_id: tenantId } }),
@@ -50,14 +52,10 @@ export async function loadMobileSubscriptionSnapshot(tenantId: string) {
   const currentPlan = tenant.price_plans
     ? {
         ...mapPlanRow(tenant.price_plans),
-        price: isKenya
-          ? getLocalizedPrice(
-              tenant.price_plans.name,
-              true,
-              Number(tenant.price_plans.price),
-              isDemoStore,
-            )
-          : Number(tenant.price_plans.price),
+        price: resolvePlanMonthlyPrice(
+          { price: tenant.price_plans.price, price_kes: tenant.price_plans.price_kes },
+          isKenya,
+        ),
         currency: isKenya ? 'KES' : 'USD',
         currencySymbol: isKenya ? 'Ksh' : '$',
       }
@@ -66,14 +64,10 @@ export async function loadMobileSubscriptionSnapshot(tenantId: string) {
   const scheduledPlan = tenant.scheduled_plan
     ? {
         ...mapPlanRow(tenant.scheduled_plan),
-        price: isKenya
-          ? getLocalizedPrice(
-              tenant.scheduled_plan.name,
-              true,
-              Number(tenant.scheduled_plan.price),
-              isDemoStore,
-            )
-          : Number(tenant.scheduled_plan.price),
+        price: resolvePlanMonthlyPrice(
+          { price: tenant.scheduled_plan.price, price_kes: tenant.scheduled_plan.price_kes },
+          isKenya,
+        ),
       }
     : null;
 

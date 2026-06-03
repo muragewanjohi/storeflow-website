@@ -1,11 +1,12 @@
 -- Script to create three pricing plans with 14-day trial periods
 -- Run this SQL script in your Supabase SQL editor or via psql
 
--- Basic Plan
-INSERT INTO price_plans (name, price, duration_months, trial_days, features, status, created_at, updated_at)
+-- Basic Plan (price = monthly charge amount; edit via Admin → Price Plans)
+INSERT INTO price_plans (name, price, price_kes, duration_months, trial_days, features, status, created_at, updated_at)
 VALUES (
   'Basic Plan',
-  29.99,
+  10,
+  1000,
   1,
   14,
   '{
@@ -24,10 +25,11 @@ VALUES (
 ON CONFLICT DO NOTHING;
 
 -- Pro Plan
-INSERT INTO price_plans (name, price, duration_months, trial_days, features, status, created_at, updated_at)
+INSERT INTO price_plans (name, price, price_kes, duration_months, trial_days, features, status, created_at, updated_at)
 VALUES (
   'Pro Plan',
-  79.99,
+  30,
+  3000,
   1,
   14,
   '{

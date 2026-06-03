@@ -1,22 +1,106 @@
 /**
  * Location-based pricing utilities
- * 
- * Detects user location and returns appropriate currency and pricing
+ *
+ * Plan amounts: `price_plans.price` (USD) and `price_plans.price_kes` (Kenya).
+ * Managed in Admin → Price Plans.
  */
 
 export interface PricingInfo {
   currency: 'KES' | 'USD';
   currencySymbol: 'Ksh' | '$';
   isKenya: boolean;
-  countryCode?: string; // ISO 3166-1 alpha-2 country code (e.g., "KE", "US")
+  countryCode?: string;
+}
+
+/** Prisma Decimal and other numeric DB types */
+export type PlanPriceInput = {
+  price: unknown;
+  price_kes?: unknown;
+};
+
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toNumber' in value &&
+    typeof (value as { toNumber: () => number }).toNumber === 'function'
+  ) {
+    const n = (value as { toNumber: () => number }).toNumber();
+    return Number.isNaN(n) ? null : n;
+  }
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Build input for {@link resolvePlanMonthlyPrice} from a price_plans row */
+export function planPriceInputFromRow(row: {
+  price: unknown;
+  price_kes?: unknown | null;
+}): PlanPriceInput {
+  return { price: row.price, price_kes: row.price_kes };
 }
 
 /**
- * Detect if user is in Kenya based on request headers
- * Checks Vercel geo headers, Cloudflare headers, or Accept-Language
+ * Monthly charge for a plan based on tenant/visitor region.
+ * Kenya uses `price_kes` when set; otherwise USD `price`.
  */
+export function resolvePlanMonthlyPrice(
+  plan: PlanPriceInput,
+  isKenya: boolean
+): number {
+  const usd = toNumber(plan.price);
+  if (isKenya) {
+    const kes = toNumber(plan.price_kes);
+    if (kes !== null) return kes;
+  }
+  return usd ?? 0;
+}
+
+/** ISO 3166-1 alpha-2, uppercase */
+export function normalizeCountryCode(code: string | null | undefined): string | null {
+  if (!code || typeof code !== 'string') return null;
+  const trimmed = code.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(trimmed) ? trimmed : null;
+}
+
+export function isKenyaCountry(country: string | null | undefined): boolean {
+  return normalizeCountryCode(country) === 'KE';
+}
+
+export function getPricingInfoForCountry(countryCode: string): PricingInfo {
+  const normalized = normalizeCountryCode(countryCode) ?? 'US';
+  const isKenya = normalized === 'KE';
+  return {
+    currency: isKenya ? 'KES' : 'USD',
+    currencySymbol: isKenya ? 'Ksh' : '$',
+    isKenya,
+    countryCode: normalized,
+  };
+}
+
+/**
+ * Pick tenant billing country at registration (explicit choice > client geo > server geo > phone).
+ */
+export function resolveTenantBillingCountry(input: {
+  billingCountry?: string | null;
+  clientCountry?: string | null;
+  geoCountry?: string | null;
+  adminPhoneCountry?: string | null;
+}): string {
+  for (const candidate of [
+    input.billingCountry,
+    input.clientCountry,
+    input.geoCountry,
+    input.adminPhoneCountry,
+  ]) {
+    const normalized = normalizeCountryCode(candidate);
+    if (normalized) return normalized;
+  }
+  return 'US';
+}
+
 export function detectUserLocation(headers: Headers): PricingInfo {
-  // Check Vercel geo header (x-vercel-ip-country)
   const vercelCountry = headers.get('x-vercel-ip-country');
   if (vercelCountry) {
     return {
@@ -27,7 +111,6 @@ export function detectUserLocation(headers: Headers): PricingInfo {
     };
   }
 
-  // Check Cloudflare geo header (cf-ipcountry)
   const cloudflareCountry = headers.get('cf-ipcountry');
   if (cloudflareCountry) {
     return {
@@ -38,14 +121,13 @@ export function detectUserLocation(headers: Headers): PricingInfo {
     };
   }
 
-  // Check Accept-Language header as fallback
   const acceptLanguage = headers.get('accept-language');
   if (acceptLanguage) {
-    // Check if language includes Swahili or timezone hints for Kenya
-    const isKenya = acceptLanguage.includes('sw-KE') || 
-                    acceptLanguage.includes('en-KE') ||
-                    acceptLanguage.toLowerCase().includes('kenya');
-    
+    const isKenya =
+      acceptLanguage.includes('sw-KE') ||
+      acceptLanguage.includes('en-KE') ||
+      acceptLanguage.toLowerCase().includes('kenya');
+
     return {
       currency: isKenya ? 'KES' : 'USD',
       currencySymbol: isKenya ? 'Ksh' : '$',
@@ -54,7 +136,6 @@ export function detectUserLocation(headers: Headers): PricingInfo {
     };
   }
 
-  // Default to USD
   return {
     currency: 'USD',
     currencySymbol: '$',
@@ -64,64 +145,24 @@ export function detectUserLocation(headers: Headers): PricingInfo {
 }
 
 /**
- * Get localized price based on plan name and location
- * For Kenya: Fixed KES prices (no conversion)
- * For demo stores (Kenya): KSh 10 Basic, KSh 30 Pro monthly (for testing)
- * For others: USD prices
+ * @deprecated Prefer `resolvePlanMonthlyPrice({ price, price_kes }, isKenya)`.
  */
 export function getLocalizedPrice(
-  planName: string,
+  _planName: string,
   isKenya: boolean,
-  usdPrice?: number,
-  isDemoStore?: boolean
+  priceUsd?: number,
+  _isDemoStore?: boolean,
+  priceKes?: number | null
 ): number {
-  if (!isKenya) {
-    // Return USD prices as-is
-    if (usdPrice !== undefined) {
-      return usdPrice;
-    }
-    // Fallback to hardcoded USD prices
-    if (planName.toLowerCase().includes('basic')) {
-      return 10;
-    } else if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
-      return 30;
-    } else if (planName.toLowerCase().includes('premium')) {
-      return 60;
-    }
-    return 0;
-  } else {
-    // Demo store: low KES prices for testing (KSh 10 Basic, KSh 30 Pro monthly)
-    if (isDemoStore) {
-      if (planName.toLowerCase().includes('basic')) {
-        return 10; // KES 10/month
-      }
-      if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
-        return 30; // KES 30/month
-      }
-      if (planName.toLowerCase().includes('premium')) {
-        return 60; // KES 60/month for testing
-      }
-      return 10;
-    }
-    // Fixed KES prices for Kenya (no conversion)
-    if (planName.toLowerCase().includes('basic')) {
-      return 1000; // KES 1,000
-    } else if (planName.toLowerCase().includes('pro') || planName.toLowerCase().includes('standard')) {
-      return 3000; // KES 3,000
-    } else if (planName.toLowerCase().includes('premium')) {
-      return 6000; // KES 6,000
-    }
-    return 0;
-  }
+  return resolvePlanMonthlyPrice(
+    { price: priceUsd, price_kes: priceKes },
+    isKenya
+  );
 }
 
-/**
- * Format price with currency symbol
- */
 export function formatPrice(price: number, currencySymbol: 'Ksh' | '$'): string {
   if (currencySymbol === 'Ksh') {
     return `Ksh ${price.toLocaleString('en-KE')}`;
   }
   return `${currencySymbol}${price.toFixed(2)}`;
 }
-

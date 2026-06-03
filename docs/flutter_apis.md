@@ -44,7 +44,7 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | POST | `/auth/mfa/status` | MFA status |
 | POST | `/auth/mfa/verify` | Complete MFA |
 | GET | `/auth/me` | Session restore: `user` + `tenant` (dashboard roles); landlord returns `tenant: null` |
-| GET | `/dashboard/overview` | Metrics + recent orders *(checklist: use **`/dashboard/getting-started`**) |
+| GET | `/dashboard/overview` | Metrics + recent orders + `subscription` + `referrals` summary (`shareSubdomain`, `referralLink`) *(checklist: use **`/dashboard/getting-started`**)* |
 | GET | `/dashboard/getting-started` | On **`items[]`** with `id`, `completed`, `progressPercent`, `storeUrl`, … |
 | POST | `/dashboard/getting-started` | Body `{ "action": "preview_done" \| "share_done" }` → persists flags (see below) |
 | GET | `/dashboard/reward-checklist` | Separate **reward** checklist — window + bonus days come from the tenant's **`price_plans`** row (see [Reward checklist](#reward-checklist-earn-1-month-free)) |
@@ -53,6 +53,7 @@ These paths are relative to **`/api/v1/mobile`** (full URL example: `https://www
 | PATCH | `/dashboard/orders/:id` | `status`, optional `notes`, tracking; **`payment_status` only when `payment_gateway` ≠ `tumizi`** (see [Tumizi orders](#tumizi-orders-merchant-app)) |
 | POST | `/dashboard/orders/:id/cancel` | Cancel order; body `{ reason, refund?, notes? }` — restores stock |
 | GET | `/dashboard/subscription` | Plans, usage, limits, trial/renewal, PesaPal config |
+| GET | `/dashboard/referrals` | Referral subdomain, referral counts, rewarded months |
 | GET | `/dashboard/subscription/billing` | Billing history + plan dates |
 | POST | `/dashboard/subscription/activate` | Upgrade / schedule downgrade / trial activation (**admin**) |
 | POST | `/dashboard/subscription/mpesa/initiate` | STK push for plan payment (**admin**) |
@@ -756,7 +757,7 @@ Public (non-mobile base): `GET /api/tenants/check-subdomain`, `POST /api/tenants
 
 | Status | Method | Path | Purpose | Flutter surface |
 |--------|--------|------|---------|-----------------|
-| Exists | GET | `/dashboard/overview` | Metrics, recent orders, **subscription/trial** snapshot | `DashboardScreen` |
+| Exists | GET | `/dashboard/overview` | Metrics, recent orders, **subscription/trial** + `referrals` snapshot (`shareSubdomain`, `referralLink`) | `DashboardScreen` |
 | Exists | GET | `/dashboard/analytics` | Metrics for last `days` (query `days`, 1–365, default 30) | `AnalyticsScreen` |
 | Exists | GET | `/dashboard/analytics/pnl` | P&L summary (`start_date` / `end_date` or camelCase) | Finance tab |
 | Exists | GET | `/dashboard/analytics/:segment` | Web-parity analytics (see table below) | Analytics sub-screens |
@@ -1420,6 +1421,7 @@ Writes blocked when subscription expired (`canEditData`).
 | Status | Method | Path | Purpose | Flutter surface |
 |--------|--------|------|---------|-----------------|
 | Exists | GET | `/dashboard/subscription` | Plans, usage, limits, trial/renewal, PesaPal config | `SubscriptionScreen` |
+| Exists | GET | `/dashboard/referrals` | Referral subdomain + referral progress summary | `ReferralScreen` / subscription loyalty section |
 | Exists | GET | `/dashboard/subscription/billing` | Billing history + plan dates | Billing tab |
 | Exists | POST | `/dashboard/subscription/activate` | **Admin** — upgrade/trial or schedule downgrade | Plan change without payment |
 | Exists | POST | `/dashboard/subscription/mpesa/initiate` | **Admin** — STK `{ planId, phoneNumber }` | M-Pesa checkout |

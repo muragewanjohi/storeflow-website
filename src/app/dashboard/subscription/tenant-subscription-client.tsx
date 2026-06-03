@@ -42,13 +42,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { Tenant } from '@/lib/tenant-context';
-import { getLocalizedPrice, formatPrice } from '@/lib/pricing/location';
+import { isKenyaCountry, resolvePlanMonthlyPrice, formatPrice } from '@/lib/pricing/location';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { toast } from 'sonner';
 
 interface PricePlan {
   id: string;
   name: string;
   price: number;
+  price_kes?: number | null;
   duration_months: number;
   trial_days?: number | null;
   features: any;
@@ -180,14 +182,12 @@ export default function TenantSubscriptionClient({
   });
   const yearlyDiscountPercent = pesapalConfig?.yearlyDiscountPercent ?? 17;
 
-  const isKenya = tenant?.country === 'KE';
-  const isDemoStore =
-    tenant?.data?.is_demo === true || (tenant?.data as Record<string, unknown>)?.isDemo === true;
+  const isKenya = isKenyaCountry(tenant?.country);
   const currencySymbol = isKenya ? 'Ksh' : '$';
-  const getDisplayPrice = (planName: string, usdPrice: number) =>
-    getLocalizedPrice(planName, isKenya, usdPrice, isDemoStore);
-  const formatPlanPrice = (planName: string, usdPrice: number) =>
-    formatPrice(getDisplayPrice(planName, usdPrice), currencySymbol);
+  const getDisplayPrice = (plan: Pick<PricePlan, 'price' | 'price_kes'>) =>
+    resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya);
+  const formatPlanPrice = (plan: Pick<PricePlan, 'price' | 'price_kes'>) =>
+    formatPrice(getDisplayPrice(plan), currencySymbol);
 
   // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
@@ -367,7 +367,7 @@ export default function TenantSubscriptionClient({
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Monthly Price</p>
                 <p className="text-xl font-bold">
-                  {formatPlanPrice(currentPlan.name, currentPlan.price)}
+                  {formatPlanPrice(currentPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     {' '}/ {currentPlan.duration_months === 1 ? 'month' : `${currentPlan.duration_months} months`}
                   </span>
@@ -467,7 +467,7 @@ export default function TenantSubscriptionClient({
                   </p>
                 </div>
               </div>
-              {Number(getDisplayPrice(currentPlan.name, currentPlan.price)) > 0 && (
+              {Number(getDisplayPrice(currentPlan)) > 0 && (
                 <Button
                   onClick={() => {
                     setSelectedPlanId(currentPlan.id);
@@ -727,8 +727,8 @@ export default function TenantSubscriptionClient({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {availablePlans.map((plan: any) => {
                   const isCurrentPlan = plan.id === currentPlan?.id;
-                  const currentDisplayPrice = currentPlan ? getDisplayPrice(currentPlan.name, currentPlan.price) : 0;
-                  const planDisplayPrice = getDisplayPrice(plan.name, plan.price);
+                  const currentDisplayPrice = currentPlan ? getDisplayPrice(currentPlan) : 0;
+                  const planDisplayPrice = getDisplayPrice(plan);
                   const isUpgrade = currentPlan && planDisplayPrice > currentDisplayPrice;
                   const isDowngrade = currentPlan && planDisplayPrice < currentDisplayPrice;
                   const features = (plan.features as any) || {};
@@ -746,7 +746,7 @@ export default function TenantSubscriptionClient({
                       <CardHeader>
                         <CardTitle className="text-2xl">{plan.name}</CardTitle>
                         <div className="mt-4">
-                          <span className="text-4xl font-bold">{formatPlanPrice(plan.name, plan.price)}</span>
+                          <span className="text-4xl font-bold">{formatPlanPrice(plan)}</span>
                           <span className="text-muted-foreground ml-2">
                             / {plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
                           </span>
@@ -817,7 +817,7 @@ export default function TenantSubscriptionClient({
                                   setShowDowngradeDialog(true);
                                 } else {
                                   // For upgrades/new subscriptions, show payment option
-                                  if (getDisplayPrice(plan.name, plan.price) > 0) {
+                                  if (getDisplayPrice(plan) > 0) {
                                     setSelectedPlanId(plan.id);
                                     setSelectedPlanName(plan.name);
                                     setShowPaymentDialog(true);
@@ -891,7 +891,7 @@ export default function TenantSubscriptionClient({
         {/* Billing History Tab */}
         <TabsContent value="billing" className="space-y-6">
           {/* Pay now card: show when due within 7 days (best practice: renewal CTA in billing) */}
-          {isExpiringSoon && currentPlan && Number(getDisplayPrice(currentPlan.name, currentPlan.price)) > 0 && (
+          {isExpiringSoon && currentPlan && Number(getDisplayPrice(currentPlan)) > 0 && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1030,7 +1030,7 @@ export default function TenantSubscriptionClient({
                 {selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
                   const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
                   if (!sel) return null;
-                  const monthlyDisplay = getDisplayPrice(sel.name, sel.price);
+                  const monthlyDisplay = getDisplayPrice(sel);
                   const yearlyDisplay = getYearlyPriceDisplay(monthlyDisplay);
                   return (
                   <>

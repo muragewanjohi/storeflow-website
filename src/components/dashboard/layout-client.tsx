@@ -25,6 +25,7 @@ import {
   PhotoIcon,
   PaintBrushIcon,
   CreditCardIcon,
+  GiftIcon,
   UsersIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
@@ -92,6 +93,7 @@ export default function DashboardLayoutClient({
           { href: '/dashboard/themes', label: 'Themes', icon: PaintBrushIcon },
           { href: '/dashboard/users', label: 'Users', icon: UsersIcon },
           { href: '/dashboard/subscription', label: 'Subscription', icon: CreditCardIcon },
+          { href: '/dashboard/subscription/referrals', label: 'Referral Rewards', icon: GiftIcon },
         ]
       : []),
   ];

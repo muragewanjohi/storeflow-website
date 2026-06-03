@@ -5,7 +5,7 @@ import {
   type SubmitOrderParams,
 } from '@/lib/pesapal/pesapal-service';
 import { pesapalConfig, getYearlyPrice } from '@/lib/pesapal/config';
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { isKenyaCountry, resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 import {
   calculateUpgradeProration,
   getPlanChangeType,
@@ -55,21 +55,17 @@ export async function initiatePesapalSubscriptionPayment(input: {
     ? await prisma.price_plans.findUnique({ where: { id: tenant.plan_id } })
     : null;
 
-  const tenantData =
-    tenant.data && typeof tenant.data === 'object' && !Array.isArray(tenant.data)
-      ? (tenant.data as Record<string, unknown>)
-      : {};
-  const isDemoStore = tenantData.is_demo === true || tenantData.isDemo === true;
-  const isKenya = tenant.country === 'KE';
+  const isKenya = isKenyaCountry(tenant.country);
 
-  const monthlyPlanPrice = Number(plan.price);
-  const monthlyPrice = isKenya
-    ? getLocalizedPrice(plan.name, true, monthlyPlanPrice, isDemoStore)
-    : monthlyPlanPrice;
+  const monthlyPrice = resolvePlanMonthlyPrice(
+    { price: plan.price, price_kes: plan.price_kes },
+    isKenya,
+  );
   const currentPlanPrice = currentPlan
-    ? isKenya
-      ? getLocalizedPrice(currentPlan.name, true, Number(currentPlan.price), isDemoStore)
-      : Number(currentPlan.price)
+    ? resolvePlanMonthlyPrice(
+        { price: currentPlan.price, price_kes: currentPlan.price_kes },
+        isKenya,
+      )
     : 0;
   const changeType = getPlanChangeType(currentPlanPrice, monthlyPrice);
 

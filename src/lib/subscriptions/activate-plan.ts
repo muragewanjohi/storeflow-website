@@ -5,7 +5,7 @@ import {
   sendPlanUpgradeConfirmationEmail,
   sendSubscriptionActivatedEmail,
 } from '@/lib/subscriptions/emails';
-import { detectUserLocation, getLocalizedPrice } from '@/lib/pricing/location';
+import { detectUserLocation, resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 import {
   calculateDaysAsPayingCustomer,
   calculateUpgradeProration,
@@ -173,7 +173,10 @@ export async function activateTenantSubscriptionPlan(input: {
         subscription: {
           currency: locationInfo.currency,
           currencySymbol: locationInfo.currencySymbol,
-          price: getLocalizedPrice(newPlan.name, locationInfo.isKenya),
+          price: resolvePlanMonthlyPrice(
+            { price: newPlan.price, price_kes: newPlan.price_kes },
+            locationInfo.isKenya,
+          ),
           planName: newPlan.name,
         },
       },

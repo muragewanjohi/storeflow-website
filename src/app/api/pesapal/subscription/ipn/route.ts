@@ -14,6 +14,7 @@ import {
 } from '@/lib/pesapal/pesapal-service';
 import { sendSubscriptionActivatedEmail } from '@/lib/subscriptions/emails';
 import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
+import { processReferralRewardForReferredTenant } from '@/lib/referrals/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,7 +111,7 @@ async function handleIpn(request: NextRequest): Promise<NextResponse> {
             where: { id: tenant.id },
             data: { expire_date: newExpire, status: 'active' },
           });
-          await prisma.payment_logs.create({
+          const recurringPayment = await prisma.payment_logs.create({
             data: {
               tenant_id: tenant.id,
               gateway: 'pesapal',
@@ -126,6 +127,11 @@ async function handleIpn(request: NextRequest): Promise<NextResponse> {
                 subscription_transaction_info: statusResult.subscription_transaction_info,
               },
             },
+          });
+
+          await processReferralRewardForReferredTenant({
+            referredTenantId: tenant.id,
+            paymentLogId: recurringPayment.id,
           });
         }
       }
@@ -212,6 +218,11 @@ async function handleIpn(request: NextRequest): Promise<NextResponse> {
           source: 'ipn',
         },
       },
+    });
+
+    await processReferralRewardForReferredTenant({
+      referredTenantId: tenant.id,
+      paymentLogId: paymentLog.id,
     });
 
     const updatedTenant = await prisma.tenants.findUnique({

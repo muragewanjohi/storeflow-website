@@ -124,6 +124,7 @@ export async function PUT(
     
     if (validatedData.name !== undefined) updateData.name = validatedData.name;
     if (validatedData.price !== undefined) updateData.price = validatedData.price;
+    if (validatedData.price_kes !== undefined) updateData.price_kes = validatedData.price_kes;
     if (validatedData.duration_months !== undefined) updateData.duration_months = validatedData.duration_months;
     if (validatedData.trial_days !== undefined) updateData.trial_days = validatedData.trial_days;
     if (validatedData.onboarding_reward_window_days !== undefined) {

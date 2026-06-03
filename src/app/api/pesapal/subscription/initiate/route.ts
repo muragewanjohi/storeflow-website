@@ -20,7 +20,7 @@ import {
   calculateUpgradeProration,
   getPlanChangeType,
 } from '@/lib/subscriptions/proration';
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { isKenyaCountry, resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 import { buildWebhookUrlWithToken } from '@/lib/payments/webhook-auth';
 
 const initiateSchema = z.object({
@@ -70,17 +70,16 @@ export async function POST(request: NextRequest) {
         })
       : null;
 
-    const locationInfo = { isKenya: tenant.country === 'KE' };
-    const tenantData = (tenant as { data?: { is_demo?: boolean; isDemo?: boolean } }).data;
-    const isDemoStore = tenantData?.is_demo === true || tenantData?.isDemo === true;
-    const monthlyPlanPrice = Number(plan.price);
-    const monthlyPrice = locationInfo.isKenya
-      ? getLocalizedPrice(plan.name, true, monthlyPlanPrice, isDemoStore)
-      : monthlyPlanPrice;
+    const locationInfo = { isKenya: isKenyaCountry(tenant.country) };
+    const monthlyPrice = resolvePlanMonthlyPrice(
+      { price: plan.price, price_kes: plan.price_kes },
+      locationInfo.isKenya,
+    );
     const currentPlanPrice = currentPlan
-      ? locationInfo.isKenya
-        ? getLocalizedPrice(currentPlan.name, true, Number(currentPlan.price), isDemoStore)
-        : Number(currentPlan.price)
+      ? resolvePlanMonthlyPrice(
+          { price: currentPlan.price, price_kes: currentPlan.price_kes },
+          locationInfo.isKenya,
+        )
       : 0;
     const changeType = getPlanChangeType(currentPlanPrice, monthlyPrice);
 

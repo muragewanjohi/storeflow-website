@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         price: true,
+        price_kes: true,
         duration_months: true,
         trial_days: true,
         onboarding_reward_window_days: true,
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         price: validatedData.price,
+        price_kes: validatedData.price_kes ?? null,
         duration_months: validatedData.duration_months,
         trial_days: validatedData.trial_days || 0,
         onboarding_reward_window_days: validatedData.onboarding_reward_window_days ?? 30,

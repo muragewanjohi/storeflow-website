@@ -19,6 +19,7 @@ import {
   getPlanChangeType,
 } from '@/lib/subscriptions/proration';
 import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
+import { processReferralRewardForReferredTenant } from '@/lib/referrals/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -269,6 +270,11 @@ export async function POST(request: NextRequest) {
           payment_method: 'mpesa_buy_goods',
         },
       },
+    });
+
+    await processReferralRewardForReferredTenant({
+      referredTenantId: tenant.id,
+      paymentLogId: paymentLog.id,
     });
 
     // Send confirmation email (don't await to avoid blocking callback)

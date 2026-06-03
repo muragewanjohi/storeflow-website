@@ -32,6 +32,7 @@ export default async function EditPricePlanPage({ params }: Readonly<PageProps>)
   const pricePlan = {
     ...pricePlanData,
     price: Number(pricePlanData.price),
+    price_kes: pricePlanData.price_kes != null ? Number(pricePlanData.price_kes) : null,
   };
 
   return (

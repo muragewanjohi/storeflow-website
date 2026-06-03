@@ -9,7 +9,16 @@ import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
 import { prisma } from '@/lib/prisma/client';
 import { getTenantPaymentUrl } from './tenant-url';
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { resolvePlanMonthlyPrice } from '@/lib/pricing/location';
+
+type SubscriptionEmailPlan = {
+  name: string;
+  price: number;
+  price_kes?: number | null;
+  duration_months: number;
+  currency?: 'KES' | 'USD';
+  currencySymbol?: 'Ksh' | '$';
+};
 
 /**
  * Send subscription renewal reminder email (7 days before expiry)
@@ -22,13 +31,7 @@ export async function sendSubscriptionRenewalReminderEmail({
 }: {
   tenant: Tenant;
   expireDate: Date;
-  plan: { 
-    name: string; 
-    price: number; 
-    duration_months: number;
-    currency?: 'KES' | 'USD';
-    currencySymbol?: 'Ksh' | '$';
-  } | null;
+  plan: SubscriptionEmailPlan | null;
   isKenya?: boolean;
 }) {
   try {
@@ -41,7 +44,7 @@ export async function sendSubscriptionRenewalReminderEmail({
     const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
     const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
     const price = plan 
-      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      ? resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya)
       : 0;
     const paymentUrl = getTenantPaymentUrl(tenant);
 
@@ -143,13 +146,7 @@ export async function sendSubscriptionExpiredEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  plan: { 
-    name: string; 
-    price: number; 
-    duration_months: number;
-    currency?: 'KES' | 'USD';
-    currencySymbol?: 'Ksh' | '$';
-  } | null;
+  plan: SubscriptionEmailPlan | null;
   isKenya?: boolean;
 }) {
   try {
@@ -161,7 +158,7 @@ export async function sendSubscriptionExpiredEmail({
     const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
     const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
     const price = plan 
-      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      ? resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya)
       : 0;
 
     const formattedPrice = price 
@@ -263,13 +260,7 @@ export async function sendSubscriptionSuspendedEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  plan: { 
-    name: string; 
-    price: number; 
-    duration_months: number;
-    currency?: 'KES' | 'USD';
-    currencySymbol?: 'Ksh' | '$';
-  } | null;
+  plan: SubscriptionEmailPlan | null;
   isKenya?: boolean;
 }) {
   try {
@@ -280,7 +271,7 @@ export async function sendSubscriptionSuspendedEmail({
     const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
     const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
     const price = plan 
-      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      ? resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya)
       : 0;
 
     const formattedPrice = price 
@@ -578,13 +569,7 @@ export async function sendSubscriptionActivatedEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  plan: { 
-    name: string; 
-    price: number; 
-    duration_months: number;
-    currency?: 'KES' | 'USD';
-    currencySymbol?: 'Ksh' | '$';
-  } | null;
+  plan: SubscriptionEmailPlan | null;
   expireDate: Date;
   isKenya?: boolean;
 }) {
@@ -595,7 +580,7 @@ export async function sendSubscriptionActivatedEmail({
     const currency = isKenya ? 'KES' : (plan?.currency || 'USD');
     const currencySymbol = isKenya ? 'Ksh' : (plan?.currencySymbol || '$');
     const price = plan 
-      ? (isKenya ? getLocalizedPrice(plan.name, true, plan.price) : plan.price)
+      ? resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya)
       : 0;
 
     const formattedPrice = price 
@@ -703,7 +688,7 @@ export async function sendPaymentDueReminderEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  plan: { name: string; price: number; duration_months: number } | null;
+  plan: SubscriptionEmailPlan | null;
   amount: number;
   dueDate: Date;
   isKenya?: boolean;
@@ -714,9 +699,7 @@ export async function sendPaymentDueReminderEmail({
     // Determine pricing for Kenya vs others
     const currency = isKenya ? 'KES' : 'USD';
     const currencySymbol = isKenya ? 'Ksh' : '$';
-    const finalAmount = plan && isKenya 
-      ? getLocalizedPrice(plan.name, true, amount) 
-      : amount;
+    const finalAmount = amount;
     const paymentUrl = getTenantPaymentUrl(tenant);
 
     // Build store URL
@@ -818,8 +801,8 @@ export async function sendPlanUpgradeConfirmationEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  oldPlan: { name: string; price: number } | null;
-  newPlan: { name: string; price: number; duration_months: number } | null;
+  oldPlan: Pick<SubscriptionEmailPlan, 'name' | 'price' | 'price_kes'> | null;
+  newPlan: SubscriptionEmailPlan | null;
   expireDate: Date;
   proratedAmount?: number;
   isKenya?: boolean;
@@ -830,7 +813,7 @@ export async function sendPlanUpgradeConfirmationEmail({
     // Determine pricing for Kenya vs others
     const currencySymbol = isKenya ? 'Ksh' : '$';
     const newPrice = newPlan 
-      ? (isKenya ? getLocalizedPrice(newPlan.name, true, newPlan.price) : newPlan.price)
+      ? resolvePlanMonthlyPrice({ price: newPlan.price, price_kes: newPlan.price_kes }, isKenya)
       : 0;
     const formattedNewPrice = newPrice 
       ? (currencySymbol === 'Ksh' 
@@ -945,8 +928,8 @@ export async function sendPlanDowngradeScheduledEmail({
   isKenya = false,
 }: {
   tenant: Tenant;
-  currentPlan: { name: string; price: number } | null;
-  newPlan: { name: string; price: number; duration_months: number } | null;
+  currentPlan: Pick<SubscriptionEmailPlan, 'name' | 'price' | 'price_kes'> | null;
+  newPlan: SubscriptionEmailPlan | null;
   effectiveDate: Date;
   isKenya?: boolean;
 }) {
@@ -956,7 +939,7 @@ export async function sendPlanDowngradeScheduledEmail({
     // Determine pricing for Kenya vs others
     const currencySymbol = isKenya ? 'Ksh' : '$';
     const newPrice = newPlan 
-      ? (isKenya ? getLocalizedPrice(newPlan.name, true, newPlan.price) : newPlan.price)
+      ? resolvePlanMonthlyPrice({ price: newPlan.price, price_kes: newPlan.price_kes }, isKenya)
       : 0;
     const formattedNewPrice = newPrice 
       ? (currencySymbol === 'Ksh' 

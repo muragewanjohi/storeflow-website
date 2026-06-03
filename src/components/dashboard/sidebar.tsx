@@ -36,6 +36,7 @@ import {
   FireIcon,
   BookOpenIcon,
   ArrowTopRightOnSquareIcon,
+  GiftIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -95,9 +96,12 @@ const navigation: NavigationItem[] = [
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'User Guide', href: '/help', icon: BookOpenIcon, group: 'Support', external: true },
   
-  // 10. Admin-only items
+  // 10. Subscription group (admin-only)
+  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, group: 'Subscription', adminOnly: true },
+  { name: 'Referral Rewards', href: '/dashboard/subscription/referrals', icon: GiftIcon, group: 'Subscription', adminOnly: true, submenu: true },
+
+  // 11. Admin-only items
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
-  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
 ];
 
 // Catalog icon
@@ -111,6 +115,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [contentExpanded, setContentExpanded] = useState(false);
   const [supportExpanded, setSupportExpanded] = useState(false);
+  const [subscriptionExpanded, setSubscriptionExpanded] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
@@ -148,6 +153,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const marketingItems = filteredNavigation.filter((item: any) => item.group === 'Marketing');
   const contentItems = filteredNavigation.filter((item: any) => item.group === 'Content');
   const supportItems = filteredNavigation.filter((item: any) => item.group === 'Support');
+  const subscriptionItems = filteredNavigation.filter((item: any) => item.group === 'Subscription');
   // Exclude Themes from adminItems since it's already added separately above
   const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group && item.name !== 'Themes');
   
@@ -198,8 +204,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   if (supportItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Support', items: supportItems });
   }
+
+  // 9. Subscription group
+  if (subscriptionItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Subscription', items: subscriptionItems });
+  }
   
-  // 9. Admin items (standalone)
+  // 10. Admin items (standalone)
   if (adminItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Main', items: adminItems });
   }
@@ -224,6 +235,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     (item) => item.group === 'Support' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
+  // Check if any subscription item is active
+  const isSubscriptionActive = filteredNavigation.some(
+    (item) =>
+      item.group === 'Subscription' &&
+      (pathname === item.href || pathname.startsWith(item.href + '/')),
+  );
+
   // Auto-expand active group on mount and when pathname changes
   useEffect(() => {
     if (isProductsActive) {
@@ -231,25 +249,35 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isMarketingActive) {
       setProductsExpanded(false);
       setMarketingExpanded(true);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isContentActive) {
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(true);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isSupportActive) {
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(true);
+      setSubscriptionExpanded(false);
+    } else if (isSubscriptionActive) {
+      setProductsExpanded(false);
+      setMarketingExpanded(false);
+      setContentExpanded(false);
+      setSupportExpanded(false);
+      setSubscriptionExpanded(true);
     }
     // Only run when pathname or active states change, not when expanded states change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isProductsActive, isMarketingActive, isContentActive, isSupportActive]);
+  }, [pathname, isProductsActive, isMarketingActive, isContentActive, isSupportActive, isSubscriptionActive]);
 
   // Accordion handler - opens one group and closes others
   const handleGroupToggle = (groupName: string) => {
@@ -257,7 +285,8 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       (groupName === 'Products' && productsExpanded) ||
       (groupName === 'Marketing' && marketingExpanded) ||
       (groupName === 'Content' && contentExpanded) ||
-      (groupName === 'Support' && supportExpanded);
+      (groupName === 'Support' && supportExpanded) ||
+      (groupName === 'Subscription' && subscriptionExpanded);
 
     // If clicking an already expanded group, close it
     // Otherwise, close all and open the clicked one
@@ -267,18 +296,21 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       if (groupName === 'Marketing') setMarketingExpanded(false);
       if (groupName === 'Content') setContentExpanded(false);
       if (groupName === 'Support') setSupportExpanded(false);
+      if (groupName === 'Subscription') setSubscriptionExpanded(false);
     } else {
       // Close all groups first, then open the clicked one
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
       
       // Open the clicked group
       if (groupName === 'Products') setProductsExpanded(true);
       if (groupName === 'Marketing') setMarketingExpanded(true);
       if (groupName === 'Content') setContentExpanded(true);
       if (groupName === 'Support') setSupportExpanded(true);
+      if (groupName === 'Subscription') setSubscriptionExpanded(true);
     }
   };
 
@@ -340,7 +372,18 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                   const isMarketingGroup = groupName === 'Marketing';
                   const isContentGroup = groupName === 'Content';
                   const isSupportGroup = groupName === 'Support';
-                  const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
+                  const isSubscriptionGroup = groupName === 'Subscription';
+                  const isExpanded = isProductsGroup
+                    ? productsExpanded
+                    : isMarketingGroup
+                      ? marketingExpanded
+                      : isContentGroup
+                        ? contentExpanded
+                        : isSupportGroup
+                          ? supportExpanded
+                          : isSubscriptionGroup
+                            ? subscriptionExpanded
+                            : true;
                   const isMainGroup = groupName === 'Main';
                   
                   return (
@@ -350,7 +393,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           type="button"
                           onClick={() => handleGroupToggle(groupName)}
                           className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                            (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                            (isProductsGroup && isProductsActive) ||
+                            (isMarketingGroup && isMarketingActive) ||
+                            (isContentGroup && isContentActive) ||
+                            (isSupportGroup && isSupportActive) ||
+                            (isSubscriptionGroup && isSubscriptionActive)
+                              ? 'text-foreground'
+                              : ''
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -366,9 +415,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             {isSupportGroup && (
                               <ChatBubbleLeftRightIcon className="h-4 w-4" />
                             )}
+                            {isSubscriptionGroup && (
+                              <CreditCardIcon className="h-4 w-4" />
+                            )}
                             <span>{groupName}</span>
                           </div>
-                          {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
+                          {(isProductsGroup ||
+                            isMarketingGroup ||
+                            isContentGroup ||
+                            isSupportGroup ||
+                            isSubscriptionGroup) && (
                             <ChevronDownIcon
                               className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                             />
@@ -478,7 +534,18 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                 const isMarketingGroup = groupName === 'Marketing';
                 const isContentGroup = groupName === 'Content';
                 const isSupportGroup = groupName === 'Support';
-                const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
+                const isSubscriptionGroup = groupName === 'Subscription';
+                const isExpanded = isProductsGroup
+                  ? productsExpanded
+                  : isMarketingGroup
+                    ? marketingExpanded
+                    : isContentGroup
+                      ? contentExpanded
+                      : isSupportGroup
+                        ? supportExpanded
+                        : isSubscriptionGroup
+                          ? subscriptionExpanded
+                          : true;
                 const isMainGroup = groupName === 'Main';
                 
                 return (
@@ -488,7 +555,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                         type="button"
                         onClick={() => handleGroupToggle(groupName)}
                         className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                          (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                          (isProductsGroup && isProductsActive) ||
+                          (isMarketingGroup && isMarketingActive) ||
+                          (isContentGroup && isContentActive) ||
+                          (isSupportGroup && isSupportActive) ||
+                          (isSubscriptionGroup && isSubscriptionActive)
+                            ? 'text-foreground'
+                            : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -504,9 +577,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           {isSupportGroup && (
                             <ChatBubbleLeftRightIcon className="h-4 w-4" />
                           )}
+                          {isSubscriptionGroup && (
+                            <CreditCardIcon className="h-4 w-4" />
+                          )}
                           <span>{groupName}</span>
                         </div>
-                        {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
+                        {(isProductsGroup ||
+                          isMarketingGroup ||
+                          isContentGroup ||
+                          isSupportGroup ||
+                          isSubscriptionGroup) && (
                           <ChevronDownIcon
                             className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                           />

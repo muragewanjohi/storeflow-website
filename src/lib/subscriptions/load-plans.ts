@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma/client';
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { isKenyaCountry, resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 
 export type SubscriptionPlanDto = {
   id: string;
@@ -12,22 +12,40 @@ export type SubscriptionPlanDto = {
   currencySymbol: string;
 };
 
+export async function getDefaultRegistrationPlan() {
+  return prisma.price_plans.findFirst({
+    where: {
+      status: 'active',
+      name: { equals: 'Basic', mode: 'insensitive' },
+    },
+    orderBy: { price: 'asc' },
+  });
+}
+
 export async function loadActiveSubscriptionPlans(options: {
   isKenya: boolean;
-  isDemoStore?: boolean;
 }): Promise<SubscriptionPlanDto[]> {
-  const { isKenya, isDemoStore = false } = options;
+  const { isKenya } = options;
 
   const rows = await prisma.price_plans.findMany({
     where: {
       status: 'active',
-      OR: [{ name: 'Basic' }, { name: 'Pro' }, { name: 'Standard' }, { name: 'Premium' }],
+      OR: [
+        { name: { equals: 'Basic', mode: 'insensitive' } },
+        { name: { equals: 'Basic Plan', mode: 'insensitive' } },
+        { name: { equals: 'Pro', mode: 'insensitive' } },
+        { name: { equals: 'Pro Plan', mode: 'insensitive' } },
+        { name: { equals: 'Standard', mode: 'insensitive' } },
+        { name: { equals: 'Premium', mode: 'insensitive' } },
+        { name: { equals: 'Premium Plan', mode: 'insensitive' } },
+      ],
     },
     orderBy: { price: 'asc' },
     select: {
       id: true,
       name: true,
       price: true,
+      price_kes: true,
       duration_months: true,
       trial_days: true,
       features: true,
@@ -35,15 +53,17 @@ export async function loadActiveSubscriptionPlans(options: {
   });
 
   const plans = rows.map((plan) => {
-    const usdPrice = Number(plan.price);
-    const localizedPrice = isKenya
-      ? getLocalizedPrice(plan.name, true, usdPrice, isDemoStore)
-      : usdPrice;
+    const displayPrice = resolvePlanMonthlyPrice(
+      { price: plan.price, price_kes: plan.price_kes },
+      isKenya,
+    );
 
     return {
       id: plan.id,
       name: plan.name,
-      price: localizedPrice || usdPrice,
+      price: displayPrice,
+      priceUsd: Number(plan.price),
+      priceKes: plan.price_kes != null ? Number(plan.price_kes) : null,
       durationMonths: plan.duration_months,
       trialDays: plan.trial_days,
       features: plan.features,
@@ -65,7 +85,7 @@ export function tenantPricingContext(tenant: {
       ? (tenant.data as Record<string, unknown>)
       : {};
   return {
-    isKenya: tenant.country === 'KE',
+    isKenya: isKenyaCountry(tenant.country),
     isDemoStore: data.is_demo === true || data.isDemo === true,
   };
 }

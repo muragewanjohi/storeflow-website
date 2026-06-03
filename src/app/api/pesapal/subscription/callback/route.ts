@@ -17,6 +17,7 @@ import {
 } from '@/lib/subscriptions/emails';
 import { getPlanChangeType } from '@/lib/subscriptions/proration';
 import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
+import { processReferralRewardForReferredTenant } from '@/lib/referrals/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -185,6 +186,11 @@ export async function GET(request: NextRequest) {
           billing_interval: billingInterval,
         },
       },
+    });
+
+    await processReferralRewardForReferredTenant({
+      referredTenantId: tenant.id,
+      paymentLogId: paymentLog.id,
     });
 
     if (currentPlan && changeType === 'upgrade' && updatedTenant) {

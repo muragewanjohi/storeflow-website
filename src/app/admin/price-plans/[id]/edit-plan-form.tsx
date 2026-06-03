@@ -19,6 +19,7 @@ interface PricePlan {
   id: string;
   name: string;
   price: number;
+  price_kes?: number | null;
   duration_months: number;
   trial_days: number | null;
   onboarding_reward_window_days: number | null;
@@ -38,6 +39,7 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
   const [formData, setFormData] = useState({
     name: pricePlan.name,
     price: pricePlan.price.toString(),
+    price_kes: pricePlan.price_kes != null ? pricePlan.price_kes.toString() : '',
     duration_months: pricePlan.duration_months.toString(),
     trial_days: (pricePlan.trial_days || 0).toString(),
     onboarding_reward_window_days: (pricePlan.onboarding_reward_window_days ?? 30).toString(),
@@ -81,6 +83,7 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
         body: JSON.stringify({
           name: formData.name,
           price: parseFloat(formData.price),
+          price_kes: formData.price_kes.trim() ? parseFloat(formData.price_kes) : null,
           duration_months: parseInt(formData.duration_months, 10),
           trial_days: parseInt(formData.trial_days, 10) || 0,
           onboarding_reward_window_days: parseInt(formData.onboarding_reward_window_days, 10) || 0,
@@ -144,7 +147,7 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Price (USD) *</Label>
+              <Label htmlFor="price">Monthly price (USD) *</Label>
               <Input
                 id="price"
                 type="number"
@@ -152,9 +155,28 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
                 min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                placeholder="29.99"
+                placeholder="e.g. 10 for Basic, 30 for Pro"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Default for non-Kenya tenants and international visitors ($).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="price_kes">Monthly price (KES)</Label>
+              <Input
+                id="price_kes"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.price_kes}
+                onChange={(e) => setFormData({ ...formData, price_kes: e.target.value })}
+                placeholder="e.g. 1000 for Basic, 3000 for Pro"
+              />
+              <p className="text-xs text-muted-foreground">
+                Kenya tenants and Kenya geo on marketing pages. Leave empty to fall back to USD price.
+              </p>
             </div>
 
             <div className="space-y-2">
