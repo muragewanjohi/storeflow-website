@@ -175,6 +175,22 @@ Skip steps 3-4 when the merchant does not choose Tumizi. They can enable it late
 
 Use the `/dashboard/tumizi/*` routes above for the Tumizi integration snapshot, wallet, withdrawals, and refunds.
 
+#### M-Pesa withdrawal screen (wallet account + balance)
+
+**Do not** display `merchantExternalId` (e.g. `storeflow-bd886184-…`) as the wallet account number. That is an internal Tumizi merchant key, not the wallet reference shown on web.
+
+| Field | Source | Example |
+|-------|--------|---------|
+| Wallet account number | `GET …/tumizi/wallet` → **`data.walletAccountNumber`** (or `GET …/tumizi/merchant` → same field) | `STOREFLOWBD88618` |
+| Available balance | `GET …/tumizi/wallet` → **`data.availableBalance`** | `20` |
+| Currency | `data.walletCurrency` | `KES` |
+| Max withdrawable | `data.maxWithdrawableAmount` / `maxWithdrawableCharge` | Web parity |
+| Refresh balance | Re-call `GET …/tumizi/wallet` (live Tumizi wallet API) | Tap refresh icon |
+
+`GET /dashboard/tumizi/merchant` also returns `generalInfo`, `walletSnapshot`, and cached `availableBalance` from the merchant profile (same fallback chain as web before refresh).
+
+`GET /dashboard/tumizi/settings` returns integration config (`walletAccountNumber` from DB) but **not** live balance — always use `/wallet` for the withdrawal UI.
+
 ### 4) Storefront checkout (customer app)
 
 - Host: **storefront tenant domain** (same as web checkout).

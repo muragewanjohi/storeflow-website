@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check tenant access level - block checkout for expired/suspended tenants
+    // Block checkout only when storefront is closed (suspended/blocked), not during owner grace period
     const accessRestriction = getTenantAccessRestriction(tenant);
-    if (!accessRestriction.canProcessOrders) {
+    if (!accessRestriction.canAcceptCustomerOrders) {
       return NextResponse.json(
         { 
           error: 'Store temporarily unavailable',

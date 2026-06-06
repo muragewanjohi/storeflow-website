@@ -8,6 +8,8 @@ describe('tumizi webhook helpers', () => {
   it('maps successful tumizi statuses to paid', () => {
     expect(mapTumiziStatusToOrderPaymentStatus('successful')).toBe('paid');
     expect(mapTumiziStatusToOrderPaymentStatus('SUCCESSFUL')).toBe('paid');
+    expect(mapTumiziStatusToOrderPaymentStatus('succeeded')).toBe('paid');
+    expect(mapTumiziStatusToOrderPaymentStatus('SUCCEEDED')).toBe('paid');
     expect(mapTumiziStatusToOrderPaymentStatus('completed')).toBe('paid');
   });
 

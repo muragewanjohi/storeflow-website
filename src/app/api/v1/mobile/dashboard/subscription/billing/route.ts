@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import { requireMobileTenantStaff } from '@/lib/auth/mobile-dashboard-tenant';
+import { resolvePlanMonthlyPrice } from '@/lib/pricing/location';
+import { tenantPricingContext } from '@/lib/subscriptions/load-plans';
 import { getDaysUntil, getTrialDaysRemaining } from '@/lib/subscriptions/trial';
 
 /**
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             price: true,
+            price_kes: true,
             duration_months: true,
             trial_days: true,
           },
@@ -70,9 +73,23 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const { isKenya } = tenantPricingContext(tenant);
+    const currencySymbol = isKenya ? 'Ksh' : '$';
+    const currency = isKenya ? 'KES' : 'USD';
+
     const trialDays = tenant.price_plans?.trial_days ?? null;
     const startDate = tenant.start_date ?? tenant.created_at;
     const expireDate = tenant.expire_date;
+    const daysUntilRenewal = expireDate ? getDaysUntil(expireDate) : null;
+    const isExpired = daysUntilRenewal != null && daysUntilRenewal <= 0;
+    const isExpiringSoon =
+      daysUntilRenewal != null && daysUntilRenewal > 0 && daysUntilRenewal <= 7;
+    const displayPrice = tenant.price_plans
+      ? resolvePlanMonthlyPrice(
+          { price: tenant.price_plans.price, price_kes: tenant.price_plans.price_kes },
+          isKenya,
+        )
+      : 0;
 
     return NextResponse.json(
       mobileSuccess({
@@ -80,9 +97,16 @@ export async function GET(request: NextRequest) {
           ? {
               id: tenant.price_plans.id,
               name: tenant.price_plans.name,
-              price: Number(tenant.price_plans.price),
+              price: displayPrice,
+              priceUsd: Number(tenant.price_plans.price),
+              priceKes:
+                tenant.price_plans.price_kes != null
+                  ? Number(tenant.price_plans.price_kes)
+                  : null,
               durationMonths: tenant.price_plans.duration_months,
               trialDays,
+              currency,
+              currencySymbol,
             }
           : null,
         subscriptionStatus: tenant.status ?? 'active',
@@ -94,7 +118,13 @@ export async function GET(request: NextRequest) {
           startDate,
           expireDate,
         }),
-        daysUntilExpire: expireDate ? getDaysUntil(expireDate) : null,
+        daysUntilExpire: daysUntilRenewal,
+        daysUntilRenewal,
+        isExpired,
+        isExpiringSoon,
+        needsRenewalPayment:
+          (isExpired || isExpiringSoon) && Boolean(tenant.price_plans && displayPrice > 0),
+        pricing: { isKenya, currency, currencySymbol },
         billingHistory,
       }),
       { status: 200 },

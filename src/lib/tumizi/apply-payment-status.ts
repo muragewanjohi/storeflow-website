@@ -19,15 +19,30 @@ function readString(data: Record<string, unknown>, ...keys: string[]): string | 
   return undefined;
 }
 
+function resolveTumiziCustomerPaymentRecord(
+  response: Record<string, unknown>,
+): Record<string, unknown> {
+  const data = toObject(response.data ?? response);
+  const nested = toObject(
+    data.customer_payment ??
+      data.customerPayment ??
+      data.payment ??
+      response.customer_payment ??
+      response.customerPayment,
+  );
+
+  return Object.keys(nested).length > 0 ? nested : data;
+}
+
 export function extractTumiziCustomerPaymentStatus(response: Record<string, unknown>): {
   status?: string;
   transactionReference?: string;
 } {
-  const data = toObject(response.data ?? response);
+  const source = resolveTumiziCustomerPaymentRecord(response);
   return {
-    status: readString(data, 'status') ?? readString(response, 'status'),
+    status: readString(source, 'status') ?? readString(response, 'status'),
     transactionReference: readString(
-      data,
+      source,
       'mpesa_receipt_number',
       'transaction_reference',
       'payment_reference',
@@ -39,6 +54,17 @@ export function extractTumiziCustomerPaymentStatus(response: Record<string, unkn
       'payment_reference',
     ),
   };
+}
+
+export function shouldSkipTumiziOrderPaymentDowngrade(
+  previousPaymentStatus: string | null | undefined,
+  nextPaymentStatus: 'paid' | 'pending' | 'failed' | 'refunded',
+): boolean {
+  return (
+    previousPaymentStatus === 'paid' &&
+    nextPaymentStatus !== 'paid' &&
+    nextPaymentStatus !== 'refunded'
+  );
 }
 
 export type ApplyTumiziPaymentResult = {
@@ -108,19 +134,30 @@ export async function applyTumiziCustomerPaymentStatus(params: {
     },
   });
 
+  let effectiveOrderPaymentStatus = orderPaymentStatus;
+  const skipOrderUpdate = shouldSkipTumiziOrderPaymentDowngrade(
+    previousPaymentStatus,
+    orderPaymentStatus,
+  );
+
   if (orderId) {
-    await prisma.orders.updateMany({
-      where: { id: orderId, tenant_id: tenantId },
-      data: {
-        payment_status: orderPaymentStatus,
-        transaction_id: transactionReference || paymentLog.transaction_id,
-        payment_gateway: 'tumizi',
-      },
-    });
+    if (skipOrderUpdate) {
+      effectiveOrderPaymentStatus = 'paid';
+    } else {
+      await prisma.orders.updateMany({
+        where: { id: orderId, tenant_id: tenantId },
+        data: {
+          payment_status: effectiveOrderPaymentStatus,
+          transaction_id: transactionReference || paymentLog.transaction_id,
+          payment_gateway: 'tumizi',
+        },
+      });
+    }
 
     if (
+      !skipOrderUpdate &&
       previousPaymentStatus &&
-      previousPaymentStatus !== orderPaymentStatus
+      previousPaymentStatus !== effectiveOrderPaymentStatus
     ) {
       const order = await prisma.orders.findFirst({
         where: { id: orderId, tenant_id: tenantId },
@@ -138,7 +175,7 @@ export async function applyTumiziCustomerPaymentStatus(params: {
           order: order as any,
           tenant: tenant as any,
           oldPaymentStatus: previousPaymentStatus,
-          newPaymentStatus: orderPaymentStatus,
+          newPaymentStatus: effectiveOrderPaymentStatus,
         }).catch((error: unknown) => {
           console.error('[Tumizi] payment status email failed:', error);
         });
@@ -149,7 +186,7 @@ export async function applyTumiziCustomerPaymentStatus(params: {
   return {
     applied: true,
     orderId,
-    paymentStatus: orderPaymentStatus,
+    paymentStatus: effectiveOrderPaymentStatus,
     previousPaymentStatus,
   };
 }

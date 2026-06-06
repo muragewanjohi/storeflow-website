@@ -24,6 +24,46 @@ export async function initiateTumiziCustomerPaymentForOrder(params: {
 }> {
   const { tenantId, tenantName, order, phoneNumber, userId, narration } = params;
 
+  const existingOrder = await prisma.orders.findFirst({
+    where: { id: order.id, tenant_id: tenantId },
+    select: { payment_status: true, payment_track: true, transaction_id: true },
+  });
+
+  if (existingOrder?.payment_status === 'paid' || existingOrder?.payment_status === 'refunded') {
+    const error = new Error('This order is already paid');
+    (error as { status?: number }).status = 409;
+    throw error;
+  }
+
+  const completedPayment = await prisma.payment_logs.findFirst({
+    where: {
+      tenant_id: tenantId,
+      gateway: 'tumizi_customer_payment',
+      status: 'completed',
+      metadata: {
+        path: ['order_id'],
+        equals: order.id,
+      },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+
+  if (completedPayment) {
+    await prisma.orders.update({
+      where: { id: order.id },
+      data: {
+        payment_gateway: 'tumizi',
+        payment_status: 'paid',
+        payment_track: completedPayment.payment_id,
+        transaction_id: completedPayment.transaction_id,
+      },
+    });
+
+    const error = new Error('This order already has a completed Tumizi payment');
+    (error as { status?: number }).status = 409;
+    throw error;
+  }
+
   const tumiziConfig = await getTumiziTenantConfigByTenantId(tenantId);
   if (!tumiziConfig?.enabled || !tumiziConfig.merchantExternalId) {
     throw new Error('Tumizi is not enabled for this store');

@@ -46,7 +46,7 @@ export default async function CheckoutPage() {
       <main className="flex-1">
         <CheckoutClient 
           isAuthenticated={!!customer}
-          canProcessOrders={accessRestriction.canProcessOrders}
+          canCheckout={accessRestriction.canAcceptCustomerOrders}
           accessRestriction={accessRestriction}
           defaultEstimatedDeliveryDays={defaultDeliveryDays ? parseInt(defaultDeliveryDays, 10) : null}
         />

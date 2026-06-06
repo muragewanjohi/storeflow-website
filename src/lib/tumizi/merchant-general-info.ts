@@ -1,3 +1,6 @@
+import { toFiniteNumber } from '@/lib/tumizi/wallet-withdrawal-tiers';
+import { deriveWalletAccountNumberFromMerchantExternalId } from '@/lib/tumizi/references';
+
 /**
  * Normalizes Tumizi "get merchant" (and optional wallet) payloads for the dashboard.
  * Supports flat `data` objects and nested `{ data: { merchant: {...}, owner: {...} } }` shapes.
@@ -135,6 +138,91 @@ export type TumiziCachedWalletSnapshot = {
   accountNumber: string;
   currency: string;
 };
+
+export type TumiziMerchantBundle = {
+  merchant?: unknown;
+  wallet?: unknown;
+  merchantExternalId?: string;
+};
+
+export type TumiziWalletPayload = {
+  wallet: Record<string, unknown>;
+  walletAccountNumber: string;
+  walletCurrency: string;
+  availableBalance: number;
+  balanceSource: 'wallet_api' | 'merchant_cache' | 'config' | 'derived';
+};
+
+export function buildTumiziMerchantBundle(
+  merchantExternalId: string,
+  merchant: unknown,
+  wallet: unknown,
+): TumiziMerchantBundle {
+  return { merchantExternalId, merchant, wallet };
+}
+
+/**
+ * Normalizes Tumizi GET wallet (and optional merchant cache / DB config) for dashboard + mobile.
+ * Never use merchantExternalId as the display wallet account — use walletAccountNumber.
+ */
+export function buildTumiziWalletPayload(options: {
+  merchantExternalId: string;
+  walletResponse?: Record<string, unknown> | null;
+  merchantBundle?: TumiziMerchantBundle | null;
+  configWalletAccountNumber?: string;
+  configWalletCurrency?: string;
+}): TumiziWalletPayload {
+  const walletEnvelope = options.walletResponse ? readEnvelope(options.walletResponse) : {};
+  const nestedWallet =
+    nestedRecord(walletEnvelope, 'wallet') ?? (walletEnvelope as Record<string, unknown>);
+
+  const merchantSnapshot = options.merchantBundle
+    ? getWalletSnapshotFromMerchantData(options.merchantBundle as Record<string, any>)
+    : null;
+
+  const derivedAccount = deriveWalletAccountNumberFromMerchantExternalId(options.merchantExternalId);
+
+  let walletAccountNumber =
+    str(nestedWallet.account_number) ||
+    str(nestedWallet.wallet_account_number) ||
+    str(walletEnvelope.wallet_account_number) ||
+    merchantSnapshot?.accountNumber ||
+    options.configWalletAccountNumber ||
+    derivedAccount;
+
+  let balanceSource: TumiziWalletPayload['balanceSource'] = 'derived';
+  let availableBalance = 0;
+
+  const walletApiBalance = nestedWallet.available_balance ?? walletEnvelope.available_balance;
+  if (walletApiBalance !== undefined && walletApiBalance !== null && walletApiBalance !== '') {
+    availableBalance = toFiniteNumber(walletApiBalance);
+    balanceSource = 'wallet_api';
+  } else if (merchantSnapshot) {
+    availableBalance = merchantSnapshot.availableBalance;
+    balanceSource = 'merchant_cache';
+  }
+
+  if (walletAccountNumber === derivedAccount && options.configWalletAccountNumber) {
+    walletAccountNumber = options.configWalletAccountNumber;
+    balanceSource = balanceSource === 'derived' ? 'config' : balanceSource;
+  } else if (walletAccountNumber === derivedAccount) {
+    balanceSource = balanceSource === 'merchant_cache' ? 'merchant_cache' : 'derived';
+  }
+
+  const walletCurrency =
+    str(nestedWallet.currency) ||
+    merchantSnapshot?.currency ||
+    options.configWalletCurrency ||
+    'KES';
+
+  return {
+    wallet: nestedWallet,
+    walletAccountNumber,
+    walletCurrency,
+    availableBalance,
+    balanceSource,
+  };
+}
 
 export function getWalletSnapshotFromMerchantData(
   merchantData: Record<string, any> | null,

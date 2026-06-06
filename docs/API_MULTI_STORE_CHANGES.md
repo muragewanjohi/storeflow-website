@@ -193,6 +193,19 @@ Validated by `registerTenantSchema` in `src/app/api/tenants/register/route.ts`:
 | `supabaseAccessToken` | Optional (Google) | Existing Supabase access token for the same Google user (equivalent to Authorization Bearer token) |
 | `googleIdToken` | Optional (Google) | Google OIDC id_token; server can exchange via Supabase when no Supabase token is provided |
 | `googleAccessToken` | Optional (Google) | Companion access token for id_token flows that include `at_hash` |
+| `referrerSubdomain` | No | Referrer’s **store subdomain** (friend who referred this merchant). Lowercase `a-z`, digits, hyphens; min 3 chars. Creates a `tenant_referrals` row when valid. Same as web register field / `?ref=` query param. |
+| `billingCountry` | No | ISO 3166-1 alpha-2 billing region for subscription pricing (`KE` → KES plan prices, else USD). If omitted, server uses client geo headers + phone country. |
+
+### Referral code at signup (web + mobile)
+
+There is **no** separate “submit referral” endpoint. Attribution happens **once** during registration.
+
+| Platform | How the user enters it |
+|----------|-------------------------|
+| **Web** | Optional field on `/register`, or pre-filled from `https://…/register?ref={referrer-subdomain}` |
+| **Mobile** | Optional `referrerSubdomain` in the **same** register JSON body |
+
+Both use identical server logic (`createTenantReferralAttribution` after tenant create). Invalid or self-referral values are skipped (registration still succeeds).
 
 ### Optional onboarding fields (no automatic catalog)
 
@@ -210,6 +223,20 @@ Sending `businessType` and `selling` is still recommended so the server can pick
   "adminPhoneCountry": "KE",
   "businessType": "Fashion",
   "selling": "Clothes and accessories"
+}
+```
+
+With an optional referral (friend’s shop subdomain):
+
+```json
+{
+  "name": "My Store",
+  "subdomain": "my-store",
+  "adminEmail": "owner@example.com",
+  "adminPassword": "your-strong-password",
+  "adminPhone": "+254700000000",
+  "adminPhoneCountry": "KE",
+  "referrerSubdomain": "friend-store"
 }
 ```
 

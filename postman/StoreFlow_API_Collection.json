@@ -4058,7 +4058,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Test Mobile Store\",\n  \"subdomain\": \"{{tenant_subdomain}}\",\n  \"adminEmail\": \"{{mobile_email}}\",\n  \"adminPassword\": \"{{mobile_password}}\",\n  \"adminPhone\": \"+254712345678\",\n  \"adminPhoneCountry\": \"KE\",\n  \"authProvider\": \"email\"\n}",
+							"raw": "{\n  \"name\": \"Test Mobile Store\",\n  \"subdomain\": \"{{tenant_subdomain}}\",\n  \"adminEmail\": \"{{mobile_email}}\",\n  \"adminPassword\": \"{{mobile_password}}\",\n  \"adminPhone\": \"+254712345678\",\n  \"adminPhoneCountry\": \"KE\",\n  \"authProvider\": \"email\",\n  \"referrerSubdomain\": \"\",\n  \"billingCountry\": \"KE\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -4078,7 +4078,7 @@
 								"register"
 							]
 						},
-						"description": "Create tenant with mobile response envelope. Same JSON as POST /api/tenants/register. Use a fresh subdomain; then Mobile Login with same email/password."
+						"description": "Create tenant with mobile response envelope. Same JSON as POST /api/tenants/register. Optional referrerSubdomain (friend's shop subdomain) for referral attribution. Optional billingCountry (ISO 2-letter, e.g. KE or US) for subscription pricing. Use a fresh subdomain; then Mobile Login with same email/password."
 					},
 					"response": []
 				},

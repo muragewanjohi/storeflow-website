@@ -28,7 +28,7 @@ export function mapTumiziStatusToOrderPaymentStatus(status?: string): 'paid' | '
     return 'pending';
   }
 
-  if (['successful', 'success', 'completed', 'paid'].includes(normalized)) {
+  if (['successful', 'success', 'succeeded', 'completed', 'paid'].includes(normalized)) {
     return 'paid';
   }
 
@@ -46,7 +46,11 @@ export function mapTumiziEventToOrderPaymentStatus(
   const normalizedEvent = event?.toLowerCase();
   if (normalizedEvent === 'partner.refund.updated') {
     const normalizedStatus = status?.toLowerCase();
-    if (['successful', 'success', 'completed', 'paid', 'refunded'].includes(normalizedStatus || '')) {
+    if (
+      ['successful', 'success', 'succeeded', 'completed', 'paid', 'refunded'].includes(
+        normalizedStatus || '',
+      )
+    ) {
       return 'refunded';
     }
     if (['failed', 'cancelled', 'reversed', 'declined', 'expired'].includes(normalizedStatus || '')) {

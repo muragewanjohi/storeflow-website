@@ -189,6 +189,21 @@ export default function TenantSubscriptionClient({
   const formatPlanPrice = (plan: Pick<PricePlan, 'price' | 'price_kes'>) =>
     formatPrice(getDisplayPrice(plan), currencySymbol);
 
+  const renewalDate = tenant.expire_date ?? null;
+  const daysUntilRenewal = getDaysUntil(renewalDate);
+  const isExpired = daysUntilRenewal <= 0;
+  const isExpiringSoon = daysUntilRenewal > 0 && daysUntilRenewal <= 7;
+  const canPayForCurrentPlan = Boolean(
+    currentPlan && Number(getDisplayPrice(currentPlan)) > 0
+  );
+
+  const openPaymentForCurrentPlan = () => {
+    if (!currentPlan || !canPayForCurrentPlan) return;
+    setSelectedPlanId(currentPlan.id);
+    setSelectedPlanName(currentPlan.name);
+    setShowPaymentDialog(true);
+  };
+
   // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -221,7 +236,15 @@ export default function TenantSubscriptionClient({
       setActiveTab('plans');
       router.replace('/dashboard/subscription?tab=plans', { scroll: false });
     }
-  }, [searchParams, router]);
+
+    const renewParam = searchParams.get('renew');
+    if (renewParam === '1' && currentPlan && canPayForCurrentPlan) {
+      setSelectedPlanId(currentPlan.id);
+      setSelectedPlanName(currentPlan.name);
+      setShowPaymentDialog(true);
+      router.replace('/dashboard/subscription', { scroll: false });
+    }
+  }, [searchParams, router, currentPlan, canPayForCurrentPlan]);
 
   // Fetch billing history
   const { data: billingData, isLoading: isLoadingBilling } = useQuery({
@@ -233,12 +256,6 @@ export default function TenantSubscriptionClient({
     },
   });
 
-  // Calculate renewal date (same as expire_date for now)
-  const renewalDate = tenant.expire_date ?? null;
-  const daysUntilRenewal = getDaysUntil(renewalDate);
-  const isExpiringSoon = daysUntilRenewal > 0 && daysUntilRenewal <= 7;
-
-  // Calculate next billing date (renewal date)
   const nextBillingDate = renewalDate;
 
   const handleUpgrade = async (planId: string, isDowngrade: boolean = false) => {
@@ -428,6 +445,35 @@ export default function TenantSubscriptionClient({
         </Card>
       )}
 
+      {/* Expired subscription renewal */}
+      {isExpired && currentPlan && canPayForCurrentPlan && (
+        <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <ClockIcon className="h-5 w-5 mt-0.5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+                <div>
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-100">
+                    Subscription Expired
+                  </p>
+                  <p className="text-sm mt-1 text-yellow-800 dark:text-yellow-200">
+                    Your subscription expired on <strong>{formatDate(renewalDate)}</strong>.
+                    Pay now to restore full access and continue using your store.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={openPaymentForCurrentPlan}
+                disabled={pesapalLoading}
+                className="sm:flex-shrink-0 bg-yellow-600 hover:bg-yellow-700"
+              >
+                {pesapalLoading ? 'Processing...' : 'Renew now'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trial/Expiry Warning */}
       {isExpiringSoon && currentPlan && (
         <Card className={`${
@@ -467,13 +513,9 @@ export default function TenantSubscriptionClient({
                   </p>
                 </div>
               </div>
-              {Number(getDisplayPrice(currentPlan)) > 0 && (
+              {canPayForCurrentPlan && (
                 <Button
-                  onClick={() => {
-                    setSelectedPlanId(currentPlan.id);
-                    setSelectedPlanName(currentPlan.name);
-                    setShowPaymentDialog(true);
-                  }}
+                  onClick={openPaymentForCurrentPlan}
                   disabled={pesapalLoading}
                   className="sm:flex-shrink-0"
                 >
@@ -891,25 +933,32 @@ export default function TenantSubscriptionClient({
         {/* Billing History Tab */}
         <TabsContent value="billing" className="space-y-6">
           {/* Pay now card: show when due within 7 days (best practice: renewal CTA in billing) */}
-          {isExpiringSoon && currentPlan && Number(getDisplayPrice(currentPlan)) > 0 && (
+          {(isExpired || isExpiringSoon) && currentPlan && canPayForCurrentPlan && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <p className="font-semibold">Renewal due soon</p>
+                    <p className="font-semibold">
+                      {isExpired ? 'Subscription expired' : 'Renewal due soon'}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Your subscription renews on <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}). Pay now to avoid interruption.
+                      {isExpired ? (
+                        <>
+                          Your subscription expired on <strong>{formatDate(renewalDate)}</strong>.
+                          Pay now to restore full access.
+                        </>
+                      ) : (
+                        <>
+                          Your subscription renews on <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}). Pay now to avoid interruption.
+                        </>
+                      )}
                     </p>
                   </div>
                   <Button
-                    onClick={() => {
-                      setSelectedPlanId(currentPlan.id);
-                      setSelectedPlanName(currentPlan.name);
-                      setShowPaymentDialog(true);
-                    }}
+                    onClick={openPaymentForCurrentPlan}
                     disabled={pesapalLoading}
                   >
-                    {pesapalLoading ? 'Processing...' : 'Pay now'}
+                    {pesapalLoading ? 'Processing...' : isExpired ? 'Renew now' : 'Pay now'}
                   </Button>
                 </div>
               </CardContent>

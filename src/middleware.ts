@@ -160,9 +160,8 @@ export async function middleware(request: NextRequest) {
     }
 
     // For expired tenants in grace period:
-    // - Dashboard: allow access but mark as read-only
-    // - Storefront: allow access but show expiration notice (read-only, no checkout)
-    // Don't redirect - let them access but with restrictions
+    // - Dashboard: read-only for the store owner (renewal banner)
+    // - Storefront: continues normally for customers (no owner-only notices)
 
     // Clone the request headers and add tenant info
     const requestHeaders = new Headers(request.headers);

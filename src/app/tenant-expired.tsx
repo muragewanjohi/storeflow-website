@@ -88,7 +88,7 @@ export default function TenantExpired() {
 
           <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:justify-center">
             <Button asChild size="lg" className="bg-primary">
-              <Link href="/dashboard/subscription">
+              <Link href="/dashboard/subscription?renew=1">
                 Renew Subscription Now
               </Link>
             </Button>

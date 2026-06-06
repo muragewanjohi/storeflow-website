@@ -8,6 +8,12 @@ import {
 import { tumiziClient } from '@/lib/tumizi/client';
 import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
 import {
+  buildTumiziGeneralInfoView,
+  buildTumiziMerchantBundle,
+  buildTumiziWalletPayload,
+  getWalletSnapshotFromMerchantData,
+} from '@/lib/tumizi/merchant-general-info';
+import {
   getErrorMessage,
   getErrorStatus,
   getTumiziMerchantExternalIdOrThrow,
@@ -27,11 +33,25 @@ export async function GET(request: NextRequest) {
       tumiziClient.getMerchantWallet(merchantExternalId).catch(() => null),
     ]);
 
+    const merchantBundle = buildTumiziMerchantBundle(merchantExternalId, merchant, wallet);
+    const walletView = buildTumiziWalletPayload({
+      merchantExternalId,
+      walletResponse: wallet,
+      merchantBundle,
+      configWalletAccountNumber: config?.walletAccountNumber,
+      configWalletCurrency: config?.walletCurrency,
+    });
+
     return NextResponse.json(
       mobileSuccess({
         merchantExternalId,
         merchant,
         wallet,
+        generalInfo: buildTumiziGeneralInfoView(merchantBundle as Record<string, any>),
+        walletSnapshot: getWalletSnapshotFromMerchantData(merchantBundle as Record<string, any>),
+        walletAccountNumber: walletView.walletAccountNumber,
+        walletCurrency: walletView.walletCurrency,
+        availableBalance: walletView.availableBalance,
       }),
       { status: 200 },
     );

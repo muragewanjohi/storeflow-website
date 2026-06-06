@@ -28,18 +28,7 @@ export async function loadActiveSubscriptionPlans(options: {
   const { isKenya } = options;
 
   const rows = await prisma.price_plans.findMany({
-    where: {
-      status: 'active',
-      OR: [
-        { name: { equals: 'Basic', mode: 'insensitive' } },
-        { name: { equals: 'Basic Plan', mode: 'insensitive' } },
-        { name: { equals: 'Pro', mode: 'insensitive' } },
-        { name: { equals: 'Pro Plan', mode: 'insensitive' } },
-        { name: { equals: 'Standard', mode: 'insensitive' } },
-        { name: { equals: 'Premium', mode: 'insensitive' } },
-        { name: { equals: 'Premium Plan', mode: 'insensitive' } },
-      ],
-    },
+    where: { status: 'active' },
     orderBy: { price: 'asc' },
     select: {
       id: true,

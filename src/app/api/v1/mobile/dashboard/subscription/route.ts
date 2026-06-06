@@ -5,7 +5,8 @@ import { loadMobileSubscriptionSnapshot } from '@/lib/subscriptions/load-subscri
 
 /**
  * GET /api/v1/mobile/dashboard/subscription
- * Subscription screen snapshot: plans, usage, limits, trial/renewal dates.
+ * Full subscription screen snapshot (web parity): plans catalog, usage progress,
+ * access restrictions, renewal/pay CTAs, scheduled downgrades, payment capabilities.
  */
 export async function GET(request: NextRequest) {
   const gate = await requireMobileTenantStaff(request);

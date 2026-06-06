@@ -2,6 +2,11 @@ function sanitizeReferencePart(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+/** Wallet account number Tumizi assigns when provisioning from merchant_external_id. */
+export function deriveWalletAccountNumberFromMerchantExternalId(merchantExternalId: string): string {
+  return sanitizeReferencePart(merchantExternalId).slice(0, 16);
+}
+
 /**
  * Build a payment-safe account reference for Tumizi/STK prompts.
  * Format intent: STORE + INVOICE/ORDER (max 12 chars, no spaces).

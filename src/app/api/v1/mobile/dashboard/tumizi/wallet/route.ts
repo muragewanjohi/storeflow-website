@@ -5,9 +5,13 @@ import { requireMobileTenantStaff } from '@/lib/auth/mobile-dashboard-tenant';
 import { tumiziClient } from '@/lib/tumizi/client';
 import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
 import {
+  buildTumiziMerchantBundle,
+  buildTumiziWalletPayload,
+} from '@/lib/tumizi/merchant-general-info';
+import {
   WITHDRAWAL_CHARGE_TIERS,
   getMaxWithdrawable,
-  toFiniteNumber,
+  getMinimumWithdrawalWithCharge,
 } from '@/lib/tumizi/wallet-withdrawal-tiers';
 import {
   getErrorMessage,
@@ -24,15 +28,24 @@ export async function GET(request: NextRequest) {
     const config = await getTumiziTenantConfigByTenantId(tenantId);
     const merchantExternalId = getTumiziMerchantExternalIdOrThrow(config);
 
-    const walletResponse = await tumiziClient.getMerchantWallet(merchantExternalId);
-    const walletData =
-      ((walletResponse.data as Record<string, unknown> | undefined)?.wallet as
-        | Record<string, unknown>
-        | undefined) ||
-      ((walletResponse.wallet as Record<string, unknown> | undefined) ?? {});
+    const [walletResponse, merchantResponse] = await Promise.all([
+      tumiziClient.getMerchantWallet(merchantExternalId),
+      tumiziClient.getMerchant(merchantExternalId).catch(() => null),
+    ]);
 
-    const availableBalance = toFiniteNumber(walletData.available_balance);
-    const maxWithdrawable = getMaxWithdrawable(availableBalance);
+    const merchantBundle = merchantResponse
+      ? buildTumiziMerchantBundle(merchantExternalId, merchantResponse, walletResponse)
+      : null;
+
+    const walletView = buildTumiziWalletPayload({
+      merchantExternalId,
+      walletResponse,
+      merchantBundle,
+      configWalletAccountNumber: config?.walletAccountNumber,
+      configWalletCurrency: config?.walletCurrency,
+    });
+
+    const maxWithdrawable = getMaxWithdrawable(walletView.availableBalance);
     const recentWithdrawals = await prisma.payment_logs.findMany({
       where: {
         tenant_id: tenantId,
@@ -45,10 +58,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       mobileSuccess({
         merchantExternalId,
-        wallet: walletData,
-        availableBalance,
+        wallet: walletView.wallet,
+        walletAccountNumber: walletView.walletAccountNumber,
+        walletCurrency: walletView.walletCurrency,
+        availableBalance: walletView.availableBalance,
+        balanceSource: walletView.balanceSource,
         maxWithdrawableAmount: maxWithdrawable.amount,
         maxWithdrawableCharge: maxWithdrawable.charge,
+        minimumWithdrawalAmount: getMinimumWithdrawalWithCharge(),
         chargeTiers: WITHDRAWAL_CHARGE_TIERS,
         recentWithdrawals: recentWithdrawals.map((row) => ({
           id: row.id,

@@ -95,7 +95,7 @@ type Step = 'shipping' | 'payment' | 'review';
 
 interface CheckoutClientProps {
   isAuthenticated?: boolean;
-  canProcessOrders?: boolean;
+  canCheckout?: boolean;
   accessRestriction?: {
     level: string;
     reason?: string;
@@ -106,7 +106,7 @@ interface CheckoutClientProps {
 
 export default function CheckoutClient({ 
   isAuthenticated = false,
-  canProcessOrders = true,
+  canCheckout = true,
   accessRestriction,
   defaultEstimatedDeliveryDays,
 }: Readonly<CheckoutClientProps>) {
@@ -1048,7 +1048,7 @@ export default function CheckoutClient({
     <div className="container mx-auto max-w-full overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8">
       <div className="max-w-4xl mx-auto">
         {/* Store Unavailable Notice (Expired/Suspended) */}
-        {!canProcessOrders && accessRestriction && (
+        {!canCheckout && accessRestriction && (
           <Card className="mb-6 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
@@ -1070,7 +1070,7 @@ export default function CheckoutClient({
         )}
         
         {/* Guest Checkout Notice */}
-        {!isAuthenticated && canProcessOrders && (
+        {!isAuthenticated && canCheckout && (
           <Card className="mb-6 border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
@@ -2077,7 +2077,7 @@ export default function CheckoutClient({
                   className="min-h-11"
                   onClick={handleNext}
                   disabled={
-                    !canProcessOrders ||
+                    !canCheckout ||
                     (currentStep === 'payment' && requiresMpesaVerification && !paymentTransactionId.trim())
                   }
                 >
@@ -2085,8 +2085,8 @@ export default function CheckoutClient({
                   <ArrowRightIcon className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <Button className="min-h-11" onClick={handleSubmit} disabled={submitting || !canProcessOrders}>
-                  {submitting ? 'Processing...' : !canProcessOrders ? 'Store Unavailable' : 'Place Order'}
+                <Button className="min-h-11" onClick={handleSubmit} disabled={submitting || !canCheckout}>
+                  {submitting ? 'Processing...' : !canCheckout ? 'Store Unavailable' : 'Place Order'}
                 </Button>
               )}
             </div>
