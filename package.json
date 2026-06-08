@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
     "build": "next build",
     "prebuild": "prisma generate && npm run type-check",
     "postinstall": "node -e \"try { const fs = require('fs'); if (fs.existsSync('scripts/generate-prisma.js')) { require('child_process').execSync('node scripts/generate-prisma.js', {stdio: 'inherit'}); } } catch(e) {}\" || true",
