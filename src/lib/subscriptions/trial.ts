@@ -35,18 +35,23 @@ export function getTrialDaysRemaining(input: TrialPeriodInput): number | null {
   const trialDays = input.trialDays;
   if (!trialDays || trialDays <= 0) return null;
 
+  const expire = parseDate(input.expireDate);
+  const daysUntilExpire = expire ? getDaysUntil(expire) : null;
+  if (daysUntilExpire != null && daysUntilExpire <= 0) return null;
+
   const start = parseDate(input.startDate);
   if (start) {
     const daysSinceStart = Math.floor((Date.now() - start.getTime()) / MS_PER_DAY);
     if (daysSinceStart >= trialDays) return null;
-    return Math.max(0, trialDays - daysSinceStart);
+    const fromStart = Math.max(0, trialDays - daysSinceStart);
+    if (daysUntilExpire != null) {
+      return Math.min(fromStart, daysUntilExpire);
+    }
+    return fromStart;
   }
 
-  const expire = parseDate(input.expireDate);
-  if (!expire) return null;
-
-  const daysUntilExpire = getDaysUntil(expire);
-  if (daysUntilExpire <= 0 || daysUntilExpire > trialDays) return null;
+  if (!expire || daysUntilExpire == null) return null;
+  if (daysUntilExpire > trialDays) return null;
   return daysUntilExpire;
 }
 

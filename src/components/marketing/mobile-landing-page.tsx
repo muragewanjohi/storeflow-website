@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 import { ArrowRight, Check, Plus, Store, Smartphone, Shield, TrendingUp, Zap } from 'lucide-react';
+import { PlayStoreBadge } from './play-store-badge';
 import {
   Accordion,
   AccordionContent,
@@ -52,11 +55,27 @@ const testimonials = [
   { initials: 'MW', name: 'Mary Wanjiku', company: "Mama's Kitchen", quote: 'So easy to use! Taking orders has never been this simple.', metric: 'KSh 80K/month' },
 ];
 
+gsap.registerPlugin(useGSAP);
+
 export function MobileLandingPage() {
   const [logoError, setLogoError] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      gsap.from('.mobile-hero-item', {
+        y: 30,
+        opacity: 0,
+        duration: 0.7,
+        stagger: 0.1,
+        ease: 'power3.out',
+      });
+    },
+    { scope: containerRef },
+  );
 
   return (
-    <div className="relative mx-auto min-h-screen w-full max-w-[440px] overflow-x-hidden bg-white text-[#101828]">
+    <div ref={containerRef} className="relative mx-auto min-h-screen w-full max-w-[440px] overflow-x-hidden bg-white text-[#101828]">
       <section className="relative bg-gradient-to-b from-[#eff6ff] via-white to-white px-4 pb-12 pt-4">
         <div className="pointer-events-none absolute -left-20 top-40 h-48 w-48 rounded-full bg-[#e9d4ff]/20 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#bedbff]/30 blur-3xl" />
@@ -76,14 +95,14 @@ export function MobileLandingPage() {
           </Link>
         </header>
 
-        <div className="mt-8 rounded-full border border-[#bedbff] bg-gradient-to-r from-[#dbeafe] to-[#f3e8ff] px-4 py-2 text-center text-[13px] font-bold text-[#355cad]">
+        <div className="mobile-hero-item mt-8 rounded-full border border-[#bedbff] bg-gradient-to-r from-[#dbeafe] to-[#f3e8ff] px-4 py-2 text-center text-[13px] font-bold text-[#355cad]">
           <span className="inline-flex items-center gap-2">
             <Zap className="h-4 w-4" />
-            Built for Kenyan Businesses
+            Now on Google Play
           </span>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mobile-hero-item mt-6 text-center">
           <h1 className="text-[36px] font-black leading-[45px] tracking-[-0.9px]">
             Sell online in
             <br />
@@ -99,24 +118,15 @@ export function MobileLandingPage() {
         <Link
           href="/register"
           onClick={() => trackMetaPixelEvent('Lead', { content_name: 'Start free trial', content_category: 'mobile_hero' })}
-          className="mt-7 flex h-[68px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold text-white shadow-[0_20px_25px_rgba(43,127,255,0.3),0_8px_10px_rgba(43,127,255,0.3)]"
+          className="mobile-hero-item mt-7 flex h-[68px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold text-white shadow-[0_20px_25px_rgba(43,127,255,0.3),0_8px_10px_rgba(43,127,255,0.3)]"
         >
           Start free trial
           <ArrowRight className="h-5 w-5" />
         </Link>
 
-        <Link
-          href="/register"
-          onClick={() =>
-            trackMetaPixelEvent('Lead', {
-              content_name: 'Create with email',
-              content_category: 'mobile_hero',
-            })
-          }
-          className="mt-3 flex h-12 items-center justify-center rounded-2xl border border-[#d1d5db] bg-white text-sm font-bold text-[#355cad]"
-        >
-          Create with email
-        </Link>
+        <div className="mobile-hero-item mt-3 flex justify-center">
+          <PlayStoreBadge variant="light" size="lg" className="w-full justify-center" />
+        </div>
 
         <p className="mt-5 text-center text-sm text-[#6a7282]">
           {trustPills.join(' • ')}
@@ -164,6 +174,25 @@ export function MobileLandingPage() {
           <span className="h-2 w-2 rounded-full bg-[#d1d5dc]" />
           <span className="h-2 w-2 rounded-full bg-[#d1d5dc]" />
           <span className="h-2 w-2 rounded-full bg-[#d1d5dc]" />
+        </div>
+      </section>
+
+      <section className="bg-gradient-to-b from-[#0c0528] to-[#0025cc] px-4 py-12 text-white">
+        <h2 className="text-center text-[30px] font-black">Get the mobile app</h2>
+        <p className="mt-1 text-center text-base text-white/80">Manage your store from anywhere</p>
+        <div className="mt-6 rounded-3xl border border-white/20 bg-white/10 p-6 backdrop-blur-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20">
+              <Smartphone className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="font-bold">DukaNest for Android</p>
+              <p className="text-sm text-white/70">Orders, products & analytics on the go</p>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-center">
+            <PlayStoreBadge variant="dark" size="lg" />
+          </div>
         </div>
       </section>
 

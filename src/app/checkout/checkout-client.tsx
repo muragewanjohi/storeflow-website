@@ -87,6 +87,10 @@ function getSavedAddressLine(address: SavedAddress): string {
   return [address.address, address.country].filter(Boolean).join(', ');
 }
 
+function getBuyGoodsTillSuffix(till: string | null | undefined): string {
+  return till ? ` (Till ${till})` : '';
+}
+
 type PaymentMethod = 'cash' | 'mpesa' | 'tumizi';
 
 type DeliveryMethod = 'delivery' | 'pickup';
@@ -1732,7 +1736,9 @@ export default function CheckoutClient({
                               <div>
                                 <div className="font-semibold">M-Pesa (automatic)</div>
                                 <div className="text-sm text-muted-foreground">
-                                  Pay with an STK push to the phone number on your order. Confirmation is automatic.
+                                  We will prompt you on your phone to pay to our Buy Goods
+                                  {getBuyGoodsTillSuffix(checkoutSettings.payment_mpesa_buy_goods_till)}.
+                                  Confirmation is automatic.
                                 </div>
                               </div>
                             </Label>
@@ -1745,10 +1751,13 @@ export default function CheckoutClient({
 
                   {paymentMethod === 'tumizi' && checkoutSettings?.payment_tumizi_ready && (
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                      <p className="font-medium">M-Pesa STK push</p>
+                      <p className="font-medium">M-Pesa Buy Goods prompt</p>
                       <p className="mt-1 text-emerald-900/90 dark:text-emerald-100/90">
-                        After you place the order, Safaricom will prompt{' '}
-                        <span className="font-medium">{shippingAddress.phone || 'your phone'}</span>. Approve the payment on your handset; this store receives confirmation automatically.
+                        After you place the order, we will send an M-Pesa prompt to{' '}
+                        <span className="font-medium">{shippingAddress.phone || 'your phone'}</span>{' '}
+                        to pay to our Buy Goods
+                        {getBuyGoodsTillSuffix(checkoutSettings.payment_mpesa_buy_goods_till)}. Approve the
+                        payment on your handset; this store receives confirmation automatically.
                       </p>
                     </div>
                   )}
@@ -2018,8 +2027,14 @@ export default function CheckoutClient({
                       {paymentMethod === 'cash'
                         ? 'Cash'
                         : paymentMethod === 'tumizi'
-                          ? 'M-Pesa (Tumizi — STK push, auto-verified)'
+                          ? `M-Pesa Buy Goods — phone prompt${getBuyGoodsTillSuffix(checkoutSettings?.payment_mpesa_buy_goods_till)}`
                           : 'M-Pesa'}
+                      {paymentMethod === 'tumizi' && (
+                        <div className="text-xs mt-1">
+                          We will prompt you on your phone to complete payment to our Buy Goods
+                          {getBuyGoodsTillSuffix(checkoutSettings?.payment_mpesa_buy_goods_till)}.
+                        </div>
+                      )}
                       {paymentMethod === 'mpesa' && checkoutSettings?.payment_mpesa_option && (
                         <div className="text-xs mt-1">
                           {checkoutSettings.payment_mpesa_option === 'send_money' && checkoutSettings.payment_mpesa_send_money_number && (

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
-import {
-  mobileTenantMustAllowWrites,
-  requireMobileTenantAdmin,
-} from '@/lib/auth/mobile-dashboard-tenant';
+import { requireMobileTenantAdmin } from '@/lib/auth/mobile-dashboard-tenant';
 import {
   ActivatePlanError,
   activateTenantSubscriptionPlan,
@@ -21,9 +18,6 @@ const activateSchema = z.object({
 export async function POST(request: NextRequest) {
   const gate = await requireMobileTenantAdmin(request);
   if (!gate.ok) return gate.response;
-
-  const forbid = mobileTenantMustAllowWrites(gate.ctx.tenant);
-  if (forbid) return forbid;
 
   try {
     const { planId } = activateSchema.parse(await request.json());

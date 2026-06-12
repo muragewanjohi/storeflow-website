@@ -152,7 +152,7 @@ export function Pricing() {
       <section id="pricing" className="py-20 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-[#0025cc]" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#0B33B7]" />
           </div>
         </div>
       </section>
@@ -177,9 +177,8 @@ export function Pricing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <p className="text-[#0025cc] font-medium mb-2">Affordable for Every Small Business</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#0c0528] mb-4">
-            A Full Online Store for Less Than You&rsquo;d Pay a Developer
+          <h2 className="text-3xl lg:text-5xl font-bold text-[#0c0528] mb-4 tracking-tight">
+            A Full Online Store For Less Than Hiring A Developer
           </h2>
           <p className="text-lg text-muted-foreground">
             Try free for 14 days. No credit card required. Cancel anytime.
@@ -281,7 +280,7 @@ export function Pricing() {
                       : 'bg-gray-100 text-[#0025cc] hover:bg-[#0025cc] hover:text-white'
                   }`}
                 >
-                  Get Started
+                  Start Free Trial
                 </button>
               </div>
             );
