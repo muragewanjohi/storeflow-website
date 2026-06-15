@@ -6,6 +6,8 @@ import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-option
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import { cache } from '@/lib/cache/simple-cache';
 import { isValidE164DigitsString } from '@/lib/phone/parse';
+import { validateSubdomain } from '@/lib/subdomain-validation';
+import { addTenantDomain, removeTenantDomain } from '@/lib/vercel-domains';
 
 const SETTINGS_KEYS = [
   'store_description',
@@ -276,6 +278,12 @@ const mobileSettingsPatchSchema = z.object({
       phone3: z.string().nullable().optional(),
       businessType: z.string().nullable().optional(),
       selling: z.string().nullable().optional(),
+      subdomain: z
+        .string()
+        .min(3, 'Subdomain must be at least 3 characters')
+        .max(63, 'Subdomain must be at most 63 characters')
+        .regex(/^[a-z0-9-]+$/, 'Subdomain can only contain lowercase letters, numbers, and hyphens')
+        .optional(),
       address: addressPatchSchema.optional(),
     })
     .optional(),
@@ -424,7 +432,7 @@ export async function PATCH(request: NextRequest) {
 
     const tenantRow = await prisma.tenants.findFirst({
       where: { id: user.tenant_id, deleted_at: null },
-      select: { id: true, name: true, contact_email: true, data: true, plan_id: true },
+      select: { id: true, name: true, contact_email: true, data: true, plan_id: true, subdomain: true },
     });
 
     if (!tenantRow) {
@@ -442,12 +450,60 @@ export async function PATCH(request: NextRequest) {
     const optionsToSave: Record<string, string | null> = {};
     let tenantName: string | undefined;
     let tenantContactEmail: string | undefined;
+    let tenantSubdomain: string | undefined;
     let tenantDataPatch: Record<string, unknown> | null = null;
 
     if (parsed.store) {
       const s = parsed.store;
       if (s.name !== undefined) tenantName = s.name;
       if (s.contactEmail !== undefined) tenantContactEmail = s.contactEmail;
+      if (s.subdomain !== undefined) {
+        const newSubdomain = s.subdomain.toLowerCase().trim();
+        const validation = validateSubdomain(newSubdomain);
+        if (!validation.isValid) {
+          return NextResponse.json(
+            mobileError('VALIDATION_ERROR', validation.error ?? 'Invalid subdomain', [
+              { field: 'store.subdomain', message: validation.error ?? 'Invalid subdomain' },
+            ]),
+            { status: 400 },
+          );
+        }
+        if (newSubdomain !== tenantRow.subdomain) {
+          const existingTenant = await prisma.tenants.findFirst({
+            where: {
+              subdomain: newSubdomain,
+              id: { not: user.tenant_id },
+              status: { not: 'deleted' },
+            },
+            select: { id: true },
+          });
+          if (existingTenant) {
+            return NextResponse.json(
+              mobileError('VALIDATION_ERROR', 'This store URL is already taken', [
+                {
+                  field: 'store.subdomain',
+                  message: 'Choose a different subdomain — this one is already in use',
+                },
+              ]),
+              { status: 400 },
+            );
+          }
+          tenantSubdomain = newSubdomain;
+
+          const projectId = process.env.VERCEL_PROJECT_ID;
+          const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+          const oldSubdomainUrl = `${tenantRow.subdomain}.${baseDomain}`;
+          const newSubdomainUrl = `${newSubdomain}.${baseDomain}`;
+          if (projectId) {
+            removeTenantDomain(oldSubdomainUrl, projectId).catch((error) => {
+              console.error(`Failed to remove old subdomain ${oldSubdomainUrl} from Vercel:`, error);
+            });
+            addTenantDomain(newSubdomainUrl, projectId).catch((error) => {
+              console.error(`Failed to add new subdomain ${newSubdomainUrl} to Vercel:`, error);
+            });
+          }
+        }
+      }
       if (s.description !== undefined) optionsToSave.store_description = s.description;
       if (s.logo !== undefined) {
         optionsToSave.store_logo =
@@ -713,11 +769,13 @@ export async function PATCH(request: NextRequest) {
     const tenantUpdate: {
       name?: string;
       contact_email?: string;
+      subdomain?: string;
       data?: object;
     } = {};
 
     if (tenantName !== undefined) tenantUpdate.name = tenantName;
     if (tenantContactEmail !== undefined) tenantUpdate.contact_email = tenantContactEmail;
+    if (tenantSubdomain !== undefined) tenantUpdate.subdomain = tenantSubdomain;
     if (tenantDataPatch !== null) tenantUpdate.data = tenantDataPatch;
 
     if (Object.keys(tenantUpdate).length > 0) {

@@ -22,6 +22,8 @@ import { toast } from 'sonner';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import { AddressAutocomplete } from '@/components/address/address-autocomplete';
+import { CountrySelect } from '@/components/address/country-select';
+import type { CountryOption } from '@/components/address/country-select';
 import { useAnalytics } from '@/lib/analytics/use-analytics';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { identifyTikTokPixelUser, trackTikTokPixelEvent } from '@/lib/analytics/tiktok-pixel';
@@ -106,6 +108,7 @@ interface CheckoutClientProps {
     daysRemaining?: number;
   };
   defaultEstimatedDeliveryDays?: number | null;
+  countries?: CountryOption[];
 }
 
 export default function CheckoutClient({ 
@@ -113,6 +116,7 @@ export default function CheckoutClient({
   canCheckout = true,
   accessRestriction,
   defaultEstimatedDeliveryDays,
+  countries = [],
 }: Readonly<CheckoutClientProps>) {
   const router = useRouter();
   const { formatCurrency, currency } = useCurrency();
@@ -1561,27 +1565,46 @@ export default function CheckoutClient({
                             />
                           </div>
                         </div>
-                        
-                        <div className="md:col-span-2">
-                          <Label htmlFor="country">Country *</Label>
-                          <Input
-                            id="country"
-                            value={shippingAddress.country}
-                            onChange={(e) => setShippingAddress({ ...shippingAddress, country: e.target.value })}
-                            placeholder="Country"
-                            required
-                          />
-                        </div>
                       </>
                     )}
                     
+                    {deliveryMethod === 'delivery' && (
+                      <div className="md:col-span-2">
+                        <Label htmlFor="country">Country *</Label>
+                        {countries.length > 0 ? (
+                          <CountrySelect
+                            id="country"
+                            value={shippingAddress.country}
+                            onChange={(country) =>
+                              setShippingAddress({ ...shippingAddress, country })
+                            }
+                            countries={countries}
+                            placeholder="Select a country"
+                            required
+                          />
+                        ) : (
+                          <Input
+                            id="country"
+                            value={shippingAddress.country}
+                            onChange={(e) =>
+                              setShippingAddress({
+                                ...shippingAddress,
+                                country: e.target.value,
+                              })
+                            }
+                            placeholder="Country"
+                            required
+                          />
+                        )}
+                      </div>
+                    )}
+
                     {/* Hidden fields for data storage (when Google Places fills them) */}
                     {shippingAddress.formatted_address && shippingAddress.city && shippingAddress.state && (
                       <>
                         <input type="hidden" value={shippingAddress.city} readOnly />
                         <input type="hidden" value={shippingAddress.state} readOnly />
                         <input type="hidden" value={shippingAddress.postal_code || ''} readOnly />
-                        <input type="hidden" value={shippingAddress.country} readOnly />
                       </>
                     )}
                   </div>
@@ -1941,12 +1964,30 @@ export default function CheckoutClient({
                           
                           <div>
                             <Label htmlFor="billing_country">Country *</Label>
-                            <Input
-                              id="billing_country"
-                              value={billingAddress.country}
-                              onChange={(e) => setBillingAddress({ ...billingAddress, country: e.target.value })}
-                              required
-                            />
+                            {countries.length > 0 ? (
+                              <CountrySelect
+                                id="billing_country"
+                                value={billingAddress.country}
+                                onChange={(country) =>
+                                  setBillingAddress({ ...billingAddress, country })
+                                }
+                                countries={countries}
+                                placeholder="Select a country"
+                                required
+                              />
+                            ) : (
+                              <Input
+                                id="billing_country"
+                                value={billingAddress.country}
+                                onChange={(e) =>
+                                  setBillingAddress({
+                                    ...billingAddress,
+                                    country: e.target.value,
+                                  })
+                                }
+                                required
+                              />
+                            )}
                           </div>
                         </div>
                       </CardContent>
