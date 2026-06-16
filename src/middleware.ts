@@ -25,7 +25,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const code = request.nextUrl.searchParams.get('code');
 
-  if ((pathname === '/' || pathname === '/index') && code) {
+  if (code && (pathname === '/' || pathname === '/index' || pathname === '/reset-password')) {
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = '/auth/callback';
     callbackUrl.search = '';
@@ -33,6 +33,8 @@ export async function middleware(request: NextRequest) {
     const nextOnRoot = request.nextUrl.searchParams.get('next');
     if (nextOnRoot) {
       callbackUrl.searchParams.set('next', nextOnRoot);
+    } else if (pathname === '/reset-password') {
+      callbackUrl.searchParams.set('next', '/reset-password');
     }
     return NextResponse.redirect(callbackUrl);
   }

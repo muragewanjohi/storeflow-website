@@ -11,6 +11,23 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+const RECOVERY_HASH_STORAGE_KEY = 'dukanest_pw_recovery_hash';
+
+function readRecoveryHash(): string {
+  if (typeof window === 'undefined') return '';
+  const fromLocation = window.location.hash;
+  if (fromLocation.length > 1) {
+    sessionStorage.setItem(RECOVERY_HASH_STORAGE_KEY, fromLocation);
+    return fromLocation;
+  }
+  return sessionStorage.getItem(RECOVERY_HASH_STORAGE_KEY) ?? '';
+}
+
+function clearRecoveryHashStorage() {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(RECOVERY_HASH_STORAGE_KEY);
+}
+
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,90 +59,137 @@ function ResetPasswordForm() {
     fetchTenantName();
   }, []);
 
-  // Check if Supabase tokens are present and establish session immediately
-  // Supabase redirects with tokens in the hash fragment: #access_token=...&type=recovery
+  // Establish a Supabase recovery session from email link tokens.
+  // Supabase may redirect with hash tokens (#access_token&type=recovery) or PKCE (?code=).
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let cancelled = false;
+
     async function establishSession() {
       try {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+
+        // Recovery session may already be in cookies (effect re-run, PKCE callback, etc.).
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession?.user) {
+          if (!cancelled) {
+            clearRecoveryHashStorage();
+            setHasValidToken(true);
+          }
+          return;
+        }
+
+        // PKCE flow: exchange code server-side, then return here with session cookies.
+        const code = searchParams.get('code');
+        if (code) {
+          const callback = new URL('/auth/callback', window.location.origin);
+          callback.searchParams.set('code', code);
+          callback.searchParams.set('next', '/reset-password');
+          window.location.replace(callback.toString());
+          return;
+        }
+
+        const hash = readRecoveryHash();
+        const hashParams = new URLSearchParams(
+          hash.startsWith('#') ? hash.substring(1) : hash,
+        );
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
-        
-        // Supabase password reset includes access_token and type=recovery in hash
+
         if (accessToken && type === 'recovery') {
-          // Import and create Supabase client
-          // The createBrowserClient from @supabase/ssr should automatically handle hash tokens
-          // but we'll explicitly set the session to ensure it's established immediately
-          const { createClient } = await import('@/lib/supabase/client');
-          const supabase = createClient();
-          
-          // Explicitly set the session from the hash tokens to ensure it's established immediately
-          // This is critical - the session must be set immediately to prevent expiration
           if (accessToken && refreshToken) {
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
-            
+            const { data: sessionData, error: sessionError } =
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
             if (sessionError || !sessionData.session) {
               console.error('Failed to establish session:', sessionError);
-              setError('Invalid or expired reset token. Please request a new password reset link.');
-              setIsTokenExpired(true);
-              setHasValidToken(false);
-              setIsEstablishingSession(false);
+              if (!cancelled) {
+                setError(
+                  'Invalid or expired reset token. Please request a new password reset link.',
+                );
+                setIsTokenExpired(true);
+                setHasValidToken(false);
+              }
               return;
             }
-            
-            // Verify the session is valid by getting the user
+
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError || !user) {
               console.error('Failed to get user from session:', userError);
-              setError('Invalid or expired reset token. Please request a new password reset link.');
-              setIsTokenExpired(true);
-              setHasValidToken(false);
-              setIsEstablishingSession(false);
+              if (!cancelled) {
+                setError(
+                  'Invalid or expired reset token. Please request a new password reset link.',
+                );
+                setIsTokenExpired(true);
+                setHasValidToken(false);
+              }
               return;
             }
-            
-            // Session established successfully - clear hash from URL for security
-            // Only clear after session is confirmed to be valid
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-            setHasValidToken(true);
-          } else {
-            // Missing refresh token - try to get session anyway (might be in cookies)
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              setHasValidToken(true);
-            } else {
-              setError('Invalid or expired reset token. Please request a new password reset link.');
-              setIsTokenExpired(true);
-              setHasValidToken(false);
-            }
+
+            clearRecoveryHashStorage();
+            window.history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search,
+            );
+            if (!cancelled) setHasValidToken(true);
+            return;
           }
-        } else {
-          // Check query params as fallback
-          const queryToken = searchParams.get('token') || searchParams.get('access_token');
-          if (queryToken) {
-            setHasValidToken(true);
-          } else {
-            setError('Invalid or missing reset token. Please request a new password reset.');
+
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            if (!cancelled) setHasValidToken(true);
+            return;
+          }
+
+          if (!cancelled) {
+            setError(
+              'Invalid or expired reset token. Please request a new password reset link.',
+            );
+            setIsTokenExpired(true);
             setHasValidToken(false);
           }
+          return;
+        }
+
+        const queryToken =
+          searchParams.get('token') || searchParams.get('access_token');
+        if (queryToken) {
+          if (!cancelled) setHasValidToken(true);
+          return;
+        }
+
+        if (!cancelled) {
+          setError(
+            'Invalid or missing reset token. Please request a new password reset.',
+          );
+          setHasValidToken(false);
         }
       } catch (err) {
         console.error('Error establishing session:', err);
-        setError('An error occurred while validating the reset token. Please request a new password reset link.');
-        setIsTokenExpired(true);
-        setHasValidToken(false);
+        if (!cancelled) {
+          setError(
+            'An error occurred while validating the reset token. Please request a new password reset link.',
+          );
+          setIsTokenExpired(true);
+          setHasValidToken(false);
+        }
       } finally {
-        setIsEstablishingSession(false);
+        if (!cancelled) setIsEstablishingSession(false);
       }
     }
 
     establishSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {

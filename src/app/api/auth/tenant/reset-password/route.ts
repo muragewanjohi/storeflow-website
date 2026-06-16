@@ -18,16 +18,6 @@ const resetPasswordSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Get current tenant from request
-    const tenant = await getTenant();
-    
-    if (!tenant) {
-      return NextResponse.json(
-        { error: 'Tenant not found' },
-        { status: 404 }
-      );
-    }
-
     const body = await request.json();
     const validatedData = resetPasswordSchema.parse(body);
 
@@ -47,21 +37,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify that this user belongs to the current tenant
-    const tenantWithUser = await prisma.tenants.findFirst({
-      where: {
-        id: tenant.id,
-        user_id: user.id,
-      },
-    });
+    // Resolve tenant from subdomain when present; otherwise from the authenticated user
+    // (mobile reset links land on www.dukanest.com/reset-password without tenant host).
+    const requestTenant = await getTenant();
+    const tenantWithUser = requestTenant
+      ? await prisma.tenants.findFirst({
+          where: {
+            id: requestTenant.id,
+            user_id: user.id,
+          },
+        })
+      : await prisma.tenants.findFirst({
+          where: {
+            user_id: user.id,
+            deleted_at: null,
+          },
+        });
 
     if (!tenantWithUser) {
       return NextResponse.json(
-        { 
-          error: 'Access denied',
-          message: 'This password reset link is not valid for this store. Please request a new password reset from the correct store.',
-        },
-        { status: 403 }
+        requestTenant
+          ? {
+              error: 'Access denied',
+              message:
+                'This password reset link is not valid for this store. Please request a new password reset from the correct store.',
+            }
+          : {
+              error: 'Tenant not found',
+              message: 'No store account was found for this user.',
+            },
+        { status: requestTenant ? 403 : 404 }
       );
     }
 
