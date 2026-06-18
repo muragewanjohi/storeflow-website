@@ -84,7 +84,7 @@ async function getCompletedSubscriptionPaymentsCount(
     FROM payment_logs
     WHERE tenant_id = ${referredTenantId}
       AND status = 'completed'
-      AND gateway IN ('mpesa_buy_goods', 'pesapal')
+      AND gateway IN ('mpesa_buy_goods', 'pesapal', 'tumizi_subscription')
       AND metadata ? 'plan_id'
   `;
 

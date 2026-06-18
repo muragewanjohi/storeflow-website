@@ -4,11 +4,100 @@ import { verifyPaymentWebhookRequest } from '@/lib/payments/webhook-auth';
 import { findTenantIdByTumiziMerchantExternalId } from '@/lib/tumizi/config';
 import { applyTumiziCustomerPaymentStatus } from '@/lib/tumizi/apply-payment-status';
 import {
+  applyTumiziSubscriptionPaymentStatus,
+  findTumiziSubscriptionPaymentByExternalReference,
+} from '@/lib/tumizi/apply-subscription-payment';
+import {
   normalizeTumiziEventPayload,
   shouldProcessTumiziWebhookEvent,
 } from '@/lib/tumizi/webhook';
 
 export const dynamic = 'force-dynamic';
+
+async function processTumiziWebhookEvent(input: {
+  normalized: ReturnType<typeof normalizeTumiziEventPayload>;
+  webhookEventId: string;
+  tenantId: string;
+}) {
+  const subscriptionPayment = await findTumiziSubscriptionPaymentByExternalReference(
+    input.normalized.externalReference!,
+  );
+
+  if (subscriptionPayment) {
+    const applyResult = await applyTumiziSubscriptionPaymentStatus({
+      tenantId: subscriptionPayment.tenant_id,
+      externalReference: input.normalized.externalReference!,
+      tumiziStatus: input.normalized.status,
+      transactionReference: input.normalized.transactionReference,
+      event: input.normalized.event,
+      rawPayload: input.normalized.raw,
+    });
+
+    if (!applyResult.applied) {
+      await prisma.tumizi_webhook_events.update({
+        where: { id: input.webhookEventId },
+        data: {
+          processing_status: 'ignored',
+          processing_error: applyResult.reason ?? 'subscription_payment_not_applied',
+          processed_at: new Date(),
+        },
+      });
+      return NextResponse.json({
+        success: true,
+        ignored: true,
+        reason: applyResult.reason ?? 'subscription_payment_not_applied',
+      });
+    }
+
+    await prisma.tumizi_webhook_events.update({
+      where: { id: input.webhookEventId },
+      data: {
+        tenant_id: subscriptionPayment.tenant_id,
+        processing_status: 'processed',
+        processing_error: null,
+        processed_at: new Date(),
+      },
+    });
+
+    return NextResponse.json({ success: true, scope: 'subscription' });
+  }
+
+  const applyResult = await applyTumiziCustomerPaymentStatus({
+    tenantId: input.tenantId,
+    externalReference: input.normalized.externalReference!,
+    tumiziStatus: input.normalized.status,
+    transactionReference: input.normalized.transactionReference,
+    event: input.normalized.event,
+    rawPayload: input.normalized.raw,
+  });
+
+  if (!applyResult.applied) {
+    await prisma.tumizi_webhook_events.update({
+      where: { id: input.webhookEventId },
+      data: {
+        processing_status: 'ignored',
+        processing_error: applyResult.reason ?? 'payment_log_not_found',
+        processed_at: new Date(),
+      },
+    });
+    return NextResponse.json({
+      success: true,
+      ignored: true,
+      reason: applyResult.reason ?? 'payment_log_not_found',
+    });
+  }
+
+  await prisma.tumizi_webhook_events.update({
+    where: { id: input.webhookEventId },
+    data: {
+      processing_status: 'processed',
+      processing_error: null,
+      processed_at: new Date(),
+    },
+  });
+
+  return NextResponse.json({ success: true, scope: 'order' });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +117,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ignored: true, reason: 'missing_external_reference' });
     }
 
+    const subscriptionPayment = await findTumiziSubscriptionPaymentByExternalReference(
+      normalized.externalReference,
+    );
+
     const existingEvent = await prisma.tumizi_webhook_events.findFirst({
       where: {
         event_name: normalized.event,
@@ -39,9 +132,10 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantId =
-      normalized.merchantExternalId
+      subscriptionPayment?.tenant_id ??
+      (normalized.merchantExternalId
         ? await findTenantIdByTumiziMerchantExternalId(normalized.merchantExternalId)
-        : null;
+        : null);
 
     const webhookEvent = existingEvent
       ? await prisma.tumizi_webhook_events.update({
@@ -77,41 +171,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, ignored: true, reason: 'tenant_not_found' });
     }
 
-    const applyResult = await applyTumiziCustomerPaymentStatus({
+    return processTumiziWebhookEvent({
+      normalized,
+      webhookEventId: webhookEvent.id,
       tenantId,
-      externalReference: normalized.externalReference,
-      tumiziStatus: normalized.status,
-      transactionReference: normalized.transactionReference,
-      event: normalized.event,
-      rawPayload: normalized.raw,
     });
-
-    if (!applyResult.applied) {
-      await prisma.tumizi_webhook_events.update({
-        where: { id: webhookEvent.id },
-        data: {
-          processing_status: 'ignored',
-          processing_error: applyResult.reason ?? 'payment_log_not_found',
-          processed_at: new Date(),
-        },
-      });
-      return NextResponse.json({
-        success: true,
-        ignored: true,
-        reason: applyResult.reason ?? 'payment_log_not_found',
-      });
-    }
-
-    await prisma.tumizi_webhook_events.update({
-      where: { id: webhookEvent.id },
-      data: {
-        processing_status: 'processed',
-        processing_error: null,
-        processed_at: new Date(),
-      },
-    });
-
-    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[Tumizi Webhook] Failed to process webhook:', error);
     return NextResponse.json({ success: false, error: 'Webhook processing failed' }, { status: 500 });

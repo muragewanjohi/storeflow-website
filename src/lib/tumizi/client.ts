@@ -92,6 +92,22 @@ export interface TumiziCreateMerchantRefundPayload {
   reason?: string;
 }
 
+export interface TumiziCreatePartnerCustomerPaymentPayload {
+  external_reference: string;
+  source: {
+    wallet_account_number: string;
+  };
+  payer: {
+    phone_number: string;
+    name: string;
+    email?: string;
+  };
+  amount: number;
+  currency?: string;
+  account_reference: string;
+  description?: string;
+}
+
 export interface TumiziUpdateMerchantPayload {
   merchant?: {
     name?: string;
@@ -218,5 +234,19 @@ export const tumiziClient = {
       method: 'POST',
       body: payload,
     });
+  },
+  getPartnerWallet() {
+    return tumiziRequest<Record<string, unknown>>('/api/partner/v1/me/wallet');
+  },
+  createPartnerCustomerPayment(payload: TumiziCreatePartnerCustomerPaymentPayload) {
+    return tumiziRequest<Record<string, unknown>>('/api/partner/v1/me/customer-payments', {
+      method: 'POST',
+      body: payload,
+    });
+  },
+  getPartnerCustomerPayment(externalReference: string) {
+    return tumiziRequest<Record<string, unknown>>(
+      `/api/partner/v1/me/customer-payments/${encodeURIComponent(externalReference)}`,
+    );
   },
 };
