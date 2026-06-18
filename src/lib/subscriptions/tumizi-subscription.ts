@@ -16,6 +16,8 @@ import {
   applyTumiziSubscriptionPaymentStatus,
 } from '@/lib/tumizi/apply-subscription-payment';
 
+export const TUMIZI_SUBSCRIPTION_GATEWAY = 'tumizi_subscription';
+
 export class TumiziSubscriptionError extends Error {
   constructor(
     message: string,
