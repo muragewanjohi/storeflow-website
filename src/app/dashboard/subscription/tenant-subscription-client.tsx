@@ -1306,7 +1306,7 @@ export default function TenantSubscriptionClient({
               {paymentBusy
                 ? 'Please wait...'
                 : paymentMethod === 'mpesa' && isKenya
-                  ? 'Pay with M-Pesa'
+                  ? 'Pay now'
                   : 'Continue to PesaPal'}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { tumiziClient, TumiziApiError } from '@/lib/tumizi/client';
 import { resolveTumiziPartnerWalletAccountNumber } from '@/lib/tumizi/partner-wallet';
 import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+import { buildTumiziAccountReference } from '@/lib/tumizi/references';
 import {
   extractTumiziCustomerPaymentStatus,
 } from '@/lib/tumizi/apply-payment-status';
@@ -25,7 +26,23 @@ export class TumiziSubscriptionError extends Error {
   }
 }
 
-export const TUMIZI_SUBSCRIPTION_GATEWAY = 'tumizi_subscription';
+function formatTumiziApiErrorMessage(error: TumiziApiError): string {
+  const details = error.details;
+  if (details && typeof details === 'object' && !Array.isArray(details)) {
+    const messages = Object.values(details as Record<string, unknown>)
+      .flatMap((value) => {
+        if (Array.isArray(value)) {
+          return value.map((item) => String(item));
+        }
+        return [String(value)];
+      })
+      .filter((value) => value.trim().length > 0);
+    if (messages.length > 0) {
+      return messages.join(' ');
+    }
+  }
+  return error.message;
+}
 
 function readCustomerMessage(response: Record<string, unknown>): string {
   const data = response.data;
@@ -98,8 +115,12 @@ export async function initiateTumiziSubscriptionPayment(input: {
     throw new TumiziSubscriptionError('Invalid payment amount. Please contact support.', 400);
   }
 
+  const chargeAmount = Math.max(1, Math.ceil(amount));
   const externalReference = `sub-${tenant.id.slice(0, 8)}-${Date.now()}`;
-  const accountReference = `SUB-${tenant.id.slice(0, 8).toUpperCase()}-${Date.now()}`;
+  const accountReference = buildTumiziAccountReference(
+    tenant.name?.trim() || 'DUKANEST',
+    plan.name?.trim() || 'SUB',
+  );
   const walletAccountNumber = await resolveTumiziPartnerWalletAccountNumber();
 
   const paymentLog = await prisma.payment_logs.create({
@@ -107,7 +128,7 @@ export async function initiateTumiziSubscriptionPayment(input: {
       tenant_id: tenant.id,
       user_id: input.userId,
       gateway: TUMIZI_SUBSCRIPTION_GATEWAY,
-      amount,
+      amount: chargeAmount,
       currency: 'KES',
       status: 'pending',
       payment_id: externalReference,
@@ -137,7 +158,7 @@ export async function initiateTumiziSubscriptionPayment(input: {
         name: input.payerName?.trim() || tenant.name?.trim() || 'DukaNest Merchant',
         email: input.payerEmail?.trim() || tenant.contact_email || undefined,
       },
-      amount,
+      amount: chargeAmount,
       currency: 'KES',
       account_reference: accountReference,
       description: `Subscription: ${plan.name}`,
@@ -159,7 +180,7 @@ export async function initiateTumiziSubscriptionPayment(input: {
 
       if (error instanceof TumiziApiError) {
         throw new TumiziSubscriptionError(
-          error.message,
+          formatTumiziApiErrorMessage(error),
           error.status >= 400 && error.status < 500 ? error.status : 502,
         );
       }
@@ -184,7 +205,7 @@ export async function initiateTumiziSubscriptionPayment(input: {
     externalReference,
     checkoutRequestId: externalReference,
     paymentLogId: paymentLog.id,
-    amount,
+    amount: chargeAmount,
     currency: 'KES' as const,
     changeType,
     proratedAmount,
