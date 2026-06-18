@@ -2,16 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
 import { requireMobileTenantAdmin } from '@/lib/auth/mobile-dashboard-tenant';
+import { TumiziApiError } from '@/lib/tumizi/client';
 import {
   TumiziSubscriptionError,
   initiateTumiziSubscriptionPayment,
 } from '@/lib/subscriptions/tumizi-subscription';
 
+import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+
 const initiateSchema = z.object({
   planId: z.string().uuid('Invalid plan ID'),
-  phoneNumber: z.string().regex(/^(?:254|0)[0-9]{9}$/, {
-    message: 'Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX',
-  }),
+  phoneNumber: z
+    .string()
+    .min(9, 'Phone number is required')
+    .refine((value) => normalizeKenyaMsisdnForTumizi(value) != null, {
+      message: 'Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX',
+    }),
 });
 
 /**
@@ -54,6 +60,13 @@ export async function POST(request: NextRequest) {
     if (error instanceof TumiziSubscriptionError) {
       return NextResponse.json(mobileError('BAD_REQUEST', error.message), {
         status: error.status,
+      });
+    }
+
+    if (error instanceof TumiziApiError) {
+      console.error('[Mobile Subscription Tumizi Initiate] Tumizi API error:', error);
+      return NextResponse.json(mobileError('BAD_REQUEST', error.message), {
+        status: error.status >= 400 && error.status < 500 ? error.status : 502,
       });
     }
 

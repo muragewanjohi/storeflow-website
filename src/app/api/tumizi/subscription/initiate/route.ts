@@ -6,16 +6,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth, requireAnyRole } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { TumiziApiError } from '@/lib/tumizi/client';
 import {
   TumiziSubscriptionError,
   initiateTumiziSubscriptionPayment,
 } from '@/lib/subscriptions/tumizi-subscription';
 
+import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+
 const initiatePaymentSchema = z.object({
   plan_id: z.string().uuid('Invalid plan ID'),
-  phone_number: z.string().regex(/^(?:254|0)[0-9]{9}$/, {
-    message: 'Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX',
-  }),
+  phone_number: z
+    .string()
+    .min(9, 'Phone number is required')
+    .refine((value) => normalizeKenyaMsisdnForTumizi(value) != null, {
+      message: 'Invalid phone number format. Use 254XXXXXXXXX or 0XXXXXXXXX',
+    }),
 });
 
 export const dynamic = 'force-dynamic';
@@ -59,6 +65,11 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof TumiziSubscriptionError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    if (error instanceof TumiziApiError) {
+      console.error('[Tumizi Subscription Initiate] Tumizi API error:', error);
+      return NextResponse.json({ error: error.message }, { status: error.status >= 400 && error.status < 500 ? error.status : 502 });
     }
 
     if (error instanceof z.ZodError) {

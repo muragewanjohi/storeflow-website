@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -168,7 +169,11 @@ export default function TenantSubscriptionClient({
   // Payment state
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'pesapal'>('mpesa');
+  const [mpesaPhone, setMpesaPhone] = useState('');
   const [pesapalLoading, setPesapalLoading] = useState(false);
+  const [mpesaLoading, setMpesaLoading] = useState(false);
+  const paymentBusy = pesapalLoading || mpesaLoading;
 
   // PesaPal config (yearly discount %)
   const { data: pesapalConfig } = useQuery({
@@ -201,8 +206,17 @@ export default function TenantSubscriptionClient({
     if (!currentPlan || !canPayForCurrentPlan) return;
     setSelectedPlanId(currentPlan.id);
     setSelectedPlanName(currentPlan.name);
+    setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+    setBillingInterval('monthly');
+    setMpesaPhone('');
     setShowPaymentDialog(true);
   };
+
+  useEffect(() => {
+    if (billingInterval === 'yearly' && paymentMethod === 'mpesa') {
+      setPaymentMethod('pesapal');
+    }
+  }, [billingInterval, paymentMethod]);
 
   // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
@@ -241,6 +255,9 @@ export default function TenantSubscriptionClient({
     if (renewParam === '1' && currentPlan && canPayForCurrentPlan) {
       setSelectedPlanId(currentPlan.id);
       setSelectedPlanName(currentPlan.name);
+      setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+      setBillingInterval('monthly');
+      setMpesaPhone('');
       setShowPaymentDialog(true);
       router.replace('/dashboard/subscription', { scroll: false });
     }
@@ -345,6 +362,69 @@ export default function TenantSubscriptionClient({
     }
   };
 
+  const pollMpesaSubscriptionStatus = async (externalReference: string): Promise<boolean> => {
+    const maxAttempts = 36;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const response = await fetch(
+        `/api/tumizi/subscription/status?external_reference=${encodeURIComponent(externalReference)}`,
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      const status = String(data.status ?? '').toLowerCase();
+      if (status === 'completed') return true;
+      if (status === 'failed' || status === 'cancelled' || status === 'timeout') {
+        throw new Error('M-Pesa payment was not completed. Please try again.');
+      }
+    }
+    throw new Error('Payment is still pending. Refresh this page shortly to confirm activation.');
+  };
+
+  const handleMpesaPayment = async (planId: string) => {
+    const phone = mpesaPhone.trim().replace(/\s+/g, '');
+    if (!phone) {
+      setUpgradeError('Enter your M-Pesa phone number.');
+      return;
+    }
+
+    setMpesaLoading(true);
+    setUpgradeError(null);
+    try {
+      const response = await fetch('/api/tumizi/subscription/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_id: planId,
+          phone_number: phone,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initiate M-Pesa payment');
+      }
+
+      const externalReference =
+        data.external_reference || data.checkout_request_id || data.checkoutRequestId;
+      if (!externalReference) {
+        throw new Error('Unexpected response from payment service');
+      }
+
+      toast.message(data.message || 'Check your phone to approve the M-Pesa prompt.');
+      const completed = await pollMpesaSubscriptionStatus(externalReference);
+      if (completed) {
+        setShowPaymentDialog(false);
+        setUpgradeSuccess('Payment successful! Your subscription has been activated.');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'M-Pesa payment failed');
+    } finally {
+      setMpesaLoading(false);
+    }
+  };
+
   // Yearly price from monthly with discount (client-side display)
   const getYearlyPriceDisplay = (monthlyPrice: number) => {
     const discount = yearlyDiscountPercent / 100;
@@ -353,13 +433,17 @@ export default function TenantSubscriptionClient({
 
   return (
     <div className="container mx-auto py-8 space-y-6 max-w-7xl">
-      {pesapalLoading && (
+      {paymentBusy && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
           <div className="rounded-xl border bg-card p-6 text-center shadow-lg">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-            <p className="mt-4 text-sm font-medium">Preparing secure checkout...</p>
+            <p className="mt-4 text-sm font-medium">
+              {mpesaLoading ? 'Waiting for M-Pesa confirmation…' : 'Preparing secure checkout...'}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Please wait while we connect you to PesaPal.
+              {mpesaLoading
+                ? 'Approve the STK prompt on your phone. This may take a moment.'
+                : 'Please wait while we connect you to PesaPal.'}
             </p>
           </div>
         </div>
@@ -862,6 +946,9 @@ export default function TenantSubscriptionClient({
                                   if (getDisplayPrice(plan) > 0) {
                                     setSelectedPlanId(plan.id);
                                     setSelectedPlanName(plan.name);
+                                    setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+                                    setBillingInterval('monthly');
+                                    setMpesaPhone('');
                                     setShowPaymentDialog(true);
                                   } else {
                                     // Free plan, activate directly
@@ -869,11 +956,11 @@ export default function TenantSubscriptionClient({
                                   }
                                 }
                               }}
-                              disabled={isUpgrading || pesapalLoading}
+                              disabled={isUpgrading || paymentBusy}
                               className="w-full"
                               variant={isUpgrade ? 'default' : 'outline'}
                             >
-                              {isUpgrading || pesapalLoading ? (
+                              {isUpgrading || paymentBusy ? (
                                 'Processing...'
                               ) : isUpgrade ? (
                                 <>
@@ -1055,13 +1142,15 @@ export default function TenantSubscriptionClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Payment dialog: PesaPal only */}
+      {/* Payment dialog: M-Pesa or PesaPal */}
       <AlertDialog
         open={showPaymentDialog}
         onOpenChange={(open) => {
           setShowPaymentDialog(open);
           if (!open) {
             setBillingInterval('monthly');
+            setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+            setMpesaPhone('');
           }
         }}
       >
@@ -1083,6 +1172,43 @@ export default function TenantSubscriptionClient({
                   const yearlyDisplay = getYearlyPriceDisplay(monthlyDisplay);
                   return (
                   <>
+                    {isKenya && (
+                      <div className="space-y-3">
+                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Payment method
+                        </Label>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('mpesa')}
+                            disabled={billingInterval === 'yearly'}
+                            className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                              paymentMethod === 'mpesa'
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                            } ${billingInterval === 'yearly' ? 'cursor-not-allowed opacity-50' : ''}`}
+                          >
+                            M-Pesa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('pesapal')}
+                            className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                              paymentMethod === 'pesapal'
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                            }`}
+                          >
+                            PesaPal
+                          </button>
+                        </div>
+                        {billingInterval === 'yearly' && (
+                          <p className="text-xs text-muted-foreground">
+                            Yearly billing is available via PesaPal only.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-3">
                       <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Billing
@@ -1115,20 +1241,38 @@ export default function TenantSubscriptionClient({
                     <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-4">
                       <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Amount to Pay</p>
                       <p className="text-2xl font-bold tracking-tight text-foreground">
-                        {billingInterval === 'monthly'
+                        {paymentMethod === 'mpesa' || billingInterval === 'monthly'
                           ? `${formatPrice(monthlyDisplay, currencySymbol)} / month`
                           : `${formatPrice(yearlyDisplay, currencySymbol)} / year`}
                       </p>
-                      {billingInterval === 'yearly' && (
+                      {billingInterval === 'yearly' && paymentMethod === 'pesapal' && (
                         <p className="text-xs text-muted-foreground mt-1.5">
                           2 months free when billed annually
                         </p>
                       )}
                     </div>
-                    <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                      <CreditCardIcon className="h-4 w-4 shrink-0" />
-                      You&apos;ll complete payment on PesaPal (card, mobile money, or other methods). You can stay on our site.
-                    </p>
+                    {paymentMethod === 'mpesa' && isKenya ? (
+                      <div className="space-y-3">
+                        <Label htmlFor="subscription-mpesa-phone">M-Pesa phone number</Label>
+                        <Input
+                          id="subscription-mpesa-phone"
+                          type="tel"
+                          placeholder="2547XXXXXXXX or 07XXXXXXXX"
+                          value={mpesaPhone}
+                          onChange={(e) => setMpesaPhone(e.target.value)}
+                          disabled={paymentBusy}
+                        />
+                        <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                          <InformationCircleIcon className="h-4 w-4 shrink-0" />
+                          You&apos;ll receive an STK prompt on your phone to approve payment.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        <CreditCardIcon className="h-4 w-4 shrink-0" />
+                        You&apos;ll complete payment on PesaPal (card, mobile money, or other methods). You can stay on our site.
+                      </p>
+                    )}
                   </>
                   );
                 })()}
@@ -1137,20 +1281,33 @@ export default function TenantSubscriptionClient({
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
             <AlertDialogCancel
-              disabled={pesapalLoading}
+              disabled={paymentBusy}
               onClick={() => {
                 setBillingInterval('monthly');
+                setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+                setMpesaPhone('');
               }}
               className="mt-2"
             >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => selectedPlanId && handlePesapalPayment(selectedPlanId)}
-              disabled={pesapalLoading}
+              onClick={() => {
+                if (!selectedPlanId) return;
+                if (paymentMethod === 'mpesa' && isKenya) {
+                  void handleMpesaPayment(selectedPlanId);
+                  return;
+                }
+                void handlePesapalPayment(selectedPlanId);
+              }}
+              disabled={paymentBusy}
               className="bg-primary hover:bg-primary/90"
             >
-              {pesapalLoading ? 'Redirecting...' : 'Continue to PesaPal'}
+              {paymentBusy
+                ? 'Please wait...'
+                : paymentMethod === 'mpesa' && isKenya
+                  ? 'Pay with M-Pesa'
+                  : 'Continue to PesaPal'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

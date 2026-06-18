@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
-import { tumiziClient } from '@/lib/tumizi/client';
+import { tumiziClient, TumiziApiError } from '@/lib/tumizi/client';
 import { resolveTumiziPartnerWalletAccountNumber } from '@/lib/tumizi/partner-wallet';
 import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
 import {
@@ -126,21 +126,45 @@ export async function initiateTumiziSubscriptionPayment(input: {
     },
   });
 
-  const response = await tumiziClient.createPartnerCustomerPayment({
-    external_reference: externalReference,
-    source: {
-      wallet_account_number: walletAccountNumber,
-    },
-    payer: {
-      phone_number: msisdn,
-      name: input.payerName?.trim() || tenant.name?.trim() || 'DukaNest Merchant',
-      email: input.payerEmail?.trim() || tenant.contact_email || undefined,
-    },
-    amount,
-    currency: 'KES',
-    account_reference: accountReference,
-    description: `Subscription: ${plan.name}`,
-  });
+  const response = await tumiziClient
+    .createPartnerCustomerPayment({
+      external_reference: externalReference,
+      source: {
+        wallet_account_number: walletAccountNumber,
+      },
+      payer: {
+        phone_number: msisdn,
+        name: input.payerName?.trim() || tenant.name?.trim() || 'DukaNest Merchant',
+        email: input.payerEmail?.trim() || tenant.contact_email || undefined,
+      },
+      amount,
+      currency: 'KES',
+      account_reference: accountReference,
+      description: `Subscription: ${plan.name}`,
+    })
+    .catch(async (error) => {
+      await prisma.payment_logs.update({
+        where: { id: paymentLog.id },
+        data: {
+          status: 'failed',
+          metadata: {
+            ...(paymentLog.metadata as Record<string, unknown>),
+            tumizi_error:
+              error instanceof TumiziApiError
+                ? { message: error.message, code: error.code, status: error.status }
+                : String(error),
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      if (error instanceof TumiziApiError) {
+        throw new TumiziSubscriptionError(
+          error.message,
+          error.status >= 400 && error.status < 500 ? error.status : 502,
+        );
+      }
+      throw error;
+    });
 
   const { transactionReference } = extractTumiziCustomerPaymentStatus(response);
 
