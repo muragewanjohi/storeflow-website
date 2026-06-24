@@ -12,6 +12,7 @@ import {
   buildGettingStartedProgress,
   GETTING_STARTED_OPTION_NAMES,
 } from '@/lib/onboarding/getting-started-progress';
+import { isInTrialPeriod } from '@/lib/subscriptions/trial';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,10 +32,28 @@ export default async function TenantsPage() {
       custom_domain: true,
       status: true,
       created_at: true,
+      start_date: true,
       expire_date: true,
+      plan_id: true,
       data: true, // Include data field to check for isDemo flag
     },
   });
+
+  const planIds = [
+    ...new Set(tenantsRaw.map((tenant) => tenant.plan_id).filter(Boolean)),
+  ] as string[];
+
+  const plans =
+    planIds.length > 0
+      ? await prisma.price_plans.findMany({
+          where: { id: { in: planIds } },
+          select: { id: true, trial_days: true },
+        })
+      : [];
+
+  const trialDaysByPlanId = new Map(
+    plans.map((plan) => [plan.id, plan.trial_days] as const),
+  );
 
   const tenantIds = tenantsRaw.map((tenant) => tenant.id);
   const allSettings = tenantIds.length
@@ -110,6 +129,11 @@ export default async function TenantsPage() {
       deliveryZoneCount: deliveryZoneCountByTenantId.get(tenant.id) ?? 0,
       settings: settingsByTenantId.get(tenant.id) ?? {},
     }).progressPercent,
+    is_on_trial: isInTrialPeriod({
+      trialDays: tenant.plan_id ? trialDaysByPlanId.get(tenant.plan_id) : null,
+      startDate: tenant.start_date,
+      expireDate: tenant.expire_date,
+    }),
   }));
 
   return (

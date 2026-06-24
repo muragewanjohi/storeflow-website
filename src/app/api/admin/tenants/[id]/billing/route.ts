@@ -1,35 +1,77 @@
 /**
  * Tenant Billing History API Route
- * 
- * Handles GET requests for tenant billing history
+ *
+ * GET /api/admin/tenants/[id]/billing — subscription payment logs per tenant (all channels).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireRole } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
+import { TUMIZI_SUBSCRIPTION_GATEWAY } from '@/lib/subscriptions/tumizi-subscription';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-/**
- * GET /api/admin/tenants/[id]/billing
- * Get tenant billing history (landlord only)
- * 
- * Note: This currently returns subscription changes from tenant history.
- * In production, you'd want a dedicated billing_logs or payment_logs table.
- */
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+const SUBSCRIPTION_GATEWAYS = [
+  'mpesa_buy_goods',
+  'pesapal',
+  TUMIZI_SUBSCRIPTION_GATEWAY,
+] as const;
+
+type SubscriptionGateway = (typeof SUBSCRIPTION_GATEWAYS)[number];
+
+function mapPaymentLog(log: {
+  id: string;
+  gateway: string | null;
+  amount: unknown;
+  currency: string | null;
+  status: string | null;
+  payment_id: string | null;
+  transaction_id: string | null;
+  metadata: unknown;
+  created_at: Date | null;
+  updated_at: Date | null;
+}) {
+  const meta =
+    log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
+      ? (log.metadata as Record<string, unknown>)
+      : null;
+  const planName = meta && typeof meta.plan_name === 'string' ? meta.plan_name : null;
+
+  return {
+    id: log.id,
+    gateway: log.gateway,
+    amount: Number(log.amount),
+    currency: log.currency,
+    status: log.status,
+    payment_id: log.payment_id,
+    transaction_id: log.transaction_id,
+    plan_name: planName,
+    created_at: log.created_at?.toISOString() ?? null,
+    updated_at: log.updated_at?.toISOString() ?? null,
+  };
+}
+
+function groupByGateway(
+  logs: ReturnType<typeof mapPaymentLog>[],
+): Record<SubscriptionGateway, ReturnType<typeof mapPaymentLog>[]> {
+  return {
+    mpesa_buy_goods: logs.filter((log) => log.gateway === 'mpesa_buy_goods'),
+    pesapal: logs.filter((log) => log.gateway === 'pesapal'),
+    [TUMIZI_SUBSCRIPTION_GATEWAY]: logs.filter(
+      (log) => log.gateway === TUMIZI_SUBSCRIPTION_GATEWAY,
+    ),
+  };
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await requireAuth();
     requireRole(user, 'landlord');
 
     const { id } = await params;
 
-    // Check if tenant exists
     const tenant = await prisma.tenants.findUnique({
       where: { id },
       include: {
@@ -45,34 +87,32 @@ export async function GET(
     });
 
     if (!tenant) {
-      return NextResponse.json(
-        { message: 'Tenant not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'Tenant not found' }, { status: 404 });
     }
 
-    // For now, return current subscription info
-    // In production, you'd query a billing_logs or payment_logs table
-    const billingHistory = [
-      {
-        id: 'current',
-        type: 'subscription',
-        description: tenant.price_plans
-          ? `Subscription: ${tenant.price_plans.name}`
-          : 'No active subscription',
-        amount: tenant.price_plans?.price || 0,
-        status: tenant.status,
-        date: tenant.created_at,
-        expireDate: tenant.expire_date,
+    const paymentLogs = await prisma.payment_logs.findMany({
+      where: {
+        tenant_id: id,
+        gateway: { in: [...SUBSCRIPTION_GATEWAYS] },
       },
-    ];
+      orderBy: { created_at: 'desc' },
+      take: 150,
+      select: {
+        id: true,
+        gateway: true,
+        amount: true,
+        currency: true,
+        status: true,
+        payment_id: true,
+        transaction_id: true,
+        metadata: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
 
-    // If you have a payment_logs table, you can add:
-    // const paymentLogs = await prisma.payment_logs.findMany({
-    //   where: { tenant_id: id },
-    //   orderBy: { created_at: 'desc' },
-    //   take: 50,
-    // });
+    const transactions = paymentLogs.map(mapPaymentLog);
+    const payments = groupByGateway(transactions);
 
     return NextResponse.json(
       {
@@ -80,39 +120,43 @@ export async function GET(
           id: tenant.id,
           name: tenant.name,
         },
-        billingHistory,
         currentPlan: tenant.price_plans,
         subscriptionStatus: tenant.status,
         expireDate: tenant.expire_date,
+        payments: {
+          mpesa: payments.mpesa_buy_goods,
+          pesapal: payments.pesapal,
+          tumizi: payments[TUMIZI_SUBSCRIPTION_GATEWAY],
+        },
+        transactions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error('Error fetching billing history:', error);
 
     if (error instanceof Error) {
       if (error.message === 'Authentication required') {
-        return NextResponse.json(
-          { message: 'Authentication required' },
-          { status: 401 }
-        );
+        return NextResponse.json({ message: 'Authentication required' }, { status: 401 });
       }
       if (error.message.includes('Access denied')) {
         return NextResponse.json(
           { message: 'Access denied. Landlord role required.' },
-          { status: 403 }
+          { status: 403 },
         );
       }
     }
 
     return NextResponse.json(
       {
-        message: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : 'Internal server error')
-          : 'Failed to fetch billing history'
+        message:
+          process.env.NODE_ENV === 'development'
+            ? error instanceof Error
+              ? error.message
+              : 'Internal server error'
+            : 'Failed to fetch billing history',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

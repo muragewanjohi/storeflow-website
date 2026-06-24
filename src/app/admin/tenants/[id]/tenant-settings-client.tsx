@@ -16,13 +16,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 // Note: Alert component may need to be created if it doesn't exist
 // For now, using inline divs for alerts
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
+import {
+  BanknotesIcon,
+  CheckCircleIcon,
+  CreditCardIcon,
   TrashIcon,
-  ArrowTopRightOnSquareIcon
+  WalletIcon,
+  XCircleIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
@@ -86,6 +97,21 @@ interface OnboardingJourney {
   progressPercent: number;
 }
 
+interface TenantBillingPayment {
+  id: string;
+  gateway: string | null;
+  amount: number;
+  currency: string | null;
+  status: string | null;
+  payment_id: string | null;
+  transaction_id: string | null;
+  plan_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+type BillingPaymentTab = 'mpesa' | 'pesapal' | 'tumizi';
+
 interface TenantSettingsClientProps {
   tenant: Tenant;
   pricePlans: PricePlan[];
@@ -138,7 +164,10 @@ export default function TenantSettingsClient({
   const [subscriptionSuccess, setSubscriptionSuccess] = useState<string | null>(null);
 
   // Billing history state
-  const [billingHistory, setBillingHistory] = useState<any[]>([]);
+  const [billingMpesaPayments, setBillingMpesaPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingPesapalPayments, setBillingPesapalPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingTumiziPayments, setBillingTumiziPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingActiveTab, setBillingActiveTab] = useState<BillingPaymentTab>('mpesa');
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -379,7 +408,9 @@ export default function TenantSettingsClient({
       const response = await fetch(`/api/admin/tenants/${tenant.id}/billing`);
       const data = await response.json();
       if (response.ok) {
-        setBillingHistory(data.billingHistory || []);
+        setBillingMpesaPayments(data.payments?.mpesa ?? []);
+        setBillingPesapalPayments(data.payments?.pesapal ?? []);
+        setBillingTumiziPayments(data.payments?.tumizi ?? []);
       }
     } catch (err) {
       console.error('Failed to load billing history:', err);
@@ -391,6 +422,100 @@ export default function TenantSettingsClient({
   useEffect(() => {
     loadBillingHistory();
   }, [loadBillingHistory]);
+
+  const getPaymentStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500">Paid</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500">Pending</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-500">Cancelled</Badge>;
+      case 'timeout':
+        return <Badge className="bg-orange-500">Timeout</Badge>;
+      default:
+        return <Badge variant="secondary">{status || 'Unknown'}</Badge>;
+    }
+  };
+
+  const formatBillingCurrency = (amount: number, currency: string | null) => {
+    const currencyCode = currency || 'KES';
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: currencyCode,
+    }).format(amount);
+  };
+
+  const billingTabPayments: Record<BillingPaymentTab, TenantBillingPayment[]> = {
+    mpesa: billingMpesaPayments,
+    pesapal: billingPesapalPayments,
+    tumizi: billingTumiziPayments,
+  };
+
+  const billingTabLabels: Record<BillingPaymentTab, string> = {
+    mpesa: 'Mpesa',
+    pesapal: 'PesaPal',
+    tumizi: 'Tumizi',
+  };
+
+  const renderBillingPaymentsTable = (rows: TenantBillingPayment[], showPlan = false) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {showPlan ? <TableHead>Plan</TableHead> : null}
+          <TableHead>Amount</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Payment ID</TableHead>
+          <TableHead>Transaction ID</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead>Updated</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((payment) => (
+          <TableRow key={payment.id}>
+            {showPlan ? (
+              <TableCell>
+                {payment.plan_name ?? <span className="text-muted-foreground">—</span>}
+              </TableCell>
+            ) : null}
+            <TableCell>{formatBillingCurrency(payment.amount, payment.currency)}</TableCell>
+            <TableCell>{getPaymentStatusBadge(payment.status)}</TableCell>
+            <TableCell>
+              {payment.payment_id ? (
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {payment.payment_id.slice(0, 20)}...
+                </code>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {payment.transaction_id ? (
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {payment.transaction_id}
+                </code>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {payment.created_at
+                ? new Date(payment.created_at).toLocaleString()
+                : '—'}
+            </TableCell>
+            <TableCell>
+              {payment.updated_at
+                ? new Date(payment.updated_at).toLocaleString()
+                : '—'}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
@@ -880,32 +1005,53 @@ export default function TenantSettingsClient({
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
-          <CardDescription>View subscription and payment history</CardDescription>
+          <CardDescription>
+            Subscription payments for this store across Mpesa, PesaPal, and Tumizi
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingBilling ? (
             <p className="text-sm text-muted-foreground">Loading billing history...</p>
-          ) : billingHistory.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No billing history available</p>
           ) : (
-            <div className="space-y-4">
-              {billingHistory.map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.description}</p>
+            <Tabs
+              value={billingActiveTab}
+              onValueChange={(value) => setBillingActiveTab(value as BillingPaymentTab)}
+              className="space-y-4"
+            >
+              <TabsList>
+                <TabsTrigger value="mpesa">
+                  <BanknotesIcon className="mr-2 h-4 w-4" />
+                  Mpesa
+                </TabsTrigger>
+                <TabsTrigger value="pesapal">
+                  <CreditCardIcon className="mr-2 h-4 w-4" />
+                  PesaPal
+                </TabsTrigger>
+                <TabsTrigger value="tumizi">
+                  <WalletIcon className="mr-2 h-4 w-4" />
+                  Tumizi
+                </TabsTrigger>
+              </TabsList>
+
+              {(['mpesa', 'pesapal', 'tumizi'] as const).map((tab) => {
+                const rows = billingTabPayments[tab];
+                return (
+                  <TabsContent key={tab} value={tab} className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      {item.date ? new Date(item.date).toLocaleDateString() : 'N/A'}
+                      {rows.length} {billingTabLabels[tab]} transaction
+                      {rows.length !== 1 ? 's' : ''}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${item.amount}</p>
-                    <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
-                      {item.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    {rows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-8 text-center">
+                        No {billingTabLabels[tab]} subscription payments for this store
+                      </p>
+                    ) : (
+                      renderBillingPaymentsTable(rows, true)
+                    )}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           )}
         </CardContent>
       </Card>

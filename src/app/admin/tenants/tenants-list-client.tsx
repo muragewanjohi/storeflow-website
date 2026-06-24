@@ -33,6 +33,7 @@ interface Tenant {
   subdomain: string;
   contact_phone: string | null;
   onboarding_progress_percent: number;
+  is_on_trial: boolean;
   status: string | null;
   created_at: Date | null;
   expire_date: Date | null;
@@ -248,6 +249,8 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
     }
   };
 
+  const getTrialLabel = (tenant: Tenant) => (tenant.is_on_trial ? 'Yes' : 'No');
+
   return (
     <Card>
       <CardHeader>
@@ -390,6 +393,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                     <TableHead>Subdomain</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Onboarding</TableHead>
+                    <TableHead>Trial</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
@@ -434,6 +438,17 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                             className="h-1.5"
                           />
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={
+                            tenant.is_on_trial
+                              ? 'font-medium text-blue-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {getTrialLabel(tenant)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -703,6 +718,7 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                     <TableHead>Subdomain</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Onboarding</TableHead>
+                    <TableHead>Trial</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Expires</TableHead>
@@ -740,6 +756,17 @@ export default function TenantsListClient({ tenants }: Readonly<TenantsListClien
                             className="h-1.5"
                           />
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={
+                            tenant.is_on_trial
+                              ? 'font-medium text-blue-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {getTrialLabel(tenant)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
