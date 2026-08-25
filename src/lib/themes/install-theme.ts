@@ -12,6 +12,7 @@ import { createDemoContent } from '@/lib/themes/demo-content';
 import { trackThemeInstallation } from '@/lib/themes/theme-installation-analytics';
 import { generateSlug } from '@/lib/content/validation';
 import { persistHomepageInstallSnapshot } from '@/lib/onboarding/onboarding-reward';
+import { canInstallTheme } from '@/lib/themes/theme-access';
 import type { Tenant } from '@/lib/tenant-context';
 
 export class ThemeInstallError extends Error {
@@ -151,6 +152,19 @@ export async function installThemeForTenant(
 
   if (!theme) {
     throw new ThemeInstallError('Theme not found', 404);
+  }
+
+  // Theme Track A4 — real Basic/Pro gating, same check as web's
+  // /api/themes/install/route.ts. Every theme ships with is_premium: false
+  // today (DA.30), so this is a no-op until a theme is actually flipped to
+  // premium, but it's the real enforcement point once one is.
+  if (theme.is_premium) {
+    const plan = tenant.plan_id
+      ? await prisma.price_plans.findUnique({ where: { id: tenant.plan_id }, select: { name: true } })
+      : null;
+    if (!canInstallTheme(plan?.name, theme)) {
+      throw new ThemeInstallError(`"${theme.title}" is a Pro theme. Upgrade your plan to install it.`, 403);
+    }
   }
 
   await prisma.tenant_themes.updateMany({

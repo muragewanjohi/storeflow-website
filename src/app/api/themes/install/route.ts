@@ -22,6 +22,7 @@ import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoContent } from '@/lib/themes/demo-content';
 import { trackThemeInstallation } from '@/lib/themes/theme-installation-analytics';
 import { generateSlug } from '@/lib/content/validation';
+import { canInstallTheme } from '@/lib/themes/theme-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +112,25 @@ export async function POST(request: NextRequest) {
 
     if (!theme) {
       return NextResponse.json({ error: 'Theme not found' }, { status: 404 });
+    }
+
+    // Theme Track A4 — real Basic/Pro gating. Every theme ships with
+    // is_premium: false today (DA.30), so this is a no-op until a theme is
+    // actually flipped to premium, but it's the real enforcement point once
+    // one is.
+    if (theme.is_premium) {
+      const plan = tenant.plan_id
+        ? await prisma.price_plans.findUnique({ where: { id: tenant.plan_id }, select: { name: true } })
+        : null;
+      if (!canInstallTheme(plan?.name, theme)) {
+        return NextResponse.json(
+          {
+            error: `"${theme.title}" is a Pro theme. Upgrade your plan to install it.`,
+            code: 'THEME_REQUIRES_UPGRADE',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Deactivate all other themes for this tenant

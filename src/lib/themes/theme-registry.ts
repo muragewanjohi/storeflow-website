@@ -49,7 +49,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'modern',
     industry: 'electronics',
     description: 'Clean, tech-focused theme perfect for electronics and gadgets',
-    screenshotUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/modern-preview.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
@@ -80,7 +80,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'hexfashion',
     industry: 'fashion',
     description: 'Elegant fashion theme with catalog-style layouts',
-    screenshotUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/hexfashion-preview.png',
     layout: {
       header: 'minimal',
       productGrid: 'catalog',
@@ -111,7 +111,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'default',
     industry: 'electronics',
     description: 'Most appealing theme with hero, testimonials, and blogs - perfect for computer and electronics stores',
-    screenshotUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/default-preview.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
@@ -143,7 +143,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'minimal',
     industry: 'general',
     description: 'A minimal and elegant theme with clean lines and simple design',
-    screenshotUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/minimal-preview.png',
     layout: {
       header: 'minimal',
       productGrid: 'grid',
@@ -205,7 +205,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'furniture',
     industry: 'furniture',
     description: 'Modern furniture theme perfect for interior design stores and furniture retailers',
-    screenshotUrl: '/images/themes/furniture.png',
+    screenshotUrl: '/images/themes/furniture-preview.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',

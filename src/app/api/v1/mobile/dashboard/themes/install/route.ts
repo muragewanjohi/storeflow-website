@@ -58,7 +58,13 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof ThemeInstallError) {
       const code =
-        error.status === 404 ? 'NOT_FOUND' : error.status === 400 ? 'BAD_REQUEST' : 'INTERNAL_ERROR';
+        error.status === 404
+          ? 'NOT_FOUND'
+          : error.status === 400
+            ? 'BAD_REQUEST'
+            : error.status === 403
+              ? 'FORBIDDEN'
+              : 'INTERNAL_ERROR';
       return NextResponse.json(mobileError(code, error.message), { status: error.status });
     }
 
