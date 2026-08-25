@@ -55,6 +55,11 @@ import { generateSlug } from '@/lib/products/validation';
 import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
 import { regenerateHomepageImage, HOMEPAGE_IMAGE_SLOTS, HOMEPAGE_IMAGE_SLOT_LABELS, isHomepageImageSlot } from '@/lib/homepage-images/regenerate-shared';
 import { canUseAiFeature } from '@/lib/subscriptions/limits';
+import {
+  writeMarketingImageBatch,
+  renderAndSaveMarketingImages,
+  MAX_MARKETING_IMAGES_PER_BATCH,
+} from '@/lib/marketing-images/marketing-image-shared';
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -146,7 +151,7 @@ export interface HandlerResult {
 // like 'category', are simple enough that this module can just create them
 // directly and immediately when the merchant already named them, on BOTH
 // platforms — see handleCategoryConfigTarget() below.
-export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'delivery_zone', 'unsupported'] as const;
+export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'delivery_zone', 'marketing_images', 'unsupported'] as const;
 export type ConfigTarget = (typeof CONFIG_TARGETS)[number];
 
 export const configTargetSchema = {
@@ -187,8 +192,34 @@ export const configTargetSchema = {
     // in that case leave this empty too and the merchant will be asked to
     // pick one.
     proposedImageSlot: { type: 'string' },
+    // Populated when target === 'marketing_images' — a free-text
+    // description of what images the merchant wants, in EITHER case: (a)
+    // first-time ask, or (b) YOUR OWN previous message proposed generating
+    // for this exact description and the merchant just confirmed (extract
+    // the SAME description back). Empty string otherwise.
+    marketingImageRequest: { type: 'string' },
+    // Best-effort count the merchant explicitly stated (e.g. "3 images",
+    // "one banner") — null if no specific number was given (the handler
+    // picks a sensible default). Never a specific number just because one
+    // seems plausible; only when clearly stated.
+    marketingImageCount: { type: ['integer', 'null'] },
+    // true ONLY when this message is confirming a previous proposal (case
+    // b above) — mirrors imageSlot's "ready to act now" signal. false for
+    // a first-time ask, which must always be proposed back before any real
+    // generation happens (real quota + real cost, same discipline as
+    // homepage_image).
+    marketingImageConfirmed: { type: 'boolean' },
   },
-  required: ['target', 'categoryNames', 'suggestedCategoryNames', 'imageSlot', 'proposedImageSlot'],
+  required: [
+    'target',
+    'categoryNames',
+    'suggestedCategoryNames',
+    'imageSlot',
+    'proposedImageSlot',
+    'marketingImageRequest',
+    'marketingImageCount',
+    'marketingImageConfirmed',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -198,6 +229,9 @@ export interface ConfigTargetParseResult {
   suggestedCategoryNames: string[];
   imageSlot: string;
   proposedImageSlot: string;
+  marketingImageRequest: string;
+  marketingImageCount: number | null;
+  marketingImageConfirmed: boolean;
 }
 
 /**
@@ -223,8 +257,8 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee).',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the homepage\'s AI images (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing images (e.g. a banner for a sale, images for social media, a promo graphic) that are NOT one of the 5 fixed homepage slots.',
+    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing image or images for some other purpose (a sale banner, a social media post, "make me a graphic for X") that is not one of the 5 fixed homepage slots, return target: "marketing_images".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
@@ -233,7 +267,10 @@ export function buildConfigTargetSystemPrompt(
     '1. YOUR OWN previous message in this conversation already proposed ONE specific slot for confirmation AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact slot value now. proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention.',
     '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If it is ambiguous which slot they mean (e.g. "update my banner images" could be any of the 3, or "improve my homepage pictures" could be any of the 5), leave proposedImageSlot empty too — you will ask them which one.',
     'delivery_zone has no extra fields here — it is a pure hand-off, the actual name/areas/fee collection happens in a dedicated follow-up conversation, not in this classification step.',
-    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a homepage image, or a delivery zone), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
+    'If target is "marketing_images", there are two cases:',
+    '1. YOUR OWN previous message in this conversation already proposed generating images for a specific description AND their latest message clearly agrees (e.g. "yes", "go ahead", "do it") — set marketingImageRequest to that SAME description you previously proposed, set marketingImageCount to the SAME number you previously stated in that proposal (it will be written in your own prior message), set marketingImageConfirmed to true. This is how a proposal becomes a real generation request — generating costs real quota/money and must never happen on the very first mention.',
+    '2. Otherwise — a first-time request — set marketingImageRequest to a clear paraphrase of what they described wanting, set marketingImageConfirmed to false. If they stated a specific number of images (e.g. "3 images", "a couple of banners" -> 2), set marketingImageCount to that number; otherwise leave it null.',
+    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a homepage image, a delivery zone, or a new marketing image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
 }
@@ -427,6 +464,129 @@ export async function handleHomepageImageConfigTarget(
     answer: `Sure — which image would you like me to regenerate? Your options are: ${slotList}.`,
     data: { target: 'homepage_image', options: HOMEPAGE_IMAGE_SLOTS },
     usage: zeroUsage,
+  };
+}
+
+const DEFAULT_MARKETING_IMAGE_COUNT = 3;
+
+/**
+ * DA.28 (AI Phase 6.1) — answers a resolved 'marketing_images'
+ * configuration_guidance target. Shared verbatim by both platforms, same
+ * reasoning as handleHomepageImageConfigTarget: the real Claude prompt-
+ * writing + Gemini rendering happens entirely server-side within one
+ * confirm turn, no chat-vs-native-form split needed.
+ *
+ * Always a 2-turn confirm before anything is generated (real quota/cost),
+ * same discipline as homepage_image. Deliberately does NOT call Claude to
+ * write the actual image prompts at proposal time — only at confirm time —
+ * so an abandoned proposal never spends real money on prompt-writing either.
+ */
+export async function handleMarketingImagesConfigTarget(
+  tenant: Tenant,
+  requestDescription: string,
+  requestedCount: number | null,
+  confirmed: boolean,
+): Promise<HandlerResult> {
+  const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
+  const description = requestDescription.trim();
+  if (!description) {
+    return {
+      intent: 'configuration_guidance',
+      answer: "What kind of image would you like me to generate — for example, a sale banner, or a promo graphic for social media?",
+      data: { target: 'marketing_images' },
+      usage: zeroUsage,
+    };
+  }
+
+  const quota = await canUseAiFeature(tenant, 'marketing_image_prompt', 'monthly');
+
+  if (!confirmed) {
+    if (!quota.allowed) {
+      return {
+        intent: 'configuration_guidance',
+        answer:
+          quota.reason ??
+          "You've used all of your marketing-image generations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+        data: { target: 'marketing_images', generated: false, reason: 'quota_exceeded' },
+        usage: zeroUsage,
+      };
+    }
+    const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0)) : MAX_MARKETING_IMAGES_PER_BATCH;
+    const count = Math.max(1, Math.min(requestedCount ?? DEFAULT_MARKETING_IMAGE_COUNT, remaining, MAX_MARKETING_IMAGES_PER_BATCH));
+    return {
+      intent: 'configuration_guidance',
+      answer: `I can generate ${count} image${count === 1 ? '' : 's'} of ${description}. Want me to go ahead?`,
+      data: { target: 'marketing_images', proposed: description, proposedCount: count },
+      usage: zeroUsage,
+    };
+  }
+
+  // Confirmed — real generation.
+  if (!quota.allowed) {
+    return {
+      intent: 'configuration_guidance',
+      answer:
+        quota.reason ??
+        "You've used all of your marketing-image generations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+      data: { target: 'marketing_images', generated: false, reason: 'quota_exceeded' },
+      usage: zeroUsage,
+    };
+  }
+
+  const apiKey = process.env.NANO_BANANA_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    return {
+      intent: 'configuration_guidance',
+      answer: "Image generation isn't configured right now — please try again later.",
+      data: { target: 'marketing_images', generated: false },
+      usage: zeroUsage,
+    };
+  }
+
+  const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0)) : MAX_MARKETING_IMAGES_PER_BATCH;
+  const count = Math.max(1, Math.min(requestedCount ?? DEFAULT_MARKETING_IMAGE_COUNT, remaining, MAX_MARKETING_IMAGES_PER_BATCH));
+  const { businessType, niche } = getBusinessProfile(tenant);
+
+  const { data: batch, usage: writeUsage } = await writeMarketingImageBatch({
+    tenantId: tenant.id,
+    businessType,
+    niche,
+    requestDescription: description,
+    requestedCount: count,
+  });
+
+  if (batch.prompts.length === 0) {
+    return {
+      intent: 'configuration_guidance',
+      answer: "I couldn't work out a good image to generate from that — could you describe it a bit differently?",
+      data: { target: 'marketing_images', generated: false },
+      usage: writeUsage,
+    };
+  }
+
+  const { images, failed } = await renderAndSaveMarketingImages({
+    tenantId: tenant.id,
+    apiKey,
+    prompts: batch.prompts,
+    bucket: 'monthly',
+  });
+
+  if (images.length === 0) {
+    return {
+      intent: 'configuration_guidance',
+      answer: "I wrote the image prompts, but generating the actual image(s) failed — please try again in a moment.",
+      data: { target: 'marketing_images', generated: false },
+      usage: writeUsage,
+    };
+  }
+
+  const labelList = images.map((img) => img.label).join(', ');
+  const failedNote = failed > 0 ? ` (${failed} failed and were skipped)` : '';
+  return {
+    intent: 'configuration_guidance',
+    answer: `Done! I generated ${images.length} image${images.length === 1 ? '' : 's'}: ${labelList}${failedNote}. You'll find them in your Media Library.`,
+    data: { target: 'marketing_images', generated: true, images: images.map((img) => ({ label: img.label, url: img.imageUrl })) },
+    usage: writeUsage,
   };
 }
 

@@ -63,8 +63,8 @@ export function withVariationSeed(prompt: string, salt: string, jobKey: string):
  */
 export interface NanoBananaJob {
   index: number;
-  kind: 'product' | 'sales_promotion' | 'hero' | 'banner' | 'split_layout';
-  /** A human label — the real product/promo name for real jobs, a fixed slot label ('Hero', 'Banner 1', ...) for generic/regenerate jobs. */
+  kind: 'product' | 'sales_promotion' | 'hero' | 'banner' | 'split_layout' | 'marketing';
+  /** A human label — the real product/promo name for real jobs, a fixed slot label ('Hero', 'Banner 1', ...) for generic/regenerate jobs, or a short Claude-written label for free-form marketing images (AI Phase 6.1). */
   productName: string;
   prompt: string;
   output: { resolution: string; format: string; style: string };
@@ -263,6 +263,8 @@ export async function executeNanoBananaJobs(params: {
   /** Which AiFeature this batch's real Gemini spend should be recorded under — see module docblock. */
   feature: AiFeature;
   bucket: AiUsageBucket;
+  /** Storage folder prefix for uploaded images (before the timestamp-random filename) — defaults to the original 'onboarding/starter-pack' used by registration-time jobs. AI Phase 6.1's free-form marketing images pass 'media/{tenantId}' instead, matching the real convention POST /api/media/upload already uses, since those images land in the Media Library. */
+  storagePathPrefix?: string;
 }): Promise<NanoBananaExecution> {
   const genAI = new GoogleGenerativeAI(params.apiKey);
   const startedAt = Date.now();
@@ -337,7 +339,7 @@ export async function executeNanoBananaJobs(params: {
             : inlineImage.mimeType.includes('webp')
               ? 'webp'
               : 'jpg';
-          storagePath = `onboarding/starter-pack/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
+          storagePath = `${params.storagePathPrefix || 'onboarding/starter-pack'}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
           const imageBuffer = Buffer.from(inlineImage.data, 'base64');
           const uploadResult = await supabase.storage
             .from(bucketName)

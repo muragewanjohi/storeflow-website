@@ -59,6 +59,7 @@
     "test:platform-settings": "tsx scripts/test-platform-settings.ts",
     "test:delivery-zone-intake": "tsx scripts/test-delivery-zone-intake.ts",
     "test:legal-page-draft": "tsx scripts/test-legal-page-draft.ts",
+    "test:marketing-images": "tsx scripts/test-marketing-images.ts",
     "test:security": "tsx scripts/security-regression-checks.ts",
     "test:tumizi": "tsx scripts/test-tumizi-connection.ts",
     "tumizi:enable-store": "tsx scripts/enable-tumizi-store.ts",
