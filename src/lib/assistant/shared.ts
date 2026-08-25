@@ -52,6 +52,9 @@ import { countActiveDemoProducts } from '@/lib/products/demo-products';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { buildGettingStartedProgress, GETTING_STARTED_OPTION_NAMES } from '@/lib/onboarding/getting-started-progress';
 import { generateSlug } from '@/lib/products/validation';
+import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
+import { regenerateHomepageImage, HOMEPAGE_IMAGE_SLOTS, HOMEPAGE_IMAGE_SLOT_LABELS, isHomepageImageSlot } from '@/lib/homepage-images/regenerate-shared';
+import { canUseAiFeature } from '@/lib/subscriptions/limits';
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -143,7 +146,7 @@ export interface HandlerResult {
 // like 'category', are simple enough that this module can just create them
 // directly and immediately when the merchant already named them, on BOTH
 // platforms — see handleCategoryConfigTarget() below.
-export const CONFIG_TARGETS = ['product_intake', 'category', 'unsupported'] as const;
+export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'unsupported'] as const;
 export type ConfigTarget = (typeof CONFIG_TARGETS)[number];
 
 export const configTargetSchema = {
@@ -167,8 +170,25 @@ export const configTargetSchema = {
     // can confirm on their NEXT message to have them actually created. See
     // buildConfigTargetSystemPrompt()'s business-context grounding.
     suggestedCategoryNames: { type: 'array', items: { type: 'string' } },
+    // Populated when target === 'homepage_image' and YOUR OWN previous
+    // message already proposed ONE specific slot (see proposedImageSlot
+    // below) AND the merchant's latest message confirms it — one of
+    // "hero"|"banner1"|"banner2"|"banner3"|"split_layout". Empty string
+    // otherwise. This is the "ready to actually regenerate now" signal —
+    // mirrors categoryNames' case 2, but for a single fixed-enum slot
+    // instead of free-form names, since regenerating costs real quota/money
+    // and should never fire on the same turn it's first mentioned.
+    imageSlot: { type: 'string' },
+    // Populated ONLY when target === 'homepage_image', imageSlot is empty,
+    // and the merchant's THIS message clearly identifies (or you can
+    // confidently infer from context) exactly ONE of the 5 real slots —
+    // proposed back for confirmation, nothing regenerated yet. Empty string
+    // if the request is ambiguous (which of 3 banners? which of all 5?) —
+    // in that case leave this empty too and the merchant will be asked to
+    // pick one.
+    proposedImageSlot: { type: 'string' },
   },
-  required: ['target', 'categoryNames', 'suggestedCategoryNames'],
+  required: ['target', 'categoryNames', 'suggestedCategoryNames', 'imageSlot', 'proposedImageSlot'],
   additionalProperties: false,
 } as const;
 
@@ -176,6 +196,8 @@ export interface ConfigTargetParseResult {
   target: string;
   categoryNames: string[];
   suggestedCategoryNames: string[];
+  imageSlot: string;
+  proposedImageSlot: string;
 }
 
 /**
@@ -201,13 +223,16 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category).',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 AI-generated homepage images (hero, one of 3 banners, or the split-layout image).',
+    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the homepage\'s AI images (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
     `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} Never invent categories unrelated to their actual business.`,
-    'For anything else (delivery zones, themes, payment settings, staff accounts, legal pages, or anything not about adding a product or category), return target: "unsupported" — guided setup for those is not available yet. categoryNames and suggestedCategoryNames are always empty unless target is "category".',
+    'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image). There are two cases:',
+    '1. YOUR OWN previous message in this conversation already proposed ONE specific slot for confirmation AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact slot value now. proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention.',
+    '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If it is ambiguous which slot they mean (e.g. "update my banner images" could be any of the 3, or "improve my homepage pictures" could be any of the 5), leave proposedImageSlot empty too — you will ask them which one.',
+    'For anything else (delivery zones, themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, or a homepage image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
 }
@@ -217,18 +242,12 @@ export function resolveConfigTarget(rawTarget: string): ConfigTarget {
   return (CONFIG_TARGETS as readonly string[]).includes(rawTarget) ? (rawTarget as ConfigTarget) : 'unsupported';
 }
 
-/**
- * Real recorded business_type/niche (tenants.data, written at registration
- * and optionally enriched via the onboarding chat) — the same real-context
- * source handleBusinessAdvice grounds itself in, reused here so category
- * suggestions (handleCategoryConfigTarget) are grounded in the same real
- * facts rather than a second, drifting extraction of the same fields.
- */
-export function getBusinessProfile(tenant: Tenant): { businessType: string | null; niche: string | null } {
-  const businessType = typeof tenant.data?.business_type === 'string' ? tenant.data.business_type : null;
-  const niche = typeof tenant.data?.niche === 'string' ? tenant.data.niche : null;
-  return { businessType, niche };
-}
+// Real recorded business_type/niche — moved to @/lib/tenant-context/business-profile
+// (DA.25) so @/lib/homepage-images/regenerate-shared can use it too without a
+// circular import back into this module. Re-exported here (imported above,
+// alongside the other top-of-file imports) so every existing caller of
+// getBusinessProfile from '@/lib/assistant/shared' keeps working unchanged.
+export { getBusinessProfile };
 
 /**
  * Real category creation, mirroring POST /api/categories's own logic
@@ -325,6 +344,87 @@ export async function handleCategoryConfigTarget(
     intent: 'configuration_guidance',
     answer: parts.join(' '),
     data: { target: 'category', created, skippedExisting },
+    usage: zeroUsage,
+  };
+}
+
+/**
+ * DA.25 — answers a resolved 'homepage_image' configuration_guidance
+ * target. Shared verbatim by both platforms, same reasoning as
+ * handleCategoryConfigTarget: no chat-vs-native-form difference here, the
+ * regeneration itself runs entirely server-side (~10-20s real Gemini call,
+ * same acceptable single-turn wait as DA.11's product_intake real writes).
+ *
+ * Always a 2-turn confirm before anything is actually regenerated — unlike
+ * category names, a wrong guess here has a real cost (quota + real money),
+ * so even an unambiguous "regenerate my hero image" gets offered back for a
+ * yes/no rather than firing immediately. See buildConfigTargetSystemPrompt's
+ * homepage_image cases for the exact confirm-flow contract.
+ */
+export async function handleHomepageImageConfigTarget(
+  tenant: Tenant,
+  imageSlot: string,
+  proposedImageSlot: string,
+): Promise<HandlerResult> {
+  const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
+  const quota = await canUseAiFeature(tenant, 'marketing_image_prompt', 'monthly');
+
+  // Case 1: confirming a slot proposed last turn — actually regenerate now.
+  if (isHomepageImageSlot(imageSlot)) {
+    if (!quota.allowed) {
+      return {
+        intent: 'configuration_guidance',
+        answer:
+          quota.reason ??
+          "You've used all of your homepage image regenerations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+        data: { target: 'homepage_image', slot: imageSlot, regenerated: false, reason: 'quota_exceeded' },
+        usage: zeroUsage,
+      };
+    }
+
+    const result = await regenerateHomepageImage({ tenant, slot: imageSlot });
+    if (!result.success) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `I couldn't regenerate the ${HOMEPAGE_IMAGE_SLOT_LABELS[imageSlot].toLowerCase()} — ${result.error} You can try again in a moment.`,
+        data: { target: 'homepage_image', slot: imageSlot, regenerated: false },
+        usage: zeroUsage,
+      };
+    }
+    const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0) - 1) : null;
+    const remainingNote = remaining !== null ? ` You have ${remaining} regeneration${remaining === 1 ? '' : 's'} left this month.` : '';
+    const patchNote = result.pagePatched
+      ? ''
+      : " I couldn't automatically update your live homepage with it, though — check the Homepage Images tab in Theme Customize.";
+    return {
+      intent: 'configuration_guidance',
+      answer: `Done! I've regenerated your ${HOMEPAGE_IMAGE_SLOT_LABELS[imageSlot].toLowerCase()}.${patchNote}${remainingNote}`,
+      data: { target: 'homepage_image', slot: imageSlot, regenerated: true, imageUrl: result.imageUrl, pagePatched: result.pagePatched },
+      usage: zeroUsage,
+    };
+  }
+
+  const remainingNote =
+    typeof quota.limit === 'number'
+      ? ` (this will use 1 of your ${Math.max(0, quota.limit - (quota.current ?? 0))} remaining regenerations this month)`
+      : '';
+
+  // Case 2: one specific slot clearly identified this turn — offer it back for confirmation.
+  if (isHomepageImageSlot(proposedImageSlot)) {
+    return {
+      intent: 'configuration_guidance',
+      answer: `Want me to regenerate your ${HOMEPAGE_IMAGE_SLOT_LABELS[proposedImageSlot].toLowerCase()}${remainingNote}? Just say the word.`,
+      data: { target: 'homepage_image', proposed: proposedImageSlot },
+      usage: zeroUsage,
+    };
+  }
+
+  // Case 3: ambiguous — ask which of the 5 real slots they mean.
+  const slotList = HOMEPAGE_IMAGE_SLOTS.map((slot) => HOMEPAGE_IMAGE_SLOT_LABELS[slot]).join(', ');
+  return {
+    intent: 'configuration_guidance',
+    answer: `Sure — which image would you like me to regenerate? Your options are: ${slotList}.`,
+    data: { target: 'homepage_image', options: HOMEPAGE_IMAGE_SLOTS },
     usage: zeroUsage,
   };
 }

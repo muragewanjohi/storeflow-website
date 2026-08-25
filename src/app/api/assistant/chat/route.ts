@@ -41,6 +41,7 @@ import {
   handleNextSteps,
   handleBusinessAdvice,
   handleCategoryConfigTarget,
+  handleHomepageImageConfigTarget,
   getBusinessProfile,
   WEB_NEXT_STEPS_META,
   configTargetSchema,
@@ -71,7 +72,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category right now. Guided setup for other things (like delivery zones or themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, or regenerate one of your homepage images, right now. Guided setup for other things (like delivery zones or themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —
@@ -107,6 +108,11 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
       href: '/dashboard/categories/new',
       cta: 'Add category',
     });
+    return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'homepage_image') {
+    const result = await handleHomepageImageConfigTarget(tenant, data.imageSlot ?? '', data.proposedImageSlot ?? '');
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
 

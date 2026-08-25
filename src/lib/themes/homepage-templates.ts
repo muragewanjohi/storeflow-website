@@ -1165,3 +1165,84 @@ export function createDefaultHomepageTemplate(
 
   return { sections };
 }
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * DA.21/DA.25 — overwrites a homepage's hero/banners/split-layout image
+ * fields with real generic AI images, all 5 at once. Originally local to
+ * src/app/api/tenants/register/route.ts (applied to a freshly-built, not
+ * yet saved PageBuilderData at registration time) — moved here, exported,
+ * so DA.25's post-registration single-image regenerate feature
+ * (@/lib/homepage-images/regenerate-shared) can reuse the exact same
+ * section-shape logic via applySingleHomepageImageToPageBuilderData()
+ * below, instead of forking a second copy of "where does each slot's image
+ * field live in a PageBuilderData". Pure — works on any already-parsed
+ * PageBuilderData, whether freshly built in-memory or fetched back out of
+ * `pages.content`, since both are shaped identically.
+ */
+export function applyGenericImagesToPageBuilderData<T extends { sections?: Array<Record<string, unknown>> }>(
+  pageBuilderData: T,
+  genericImages: { hero: string | null; banners: string[]; splitLayout: string | null }
+): T {
+  if (!Array.isArray(pageBuilderData.sections)) return pageBuilderData;
+
+  const sections = pageBuilderData.sections.map((section) => {
+    if (section.type === 'hero' && genericImages.hero) {
+      return { ...section, image: genericImages.hero };
+    }
+    if (section.type === 'banners' && Array.isArray(section.banners) && genericImages.banners.length > 0) {
+      const existingBanners = section.banners as Array<Record<string, unknown>>;
+      const nextBanners = existingBanners.map((banner, i) => {
+        const image = genericImages.banners[i];
+        return image ? { ...banner, image } : banner;
+      });
+      return { ...section, banners: nextBanners };
+    }
+    if (section.type === 'split_layout' && genericImages.splitLayout && isPlainRecord(section.left_side)) {
+      return { ...section, left_side: { ...section.left_side, image: genericImages.splitLayout } };
+    }
+    return section;
+  });
+
+  return { ...pageBuilderData, sections };
+}
+
+/** The 5 fixed homepage image slots a merchant can individually regenerate post-registration — see @/lib/homepage-images/regenerate-shared. Kept in sync with @/lib/onboarding/nano-banana-jobs's GENERIC_IMAGE_SLOTS (that module owns the canonical list; duplicated here as a type-only re-statement to avoid a lib->lib import cycle risk between onboarding and themes). */
+export type HomepageImageSlot = 'hero' | 'banner1' | 'banner2' | 'banner3' | 'split_layout';
+
+/**
+ * DA.25 — same section-shape logic as applyGenericImagesToPageBuilderData()
+ * above, narrowed to exactly ONE slot, for the post-registration "regenerate
+ * just my hero/banner N/split-layout image" feature. Never touches the
+ * other 4 sections' images.
+ */
+export function applySingleHomepageImageToPageBuilderData<T extends { sections?: Array<Record<string, unknown>> }>(
+  pageBuilderData: T,
+  slot: HomepageImageSlot,
+  imageUrl: string
+): T {
+  if (!Array.isArray(pageBuilderData.sections)) return pageBuilderData;
+
+  const bannerIndex = slot === 'banner1' ? 0 : slot === 'banner2' ? 1 : slot === 'banner3' ? 2 : -1;
+
+  const sections = pageBuilderData.sections.map((section) => {
+    if (slot === 'hero' && section.type === 'hero') {
+      return { ...section, image: imageUrl };
+    }
+    if (bannerIndex >= 0 && section.type === 'banners' && Array.isArray(section.banners)) {
+      const existingBanners = section.banners as Array<Record<string, unknown>>;
+      if (bannerIndex >= existingBanners.length) return section;
+      const nextBanners = existingBanners.map((banner, i) => (i === bannerIndex ? { ...banner, image: imageUrl } : banner));
+      return { ...section, banners: nextBanners };
+    }
+    if (slot === 'split_layout' && section.type === 'split_layout' && isPlainRecord(section.left_side)) {
+      return { ...section, left_side: { ...section.left_side, image: imageUrl } };
+    }
+    return section;
+  });
+
+  return { ...pageBuilderData, sections };
+}

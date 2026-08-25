@@ -54,6 +54,8 @@
     "test:claude-expense-categorize": "tsx scripts/test-claude-expense-categorize.ts",
     "test:claude-photo-qa": "tsx scripts/test-claude-photo-qa.ts",
     "test:claude-analytics-insights": "tsx scripts/test-claude-analytics-insights.ts",
+    "test:homepage-images-regenerate": "tsx scripts/test-homepage-images-regenerate.ts",
+    "test:homepage-images-assistant": "tsx scripts/test-homepage-images-assistant.ts",
     "test:security": "tsx scripts/security-regression-checks.ts",
     "test:tumizi": "tsx scripts/test-tumizi-connection.ts",
     "tumizi:enable-store": "tsx scripts/enable-tumizi-store.ts",

@@ -2,23 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
-import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getThemeColorSettingsWithDefaults } from '@/lib/themes/color-settings';
 import { buildSellingMatchKeys, checkSellingExists, isSellingEquivalent, normalizeSellingKey } from '@/lib/onboarding/selling-check';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { recordAiUsage } from '@/lib/ai/usage';
-import { estimateGeminiTextCostUsd, estimateGeminiImageCostUsd } from '@/lib/ai/gemini-cost';
+import { estimateGeminiTextCostUsd } from '@/lib/ai/gemini-cost';
+import {
+  DEFAULT_GEMINI_IMAGE_MODEL,
+  GEMINI_IMAGE_FALLBACK_MODELS,
+  withImageNegativePrompt,
+  buildNanoBananaJobs,
+  buildGenericHomepageImageJobs,
+  executeNanoBananaJobs,
+  type NanoBananaJob,
+} from '@/lib/onboarding/nano-banana-jobs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_MODELS = ['gemini-1.5-flash'];
-const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
-const GEMINI_IMAGE_FALLBACK_MODELS = ['gemini-2.5-flash-image'];
-const IMAGE_NEGATIVE_PROMPT =
-  'Do NOT include bananas, banana fruit, banana peels, or any banana-shaped props. Keep the scene strictly relevant to the target product.';
 
 const starterPackRequestSchema = z.object({
   businessType: z.string().min(1, 'businessType is required'),
@@ -99,16 +102,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toStringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function withImageNegativePrompt(prompt: string): string {
-  const trimmed = prompt.trim();
-  if (!trimmed) return IMAGE_NEGATIVE_PROMPT;
-  const lower = trimmed.toLowerCase();
-  if (lower.includes('do not include bananas') || lower.includes('banana fruit')) {
-    return trimmed;
-  }
-  return `${trimmed}. ${IMAGE_NEGATIVE_PROMPT}`;
 }
 
 function normalizeHexColor(value: unknown): string | undefined {
@@ -1010,153 +1003,6 @@ async function executeGeminiJsonWithFallback(params: {
 }
 
 /**
- * Append a tenant/store specific "variation seed" to each Nano Banana prompt so
- * that two stores with identical prompts (e.g. same niche, same product names)
- * get visually distinct images instead of near-duplicates. The seed is opaque to
- * the model; it simply forces a different random walk through the latent space.
- */
-function withVariationSeed(prompt: string, salt: string, jobKey: string): string {
-  const trimmedSalt = (salt || '').trim();
-  const trimmedKey = (jobKey || '').trim();
-  if (!trimmedSalt && !trimmedKey) return prompt;
-  const composite = [trimmedSalt, trimmedKey].filter(Boolean).join(':');
-  return `${prompt}\n\nUnique composition seed (do not render as text, just use it to vary framing, angle, lighting, props, and color accents so this image is visually distinct from other stores): ${composite}`;
-}
-
-/**
- * Shared shape for every Gemini image-generation job — real per-product/
- * per-promotion jobs (buildNanoBananaJobs) and the generic 5-image jobs
- * (buildGenericHomepageImageJobs, DA.21) both produce this same shape, so
- * executeNanoBananaJobs() (the actual Gemini call + upload + cost-tracking
- * logic) is written once and never forked for the generic case.
- */
-interface NanoBananaJob {
-  index: number;
-  kind: 'product' | 'sales_promotion' | 'hero' | 'banner' | 'split_layout';
-  /** A human label — the real product/promo name for real jobs, a fixed slot label ('Hero', 'Banner 1', ...) for generic jobs. */
-  productName: string;
-  prompt: string;
-  output: { resolution: string; format: string; style: string };
-}
-
-function buildNanoBananaJobs(
-  starterPack: z.infer<typeof generatedStarterPackSchema>,
-  options?: { salt?: string }
-): NanoBananaJob[] {
-  const salt = options?.salt?.trim() || '';
-  const productJobs = starterPack.demoProducts
-    .map((product, index) => {
-      const promptRaw = product.imagePrompt || product.nanoBananaPrompt;
-      const basePrompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
-      if (!basePrompt) {
-        return null;
-      }
-      const jobKey = `product-${index + 1}-${product.name}`;
-      const prompt = salt ? withVariationSeed(basePrompt, salt, jobKey) : basePrompt;
-
-      return {
-        index: index + 1,
-        kind: 'product' as const,
-        productName: product.name,
-        prompt,
-        output: {
-          resolution: '4k',
-          format: 'png',
-          style: 'realistic-product-photography',
-        },
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  const promoJobs = starterPack.salesPromotions
-    .map((promotion, index) => {
-      const promptRaw = promotion.imagePrompt || promotion.nanoBananaPrompt;
-      const basePrompt = promptRaw ? withImageNegativePrompt(promptRaw) : '';
-      if (!basePrompt) {
-        return null;
-      }
-      const jobKey = `promotion-${index + 1}-${promotion.title}`;
-      const prompt = salt ? withVariationSeed(basePrompt, salt, jobKey) : basePrompt;
-
-      return {
-        index: productJobs.length + index + 1,
-        kind: 'sales_promotion' as const,
-        productName: promotion.title,
-        prompt,
-        output: {
-          resolution: '4k',
-          format: 'png',
-          style: 'realistic-promotional-banner',
-        },
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  return [...productJobs, ...promoJobs];
-}
-
-/**
- * Exactly 5 generic images (never product-specific — no fake demo products
- * are ever invented) for EVERY new registration (DA.21, scope widened —
- * originally the "niche is empty" fallback only, now the universal image
- * path per direct user request: "stop the 8-product/10-image path
- * entirely"): 1 hero foreground image, 3 banners, 1 split-layout left-side
- * image. Grounded on niche when given (more relevant mood/category imagery
- * — e.g. "evocative of a store selling electric scooters" instead of just
- * "Retail"), business type otherwise — same niche-first-then-business-type
- * discipline as DA.20's buildGeminiPrompts() fix, but still never claiming
- * to depict a specific named product, since no real inventory exists yet.
- */
-function buildGenericHomepageImageJobs(businessType: string, niche?: string): NanoBananaJob[] {
-  const style = niche?.trim() || businessType.trim() || 'general retail';
-  const baseStyle =
-    `Professional, appealing ecommerce imagery evocative of a store selling "${style}", ` +
-    'without depicting any single specific named product — a general mood/lifestyle or category shot, ' +
-    'studio-quality or natural lighting, clean modern composition, realistic photography (not illustration).';
-
-  const jobs: Array<{ productName: string; kind: NanoBananaJob['kind']; prompt: string; style: string }> = [
-    {
-      productName: 'Hero',
-      kind: 'hero',
-      style: 'realistic-hero-photography',
-      prompt: `${baseStyle} Wide hero-banner composition suitable for the top of a homepage, with open negative space on one side for overlaid text.`,
-    },
-    {
-      productName: 'Banner 1',
-      kind: 'banner',
-      style: 'realistic-promotional-banner',
-      prompt: `${baseStyle} Banner composition themed around "New Arrivals" for this kind of store.`,
-    },
-    {
-      productName: 'Banner 2',
-      kind: 'banner',
-      style: 'realistic-promotional-banner',
-      prompt: `${baseStyle} Banner composition themed around "Best Sellers" for this kind of store.`,
-    },
-    {
-      productName: 'Banner 3',
-      kind: 'banner',
-      style: 'realistic-promotional-banner',
-      prompt: `${baseStyle} Banner composition themed around "Special Offers" for this kind of store.`,
-    },
-    {
-      productName: 'Split Layout',
-      kind: 'split_layout',
-      style: 'realistic-product-photography',
-      prompt: `${baseStyle} Tall, square-friendly composition suitable for the left half of a split homepage section.`,
-    },
-  ];
-
-  return jobs.map((job, index) => ({
-    index: index + 1,
-    kind: job.kind,
-    productName: job.productName,
-    prompt: withImageNegativePrompt(job.prompt),
-    output: { resolution: '4k', format: 'png', style: job.style },
-  }));
-}
-
-/**
  * DA.24: reuse cache for the 5 generic homepage images. Deliberately separate
  * from loadStarterPackFromExistingBusiness()'s cache (which intentionally
  * strips reused image URLs for specific-looking fake product photos, see
@@ -1266,197 +1112,6 @@ function extractImageUrl(payload: unknown): string | null {
     if (Array.isArray(nested.images) && typeof nested.images[0] === 'string') return nested.images[0] as string;
   }
   return null;
-}
-
-async function executeNanoBananaJobs(params: {
-  apiKey: string;
-  jobs: NanoBananaJob[];
-  tenantId: string | null;
-}) {
-  const genAI = new GoogleGenerativeAI(params.apiKey);
-  const startedAt = Date.now();
-  const results = await Promise.all(
-    params.jobs.map(async (job) => {
-      const itemStartedAt = Date.now();
-      try {
-        let inlineImage: { mimeType: string; data: string } | null = null;
-        let usedModel = DEFAULT_GEMINI_IMAGE_MODEL;
-        let lastError: unknown = null;
-        // Real returned usage, not the requested resolution — DA.17 found
-        // live that a "4k resolution" prompt instruction does not make the
-        // model actually deliver 4K pixels (a real test returned 1408x768
-        // from the primary model); billing off the real image-token count
-        // is the only way to get an accurate number. Best-effort, 0 if the
-        // SDK response didn't expose usageMetadata.
-        let promptTokenCount = 0;
-        let imageTokenCount = 0;
-        const modelsToTry = [DEFAULT_GEMINI_IMAGE_MODEL, ...GEMINI_IMAGE_FALLBACK_MODELS];
-
-        for (const modelName of modelsToTry) {
-          try {
-            const imageModel = genAI.getGenerativeModel({
-              model: modelName,
-            });
-            const imageResponse = await imageModel.generateContent(job.prompt);
-            const parts = imageResponse.response?.candidates?.[0]?.content?.parts ?? [];
-            const inlinePart = parts.find(
-              (part: any) => part?.inlineData?.data && part?.inlineData?.mimeType
-            );
-            if (inlinePart?.inlineData?.data && inlinePart?.inlineData?.mimeType) {
-              inlineImage = {
-                mimeType: inlinePart.inlineData.mimeType,
-                data: inlinePart.inlineData.data,
-              };
-              usedModel = modelName;
-              const usageMetadata = (imageResponse.response as any)?.usageMetadata;
-              promptTokenCount = Number(usageMetadata?.promptTokenCount) || 0;
-              const imageDetail = Array.isArray(usageMetadata?.candidatesTokensDetails)
-                ? usageMetadata.candidatesTokensDetails.find((d: any) => d?.modality === 'IMAGE')
-                : null;
-              // Falls back to the overall candidatesTokenCount for an
-              // image-only call (no text output to conflate it with) if
-              // the per-modality breakdown isn't present.
-              imageTokenCount = Number(imageDetail?.tokenCount ?? usageMetadata?.candidatesTokenCount) || 0;
-              break;
-            }
-          } catch (error) {
-            lastError = error;
-          }
-        }
-
-        if (!inlineImage) {
-          throw (
-            lastError instanceof Error
-              ? lastError
-              : new Error('Gemini image model returned no inline image data')
-          );
-        }
-
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const bucketName = process.env.NEXT_PUBLIC_STORAGE_BUCKET || 'product-images';
-        let publicUrl: string | null = null;
-        let storagePath: string | null = null;
-        let uploadError: string | null = null;
-
-        if (supabaseUrl && supabaseServiceRole) {
-          const supabase = createClient(supabaseUrl, supabaseServiceRole);
-          const extension = inlineImage.mimeType.includes('png')
-            ? 'png'
-            : inlineImage.mimeType.includes('webp')
-              ? 'webp'
-              : 'jpg';
-          storagePath = `onboarding/starter-pack/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
-          const imageBuffer = Buffer.from(inlineImage.data, 'base64');
-          const uploadResult = await supabase.storage
-            .from(bucketName)
-            .upload(storagePath, imageBuffer, {
-              contentType: inlineImage.mimeType,
-              upsert: false,
-            });
-          if (!uploadResult.error) {
-            const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
-            publicUrl = urlData.publicUrl;
-          } else {
-            uploadError = uploadResult.error.message;
-          }
-        } else {
-          uploadError = 'Supabase storage is not configured (missing URL or service role key)';
-        }
-
-        const imageCostUsd = estimateGeminiImageCostUsd({
-          model: usedModel,
-          imageTokenCount,
-          promptTokenCount,
-        });
-
-        // A job with no real, fetchable URL isn't useful to any caller
-        // regardless of whether Gemini itself generated the image — a real
-        // gap found live-testing DA.21: this used to return success:true
-        // with imageUrl:null on an upload failure, silently dropping the
-        // image with no visible error anywhere. Cost is still billed
-        // (generation genuinely happened), but the job itself is now
-        // correctly marked failed.
-        if (!publicUrl) {
-          console.warn('[StarterPack][Trace] Nano Banana upload failed', {
-            job: job.productName,
-            model: usedModel,
-            error: uploadError,
-          });
-          return {
-            ...job,
-            success: false,
-            error: uploadError ?? 'Image upload failed',
-            durationMs: Date.now() - itemStartedAt,
-            imageCostUsd,
-            rawResponse: null,
-            imageUrl: null,
-          };
-        }
-
-        return {
-          ...job,
-          success: true,
-          durationMs: Date.now() - itemStartedAt,
-          imageUrl: publicUrl,
-          storagePath,
-          imageCostUsd,
-          rawResponse: {
-            provider: 'gemini-image-sdk',
-            model: usedModel,
-            mimeType: inlineImage.mimeType,
-            uploaded: true,
-          },
-        };
-      } catch (error) {
-        return {
-          ...job,
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown Gemini image generation error',
-          durationMs: Date.now() - itemStartedAt,
-          imageCostUsd: 0,
-          rawResponse: null,
-          imageUrl: null,
-        };
-      }
-    })
-  );
-
-  // One usage record for the whole batch. Cost is summed from EVERY job
-  // that incurred real Gemini generation cost (imageCostUsd > 0), even ones
-  // that then failed to upload — Google already billed for the generation
-  // itself regardless of what happened afterward (see the upload-failure
-  // handling above, DA.21). itemCount stays success-based (real, usable
-  // images actually delivered) since that's the more meaningful "how many
-  // photos did we get" number for the AI Usage page. Best-effort: never let
-  // usage recording fail the actual starter-pack response.
-  const succeededResults = results.filter((item) => item.success);
-  const totalCost = results.reduce((sum, item) => sum + (item.imageCostUsd ?? 0), 0);
-  if (totalCost > 0) {
-    try {
-      await recordAiUsage({
-        tenantId: params.tenantId,
-        feature: 'starter_pack_image',
-        bucket: 'setup',
-        provider: 'gemini',
-        usage: { inputTokens: 0, outputTokens: 0 },
-        estimatedCost: totalCost,
-        itemCount: succeededResults.length,
-      });
-    } catch (error) {
-      console.warn('[StarterPack][Trace] Failed to record Gemini image usage (non-fatal)', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-
-  return {
-    durationMs: Date.now() - startedAt,
-    completed: results.length,
-    succeeded: results.filter((item) => item.success).length,
-    failed: results.filter((item) => !item.success).length,
-    results,
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -1582,6 +1237,8 @@ export async function POST(request: NextRequest) {
         apiKey: nanoBananaApiKey,
         jobs: genericJobs,
         tenantId: input.tenantId ?? null,
+        feature: 'starter_pack_image',
+        bucket: 'setup',
       });
 
       // `success: true` only means Gemini generated an image — it does NOT
@@ -1973,6 +1630,8 @@ export async function POST(request: NextRequest) {
           apiKey: nanoBananaApiKey,
           jobs: nanoBananaJobs,
           tenantId: input.tenantId ?? null,
+          feature: 'starter_pack_image',
+          bucket: 'setup',
         });
         console.log('[StarterPack][Trace] Nano Banana execution completed', {
           traceId,

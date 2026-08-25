@@ -66,6 +66,7 @@ import {
   handleNextSteps,
   handleBusinessAdvice,
   handleCategoryConfigTarget,
+  handleHomepageImageConfigTarget,
   getBusinessProfile,
   configTargetSchema,
   buildConfigTargetSystemPrompt,
@@ -110,7 +111,7 @@ const MOBILE_NEXT_STEPS_META: Record<string, NextStepsNavMeta> = {
 };
 
 const MOBILE_CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category right now. Guided setup for other things (like delivery zones or themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
+  "I can help you add a new product or category, or regenerate one of your homepage images, right now. Guided setup for other things (like delivery zones or themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
 
 /**
  * Mobile's answer for a resolved configuration_guidance target. See module
@@ -142,6 +143,11 @@ async function handleMobileConfigurationGuidance(messages: ChatMessage[], tenant
 
   if (target === 'category') {
     const result = await handleCategoryConfigTarget(tenant, data.categoryNames ?? [], data.suggestedCategoryNames ?? [], { href: '/categories/new', cta: 'Add category' });
+    return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'homepage_image') {
+    const result = await handleHomepageImageConfigTarget(tenant, data.imageSlot ?? '', data.proposedImageSlot ?? '');
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
 

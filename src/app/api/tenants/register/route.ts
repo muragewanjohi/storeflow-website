@@ -30,6 +30,7 @@ import {
   getHomepageLayout,
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
+  applyGenericImagesToPageBuilderData,
 } from '@/lib/themes/homepage-templates';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
@@ -968,44 +969,6 @@ async function applyStarterPackToTenant(
     salesCreated,
     blogsCreated,
   };
-}
-
-/**
- * DA.21 — overwrites a freshly-built (not yet saved) homepage's hero/
- * banners/split-layout image fields with real generic AI images, for the
- * "niche is empty" registration path (buildGenericHomepageImageJobs()/
- * genericImagesOnly in src/app/api/onboarding/starter-pack/route.ts). Pure/
- * in-memory — applied to a PageBuilderData BEFORE it's ever written to
- * `pages.content`, not a later DB patch, so it works the same regardless of
- * which template function (createGroceryHomepageTemplate,
- * createDefaultHomepageTemplate) built the base structure — both already
- * shape hero/banners/split_layout sections identically.
- */
-function applyGenericImagesToPageBuilderData<T extends { sections?: Array<Record<string, unknown>> }>(
-  pageBuilderData: T,
-  genericImages: { hero: string | null; banners: string[]; splitLayout: string | null }
-): T {
-  if (!Array.isArray(pageBuilderData.sections)) return pageBuilderData;
-
-  const sections = pageBuilderData.sections.map((section) => {
-    if (section.type === 'hero' && genericImages.hero) {
-      return { ...section, image: genericImages.hero };
-    }
-    if (section.type === 'banners' && Array.isArray(section.banners) && genericImages.banners.length > 0) {
-      const existingBanners = section.banners as Array<Record<string, unknown>>;
-      const nextBanners = existingBanners.map((banner, i) => {
-        const image = genericImages.banners[i];
-        return image ? { ...banner, image } : banner;
-      });
-      return { ...section, banners: nextBanners };
-    }
-    if (section.type === 'split_layout' && genericImages.splitLayout && isRecord(section.left_side)) {
-      return { ...section, left_side: { ...section.left_side, image: genericImages.splitLayout } };
-    }
-    return section;
-  });
-
-  return { ...pageBuilderData, sections };
 }
 
 async function applyStarterPackImagesToTenant(

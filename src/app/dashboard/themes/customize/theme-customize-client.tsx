@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
 import { THEME_COLOR_SETTINGS } from '@/lib/themes/color-settings';
+import HomepageImagesTab from './homepage-images-tab';
 
 interface ThemeColors {
   primary?: string;
@@ -491,15 +492,21 @@ export default function ThemeCustomizeClient() {
           >
             Layout
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="branding"
             className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
           >
             Branding
           </TabsTrigger>
-          <TabsTrigger 
-            value="advanced" 
-            disabled 
+          <TabsTrigger
+            value="images"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Homepage Images
+          </TabsTrigger>
+          <TabsTrigger
+            value="advanced"
+            disabled
             title="Coming soon"
             className="data-[state=inactive]:text-muted-foreground/50"
           >
@@ -995,6 +1002,11 @@ export default function ThemeCustomizeClient() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Homepage Images Tab (DA.25) */}
+        <TabsContent value="images">
+          <HomepageImagesTab />
         </TabsContent>
 
         {/* Advanced Tab */}
