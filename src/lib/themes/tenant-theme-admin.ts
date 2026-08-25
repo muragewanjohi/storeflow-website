@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
+import { hasCustomCssAccess } from '@/lib/themes/theme-access';
+import { sanitizeCustomCss, CustomCssValidationError } from '@/lib/themes/custom-css-sanitizer';
 
 export class TenantThemeAdminError extends Error {
   constructor(
@@ -116,7 +118,6 @@ export async function getCurrentTenantTheme(tenantId: string) {
       custom_fonts: tenantTheme.custom_fonts,
       custom_layouts: tenantTheme.custom_layouts,
       custom_css: tenantTheme.custom_css,
-      custom_js: (tenantTheme as { custom_js?: unknown }).custom_js,
       logo_url: tenantTheme.logo_url,
       favicon_url: tenantTheme.favicon_url,
       meta_title: tenantTheme.meta_title,
@@ -143,6 +144,36 @@ export async function updateTenantThemeCustomizations(
   }
 
   const bodyRecord = body as Record<string, unknown>;
+
+  // Theme Track B1.4 — same real gating/sanitization as the web
+  // PUT /api/themes/current route applies, mirrored here since this
+  // function is the shared save path for the mobile dashboard's
+  // /api/v1/mobile/dashboard/themes/current route too. Custom JS is never
+  // accepted from either caller — confirmed, dropped-entirely decision.
+  const rawCustomCss = bodyRecord.custom_css ?? bodyRecord.customCss;
+  let sanitizedCustomCss: string | undefined;
+  if (typeof rawCustomCss === 'string' && rawCustomCss.length > 0) {
+    const tenant = await prisma.tenants.findUnique({ where: { id: tenantId }, select: { plan_id: true } });
+    const plan = tenant?.plan_id
+      ? await prisma.price_plans.findUnique({ where: { id: tenant.plan_id }, select: { name: true } })
+      : null;
+
+    if (!hasCustomCssAccess(plan?.name)) {
+      throw new TenantThemeAdminError('Custom CSS is a Pro feature. Upgrade your plan to use it.', 403);
+    }
+
+    try {
+      sanitizedCustomCss = sanitizeCustomCss(rawCustomCss).css;
+    } catch (error) {
+      if (error instanceof CustomCssValidationError) {
+        throw new TenantThemeAdminError(error.message, 400);
+      }
+      throw error;
+    }
+  } else if (rawCustomCss === null || rawCustomCss === '') {
+    sanitizedCustomCss = '';
+  }
+
   const updated = await prisma.tenant_themes.update({
     where: {
       id: tenantTheme.id,
@@ -152,8 +183,7 @@ export async function updateTenantThemeCustomizations(
       custom_fonts: (bodyRecord.custom_fonts ?? bodyRecord.customFonts ?? tenantTheme.custom_fonts) as never,
       custom_layouts:
         (bodyRecord.custom_layouts ?? bodyRecord.customLayouts ?? tenantTheme.custom_layouts) as never,
-      custom_css: (bodyRecord.custom_css ?? bodyRecord.customCss ?? tenantTheme.custom_css) as never,
-      custom_js: (bodyRecord.custom_js ?? bodyRecord.customJs ?? (tenantTheme as { custom_js?: unknown }).custom_js) as never,
+      custom_css: (sanitizedCustomCss ?? tenantTheme.custom_css) as never,
       logo_url: (bodyRecord.logo_url ?? bodyRecord.logoUrl ?? tenantTheme.logo_url) as string | null | undefined,
       favicon_url: (bodyRecord.favicon_url ?? bodyRecord.faviconUrl ?? tenantTheme.favicon_url) as string | null | undefined,
       meta_title: (bodyRecord.meta_title ?? bodyRecord.metaTitle ?? tenantTheme.meta_title) as string | null | undefined,

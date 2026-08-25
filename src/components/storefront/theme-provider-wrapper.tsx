@@ -220,34 +220,12 @@ export default function ThemeProviderWrapper({ children }: { children: React.Rea
     }
   }, [customizations?.custom_css]);
 
-  // Inject custom JavaScript
-  useEffect(() => {
-    if (customizations?.custom_js && typeof document !== 'undefined') {
-      const scriptId = 'tenant-custom-js';
-      let scriptElement = document.getElementById(scriptId) as HTMLScriptElement;
-      
-      if (!scriptElement) {
-        scriptElement = document.createElement('script');
-        scriptElement.id = scriptId;
-        scriptElement.type = 'text/javascript';
-        document.body.appendChild(scriptElement);
-      }
-      
-      try {
-        scriptElement.textContent = '';
-        scriptElement.textContent = customizations.custom_js;
-      } catch (error) {
-        console.error('Error executing custom JavaScript:', error);
-      }
-      
-      return () => {
-        const element = document.getElementById(scriptId);
-        if (element) {
-          element.remove();
-        }
-      };
-    }
-  }, [customizations?.custom_js]);
+  // Custom JavaScript injection was removed (Theme Track B1.4) — direct,
+  // confirmed user decision: arbitrary JS execution on customer-facing
+  // storefront pages, including real M-Pesa/Pesapal payment flows, isn't a
+  // risk this platform takes on. See @/lib/themes/custom-css-sanitizer.ts
+  // for the full rationale. Any legacy custom_js still stored on a
+  // tenant_themes row is simply never read here anymore.
 
   return <>{children}</>;
 }

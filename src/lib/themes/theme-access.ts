@@ -24,3 +24,17 @@ export function canInstallTheme(
   if (!theme.is_premium) return true;
   return hasPremiumThemeAccess(planName);
 }
+
+/**
+ * Theme Track B1.4 — Custom CSS is a Pro/Premium-only feature (real
+ * sanitization exists, @/lib/themes/custom-css-sanitizer, but the ability
+ * to set it at all is still gated — same reasoning as premium themes: a
+ * real differentiator worth paying for, not a security question). Same
+ * underlying check as hasPremiumThemeAccess — kept as its own named export
+ * (not just an alias) so each call site reads as "does this tenant have
+ * access to THIS feature", matching the per-feature-named-function
+ * convention @/lib/analytics/plan-access.ts already established.
+ */
+export function hasCustomCssAccess(planName: string | null | undefined): boolean {
+  return hasPremiumThemeAccess(planName);
+}

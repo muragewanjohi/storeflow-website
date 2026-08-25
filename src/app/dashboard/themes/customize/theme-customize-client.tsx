@@ -15,13 +15,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code, Undo2 } from 'lucide-react';
+import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code, Undo2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
 import { THEME_COLOR_SETTINGS } from '@/lib/themes/color-settings';
+import { hasCustomCssAccess } from '@/lib/themes/theme-access';
 import HomepageImagesTab from './homepage-images-tab';
+import LiveThemePreview from './live-theme-preview';
 
 interface ThemeColors {
   primary?: string;
@@ -52,6 +54,7 @@ interface CurrentTheme {
   theme: {
     id: string;
     title: string;
+    slug: string;
     colors: ThemeColors | null;
     typography: ThemeTypography | null;
   } | null;
@@ -88,9 +91,12 @@ const FONT_WEIGHTS = [
   { value: '700', label: 'Bold (700)' },
 ];
 
-export default function ThemeCustomizeClient() {
+export default function ThemeCustomizeClient({
+  currentPlanName,
+}: Readonly<{ currentPlanName: string | null }>) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const canUseCustomCss = hasCustomCssAccess(currentPlanName);
 
   // Fetch current theme and customizations
   const { data: currentThemeData, isLoading } = useQuery({
@@ -107,7 +113,6 @@ export default function ThemeCustomizeClient() {
   const [customFonts, setCustomFonts] = useState<ThemeTypography>({});
   const [customLayouts, setCustomLayouts] = useState<ThemeLayout>({});
   const [customCss, setCustomCss] = useState('');
-  const [customJs, setCustomJs] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
   const [metaTitle, setMetaTitle] = useState('');
@@ -126,7 +131,6 @@ export default function ThemeCustomizeClient() {
     fonts: ThemeTypography;
     layouts: ThemeLayout;
     css: string;
-    js: string;
     logoUrl: string;
     faviconUrl: string;
     metaTitle: string;
@@ -142,7 +146,6 @@ export default function ThemeCustomizeClient() {
         fonts: customizations.custom_fonts || {},
         layouts: customizations.custom_layouts || {},
         css: customizations.custom_css || '',
-        js: (customizations as any).custom_js || '',
         logoUrl: customizations.logo_url || '',
         faviconUrl: customizations.favicon_url || '',
         metaTitle: customizations.meta_title || '',
@@ -157,7 +160,6 @@ export default function ThemeCustomizeClient() {
       setCustomFonts(initial.fonts);
       setCustomLayouts(initial.layouts);
       setCustomCss(initial.css);
-      setCustomJs(initial.js);
       setLogoUrl(initial.logoUrl);
       setFaviconUrl(initial.faviconUrl);
       setMetaTitle(initial.metaTitle);
@@ -172,7 +174,6 @@ export default function ThemeCustomizeClient() {
       custom_fonts?: ThemeTypography;
       custom_layouts?: ThemeLayout;
       custom_css?: string;
-      custom_js?: string;
       logo_url?: string;
       favicon_url?: string;
       meta_title?: string;
@@ -203,8 +204,10 @@ export default function ThemeCustomizeClient() {
       custom_colors: customColors,
       custom_fonts: customFonts,
       custom_layouts: customLayouts,
-      custom_css: customCss,
-      custom_js: customJs,
+      // Non-Pro tenants never get to type into the Custom CSS field (it's
+      // locked in the UI below), but guard here too so a save can never
+      // accidentally submit CSS text this tenant isn't entitled to save.
+      custom_css: canUseCustomCss ? customCss : '',
       logo_url: logoUrl,
       favicon_url: faviconUrl,
       meta_title: metaTitle,
@@ -390,7 +393,6 @@ export default function ThemeCustomizeClient() {
       setCustomFonts(initialValues.fonts);
       setCustomLayouts(initialValues.layouts);
       setCustomCss(initialValues.css);
-      setCustomJs(initialValues.js);
       setLogoUrl(initialValues.logoUrl);
       setFaviconUrl(initialValues.faviconUrl);
       setMetaTitle(initialValues.metaTitle);
@@ -472,6 +474,7 @@ export default function ThemeCustomizeClient() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start">
       <Tabs defaultValue="colors" className="space-y-6">
         <TabsList className="bg-muted/50 border border-border">
           <TabsTrigger 
@@ -1011,67 +1014,51 @@ export default function ThemeCustomizeClient() {
 
         {/* Advanced Tab */}
         <TabsContent value="advanced">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <div className="space-y-4">
-                <div className="text-4xl">🚧</div>
-                <h3 className="text-xl font-semibold">Coming Soon</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  The Advanced section with Custom CSS and JavaScript customization will be available soon.
-                  This will allow you to add custom styling and functionality to your theme.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          {/* Keep the content but hide it for now */}
-          <div className="hidden space-y-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Custom CSS</CardTitle>
-                <CardDescription>
-                  Add custom CSS to further customize your theme. Use with caution.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Custom CSS</CardTitle>
+                    <CardDescription>
+                      Add custom CSS to further customize your theme. Use with caution.
+                    </CardDescription>
+                  </div>
+                  {!canUseCustomCss && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                      <Lock className="h-3 w-3" />
+                      Pro feature
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="custom-css">Custom CSS</Label>
-                  <Textarea
-                    id="custom-css"
-                    value={customCss}
-                    onChange={(e) => setCustomCss(e.target.value)}
-                    placeholder=".my-custom-class { color: red; }"
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    CSS will be injected into the storefront pages. Make sure your selectors are specific to avoid conflicts.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom JavaScript</CardTitle>
-                <CardDescription>
-                  Add custom JavaScript code to your storefront. Use with extreme caution.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="custom-js">Custom JavaScript</Label>
-                  <Textarea
-                    id="custom-js"
-                    value={customJs}
-                    onChange={(e) => setCustomJs(e.target.value)}
-                    placeholder="console.log('Custom script loaded');"
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    JavaScript will be executed on all storefront pages. Ensure your code is safe and doesn&apos;t conflict with existing functionality.
-                  </p>
-                </div>
+                {canUseCustomCss ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-css">Custom CSS</Label>
+                    <Textarea
+                      id="custom-css"
+                      value={customCss}
+                      onChange={(e) => setCustomCss(e.target.value)}
+                      placeholder=".my-custom-class { color: red; }"
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      CSS is sanitized and injected into your storefront pages. Make sure your selectors are specific to avoid conflicts.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-3">
+                    <Lock className="h-6 w-6 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Custom CSS is available on Pro plans. Upgrade to add your own styling on top of this theme.
+                    </p>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/dashboard/subscription">Upgrade to Pro</Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1102,9 +1089,19 @@ export default function ThemeCustomizeClient() {
               </Card>
             )}
           </div>
-          {/* End of hidden content */}
         </TabsContent>
       </Tabs>
+
+      {currentThemeData?.theme?.slug && (
+        <div className="hidden lg:block">
+          <LiveThemePreview
+            slug={currentThemeData.theme.slug}
+            colors={customColors}
+            typography={customFonts as Record<string, string | number | undefined>}
+          />
+        </div>
+      )}
+      </div>
 
       {/* Save and Cancel buttons at the bottom */}
       <div className="mt-8 pt-6 border-t flex items-center justify-end gap-4">

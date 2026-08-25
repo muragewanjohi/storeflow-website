@@ -9,12 +9,26 @@
  * /dashboard/themes/preview/[themeId] client, reusing the exact same
  * @/lib/themes/theme-loader dynamic component loaders and the same public
  * GET /api/themes/{id}/demo-content endpoint that page already uses.
+ *
+ * Theme Track B (live preview): also doubles as the iframe target for
+ * theme-customize-client.tsx's live-preview pane — listens for draft
+ * color/typography overrides via postMessage (@/lib/themes/
+ * live-preview-protocol) and merges them over the theme's real saved
+ * values, same "customizations override base" merge the authenticated
+ * preview client already does for SAVED custom_colors/custom_fonts. When
+ * embedded standalone (not in an iframe), no messages ever arrive and this
+ * behaves exactly as before — zero behavior change for that case.
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { loadThemeHeader, loadThemeFooter, loadThemeHomepage } from '@/lib/themes/theme-loader';
 import { PreviewProvider } from '@/lib/themes/preview-context';
+import {
+  THEME_LIVE_PREVIEW_READY,
+  THEME_LIVE_PREVIEW_UPDATE,
+  type ThemeLivePreviewUpdateMessage,
+} from '@/lib/themes/live-preview-protocol';
 
 interface Theme {
   id: string;
@@ -28,6 +42,9 @@ export default function ThemePublicPreviewClient({ theme }: Readonly<{ theme: Th
   const ThemeHeader = useMemo(() => loadThemeHeader(theme.slug), [theme.slug]);
   const ThemeFooter = useMemo(() => loadThemeFooter(theme.slug), [theme.slug]);
   const ThemeHomepage = useMemo(() => loadThemeHomepage(theme.slug), [theme.slug]);
+
+  const [draftColors, setDraftColors] = useState<Record<string, string> | null>(null);
+  const [draftTypography, setDraftTypography] = useState<Record<string, string | number> | null>(null);
 
   // Grocery's real registered theme is branded "Multipurpose" in its real
   // demo/marketing surfaces (theme-preview-client.tsx, src/app/themes/
@@ -49,9 +66,28 @@ export default function ThemePublicPreviewClient({ theme }: Readonly<{ theme: Th
     gcTime: 0,
   });
 
+  // Live-preview channel: only ever acts on same-origin messages, and only
+  // ever a well-known literal type — never eval'd, never used to inject
+  // markup, purely CSS variable values.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as ThemeLivePreviewUpdateMessage | undefined;
+      if (!data || data.type !== THEME_LIVE_PREVIEW_UPDATE) return;
+      if (data.colors) setDraftColors(data.colors);
+      if (data.typography) setDraftTypography(data.typography);
+    }
+    window.addEventListener('message', handleMessage);
+    // Tell the parent (if any) this frame is ready to receive updates —
+    // avoids the race where the parent posts before a listener exists.
+    window.parent?.postMessage({ type: THEME_LIVE_PREVIEW_READY }, window.location.origin);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   useEffect(() => {
     const root = document.documentElement;
-    const colors = (theme.colors || {}) as Record<string, string>;
+    const baseColors = (theme.colors || {}) as Record<string, string>;
+    const colors = { ...baseColors, ...(draftColors || {}) };
     Object.entries(colors).forEach(([key, value]) => {
       if (!value) return;
       const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -61,7 +97,8 @@ export default function ThemePublicPreviewClient({ theme }: Readonly<{ theme: Th
       if (key === 'accent') root.style.setProperty('--accent', value);
     });
 
-    const typography = (theme.typography || {}) as Record<string, string | number>;
+    const baseTypography = (theme.typography || {}) as Record<string, string | number>;
+    const typography = { ...baseTypography, ...(draftTypography || {}) };
     if (typography.headingFont) root.style.setProperty('--font-heading', String(typography.headingFont));
     if (typography.bodyFont) root.style.setProperty('--font-body', String(typography.bodyFont));
     if (typography.baseFontSize) root.style.setProperty('--font-size-base', `${typography.baseFontSize}px`);
@@ -72,7 +109,7 @@ export default function ThemePublicPreviewClient({ theme }: Readonly<{ theme: Th
         root.style.removeProperty(`--color-${cssKey}`);
       });
     };
-  }, [theme]);
+  }, [theme, draftColors, draftTypography]);
 
   if (isLoading || !demoContent) {
     return (

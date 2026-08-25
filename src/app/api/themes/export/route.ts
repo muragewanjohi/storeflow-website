@@ -57,7 +57,6 @@ export async function GET(request: NextRequest) {
         custom_fonts: tenantTheme.custom_fonts,
         custom_layouts: tenantTheme.custom_layouts,
         custom_css: tenantTheme.custom_css,
-        custom_js: (tenantTheme as any).custom_js,
         logo_url: tenantTheme.logo_url,
         favicon_url: tenantTheme.favicon_url,
         meta_title: tenantTheme.meta_title,
