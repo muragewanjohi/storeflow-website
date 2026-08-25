@@ -230,6 +230,31 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
       },
     },
 
+    // Furniture Theme - Warm wood/gold tones, derived from the real
+    // component code's own hardcoded colors (src/components/themes/
+    // furniture/{Header,Homepage}.tsx) rather than invented, so this
+    // matches what the theme actually looks like — real primary #B88E2F
+    // accent, #3a3a3a heading text, #616161 muted, Poppins throughout.
+    furniture: {
+      colors: {
+        primary: '#B88E2F',      // Warm gold/wood accent
+        secondary: '#3a3a3a',    // Dark charcoal heading text
+        accent: '#B88E2F',
+        background: '#FFFFFF',
+        text: '#3a3a3a',
+        muted: '#616161',
+        buttonBackground: '#B88E2F',
+        buttonText: '#FFFFFF',
+      },
+      fonts: {
+        headingFont: 'Poppins',
+        bodyFont: 'Poppins',
+        baseFontSize: 16,
+        headingWeight: 600,
+        bodyWeight: 400,
+      },
+    },
+
     // Default Theme - Fallback for unknown themes
     default: {
       colors: {

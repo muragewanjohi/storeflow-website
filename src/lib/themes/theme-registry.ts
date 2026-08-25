@@ -173,7 +173,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'grocery',
     industry: 'grocery',
     description: 'Fresh and organic grocery theme perfect for food stores, farmers markets, and organic food retailers',
-    screenshotUrl: '/images/themes/clothes_multipurpose.png',
+    screenshotUrl: '/images/themes/grocery.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
@@ -205,7 +205,7 @@ export const themeTemplates: Record<string, ThemeTemplateConfig> = {
     slug: 'furniture',
     industry: 'furniture',
     description: 'Modern furniture theme perfect for interior design stores and furniture retailers',
-    screenshotUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1200&h=800&fit=crop',
+    screenshotUrl: '/images/themes/furniture.png',
     layout: {
       header: 'sticky',
       productGrid: 'grid',
