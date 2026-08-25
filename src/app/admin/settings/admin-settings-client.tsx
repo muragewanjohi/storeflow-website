@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import AiPlatformSettingsCard from './ai-platform-settings-card';
 
 interface AdminSettingsClientProps {
   stats: {
@@ -210,6 +211,9 @@ export default function AdminSettingsClient({
           </Alert>
         </CardContent>
       </Card>
+
+      {/* AI & Image Generation (DA.26) */}
+      <AiPlatformSettingsCard />
 
       {/* System Information */}
       <Card>

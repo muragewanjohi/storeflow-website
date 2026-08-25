@@ -7,6 +7,7 @@ import { getThemeColorSettingsWithDefaults } from '@/lib/themes/color-settings';
 import { buildSellingMatchKeys, checkSellingExists, isSellingEquivalent, normalizeSellingKey } from '@/lib/onboarding/selling-check';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { recordAiUsage } from '@/lib/ai/usage';
+import { getGenericImageCacheReuseCap } from '@/lib/settings/platform-settings';
 import { estimateGeminiTextCostUsd } from '@/lib/ai/gemini-cost';
 import {
   DEFAULT_GEMINI_IMAGE_MODEL,
@@ -1009,14 +1010,13 @@ async function executeGeminiJsonWithFallback(params: {
  * stripReusedImageUrls) — these 5 images are never product-specific, so
  * reusing the exact same URLs across tenants sharing a style is safe and
  * expected (same reasoning Wix/Squarespace/Shopify's Burst library rely on
- * for shared stock/template imagery). Capped at GENERIC_IMAGE_CACHE_REUSE_CAP
- * reuses per style+theme so a very popular niche doesn't render identically
+ * for shared stock/template imagery). Capped at a real, admin-editable reuse
+ * count per style+theme (DA.26 — getGenericImageCacheReuseCap(), was a
+ * hardcoded constant) so a very popular niche doesn't render identically
  * for hundreds of stores forever — count-based rather than time-based, so a
  * rarely-used style never gets force-regenerated just because a calendar
  * window passed, while a genuinely popular one still gets refreshed.
  */
-const GENERIC_IMAGE_CACHE_REUSE_CAP = 8;
-
 interface GenericImageCacheHit {
   hero: string;
   banners: string[];
@@ -1027,10 +1027,13 @@ interface GenericImageCacheHit {
 async function loadGenericImageCache(styleKey: string, themeSlug: string): Promise<GenericImageCacheHit | null> {
   if (!styleKey) return null;
   try {
-    const row = await prisma.onboarding_generic_image_cache.findUnique({
-      where: { style_key_theme_slug: { style_key: styleKey, theme_slug: themeSlug } },
-    });
-    if (!row || row.reuse_count >= GENERIC_IMAGE_CACHE_REUSE_CAP) return null;
+    const [row, reuseCap] = await Promise.all([
+      prisma.onboarding_generic_image_cache.findUnique({
+        where: { style_key_theme_slug: { style_key: styleKey, theme_slug: themeSlug } },
+      }),
+      getGenericImageCacheReuseCap(),
+    ]);
+    if (!row || row.reuse_count >= reuseCap) return null;
     const banners = Array.isArray(row.banner_urls)
       ? (row.banner_urls as unknown[]).filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
       : [];

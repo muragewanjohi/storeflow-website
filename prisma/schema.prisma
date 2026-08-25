@@ -887,6 +887,21 @@ model onboarding_generic_image_cache {
   @@index([style_key], map: "idx_generic_image_cache_style_key")
 }
 
+/// DA.26: platform-wide, landlord-editable key/value settings. First real
+/// use: the DA.24 starter-pack generic-image reuse cap, previously a
+/// hardcoded constant -- requested directly by the user ("make it an
+/// editable configuration on admin dashboard"). See
+/// src/lib/settings/platform-settings.ts for the typed accessor. No FK to
+/// auth.users for updated_by -- informational only, same reasoning as
+/// onboarding_generic_image_cache's source_tenant_id.
+model platform_settings {
+  key         String    @id @db.VarChar(100)
+  value       String
+  description String?
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_by  String?   @db.Uuid
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
   id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
