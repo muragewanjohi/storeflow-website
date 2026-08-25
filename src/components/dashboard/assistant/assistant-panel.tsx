@@ -33,6 +33,14 @@
  *    @/lib/media/mobile-image-upload — then PUTs the result onto the new
  *    product via PUT /api/products/[id]. Skippable; never blocks anything.
  *
+ *  - 'delivery_zone_intake' mode (AI Phase 7.1): entered when
+ *    configuration_guidance hands off a 'delivery_zone' target. Drives
+ *    POST /api/delivery-zones/ai-intake, same JSON.stringify(data)-as-
+ *    assistant-turn contract as product_intake. On done:true, calls the
+ *    existing POST /api/admin/delivery-zones directly (no id resolution
+ *    needed — unlike product_intake's category, a zone has no foreign key
+ *    to look up), then drops back to 'assistant' mode.
+ *
  * Both backends already enforce their own auth/tenant/quota/rate-limit
  * checks — this component does no authorization logic of its own, only
  * renders their responses and forwards user input.
@@ -109,7 +117,7 @@ interface DisplayMessage {
   isError?: boolean;
 }
 
-type Mode = 'assistant' | 'product_intake';
+type Mode = 'assistant' | 'product_intake' | 'delivery_zone_intake';
 
 interface CollectedProduct {
   name: string | null;
@@ -119,10 +127,17 @@ interface CollectedProduct {
   sku: string | null;
 }
 
+interface CollectedZone {
+  name: string | null;
+  price: number | null;
+  locations: string[];
+}
+
 const WELCOME_TEXT =
   "Hi! I can answer questions about your store's data, help you understand DukaNest's features, walk you through adding a new product, suggest categories/pricing for your business, or tell you what to set up next. What can I help with?";
 const GENERIC_ERROR_TEXT = 'Something went wrong reaching the assistant. Please try again.';
 const INTAKE_START: ApiMessage = { role: 'user', content: '(Start the product intake conversation.)' };
+const ZONE_INTAKE_START: ApiMessage = { role: 'user', content: '(Start the delivery zone setup conversation.)' };
 const SPOTLIGHT_DISMISSED_KEY = 'dukanest_assistant_spotlight_dismissed';
 const SPOTLIGHT_SHOW_DELAY_MS = 1500;
 const SPOTLIGHT_AUTO_HIDE_MS = 10000;
@@ -145,6 +160,7 @@ export default function AssistantPanel() {
   const [mode, setMode] = useState<Mode>('assistant');
   const [assistantHistory, setAssistantHistory] = useState<ApiMessage[]>([]);
   const [intakeHistory, setIntakeHistory] = useState<ApiMessage[]>([]);
+  const [zoneIntakeHistory, setZoneIntakeHistory] = useState<ApiMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSpotlight, setShowSpotlight] = useState(false);
@@ -347,6 +363,80 @@ export default function AssistantPanel() {
     }
   }
 
+  async function createZoneFromCollected(collected: CollectedZone) {
+    if (!collected.name || collected.price == null || collected.locations.length === 0) {
+      pushMessage({
+        role: 'assistant',
+        text: "I didn't end up with enough details to create the delivery zone — you can finish it from the Delivery Zones page.",
+        isError: true,
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/delivery-zones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: collected.name,
+          price: collected.price,
+          locations: collected.locations,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        pushMessage({
+          role: 'assistant',
+          text: `I collected the details, but creating the zone failed: ${body.error ?? 'please try again from the Delivery Zones page.'}`,
+          isError: true,
+        });
+        return;
+      }
+
+      pushMessage({
+        role: 'assistant',
+        text: `Done — the "${collected.name}" delivery zone has been created.`,
+      });
+    } catch {
+      pushMessage({
+        role: 'assistant',
+        text: 'I collected the details, but could not reach the server to save the zone. You can add it from the Delivery Zones page.',
+        isError: true,
+      });
+    }
+  }
+
+  async function sendZoneIntakeTurn(history: ApiMessage[]) {
+    try {
+      const res = await fetch('/api/delivery-zones/ai-intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history, bucket: 'monthly' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        pushMessage({
+          role: 'assistant',
+          text: data.error ?? 'Something went wrong — you can add the delivery zone from the Delivery Zones page instead.',
+          isError: true,
+        });
+        setMode('assistant');
+        return;
+      }
+
+      pushMessage({ role: 'assistant', text: data.reply });
+      setZoneIntakeHistory([...history, { role: 'assistant', content: JSON.stringify(data) }]);
+
+      if (data.done) {
+        setMode('assistant');
+        await createZoneFromCollected(data.collected as CollectedZone);
+      }
+    } catch {
+      pushMessage({ role: 'assistant', text: GENERIC_ERROR_TEXT, isError: true });
+      setMode('assistant');
+    }
+  }
+
   async function sendAssistantTurn(history: ApiMessage[]) {
     try {
       const res = await fetch('/api/assistant/chat', {
@@ -377,6 +467,10 @@ export default function AssistantPanel() {
         setMode('product_intake');
         setIntakeHistory([INTAKE_START]);
         await sendIntakeTurn([INTAKE_START]);
+      } else if (result.intent === 'configuration_guidance' && result.data?.target === 'delivery_zone') {
+        setMode('delivery_zone_intake');
+        setZoneIntakeHistory([ZONE_INTAKE_START]);
+        await sendZoneIntakeTurn([ZONE_INTAKE_START]);
       }
     } catch {
       pushMessage({ role: 'assistant', text: GENERIC_ERROR_TEXT, isError: true });
@@ -395,6 +489,10 @@ export default function AssistantPanel() {
         const next = [...intakeHistory, { role: 'user' as const, content: text }];
         setIntakeHistory(next);
         await sendIntakeTurn(next);
+      } else if (mode === 'delivery_zone_intake') {
+        const next = [...zoneIntakeHistory, { role: 'user' as const, content: text }];
+        setZoneIntakeHistory(next);
+        await sendZoneIntakeTurn(next);
       } else {
         const next = [...assistantHistory, { role: 'user' as const, content: text }];
         setAssistantHistory(next);

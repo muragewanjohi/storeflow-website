@@ -72,7 +72,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, or regenerate one of your homepage images, right now. Guided setup for other things (like delivery zones or themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, regenerate one of your homepage images, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —
@@ -114,6 +114,15 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
   if (target === 'homepage_image') {
     const result = await handleHomepageImageConfigTarget(tenant, data.imageSlot ?? '', data.proposedImageSlot ?? '');
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'delivery_zone') {
+    return {
+      intent: 'configuration_guidance',
+      answer: "Sure — let's set up a delivery zone together. I'll ask you a few quick questions.",
+      data: { target, endpoint: '/api/delivery-zones/ai-intake' },
+      usage,
+    };
   }
 
   return {

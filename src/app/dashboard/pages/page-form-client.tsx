@@ -27,6 +27,7 @@ import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import ContextualHelp from '@/components/dashboard/contextual-help';
 import ContextualHelpPanel from '@/components/dashboard/contextual-help-panel';
 import FeatureDiscoveryTooltip from '@/components/dashboard/feature-discovery-tooltip';
+import LegalPageDraftButton from './legal-page-draft-button';
 
 interface Page {
   id: string;
@@ -600,6 +601,11 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                     <p className="text-xs text-muted-foreground mb-3">
                       Write freely with formatting tools -- best for simple text pages.
                     </p>
+                    <LegalPageDraftButton
+                      onDrafted={(draft) =>
+                        setFormData((prev) => ({ ...prev, title: prev.title || draft.title, content: draft.contentHtml }))
+                      }
+                    />
                     <RichTextEditor
                       content={contentMode === 'rich-text' ? (formData.content || '') : ''}
                       onChange={(content) => setFormData((prev) => ({ ...prev, content }))}

@@ -111,7 +111,7 @@ const MOBILE_NEXT_STEPS_META: Record<string, NextStepsNavMeta> = {
 };
 
 const MOBILE_CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, or regenerate one of your homepage images, right now. Guided setup for other things (like delivery zones or themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
+  "I can help you add a new product or category, regenerate one of your homepage images, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
 
 /**
  * Mobile's answer for a resolved configuration_guidance target. See module
@@ -149,6 +149,15 @@ async function handleMobileConfigurationGuidance(messages: ChatMessage[], tenant
   if (target === 'homepage_image') {
     const result = await handleHomepageImageConfigTarget(tenant, data.imageSlot ?? '', data.proposedImageSlot ?? '');
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'delivery_zone') {
+    return {
+      intent: 'configuration_guidance',
+      answer: "Sure — let's set up a delivery zone together. I'll ask you a few quick questions.",
+      data: { target, endpoint: '/api/v1/mobile/delivery-zones/ai-intake' },
+      usage,
+    };
   }
 
   return {

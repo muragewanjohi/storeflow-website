@@ -146,7 +146,7 @@ export interface HandlerResult {
 // like 'category', are simple enough that this module can just create them
 // directly and immediately when the merchant already named them, on BOTH
 // platforms — see handleCategoryConfigTarget() below.
-export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'unsupported'] as const;
+export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'delivery_zone', 'unsupported'] as const;
 export type ConfigTarget = (typeof CONFIG_TARGETS)[number];
 
 export const configTargetSchema = {
@@ -223,8 +223,8 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 AI-generated homepage images (hero, one of 3 banners, or the split-layout image).',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the homepage\'s AI images (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee).',
+    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the homepage\'s AI images (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
@@ -232,7 +232,8 @@ export function buildConfigTargetSystemPrompt(
     'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image). There are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed ONE specific slot for confirmation AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact slot value now. proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention.',
     '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If it is ambiguous which slot they mean (e.g. "update my banner images" could be any of the 3, or "improve my homepage pictures" could be any of the 5), leave proposedImageSlot empty too — you will ask them which one.',
-    'For anything else (delivery zones, themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, or a homepage image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
+    'delivery_zone has no extra fields here — it is a pure hand-off, the actual name/areas/fee collection happens in a dedicated follow-up conversation, not in this classification step.',
+    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a homepage image, or a delivery zone), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
 }
