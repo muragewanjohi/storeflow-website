@@ -1156,6 +1156,101 @@ function buildGenericHomepageImageJobs(businessType: string, niche?: string): Na
   }));
 }
 
+/**
+ * DA.24: reuse cache for the 5 generic homepage images. Deliberately separate
+ * from loadStarterPackFromExistingBusiness()'s cache (which intentionally
+ * strips reused image URLs for specific-looking fake product photos, see
+ * stripReusedImageUrls) — these 5 images are never product-specific, so
+ * reusing the exact same URLs across tenants sharing a style is safe and
+ * expected (same reasoning Wix/Squarespace/Shopify's Burst library rely on
+ * for shared stock/template imagery). Capped at GENERIC_IMAGE_CACHE_REUSE_CAP
+ * reuses per style+theme so a very popular niche doesn't render identically
+ * for hundreds of stores forever — count-based rather than time-based, so a
+ * rarely-used style never gets force-regenerated just because a calendar
+ * window passed, while a genuinely popular one still gets refreshed.
+ */
+const GENERIC_IMAGE_CACHE_REUSE_CAP = 8;
+
+interface GenericImageCacheHit {
+  hero: string;
+  banners: string[];
+  splitLayout: string | null;
+  reuseCount: number;
+}
+
+async function loadGenericImageCache(styleKey: string, themeSlug: string): Promise<GenericImageCacheHit | null> {
+  if (!styleKey) return null;
+  try {
+    const row = await prisma.onboarding_generic_image_cache.findUnique({
+      where: { style_key_theme_slug: { style_key: styleKey, theme_slug: themeSlug } },
+    });
+    if (!row || row.reuse_count >= GENERIC_IMAGE_CACHE_REUSE_CAP) return null;
+    const banners = Array.isArray(row.banner_urls)
+      ? (row.banner_urls as unknown[]).filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+      : [];
+    if (!row.hero_url || banners.length === 0) return null;
+
+    await prisma.onboarding_generic_image_cache.update({
+      where: { id: row.id },
+      data: { reuse_count: { increment: 1 } },
+    });
+
+    return {
+      hero: row.hero_url,
+      banners,
+      splitLayout: row.split_url,
+      reuseCount: row.reuse_count + 1,
+    };
+  } catch (error) {
+    // Best-effort — a cache read failure should fall through to real
+    // generation, never block or error out the whole request.
+    console.warn('[StarterPack][Trace] Generic image cache read failed (falling back to generation)', {
+      error: error instanceof Error ? error.message : 'Unknown cache read error',
+    });
+    return null;
+  }
+}
+
+async function saveGenericImageCache(params: {
+  styleKey: string;
+  styleRaw: string;
+  themeSlug: string;
+  hero: string;
+  banners: string[];
+  splitLayout: string | null;
+  sourceTenantId: string | null;
+}): Promise<void> {
+  if (!params.styleKey || !params.hero || params.banners.length === 0) return;
+  try {
+    await prisma.onboarding_generic_image_cache.upsert({
+      where: { style_key_theme_slug: { style_key: params.styleKey, theme_slug: params.themeSlug } },
+      create: {
+        style_key: params.styleKey,
+        style_raw: params.styleRaw,
+        theme_slug: params.themeSlug,
+        hero_url: params.hero,
+        banner_urls: params.banners,
+        split_url: params.splitLayout,
+        reuse_count: 0,
+        source_tenant_id: params.sourceTenantId,
+      },
+      update: {
+        hero_url: params.hero,
+        banner_urls: params.banners,
+        split_url: params.splitLayout,
+        reuse_count: 0,
+        source_tenant_id: params.sourceTenantId,
+      },
+    });
+  } catch (error) {
+    // Best-effort — a cache write failure should never break the response
+    // that already has real, successfully generated images in hand.
+    console.warn('[StarterPack][Trace] Generic image cache write failed (non-fatal)', {
+      error: error instanceof Error ? error.message : 'Unknown cache write error',
+    });
+  }
+}
+
 function extractImageUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
   const root = payload as Record<string, unknown>;
@@ -1450,6 +1545,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // DA.24: reuse cache check — a style (niche, or business type when
+      // niche is empty) that's already been generated recently for this
+      // theme skips Gemini entirely (real $0 cost, near-instant), up to
+      // GENERIC_IMAGE_CACHE_REUSE_CAP reuses. See loadGenericImageCache().
+      const styleRaw = (input.niche || input.selling || input.businessType).trim();
+      const styleKey = normalizeSellingKey(styleRaw);
+      const cacheTheme = await resolveTheme(input.themeId, input.themeSlug);
+      const themeSlug = cacheTheme?.slug || 'default';
+
+      const cached = await loadGenericImageCache(styleKey, themeSlug);
+      if (cached) {
+        console.log('[StarterPack][Trace] genericImagesOnly served from cache', {
+          traceId,
+          styleKey,
+          themeSlug,
+          reuseCount: cached.reuseCount,
+        });
+        return NextResponse.json({
+          success: true,
+          data: {
+            genericImages: {
+              hero: cached.hero,
+              banners: cached.banners,
+              splitLayout: cached.splitLayout,
+            },
+            nanoBanana: { durationMs: 0, completed: 0, succeeded: 0, failed: 0, results: [] },
+            imageSource: 'cache',
+            cacheReuseCount: cached.reuseCount,
+          },
+        });
+      }
+
       const genericJobs = buildGenericHomepageImageJobs(input.businessType, input.niche || input.selling);
       const execution = await executeNanoBananaJobs({
         apiKey: nanoBananaApiKey,
@@ -1485,11 +1612,29 @@ export async function POST(request: NextRequest) {
         splitLayout: Boolean(genericImages.splitLayout),
       });
 
+      // Cache a genuinely complete set (hero + all 3 banners) for future
+      // reuse. A partial set (e.g. an upload failure dropped a banner) is
+      // deliberately never cached — caching a hole would just serve the same
+      // hole to every future reuse of this style until the cap resets it.
+      if (genericImages.hero && genericImages.banners.length === 3) {
+        await saveGenericImageCache({
+          styleKey,
+          styleRaw,
+          themeSlug,
+          hero: genericImages.hero,
+          banners: genericImages.banners,
+          splitLayout: genericImages.splitLayout,
+          sourceTenantId: input.tenantId ?? null,
+        });
+      }
+
       return NextResponse.json({
         success: true,
         data: {
           genericImages,
           nanoBanana: execution,
+          imageSource: 'generated',
+          cacheReuseCount: 0,
         },
       });
     }

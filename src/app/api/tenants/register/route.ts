@@ -2653,6 +2653,7 @@ export async function POST(request: NextRequest) {
                         businessType: validatedData.businessType,
                         niche: nicheGiven ? finalSelling : undefined,
                         tenantId: tenant.id,
+                        themeId: effectiveThemeId,
                         genericImagesOnly: true,
                       }),
                     });

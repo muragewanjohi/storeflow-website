@@ -858,6 +858,35 @@ model onboarding_starter_packs {
   @@index([source_tenant_id], map: "idx_onboarding_starter_packs_source_tenant")
 }
 
+/// DA.24: cache of the 5 generic homepage images (hero/banners/split-layout)
+/// generated for the niche-agnostic starter pack path (see
+/// buildGenericHomepageImageJobs in src/app/api/onboarding/starter-pack/route.ts).
+/// Deliberately separate from onboarding_starter_packs — that cache exists for
+/// specific-looking (fake) product photos and intentionally strips reused image
+/// URLs (stripReusedImageUrls) so competing tenants never render identical
+/// "product" photos. These 5 images are never product-specific (generic
+/// hero/banner/split-layout dressing only), so reuse across tenants sharing a
+/// style is safe and expected -- the same reasoning Wix/Squarespace/Shopify's
+/// Burst library rely on for shared stock/template imagery. No FK relation to
+/// tenants (source_tenant_id is informational only) -- deliberately kept out of
+/// the tenants model to avoid touching that high-stakes file for this.
+model onboarding_generic_image_cache {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  style_key        String    @db.VarChar(255)
+  style_raw        String?   @db.VarChar(255)
+  theme_slug       String    @default("default") @db.VarChar(100)
+  hero_url         String
+  banner_urls      Json      @default("[]")
+  split_url        String?
+  reuse_count      Int       @default(0)
+  source_tenant_id String?   @db.Uuid
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([style_key, theme_slug], map: "idx_generic_image_cache_style_theme")
+  @@index([style_key], map: "idx_generic_image_cache_style_key")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
   id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
