@@ -4,7 +4,7 @@ import { resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
 import type { Tenant } from '@/lib/tenant-context';
 import { loadActiveSubscriptionPlans, tenantPricingContext } from '@/lib/subscriptions/load-plans';
-import { planLimitsFromFeatures, type PlanLimits } from '@/lib/subscriptions/plan-limits';
+import { planLimitsFromFeatures, type PlanLimitsSnapshot } from '@/lib/subscriptions/limits';
 import { getPlanChangeType } from '@/lib/subscriptions/proration';
 import { getDaysUntil, getTrialDaysRemaining } from '@/lib/subscriptions/trial';
 
@@ -36,7 +36,7 @@ type UsageCounts = {
   customers: number;
 };
 
-function buildUsageDetails(usage: UsageCounts, limits: PlanLimits) {
+function buildUsageDetails(usage: UsageCounts, limits: PlanLimitsSnapshot) {
   const rows = [
     { key: 'products', label: 'Products', current: usage.products, limit: limits.maxProducts },
     { key: 'orders', label: 'Orders', current: usage.orders, limit: limits.maxOrders },

@@ -39,6 +39,7 @@ import { UpdateNotificationBanner } from './update-notification-banner';
 import { CurrencyProvider } from '@/lib/currency/currency-context';
 import CompleteProfilePrompt from './complete-profile-prompt';
 import DashboardPwaControls from '@/components/pwa/dashboard-pwa-controls';
+import AssistantPanel from '@/components/dashboard/assistant/assistant-panel';
 
 interface LayoutClientProps {
   user: AuthUser;
@@ -225,6 +226,7 @@ export default function DashboardLayoutClient({
           </div>
         )}
         <DashboardPwaControls />
+        <AssistantPanel />
       </div>
     </CurrencyProvider>
   );

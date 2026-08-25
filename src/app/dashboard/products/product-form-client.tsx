@@ -16,7 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeftIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PhotoIcon } from '@heroicons/react/24/solid';
 import { generateVariantName } from '@/lib/products/variant-helpers';
 import ProductSalesSection from './product-sales-section';
@@ -215,6 +216,19 @@ export default function ProductFormClient({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<string[]>([]);
 
+  // AI Phase 5 — Product Photo QA. Purely advisory (never auto-applied);
+  // reset whenever the image changes so stale feedback for a removed/
+  // replaced photo never lingers on screen.
+  const [photoQaResult, setPhotoQaResult] = useState<{
+    qualityScore: 'good' | 'needs_improvement' | 'poor';
+    issues: string[];
+    reshootSuggestions: string[];
+    suggestedAltText: string;
+    suggestedSeoDescription: string;
+  } | null>(null);
+  const [photoQaLoading, setPhotoQaLoading] = useState(false);
+  const [photoQaError, setPhotoQaError] = useState<string | null>(null);
+
   // Fetch attributes on component mount
   useEffect(() => {
     const fetchAttributes = async () => {
@@ -264,6 +278,8 @@ export default function ProductFormClient({
     setUploadContext('main image');
     setUploadProgress(0);
     setError(null);
+    setPhotoQaResult(null);
+    setPhotoQaError(null);
 
     try {
       const compressedFile = await compressImageForMobile(file);
@@ -281,6 +297,39 @@ export default function ProductFormClient({
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  };
+
+  // AI Phase 5 — advisory only. Never writes to formData itself; the
+  // merchant explicitly chooses to use a suggestion via its own button.
+  const handleCheckPhotoQuality = async () => {
+    if (!formData.image) return;
+    setPhotoQaLoading(true);
+    setPhotoQaError(null);
+    setPhotoQaResult(null);
+    try {
+      const res = await fetch('/api/products/photo-qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: formData.image,
+          productName: formData.name.trim() || undefined,
+          // Always 'monthly' — this manual form has no reliable signal for
+          // "this is part of initial onboarding" vs. routine ongoing
+          // product creation months later; 'setup' is reserved for the
+          // Store Starter Pack's own dedicated bulk-onboarding code path.
+          bucket: 'monthly',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Photo QA is temporarily unavailable.');
+      }
+      setPhotoQaResult(data);
+    } catch (err: any) {
+      setPhotoQaError(err.message || 'Photo QA is temporarily unavailable.');
+    } finally {
+      setPhotoQaLoading(false);
     }
   };
 
@@ -1152,6 +1201,8 @@ export default function ProductFormClient({
                       onClick={() => {
                         setImagePreview(null);
                         setFormData({ ...formData, image: '' });
+                        setPhotoQaResult(null);
+                        setPhotoQaError(null);
                         if (fileInputRef.current) {
                           fileInputRef.current.value = '';
                         }
@@ -1213,6 +1264,92 @@ export default function ProductFormClient({
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* AI Phase 5 — Product Photo QA. Advisory only; never
+                    auto-applies anything to the form. */}
+                {formData.image && !isUploading && (
+                  <div className="space-y-3 border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleCheckPhotoQuality}
+                      disabled={photoQaLoading}
+                    >
+                      <SparklesIcon className="mr-2 h-4 w-4" />
+                      {photoQaLoading ? 'Checking photo…' : 'Check photo quality'}
+                    </Button>
+
+                    {photoQaError && (
+                      <p className="text-xs text-muted-foreground">{photoQaError}</p>
+                    )}
+
+                    {photoQaResult && (
+                      <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              photoQaResult.qualityScore === 'good'
+                                ? 'default'
+                                : photoQaResult.qualityScore === 'needs_improvement'
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                          >
+                            {photoQaResult.qualityScore === 'good'
+                              ? 'Good quality'
+                              : photoQaResult.qualityScore === 'needs_improvement'
+                                ? 'Could be improved'
+                                : 'Needs a retake'}
+                          </Badge>
+                        </div>
+
+                        {photoQaResult.issues.length > 0 && (
+                          <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                            {photoQaResult.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {photoQaResult.reshootSuggestions.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium">Tips for a better photo:</p>
+                            <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                              {photoQaResult.reshootSuggestions.map((tip) => (
+                                <li key={tip}>{tip}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium">Suggested alt text</p>
+                          <p className="text-xs text-muted-foreground">{photoQaResult.suggestedAltText}</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium">Suggested SEO description</p>
+                          <p className="text-xs text-muted-foreground">{photoQaResult.suggestedSeoDescription}</p>
+                          {!formData.description.trim() && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto px-2 py-1 text-xs"
+                              onClick={() =>
+                                setFormData((prev) => ({ ...prev, description: photoQaResult.suggestedSeoDescription }))
+                              }
+                            >
+                              Use as description
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

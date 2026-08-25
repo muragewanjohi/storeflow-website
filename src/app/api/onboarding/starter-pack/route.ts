@@ -8,6 +8,8 @@ import { getThemeDefaults } from '@/lib/themes/theme-defaults';
 import { getThemeColorSettingsWithDefaults } from '@/lib/themes/color-settings';
 import { buildSellingMatchKeys, checkSellingExists, isSellingEquivalent, normalizeSellingKey } from '@/lib/onboarding/selling-check';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { recordAiUsage } from '@/lib/ai/usage';
+import { estimateGeminiTextCostUsd, estimateGeminiImageCostUsd } from '@/lib/ai/gemini-cost';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -38,6 +40,20 @@ const starterPackRequestSchema = z.object({
   forceExternalGeneration: z.boolean().default(false),
   geminiModel: z.string().default(DEFAULT_GEMINI_MODEL),
   geminiResult: z.unknown().optional(),
+  /**
+   * When true, skips the full demoProducts/categories/salesPromotions
+   * generation entirely and instead generates exactly 5 generic,
+   * business-type-flavored images (hero, 3 banners, split-layout) — no
+   * fake products or categories are invented. Requested directly by the
+   * user for registrations where the merchant never said what they're
+   * selling (niche is empty) — inventing 8 specific demo products from
+   * business type alone ("Retail") reads as arbitrary/generic, whereas a
+   * few tasteful generic images plus an empty catalog honestly signals
+   * "add your own products" (which the assistant's product_intake/photo-QA
+   * features, already built this session, exist to help with). See
+   * docs/IMPLEMENTATION_TRACKER.md DA.21.
+   */
+  genericImagesOnly: z.boolean().default(false),
 });
 
 const generatedProductSchema = z.object({
@@ -819,13 +835,25 @@ function buildGeminiPrompts(input: {
     'For themeConfig, include ALL provided color keys and include a description for each key.',
     'For demoProducts, every item must include a highly descriptive Nano Banana image prompt suitable for 4k output.',
     'For salesPromotions, generate exactly 2 promotion banners with strong sales wording and dedicated image prompts.',
+    // Niche-first grounding for imagery — requested directly by the user:
+    // images must depict what the merchant actually sells (niche), not the
+    // broader business-type category. `input.niche` here is already
+    // resolved as niche || selling || businessType by the caller (see the
+    // `niche` local variable in POST below), so this instruction is safe
+    // even when the merchant never gave a niche and it fell back to
+    // business type.
+    'Every image prompt (demoProducts.imagePrompt and salesPromotions.imagePrompt) must depict the specific niche below, not the broader business type category — e.g. for niche "electric scooters" under business type "Retail", every image prompt must show electric scooters specifically, never generic retail/shop imagery.',
   ].join(' ');
 
   const userPrompt = [
-    `Generate a Store Starter Pack for business type "${input.businessType}" and niche "${input.niche}".`,
+    // Niche is the primary, authoritative signal for everything generated
+    // here (categories, products, image prompts) — business type is only
+    // secondary context (e.g. for general tone), never a co-equal subject
+    // for image prompts to describe.
+    `Generate a Store Starter Pack for a store selling: "${input.niche}" (general business type for context only: "${input.businessType}").`,
     input.storeName ? `Store name: "${input.storeName}".` : 'Store name: not provided.',
     `Locale: ${input.locale}. Currency: ${input.currency}.`,
-    `Provide exactly ${input.categoriesCount} categories, ${input.productsCount} demo products, 2 sales promotions, and ${input.blogPostsCount} blog posts.`,
+    `Provide exactly ${input.categoriesCount} categories, ${input.productsCount} demo products, 2 sales promotions, and ${input.blogPostsCount} blog posts — every one of them specific to "${input.niche}".`,
     input.themeTitle ? `Base theme: ${input.themeTitle}.` : 'Base theme: default.',
     'Theme color keys and descriptions to include in themeConfig:',
     themeColorInstruction,
@@ -833,7 +861,7 @@ function buildGeminiPrompts(input: {
     'Each demoProducts item must include: name, priceKES, description, imagePrompt.',
     'Each salesPromotions item must include: title, subtitle, ctaText, imagePrompt.',
     'Ensure copy.headline, copy.subheadline, and copy.ctaText are compelling and niche-specific.',
-    'Image prompts must specify: 4k resolution, studio-quality lighting, realistic ecommerce photography, and a consistent background style.',
+    `Image prompts must depict "${input.niche}" specifically (real products/scenes a customer buying that would recognize) and specify: 4k resolution, studio-quality lighting, realistic ecommerce photography, and a consistent background style.`,
     'Explicitly avoid bananas or banana fruit in any image prompt.',
     'Do not include branded logos, trademarked packaging, or copyrighted characters.',
   ].join('\n');
@@ -881,10 +909,56 @@ async function executeGeminiJson(params: {
     throw new Error('Gemini returned an empty response body');
   }
 
+  // Real token counts for cost tracking (@/lib/ai/gemini-cost.ts) — 0 if
+  // the API response didn't include usageMetadata (never invented).
+  // thoughtsTokenCount is REAL billed output too — gemini-2.5-flash uses
+  // extended thinking by default, and Google bills those tokens at the
+  // same output rate as candidatesTokenCount but reports them in a
+  // SEPARATE field. Found live-testing a real cost projection (DA.22):
+  // a real call showed candidatesTokenCount=2003 but thoughtsTokenCount=
+  // 2253 — omitting it would have undercounted real cost by ~2x for any
+  // call that used thinking, not a rounding error.
+  const usage = {
+    promptTokenCount: Number(payload?.usageMetadata?.promptTokenCount) || 0,
+    candidatesTokenCount:
+      (Number(payload?.usageMetadata?.candidatesTokenCount) || 0) +
+      (Number(payload?.usageMetadata?.thoughtsTokenCount) || 0),
+  };
+
   try {
-    return JSON.parse(text);
+    return { parsed: JSON.parse(text), usage };
   } catch {
     throw new Error('Gemini response is not valid JSON');
+  }
+}
+
+/**
+ * Records one Gemini usage row — best-effort, never throws into the caller.
+ * `tenantId` is genuinely nullable here: this route's most common real path
+ * (src/app/api/onboarding/starter-pack-jobs/route.ts) runs before a tenant
+ * exists yet, and that anonymous/pre-registration usage is real cost worth
+ * tracking, not something to silently drop. See migration
+ * 20260824180000_ai_usage_log_provider_and_nullable_tenant.sql.
+ */
+async function recordGeminiTextUsage(params: {
+  tenantId: string | null;
+  model: string;
+  usage: { promptTokenCount: number; candidatesTokenCount: number };
+}): Promise<void> {
+  try {
+    await recordAiUsage({
+      tenantId: params.tenantId,
+      feature: 'starter_pack_content',
+      bucket: 'setup',
+      provider: 'gemini',
+      usage: { inputTokens: params.usage.promptTokenCount, outputTokens: params.usage.candidatesTokenCount },
+      estimatedCost: estimateGeminiTextCostUsd(params.model, params.usage),
+      itemCount: 1,
+    });
+  } catch (error) {
+    console.warn('[StarterPack][Trace] Failed to record Gemini text usage (non-fatal)', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }
 
@@ -912,14 +986,15 @@ async function executeGeminiJsonWithFallback(params: {
   for (const model of modelsToTry) {
     attemptedModels.push(model);
     try {
-      const raw = await executeGeminiJson({
+      const { parsed, usage } = await executeGeminiJson({
         apiKey: params.apiKey,
         model,
         systemInstruction: params.systemInstruction,
         userPrompt: params.userPrompt,
       });
       return {
-        raw,
+        raw: parsed,
+        usage,
         usedModel: model,
         attemptedModels,
       };
@@ -948,10 +1023,26 @@ function withVariationSeed(prompt: string, salt: string, jobKey: string): string
   return `${prompt}\n\nUnique composition seed (do not render as text, just use it to vary framing, angle, lighting, props, and color accents so this image is visually distinct from other stores): ${composite}`;
 }
 
+/**
+ * Shared shape for every Gemini image-generation job — real per-product/
+ * per-promotion jobs (buildNanoBananaJobs) and the generic 5-image jobs
+ * (buildGenericHomepageImageJobs, DA.21) both produce this same shape, so
+ * executeNanoBananaJobs() (the actual Gemini call + upload + cost-tracking
+ * logic) is written once and never forked for the generic case.
+ */
+interface NanoBananaJob {
+  index: number;
+  kind: 'product' | 'sales_promotion' | 'hero' | 'banner' | 'split_layout';
+  /** A human label — the real product/promo name for real jobs, a fixed slot label ('Hero', 'Banner 1', ...) for generic jobs. */
+  productName: string;
+  prompt: string;
+  output: { resolution: string; format: string; style: string };
+}
+
 function buildNanoBananaJobs(
   starterPack: z.infer<typeof generatedStarterPackSchema>,
   options?: { salt?: string }
-) {
+): NanoBananaJob[] {
   const salt = options?.salt?.trim() || '';
   const productJobs = starterPack.demoProducts
     .map((product, index) => {
@@ -1004,6 +1095,67 @@ function buildNanoBananaJobs(
   return [...productJobs, ...promoJobs];
 }
 
+/**
+ * Exactly 5 generic images (never product-specific — no fake demo products
+ * are ever invented) for EVERY new registration (DA.21, scope widened —
+ * originally the "niche is empty" fallback only, now the universal image
+ * path per direct user request: "stop the 8-product/10-image path
+ * entirely"): 1 hero foreground image, 3 banners, 1 split-layout left-side
+ * image. Grounded on niche when given (more relevant mood/category imagery
+ * — e.g. "evocative of a store selling electric scooters" instead of just
+ * "Retail"), business type otherwise — same niche-first-then-business-type
+ * discipline as DA.20's buildGeminiPrompts() fix, but still never claiming
+ * to depict a specific named product, since no real inventory exists yet.
+ */
+function buildGenericHomepageImageJobs(businessType: string, niche?: string): NanoBananaJob[] {
+  const style = niche?.trim() || businessType.trim() || 'general retail';
+  const baseStyle =
+    `Professional, appealing ecommerce imagery evocative of a store selling "${style}", ` +
+    'without depicting any single specific named product — a general mood/lifestyle or category shot, ' +
+    'studio-quality or natural lighting, clean modern composition, realistic photography (not illustration).';
+
+  const jobs: Array<{ productName: string; kind: NanoBananaJob['kind']; prompt: string; style: string }> = [
+    {
+      productName: 'Hero',
+      kind: 'hero',
+      style: 'realistic-hero-photography',
+      prompt: `${baseStyle} Wide hero-banner composition suitable for the top of a homepage, with open negative space on one side for overlaid text.`,
+    },
+    {
+      productName: 'Banner 1',
+      kind: 'banner',
+      style: 'realistic-promotional-banner',
+      prompt: `${baseStyle} Banner composition themed around "New Arrivals" for this kind of store.`,
+    },
+    {
+      productName: 'Banner 2',
+      kind: 'banner',
+      style: 'realistic-promotional-banner',
+      prompt: `${baseStyle} Banner composition themed around "Best Sellers" for this kind of store.`,
+    },
+    {
+      productName: 'Banner 3',
+      kind: 'banner',
+      style: 'realistic-promotional-banner',
+      prompt: `${baseStyle} Banner composition themed around "Special Offers" for this kind of store.`,
+    },
+    {
+      productName: 'Split Layout',
+      kind: 'split_layout',
+      style: 'realistic-product-photography',
+      prompt: `${baseStyle} Tall, square-friendly composition suitable for the left half of a split homepage section.`,
+    },
+  ];
+
+  return jobs.map((job, index) => ({
+    index: index + 1,
+    kind: job.kind,
+    productName: job.productName,
+    prompt: withImageNegativePrompt(job.prompt),
+    output: { resolution: '4k', format: 'png', style: job.style },
+  }));
+}
+
 function extractImageUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
   const root = payload as Record<string, unknown>;
@@ -1023,7 +1175,8 @@ function extractImageUrl(payload: unknown): string | null {
 
 async function executeNanoBananaJobs(params: {
   apiKey: string;
-  jobs: ReturnType<typeof buildNanoBananaJobs>;
+  jobs: NanoBananaJob[];
+  tenantId: string | null;
 }) {
   const genAI = new GoogleGenerativeAI(params.apiKey);
   const startedAt = Date.now();
@@ -1034,6 +1187,14 @@ async function executeNanoBananaJobs(params: {
         let inlineImage: { mimeType: string; data: string } | null = null;
         let usedModel = DEFAULT_GEMINI_IMAGE_MODEL;
         let lastError: unknown = null;
+        // Real returned usage, not the requested resolution — DA.17 found
+        // live that a "4k resolution" prompt instruction does not make the
+        // model actually deliver 4K pixels (a real test returned 1408x768
+        // from the primary model); billing off the real image-token count
+        // is the only way to get an accurate number. Best-effort, 0 if the
+        // SDK response didn't expose usageMetadata.
+        let promptTokenCount = 0;
+        let imageTokenCount = 0;
         const modelsToTry = [DEFAULT_GEMINI_IMAGE_MODEL, ...GEMINI_IMAGE_FALLBACK_MODELS];
 
         for (const modelName of modelsToTry) {
@@ -1052,6 +1213,15 @@ async function executeNanoBananaJobs(params: {
                 data: inlinePart.inlineData.data,
               };
               usedModel = modelName;
+              const usageMetadata = (imageResponse.response as any)?.usageMetadata;
+              promptTokenCount = Number(usageMetadata?.promptTokenCount) || 0;
+              const imageDetail = Array.isArray(usageMetadata?.candidatesTokensDetails)
+                ? usageMetadata.candidatesTokensDetails.find((d: any) => d?.modality === 'IMAGE')
+                : null;
+              // Falls back to the overall candidatesTokenCount for an
+              // image-only call (no text output to conflate it with) if
+              // the per-modality breakdown isn't present.
+              imageTokenCount = Number(imageDetail?.tokenCount ?? usageMetadata?.candidatesTokenCount) || 0;
               break;
             }
           } catch (error) {
@@ -1072,6 +1242,7 @@ async function executeNanoBananaJobs(params: {
         const bucketName = process.env.NEXT_PUBLIC_STORAGE_BUCKET || 'product-images';
         let publicUrl: string | null = null;
         let storagePath: string | null = null;
+        let uploadError: string | null = null;
 
         if (supabaseUrl && supabaseServiceRole) {
           const supabase = createClient(supabaseUrl, supabaseServiceRole);
@@ -1091,7 +1262,41 @@ async function executeNanoBananaJobs(params: {
           if (!uploadResult.error) {
             const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
             publicUrl = urlData.publicUrl;
+          } else {
+            uploadError = uploadResult.error.message;
           }
+        } else {
+          uploadError = 'Supabase storage is not configured (missing URL or service role key)';
+        }
+
+        const imageCostUsd = estimateGeminiImageCostUsd({
+          model: usedModel,
+          imageTokenCount,
+          promptTokenCount,
+        });
+
+        // A job with no real, fetchable URL isn't useful to any caller
+        // regardless of whether Gemini itself generated the image — a real
+        // gap found live-testing DA.21: this used to return success:true
+        // with imageUrl:null on an upload failure, silently dropping the
+        // image with no visible error anywhere. Cost is still billed
+        // (generation genuinely happened), but the job itself is now
+        // correctly marked failed.
+        if (!publicUrl) {
+          console.warn('[StarterPack][Trace] Nano Banana upload failed', {
+            job: job.productName,
+            model: usedModel,
+            error: uploadError,
+          });
+          return {
+            ...job,
+            success: false,
+            error: uploadError ?? 'Image upload failed',
+            durationMs: Date.now() - itemStartedAt,
+            imageCostUsd,
+            rawResponse: null,
+            imageUrl: null,
+          };
         }
 
         return {
@@ -1100,11 +1305,12 @@ async function executeNanoBananaJobs(params: {
           durationMs: Date.now() - itemStartedAt,
           imageUrl: publicUrl,
           storagePath,
+          imageCostUsd,
           rawResponse: {
             provider: 'gemini-image-sdk',
             model: usedModel,
             mimeType: inlineImage.mimeType,
-            uploaded: Boolean(publicUrl),
+            uploaded: true,
           },
         };
       } catch (error) {
@@ -1113,12 +1319,41 @@ async function executeNanoBananaJobs(params: {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown Gemini image generation error',
           durationMs: Date.now() - itemStartedAt,
+          imageCostUsd: 0,
           rawResponse: null,
           imageUrl: null,
         };
       }
     })
   );
+
+  // One usage record for the whole batch. Cost is summed from EVERY job
+  // that incurred real Gemini generation cost (imageCostUsd > 0), even ones
+  // that then failed to upload — Google already billed for the generation
+  // itself regardless of what happened afterward (see the upload-failure
+  // handling above, DA.21). itemCount stays success-based (real, usable
+  // images actually delivered) since that's the more meaningful "how many
+  // photos did we get" number for the AI Usage page. Best-effort: never let
+  // usage recording fail the actual starter-pack response.
+  const succeededResults = results.filter((item) => item.success);
+  const totalCost = results.reduce((sum, item) => sum + (item.imageCostUsd ?? 0), 0);
+  if (totalCost > 0) {
+    try {
+      await recordAiUsage({
+        tenantId: params.tenantId,
+        feature: 'starter_pack_image',
+        bucket: 'setup',
+        provider: 'gemini',
+        usage: { inputTokens: 0, outputTokens: 0 },
+        estimatedCost: totalCost,
+        itemCount: succeededResults.length,
+      });
+    } catch (error) {
+      console.warn('[StarterPack][Trace] Failed to record Gemini image usage (non-fatal)', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
 
   return {
     durationMs: Date.now() - startedAt,
@@ -1193,6 +1428,70 @@ export async function POST(request: NextRequest) {
           { status: 429, headers: { 'Retry-After': String(tenantLimit.retryAfterSeconds) } }
         );
       }
+    }
+
+    // DA.21 — genericImagesOnly short-circuits everything below: no niche
+    // resolution, no selling-exists reuse check, no demoProducts/categories/
+    // salesPromotions text generation at all. Just 5 generic images.
+    if (input.genericImagesOnly) {
+      const nanoBananaApiKey =
+        process.env.NANO_BANANA_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+      if (!nanoBananaApiKey) {
+        console.warn('[StarterPack][Trace] Missing Gemini API key for genericImagesOnly', { traceId });
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: 'GEMINI_API_KEY_MISSING',
+              message: 'Set GEMINI_API_KEY (or GOOGLE_AI_API_KEY) to enable image generation.',
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      const genericJobs = buildGenericHomepageImageJobs(input.businessType, input.niche || input.selling);
+      const execution = await executeNanoBananaJobs({
+        apiKey: nanoBananaApiKey,
+        jobs: genericJobs,
+        tenantId: input.tenantId ?? null,
+      });
+
+      // `success: true` only means Gemini generated an image — it does NOT
+      // guarantee the Supabase upload afterward also succeeded (a real gap
+      // found live-testing this: one job came back success:true with
+      // imageUrl:null, uploaded:false). Require a real non-empty URL, not
+      // just the generation flag.
+      const urlFor = (label: string) => {
+        const url = execution.results.find((r) => r.productName === label)?.imageUrl;
+        return typeof url === 'string' && url.trim() ? url : null;
+      };
+
+      const genericImages = {
+        hero: urlFor('Hero'),
+        banners: [urlFor('Banner 1'), urlFor('Banner 2'), urlFor('Banner 3')].filter(
+          (url): url is string => url !== null
+        ),
+        splitLayout: urlFor('Split Layout'),
+      };
+
+      console.log('[StarterPack][Trace] genericImagesOnly completed', {
+        traceId,
+        durationMs: execution.durationMs,
+        succeeded: execution.succeeded,
+        failed: execution.failed,
+        hero: Boolean(genericImages.hero),
+        banners: genericImages.banners.length,
+        splitLayout: Boolean(genericImages.splitLayout),
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          genericImages,
+          nanoBanana: execution,
+        },
+      });
     }
 
     const niche = (input.niche || input.selling || input.businessType).trim();
@@ -1346,6 +1645,11 @@ export async function POST(request: NextRequest) {
         geminiRaw = geminiResult.raw;
         geminiUsedModel = geminiResult.usedModel;
         geminiAttemptedModels = geminiResult.attemptedModels;
+        await recordGeminiTextUsage({
+          tenantId: input.tenantId ?? null,
+          model: geminiResult.usedModel,
+          usage: geminiResult.usage,
+        });
         parsedStarterPack = generatedStarterPackSchema.parse(
           normalizeGeneratedStarterPack(geminiRaw, {
             niche,
@@ -1401,6 +1705,11 @@ export async function POST(request: NextRequest) {
             systemInstruction:
               'You are a UI theming assistant. Return ONLY valid JSON with no markdown and no extra prose.',
             userPrompt: retryPrompt,
+          });
+          await recordGeminiTextUsage({
+            tenantId: input.tenantId ?? null,
+            model: themeRetry.usedModel,
+            usage: themeRetry.usage,
           });
 
           const normalizedThemeRetry = normalizeGeneratedStarterPack(themeRetry.raw, {
@@ -1518,6 +1827,7 @@ export async function POST(request: NextRequest) {
         nanoBananaExecution = await executeNanoBananaJobs({
           apiKey: nanoBananaApiKey,
           jobs: nanoBananaJobs,
+          tenantId: input.tenantId ?? null,
         });
         console.log('[StarterPack][Trace] Nano Banana execution completed', {
           traceId,

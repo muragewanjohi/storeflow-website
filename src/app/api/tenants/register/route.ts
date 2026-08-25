@@ -970,6 +970,44 @@ async function applyStarterPackToTenant(
   };
 }
 
+/**
+ * DA.21 — overwrites a freshly-built (not yet saved) homepage's hero/
+ * banners/split-layout image fields with real generic AI images, for the
+ * "niche is empty" registration path (buildGenericHomepageImageJobs()/
+ * genericImagesOnly in src/app/api/onboarding/starter-pack/route.ts). Pure/
+ * in-memory — applied to a PageBuilderData BEFORE it's ever written to
+ * `pages.content`, not a later DB patch, so it works the same regardless of
+ * which template function (createGroceryHomepageTemplate,
+ * createDefaultHomepageTemplate) built the base structure — both already
+ * shape hero/banners/split_layout sections identically.
+ */
+function applyGenericImagesToPageBuilderData<T extends { sections?: Array<Record<string, unknown>> }>(
+  pageBuilderData: T,
+  genericImages: { hero: string | null; banners: string[]; splitLayout: string | null }
+): T {
+  if (!Array.isArray(pageBuilderData.sections)) return pageBuilderData;
+
+  const sections = pageBuilderData.sections.map((section) => {
+    if (section.type === 'hero' && genericImages.hero) {
+      return { ...section, image: genericImages.hero };
+    }
+    if (section.type === 'banners' && Array.isArray(section.banners) && genericImages.banners.length > 0) {
+      const existingBanners = section.banners as Array<Record<string, unknown>>;
+      const nextBanners = existingBanners.map((banner, i) => {
+        const image = genericImages.banners[i];
+        return image ? { ...banner, image } : banner;
+      });
+      return { ...section, banners: nextBanners };
+    }
+    if (section.type === 'split_layout' && genericImages.splitLayout && isRecord(section.left_side)) {
+      return { ...section, left_side: { ...section.left_side, image: genericImages.splitLayout } };
+    }
+    return section;
+  });
+
+  return { ...pageBuilderData, sections };
+}
+
 async function applyStarterPackImagesToTenant(
   tenantId: string,
   starterPack: StarterPackPayload
@@ -1566,6 +1604,24 @@ export async function POST(request: NextRequest) {
       validatedData.selling?.trim() ||
       validatedData.businessType?.trim() ||
       undefined;
+    // DA.21 — the REAL, un-defaulted signal for "did the merchant say what
+    // they're selling". businessType is mandatory (frontend-enforced,
+    // src/app/register/page.tsx), so finalSelling above always resolves to
+    // *something* — it can never tell you whether niche was actually given.
+    // Still used to GROUND the 5 generic images below (more relevant
+    // imagery when niche is known) — no longer used as an on/off switch for
+    // the full starter pack, see ENABLE_FULL_AI_STARTER_PACK.
+    const nicheGiven = Boolean(validatedData.selling?.trim());
+    // DA.21 — scope widened per direct user request ("stop the 8-product/
+    // 10-image path entirely"): the full AI starter pack (8 demoProducts +
+    // 8 categories + 2 salesPromotions + 10 images) is now disabled for
+    // EVERY new registration, not just the niche-empty case — every new
+    // store gets the lighter 5-generic-image treatment (hero + 3 banners +
+    // split-layout), no invented demo products/categories, regardless of
+    // whether niche was given. Left as a single flag (not deleted code)
+    // in case this is ever revisited — every gate below reads this, not a
+    // hardcoded literal, so re-enabling is a one-line change if needed.
+    const ENABLE_FULL_AI_STARTER_PACK = false;
 
     let starterPackPayload: StarterPackPayload | null = null;
     if (validatedData.starterPackJobId) {
@@ -1619,10 +1675,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Run Gemini in foreground (fast) and defer image generation to background.
+    // DA.21: full AI starter pack disabled — see ENABLE_FULL_AI_STARTER_PACK above.
     if (
       !starterPackPayload &&
       includeDemoContent &&
-      finalSelling &&
+      ENABLE_FULL_AI_STARTER_PACK &&
       validatedData.businessType
     ) {
       let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -1680,7 +1737,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Guarantee starter-pack content for registration even if Gemini fails.
-    if (!starterPackPayload && includeDemoContent && finalSelling) {
+    // DA.21: full AI starter pack disabled — see ENABLE_FULL_AI_STARTER_PACK
+    // above; this would otherwise deterministically invent 8 fake products,
+    // exactly what that flag exists to prevent.
+    if (!starterPackPayload && includeDemoContent && ENABLE_FULL_AI_STARTER_PACK && finalSelling) {
       starterPackPayload = buildSellingFallbackStarterPack(finalSelling);
       console.warn('[Registration] Starter-pack API unavailable; using deterministic selling fallback', {
         traceId: registrationTraceId,
@@ -2023,7 +2083,30 @@ export async function POST(request: NextRequest) {
               pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
             } else {
               console.log(`[Registration] Using default homepage template with businessType: ${validatedData.businessType || 'none'}`);
-              pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, validatedData.businessType || undefined);
+              // DA.21: reserve real banner/split-layout section SHELLS now
+              // (with the shared onboarding placeholder image, not left out
+              // entirely) — the background task later patches these with
+              // the real generated images once ready
+              // (applyGenericImagesToPageBuilderData requires the sections
+              // to already exist to have anything to patch). Always reserved
+              // now that the full AI starter pack is disabled for every
+              // registration (ENABLE_FULL_AI_STARTER_PACK) — every new store
+              // goes through the 5-generic-image path, none through the old
+              // real-starter-pack-images patch.
+              const nichelessPlaceholderImage = getOnboardingImagePlaceholderUrl();
+              const placeholderSections = ENABLE_FULL_AI_STARTER_PACK
+                ? undefined
+                : {
+                    hero: nichelessPlaceholderImage,
+                    banners: [nichelessPlaceholderImage, nichelessPlaceholderImage, nichelessPlaceholderImage],
+                    splitLayout: nichelessPlaceholderImage,
+                  };
+              pageBuilderData = createDefaultHomepageTemplate(
+                theme.slug,
+                tenant.name,
+                validatedData.businessType || undefined,
+                placeholderSections
+              );
             }
 
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
@@ -2464,7 +2547,8 @@ export async function POST(request: NextRequest) {
               const startedAt = Date.now();
               try {
                 let backgroundStarterPackPayload: StarterPackPayload | null = null;
-                if (finalSelling && validatedData.businessType) {
+                // DA.21: full AI starter pack disabled for every registration — see ENABLE_FULL_AI_STARTER_PACK above.
+                if (ENABLE_FULL_AI_STARTER_PACK && validatedData.businessType) {
                   const starterPackResponse = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
                     method: 'POST',
                     headers: {
@@ -2545,7 +2629,86 @@ export async function POST(request: NextRequest) {
                     blogsCreated: starterPackResult.blogsCreated,
                     attributesCreated,
                   };
+                } else if (!ENABLE_FULL_AI_STARTER_PACK) {
+                  // DA.21 — full AI starter pack disabled for every
+                  // registration: do NOT invent demo products/categories
+                  // (per direct user request — "kindly note not to generate
+                  // any demo categories and products", later widened to
+                  // "stop the 8-product/10-image path entirely" regardless
+                  // of niche). Generate exactly 5 generic images instead —
+                  // grounded on niche when it was given (nicheGiven, more
+                  // relevant imagery), business type otherwise — and bake
+                  // them into the already-created homepage. Never a fake
+                  // specific product either way.
+                  appliedSource = 'generic-demo';
+                  let genericImagesApplied = false;
+                  try {
+                    const genericRes = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'X-Registration-Trace-Id': registrationTraceId,
+                      },
+                      body: JSON.stringify({
+                        businessType: validatedData.businessType,
+                        niche: nicheGiven ? finalSelling : undefined,
+                        tenantId: tenant.id,
+                        genericImagesOnly: true,
+                      }),
+                    });
+                    const genericBody = await genericRes.json().catch(() => ({}));
+                    const images = genericBody?.data?.genericImages as
+                      | { hero: string | null; banners: string[]; splitLayout: string | null }
+                      | undefined;
+
+                    if (genericRes.ok && genericBody?.success && images) {
+                      const homePage = await prisma.pages.findFirst({
+                        where: { tenant_id: tenant.id, slug: 'home' },
+                        select: { id: true, content: true },
+                      });
+                      if (homePage?.content) {
+                        const pageBuilderData = JSON.parse(homePage.content) as {
+                          sections?: Array<Record<string, unknown>>;
+                        };
+                        const updated = applyGenericImagesToPageBuilderData(pageBuilderData, images);
+                        await prisma.pages.update({
+                          where: { id: homePage.id },
+                          data: { content: JSON.stringify(updated) },
+                        });
+                        genericImagesApplied = true;
+                      }
+                    } else {
+                      console.warn('[Registration] Generic homepage image generation did not succeed', {
+                        traceId: registrationTraceId,
+                        tenantId: tenant.id,
+                        status: genericRes.status,
+                      });
+                    }
+                  } catch (genericImagesError) {
+                    console.warn('[Registration] Failed to generate/apply generic homepage images (non-fatal)', {
+                      traceId: registrationTraceId,
+                      tenantId: tenant.id,
+                      error:
+                        genericImagesError instanceof Error
+                          ? genericImagesError.message
+                          : 'Unknown generic-images error',
+                    });
+                  }
+                  resultPayload = {
+                    source: appliedSource,
+                    productsCreated: 0,
+                    categoriesCreated: 0,
+                    salesCreated: 0,
+                    blogsCreated: 0,
+                    attributesCreated: 0,
+                    genericImagesApplied,
+                  };
                 } else {
+                  // Unreachable while ENABLE_FULL_AI_STARTER_PACK is false
+                  // (the branch above always fires instead) — left intact,
+                  // not deleted, in case the flag is ever turned back on.
+                  // Originally: "niche WAS given but Gemini genuinely
+                  // failed" deterministic fallback.
                   const demoResult = await createDemoContent(
                     prisma,
                     tenant.id,

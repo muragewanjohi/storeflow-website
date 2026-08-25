@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
+import { prismaTenantRowToTenant } from '@/lib/auth/mobile-dashboard-tenant';
+import { getAiQuotaWarnings, formatAiQuotaWarning } from '@/lib/subscriptions/ai-quota-warnings';
 
 type MobileNotificationType =
   | 'new_order'
@@ -9,7 +11,10 @@ type MobileNotificationType =
   | 'low_stock'
   | 'new_support_ticket'
   | 'delivery_fee_approved'
-  | 'delivery_fee_rejected';
+  | 'delivery_fee_rejected'
+  // AI Phase 8.2 — see @/lib/subscriptions/ai-quota-warnings.ts.
+  | 'ai_quota_warning'
+  | 'ai_quota_reached';
 
 interface MobileNotification {
   id: string;
@@ -38,7 +43,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [pendingOrders, lowStockProducts, openTickets, approvedDelivery, rejectedDelivery] =
+    // Needed for AI Phase 8.2's real quota check — requireMobileAuth() only
+    // returns the bearer user, not the full tenant row (plan_id etc.).
+    const tenantRow = await prisma.tenants.findFirst({ where: { id: user.tenant_id, deleted_at: null } });
+
+    const [pendingOrders, lowStockProducts, openTickets, approvedDelivery, rejectedDelivery, aiQuotaWarnings] =
       await Promise.all([
         prisma.orders.findMany({
           where: {
@@ -109,6 +118,7 @@ export async function GET(request: NextRequest) {
             updated_at: true,
           },
         }),
+        tenantRow ? getAiQuotaWarnings(prismaTenantRowToTenant(tenantRow)) : Promise.resolve([]),
       ]);
 
     const notifications: MobileNotification[] = [
@@ -152,6 +162,24 @@ export async function GET(request: NextRequest) {
         createdAt: (order.updated_at ?? new Date()).toISOString(),
         link: `/dashboard/orders/${order.id}`,
       })),
+      // AI Phase 8.2 — real usage vs real plan quota. Backdated to the
+      // start of the month (not "now") so a low-urgency quota nudge never
+      // outranks a same-day pending payment or new order in the sort
+      // below purely because it was computed this instant — see the web
+      // route's identical comment for the full reasoning.
+      ...aiQuotaWarnings.map((warning) => {
+        const { title, message } = formatAiQuotaWarning(warning);
+        return {
+          id: warning.id,
+          type: (warning.severity === 'reached' ? 'ai_quota_reached' : 'ai_quota_warning') as MobileNotificationType,
+          title,
+          message,
+          createdAt: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+          // Real Flutter router.dart path (confirmed), unlike every other
+          // link in this file which reuses a web-shaped /dashboard/... path.
+          link: '/subscription',
+        };
+      }),
     ]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 20);

@@ -15,6 +15,7 @@ export interface GettingStartedProgressSummary {
 export const GETTING_STARTED_OPTION_NAMES = [
   'getting_started_previewed_store',
   'getting_started_shared_link',
+  'getting_started_tried_assistant',
   'store_phone',
   'store_logo',
   'shipping_enabled',
@@ -38,6 +39,19 @@ interface BuildProgressInput {
   activeDemoProductCount?: number;
   deliveryZoneCount: number;
   settings: SettingsMap;
+  /**
+   * Include the 'assistant' item ("Try the DukaNest Assistant"). Defaults to
+   * false — the Dashboard AI Assistant (DA.0-DA.7) is web-only today, so
+   * including it unconditionally would silently inflate totalCount for
+   * callers with no UI for it, making 100% completion unreachable. The web
+   * getting-started route (src/app/api/dashboard/getting-started/route.ts)
+   * opts in explicitly; the mobile route
+   * (src/app/api/v1/mobile/dashboard/getting-started/route.ts) does not —
+   * found and fixed as a real regression when the user asked "is this for
+   * both web and Flutter?", which prompted checking. Flip this once Flutter
+   * has its own assistant entry point to link to.
+   */
+  includeAssistantItem?: boolean;
 }
 
 function hasValue(value: string | null | undefined): boolean {
@@ -45,7 +59,7 @@ function hasValue(value: string | null | undefined): boolean {
 }
 
 export function buildGettingStartedProgress(input: BuildProgressInput): GettingStartedProgressSummary {
-  const { productCount, categoryCount = 0, activeDemoProductCount = 0, deliveryZoneCount, settings } = input;
+  const { productCount, categoryCount = 0, activeDemoProductCount = 0, deliveryZoneCount, settings, includeAssistantItem = false } = input;
 
   const hasLogo = hasValue(settings.store_logo);
   const hasContactPhone = hasValue(settings.store_phone);
@@ -116,6 +130,16 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
       completed: hasLogo,
     },
   ];
+
+  // Web-only for now — see includeAssistantItem's doc comment above.
+  if (includeAssistantItem) {
+    items.push({
+      id: 'assistant',
+      label: 'Try the DukaNest Assistant',
+      description: 'Ask it a question — about your store, a feature, or what to do next',
+      completed: settings.getting_started_tried_assistant === 'true',
+    });
+  }
 
   // Only show this step when sample/demo products actually exist.
   if (activeDemoProductCount > 0) {

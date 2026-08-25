@@ -6,6 +6,7 @@
 
 import { prisma } from '@/lib/prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
+import type { AiFeature, AiUsageBucket } from '@/lib/ai/types';
 
 export interface PlanLimits {
   max_products?: number; // -1 means unlimited
@@ -42,6 +43,202 @@ export function getPlanLimits(planFeatures: any): PlanLimits {
  */
 export function isUnlimited(limit: number | undefined): boolean {
   return limit === -1 || limit === undefined;
+}
+
+/**
+ * Read-only snapshot shape for the subscription dashboard/mobile summary
+ * (src/lib/subscriptions/load-subscription-snapshot.ts). camelCase,
+ * `null`-based, distinct from PlanLimits above (snake_case, `-1`-based,
+ * used at enforcement time by canCreate*() below) on purpose — this was
+ * previously a second file (plan-limits.ts) with its own independent
+ * `features` JSON parser, which is exactly the kind of drift this file was
+ * merged to prevent: planLimitsFromFeatures() now delegates to
+ * getPlanLimits() below for the actual field extraction, so there is one
+ * parser, not two, even though there remain two output shapes for two
+ * different callers.
+ */
+export type PlanLimitsSnapshot = {
+  maxProducts: number | null;
+  maxOrders: number | null;
+  maxPages: number | null;
+  maxBlogs: number | null;
+  maxCustomers: number | null;
+  maxStorageMb: number | null;
+  ai: AiPlanLimits;
+};
+
+/**
+ * AI feature quotas — see docs/AI_FEATURES_PLAN.md "Plan quotas" section for
+ * the reasoning behind the setup/monthly split. `null` means "not available
+ * on this plan" (not "unlimited") — treat null as a hard gate, distinct from
+ * a generous numeric quota. This is a different `null` convention than the
+ * top-level PlanLimitsSnapshot fields above, where `null` means "key absent
+ * from features JSON" and a literal `-1` (passed through unchanged) is what
+ * actually means unlimited — see isUnlimited() and buildUsageDetails() in
+ * load-subscription-snapshot.ts, which already handles that distinction.
+ */
+export type AiPlanLimits = {
+  /** One-time allowance consumed during initial store build, not tied to the calendar month. */
+  setup: {
+    descriptions: number | null;
+    photoQaPasses: number | null;
+    marketingImages: number | null;
+    themeStylingPasses: number | null;
+    legalPageDrafts: number | null;
+  };
+  /** Recurring allowance, resets monthly, for post-setup usage. */
+  monthly: {
+    /** Product descriptions and photo-QA passes share one counter — see AI_FEATURES_PLAN.md. */
+    descriptionsAndPhotoQa: number | null;
+    marketingImages: number | null;
+    /** Gated to Pro/Premium via hasAdvancedAnalyticsAccess() — expect null on Basic regardless of this value. */
+    analyticsInsights: number | null;
+    /** Dashboard AI Assistant (docs/DASHBOARD_AI_ASSISTANT_PLAN.md) — unlike analyticsInsights, available on both tiers, differentiated by this quota rather than a hard gate. */
+    assistantQueries: number | null;
+  };
+};
+
+function readNumberOrNull(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
+/** undefined (key absent) becomes null; -1 and every other value pass through unchanged. */
+function toSnapshotValue(raw: number | undefined): number | null {
+  return raw === undefined ? null : raw;
+}
+
+export function planLimitsFromFeatures(features: unknown): PlanLimitsSnapshot {
+  const enforcementLimits = getPlanLimits(features);
+
+  const f =
+    features && typeof features === 'object' && !Array.isArray(features)
+      ? (features as Record<string, unknown>)
+      : {};
+  const ai =
+    f.ai && typeof f.ai === 'object' && !Array.isArray(f.ai)
+      ? (f.ai as Record<string, unknown>)
+      : {};
+  const aiSetup =
+    ai.setup && typeof ai.setup === 'object' && !Array.isArray(ai.setup)
+      ? (ai.setup as Record<string, unknown>)
+      : {};
+  const aiMonthly =
+    ai.monthly && typeof ai.monthly === 'object' && !Array.isArray(ai.monthly)
+      ? (ai.monthly as Record<string, unknown>)
+      : {};
+
+  return {
+    maxProducts: toSnapshotValue(enforcementLimits.max_products),
+    maxOrders: toSnapshotValue(enforcementLimits.max_orders),
+    maxPages: toSnapshotValue(enforcementLimits.max_pages),
+    maxBlogs: toSnapshotValue(enforcementLimits.max_blogs),
+    maxCustomers: toSnapshotValue(enforcementLimits.max_customers),
+    maxStorageMb: toSnapshotValue(enforcementLimits.max_storage_mb),
+    ai: {
+      setup: {
+        descriptions: readNumberOrNull(aiSetup.descriptions),
+        photoQaPasses: readNumberOrNull(aiSetup.photo_qa_passes),
+        marketingImages: readNumberOrNull(aiSetup.marketing_images),
+        themeStylingPasses: readNumberOrNull(aiSetup.theme_styling_passes),
+        legalPageDrafts: readNumberOrNull(aiSetup.legal_page_drafts),
+      },
+      monthly: {
+        descriptionsAndPhotoQa: readNumberOrNull(aiMonthly.descriptions_and_photo_qa),
+        marketingImages: readNumberOrNull(aiMonthly.marketing_images),
+        analyticsInsights: readNumberOrNull(aiMonthly.analytics_insights),
+        assistantQueries: readNumberOrNull(aiMonthly.assistant_queries),
+      },
+    },
+  };
+}
+
+/**
+ * Default AI quotas by plan-name substring, used when a price_plans row's
+ * `features` JSON hasn't been backfilled with an `ai` block yet. Mirrors the
+ * recommended defaults in docs/AI_FEATURES_PLAN.md — update both together.
+ */
+export function defaultAiPlanLimits(planName: string | null | undefined): AiPlanLimits {
+  const isPro = !!planName && /pro|premium/i.test(planName);
+
+  if (isPro) {
+    return {
+      setup: {
+        descriptions: 50,
+        photoQaPasses: 50,
+        marketingImages: 15,
+        themeStylingPasses: 5,
+        legalPageDrafts: 3,
+      },
+      monthly: {
+        descriptionsAndPhotoQa: 150,
+        marketingImages: 20,
+        analyticsInsights: 30,
+        assistantQueries: 200, // effectively unlimited for real usage patterns
+      },
+    };
+  }
+
+  return {
+    setup: {
+      descriptions: 50,
+      photoQaPasses: 50,
+      marketingImages: 15,
+      themeStylingPasses: 5,
+      legalPageDrafts: 3,
+    },
+    monthly: {
+      descriptionsAndPhotoQa: 40,
+      marketingImages: 4,
+      analyticsInsights: null, // gated off entirely — use hasAdvancedAnalyticsAccess(), not this value, to enforce
+      // Available on Basic too, per DASHBOARD_AI_ASSISTANT_PLAN.md's
+      // resolved gating decision — quota-differentiated, not hard-gated.
+      // Raised from 20 to 50 (docs/IMPLEMENTATION_TRACKER.md, DA.14) after
+      // real device testing showed 20 gets burned in a single realistic
+      // onboarding session (Haiku 4.5 cost is trivial either way — ~$0.002
+      // real average per request, so ~$0.09/tenant/month worst case at 50;
+      // this was never a cost constraint, just too tight a UX ceiling).
+      // Admin-editable per plan from here down — see
+      // src/app/admin/price-plans/[id]/edit-plan-form.tsx; this default
+      // only applies until a plan's features.ai block is explicitly saved.
+      assistantQueries: 50,
+    },
+  };
+}
+
+/**
+ * Per-field "what would actually apply right now" snapshot — declared value
+ * from `features.ai` where present, the plan-name default otherwise. Used
+ * to pre-fill the admin price-plan edit form (edit-plan-form.tsx) so an
+ * admin editing a plan that has never had its `ai` block explicitly saved
+ * still sees real, honest numbers instead of blanks or nulls.
+ *
+ * Deliberately per-field, NOT the same all-or-nothing rule
+ * canUseAiFeature()/getAiFeatureLimit() use at enforcement time (there, ANY
+ * declared field makes the whole block authoritative, so an
+ * unmentioned field there means "off", not "use the default") — that
+ * distinction stops mattering the moment the admin form saves, since it
+ * always writes the complete 9-field block from here on. This function
+ * exists purely to make the FIRST edit of a not-yet-backfilled plan show
+ * sensible numbers, not to change how enforcement itself reads the JSON.
+ */
+export function effectiveAiPlanLimits(features: unknown, planName: string | null | undefined): AiPlanLimits {
+  const declared = planLimitsFromFeatures(features).ai;
+  const fallback = defaultAiPlanLimits(planName);
+  return {
+    setup: {
+      descriptions: declared.setup.descriptions ?? fallback.setup.descriptions,
+      photoQaPasses: declared.setup.photoQaPasses ?? fallback.setup.photoQaPasses,
+      marketingImages: declared.setup.marketingImages ?? fallback.setup.marketingImages,
+      themeStylingPasses: declared.setup.themeStylingPasses ?? fallback.setup.themeStylingPasses,
+      legalPageDrafts: declared.setup.legalPageDrafts ?? fallback.setup.legalPageDrafts,
+    },
+    monthly: {
+      descriptionsAndPhotoQa: declared.monthly.descriptionsAndPhotoQa ?? fallback.monthly.descriptionsAndPhotoQa,
+      marketingImages: declared.monthly.marketingImages ?? fallback.monthly.marketingImages,
+      analyticsInsights: declared.monthly.analyticsInsights ?? fallback.monthly.analyticsInsights,
+      assistantQueries: declared.monthly.assistantQueries ?? fallback.monthly.assistantQueries,
+    },
+  };
 }
 
 /**
@@ -367,5 +564,129 @@ export async function getTenantUsage(tenant: Tenant): Promise<{
       limit: limits.max_storage_mb === -1 ? null : limits.max_storage_mb ?? null,
     },
   };
+}
+
+/**
+ * Look up the quota for one AI feature+bucket combination from a plan's
+ * AiPlanLimits. Returns:
+ *   - a number: the enforced cap (compared against cumulative item_count)
+ *   - null: feature explicitly unavailable on this plan
+ *   - undefined: no cap defined for this feature/bucket — canUseAiFeature
+ *     allows it unconditionally (rate limiting in @/lib/ai/rate-limit is
+ *     still the abuse guard for these). This is deliberate for features
+ *     like expense_categorization that are unlimited-by-design because
+ *     their per-request cost is trivial — see docs/AI_FEATURES_PLAN.md.
+ */
+function getAiFeatureLimit(
+  limits: AiPlanLimits,
+  feature: AiFeature,
+  bucket: AiUsageBucket
+): number | null | undefined {
+  if (bucket === 'setup') {
+    switch (feature) {
+      case 'product_description':
+        return limits.setup.descriptions;
+      case 'photo_qa':
+        return limits.setup.photoQaPasses;
+      case 'marketing_image_prompt':
+        return limits.setup.marketingImages;
+      case 'theme_styling':
+        return limits.setup.themeStylingPasses;
+      case 'legal_page_draft':
+        return limits.setup.legalPageDrafts;
+      default:
+        return undefined;
+    }
+  }
+
+  switch (feature) {
+    case 'product_description':
+    case 'photo_qa':
+      // Descriptions and photo-QA passes share one monthly counter — see
+      // docs/AI_FEATURES_PLAN.md "Plan quotas".
+      return limits.monthly.descriptionsAndPhotoQa;
+    case 'marketing_image_prompt':
+      return limits.monthly.marketingImages;
+    case 'analytics_insight':
+      return limits.monthly.analyticsInsights;
+    case 'assistant_query':
+      return limits.monthly.assistantQueries;
+    default:
+      return undefined;
+  }
+}
+
+function startOfCurrentMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/**
+ * Check whether a tenant can use an AI feature, against the setup-bucket or
+ * monthly-bucket quota (see docs/AI_FEATURES_PLAN.md "Plan quotas"). Counts
+ * cumulative item_count from ai_usage_log, not row count, so a single
+ * batched call generating 10 descriptions correctly consumes 10 units of
+ * quota, not 1.
+ *
+ * This is a quota check only — pair it with checkAiRateLimit()
+ * (@/lib/ai/rate-limit) on every AI route; that guards against
+ * abuse/retry-storms within the quota, which this function does not.
+ */
+export async function canUseAiFeature(
+  tenant: Tenant,
+  feature: AiFeature,
+  bucket: AiUsageBucket
+): Promise<{ allowed: boolean; reason?: string; current?: number; limit?: number | null }> {
+  if (!tenant.plan_id) {
+    return { allowed: false, reason: 'No active subscription plan' };
+  }
+
+  const plan = await prisma.price_plans.findUnique({
+    where: { id: tenant.plan_id },
+  });
+
+  if (!plan) {
+    return { allowed: false, reason: 'Subscription plan not found' };
+  }
+
+  const declaredAi = planLimitsFromFeatures(plan.features).ai;
+  const hasDeclaredAi =
+    Object.values(declaredAi.setup).some((v) => v !== null) ||
+    Object.values(declaredAi.monthly).some((v) => v !== null);
+  const limits = hasDeclaredAi ? declaredAi : defaultAiPlanLimits(plan.name);
+
+  const limit = getAiFeatureLimit(limits, feature, bucket);
+
+  if (limit === undefined) {
+    return { allowed: true };
+  }
+  if (limit === null) {
+    return { allowed: false, reason: `${feature} is not available on your current plan.` };
+  }
+
+  const since = bucket === 'monthly' ? startOfCurrentMonth() : undefined;
+  const agg = await prisma.ai_usage_log.aggregate({
+    where: {
+      tenant_id: tenant.id,
+      feature,
+      bucket,
+      ...(since ? { created_at: { gte: since } } : {}),
+    },
+    _sum: { item_count: true },
+  });
+  const current = agg._sum.item_count ?? 0;
+
+  if (current >= limit) {
+    return {
+      allowed: false,
+      reason: `${feature} limit reached (${current}/${limit}) for this ${
+        bucket === 'setup' ? 'store setup' : 'month'
+      }. Please upgrade your plan to continue.`,
+      current,
+      limit,
+    };
+  }
+
+  return { allowed: true, current, limit };
 }
 

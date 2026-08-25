@@ -1048,58 +1048,120 @@ export function createGroceryHomepageTemplate(tenantName: string, businessType?:
 }
 
 /**
- * Create a simple default homepage template if theme-specific one doesn't exist
+ * Real, AI-generated (Gemini/Nano Banana) images for the DA.21 "niche is
+ * empty" registration path — see buildGenericHomepageImageJobs() in
+ * src/app/api/onboarding/starter-pack/route.ts (genericImagesOnly mode).
+ * Never fabricated demo products/categories alongside these — see that
+ * route's docblock for why.
  */
-export function createDefaultHomepageTemplate(themeSlug: string, tenantName: string, businessType?: string): PageBuilderData {
+export interface GenericHomepageImages {
+  hero: string;
+  /** 0-3 banner URLs — fewer than 3 if some jobs failed; sections are omitted for any missing ones, never left with a broken/placeholder image. */
+  banners: string[];
+  splitLayout: string | null;
+}
+
+/**
+ * Create a simple default homepage template if theme-specific one doesn't exist
+ * @param genericImages Real AI-generated images for a niche-less registration (DA.21) — when provided, replaces the plain hero and adds banners/split-layout sections using these real URLs instead of leaving them out.
+ */
+export function createDefaultHomepageTemplate(
+  themeSlug: string,
+  tenantName: string,
+  businessType?: string,
+  genericImages?: GenericHomepageImages
+): PageBuilderData {
   // Use grocery template for grocery theme
   if (themeSlug === 'grocery') {
     return createGroceryHomepageTemplate(tenantName, businessType);
   }
 
-  return {
-    sections: [
-      {
-        id: 'hero-1',
-        type: 'hero' as const,
-        order: 1,
-        title: `Welcome to ${tenantName}`,
-        subtitle: 'Discover amazing products and great deals',
+  const sections: PageSection[] = [
+    {
+      id: 'hero-1',
+      type: 'hero' as const,
+      order: 1,
+      title: `Welcome to ${tenantName}`,
+      subtitle: 'Discover amazing products and great deals',
+      cta_text: 'Shop Now',
+      cta_link: '/products',
+      ...(genericImages?.hero ? { image: genericImages.hero } : {}),
+    },
+  ];
+
+  if (genericImages?.banners && genericImages.banners.length > 0) {
+    const bannerTitles = ['New Arrivals', 'Best Sellers', 'Special Offers'];
+    sections.push({
+      id: 'banners-1',
+      type: 'banners' as const,
+      order: 2,
+      banners: genericImages.banners.map((image, index) => ({
+        id: `banner-${index + 1}`,
+        title: bannerTitles[index] ?? `Offer ${index + 1}`,
+        image,
         cta_text: 'Shop Now',
         cta_link: '/products',
+        background_color: '#f5f5f5',
+      })),
+      columns: genericImages.banners.length,
+    } as PageSection);
+  }
+
+  sections.push({
+    id: 'products-1',
+    type: 'products' as const,
+    order: 3,
+    title: 'Featured Products',
+    limit: 8,
+    columns: 4,
+  });
+
+  if (genericImages?.splitLayout) {
+    sections.push({
+      id: 'split-layout-1',
+      type: 'split_layout' as const,
+      order: 4,
+      left_side: {
+        type: 'banner',
+        image: genericImages.splitLayout,
+        cta_link: '/products',
+        background_color: 'transparent',
+        image_position: 'cover',
+      },
+      right_side: {
+        type: 'products',
+        title: 'Top Rated',
+        limit: 4,
+        columns: 2,
+      },
+    } as PageSection);
+  }
+
+  sections.push({
+    id: 'features-1',
+    type: 'features' as const,
+    order: 5,
+    title: 'Why Shop With Us',
+    subtitle: 'Discover what makes us special',
+    features: [
+      {
+        id: 'feature-1',
+        title: 'Fast Shipping',
+        description: 'Free shipping on orders over $50',
       },
       {
-        id: 'products-1',
-        type: 'products' as const,
-        order: 2,
-        title: 'Featured Products',
-        limit: 8,
-        columns: 4,
+        id: 'feature-2',
+        title: 'Secure Payment',
+        description: 'Your payment information is safe',
       },
       {
-        id: 'features-1',
-        type: 'features' as const,
-        order: 3,
-        title: 'Why Shop With Us',
-        subtitle: 'Discover what makes us special',
-        features: [
-          {
-            id: 'feature-1',
-            title: 'Fast Shipping',
-            description: 'Free shipping on orders over $50',
-          },
-          {
-            id: 'feature-2',
-            title: 'Secure Payment',
-            description: 'Your payment information is safe',
-          },
-          {
-            id: 'feature-3',
-            title: '24/7 Support',
-            description: 'We\'re here to help anytime',
-          },
-        ],
-        columns: 3,
+        id: 'feature-3',
+        title: '24/7 Support',
+        description: 'We\'re here to help anytime',
       },
-    ] as PageSection[],
-  };
+    ],
+    columns: 3,
+  });
+
+  return { sections };
 }

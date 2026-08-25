@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
+import { effectiveAiPlanLimits } from '@/lib/subscriptions/limits';
 import EditPlanForm from './edit-plan-form';
 
 interface PageProps {
@@ -35,6 +36,11 @@ export default async function EditPricePlanPage({ params }: Readonly<PageProps>)
     price_kes: pricePlanData.price_kes != null ? Number(pricePlanData.price_kes) : null,
   };
 
+  // Real effective AI quotas (declared, or the plan-tier default) — see
+  // effectiveAiPlanLimits()'s docblock for why this differs from the
+  // stricter all-or-nothing rule enforcement itself uses.
+  const aiLimits = effectiveAiPlanLimits(pricePlanData.features, pricePlanData.name);
+
   return (
     <div>
       <div className="mb-6">
@@ -43,7 +49,7 @@ export default async function EditPricePlanPage({ params }: Readonly<PageProps>)
           Update subscription plan details
         </p>
       </div>
-      <EditPlanForm pricePlan={pricePlan} />
+      <EditPlanForm pricePlan={pricePlan} aiLimits={aiLimits} />
     </div>
   );
 }

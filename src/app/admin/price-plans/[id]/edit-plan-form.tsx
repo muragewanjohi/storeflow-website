@@ -28,11 +28,34 @@ interface PricePlan {
   status: string | null;
 }
 
-interface EditPlanFormProps {
-  pricePlan: PricePlan;
+/** Mirrors AiPlanLimits (@/lib/subscriptions/limits) — kept as a separate, plain type here since this is a client component. */
+interface AiLimits {
+  setup: {
+    descriptions: number | null;
+    photoQaPasses: number | null;
+    marketingImages: number | null;
+    themeStylingPasses: number | null;
+    legalPageDrafts: number | null;
+  };
+  monthly: {
+    descriptionsAndPhotoQa: number | null;
+    marketingImages: number | null;
+    analyticsInsights: number | null;
+    assistantQueries: number | null;
+  };
 }
 
-export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>) {
+interface EditPlanFormProps {
+  pricePlan: PricePlan;
+  /** Real EFFECTIVE quotas (declared, or the plan-tier default) — see effectiveAiPlanLimits()'s docblock. Never null in practice (every field always has a numeric default), typed nullable only to mirror AiPlanLimits exactly. */
+  aiLimits: AiLimits;
+}
+
+function aiFieldToString(value: number | null): string {
+  return value == null ? '' : value.toString();
+}
+
+export default function EditPlanForm({ pricePlan, aiLimits }: Readonly<EditPlanFormProps>) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +77,17 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
       max_blogs: pricePlan.features?.max_blogs?.toString() || '',
       max_staff_users: pricePlan.features?.max_staff_users?.toString() || '',
     },
+    ai: {
+      setupDescriptions: aiFieldToString(aiLimits.setup.descriptions),
+      setupPhotoQaPasses: aiFieldToString(aiLimits.setup.photoQaPasses),
+      setupMarketingImages: aiFieldToString(aiLimits.setup.marketingImages),
+      setupThemeStylingPasses: aiFieldToString(aiLimits.setup.themeStylingPasses),
+      setupLegalPageDrafts: aiFieldToString(aiLimits.setup.legalPageDrafts),
+      monthlyDescriptionsAndPhotoQa: aiFieldToString(aiLimits.monthly.descriptionsAndPhotoQa),
+      monthlyMarketingImages: aiFieldToString(aiLimits.monthly.marketingImages),
+      monthlyAnalyticsInsights: aiFieldToString(aiLimits.monthly.analyticsInsights),
+      monthlyAssistantQueries: aiFieldToString(aiLimits.monthly.assistantQueries),
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -74,6 +108,35 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
           features[key] = isNaN(numValue) ? null : numValue;
         }
       });
+
+      // Always writes the COMPLETE 9-field ai block, never a partial one —
+      // canUseAiFeature() treats ANY declared field as "this plan's ai
+      // block is now authoritative", so leaving a field out here would
+      // silently hard-gate that feature off for this plan (readNumberOrNull
+      // -> null for a missing key), not "use the default". A blank input
+      // means "not available on this plan" (null), matching the existing
+      // -1/empty convention used by the flat feature fields above.
+      const toAiValue = (raw: string): number | null => {
+        const trimmed = raw.trim();
+        if (trimmed === '') return null;
+        const parsed = parseInt(trimmed, 10);
+        return isNaN(parsed) ? null : parsed;
+      };
+      features.ai = {
+        setup: {
+          descriptions: toAiValue(formData.ai.setupDescriptions),
+          photo_qa_passes: toAiValue(formData.ai.setupPhotoQaPasses),
+          marketing_images: toAiValue(formData.ai.setupMarketingImages),
+          theme_styling_passes: toAiValue(formData.ai.setupThemeStylingPasses),
+          legal_page_drafts: toAiValue(formData.ai.setupLegalPageDrafts),
+        },
+        monthly: {
+          descriptions_and_photo_qa: toAiValue(formData.ai.monthlyDescriptionsAndPhotoQa),
+          marketing_images: toAiValue(formData.ai.monthlyMarketingImages),
+          analytics_insights: toAiValue(formData.ai.monthlyAnalyticsInsights),
+          assistant_queries: toAiValue(formData.ai.monthlyAssistantQueries),
+        },
+      };
 
       const response = await fetch(`/api/admin/price-plans/${pricePlan.id}`, {
         method: 'PUT',
@@ -113,6 +176,16 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
       ...formData,
       features: {
         ...formData.features,
+        [key]: value,
+      },
+    });
+  };
+
+  const handleAiFieldChange = (key: keyof typeof formData.ai, value: string) => {
+    setFormData({
+      ...formData,
+      ai: {
+        ...formData.ai,
         [key]: value,
       },
     });
@@ -344,6 +417,135 @@ export default function EditPlanForm({ pricePlan }: Readonly<EditPlanFormProps>)
                   value={formData.features.max_staff_users}
                   onChange={(e) => handleFeatureChange('max_staff_users', e.target.value)}
                   placeholder="-1 for unlimited"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4">AI Assistant &amp; Features</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Monthly quotas reset on the 1st of each calendar month; setup quotas are one-time, consumed during initial store build.
+              Leave a field empty to disable that AI feature entirely for this plan (not &quot;unlimited&quot; — for that, see docs/AI_FEATURES_PLAN.md).
+              Haiku 4.5 cost is trivial at these volumes (well under $1/tenant/month even near the top of these ranges) — these limits exist for plan-tier differentiation, not cost control.
+            </p>
+
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Monthly (recurring)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="space-y-2">
+                <Label htmlFor="ai_monthly_assistant_queries">Dashboard AI Assistant — requests/month</Label>
+                <Input
+                  id="ai_monthly_assistant_queries"
+                  type="number"
+                  min="0"
+                  value={formData.ai.monthlyAssistantQueries}
+                  onChange={(e) => handleAiFieldChange('monthlyAssistantQueries', e.target.value)}
+                  placeholder="e.g. 50 (Basic), 200 (Pro)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Every assistant chat turn (a question, a category/product-creation exchange) counts as one request.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_monthly_descriptions">Product descriptions + photo QA/month</Label>
+                <Input
+                  id="ai_monthly_descriptions"
+                  type="number"
+                  min="0"
+                  value={formData.ai.monthlyDescriptionsAndPhotoQa}
+                  onChange={(e) => handleAiFieldChange('monthlyDescriptionsAndPhotoQa', e.target.value)}
+                  placeholder="e.g. 40 (Basic), 150 (Pro)"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_monthly_marketing">Marketing images/month</Label>
+                <Input
+                  id="ai_monthly_marketing"
+                  type="number"
+                  min="0"
+                  value={formData.ai.monthlyMarketingImages}
+                  onChange={(e) => handleAiFieldChange('monthlyMarketingImages', e.target.value)}
+                  placeholder="e.g. 4 (Basic), 20 (Pro)"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_monthly_analytics">Analytics insight summaries/month</Label>
+                <Input
+                  id="ai_monthly_analytics"
+                  type="number"
+                  min="0"
+                  value={formData.ai.monthlyAnalyticsInsights}
+                  onChange={(e) => handleAiFieldChange('monthlyAnalyticsInsights', e.target.value)}
+                  placeholder="e.g. 30 (Pro only)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Advanced analytics is also gated by plan tier separately (hasAdvancedAnalyticsAccess) — this number only matters on plans where that access is already granted.
+                </p>
+              </div>
+            </div>
+
+            <h4 className="text-sm font-medium text-muted-foreground mb-2">Setup (one-time, during initial store build)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai_setup_descriptions">Product descriptions</Label>
+                <Input
+                  id="ai_setup_descriptions"
+                  type="number"
+                  min="0"
+                  value={formData.ai.setupDescriptions}
+                  onChange={(e) => handleAiFieldChange('setupDescriptions', e.target.value)}
+                  placeholder="e.g. 50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_setup_photo_qa">Photo QA passes</Label>
+                <Input
+                  id="ai_setup_photo_qa"
+                  type="number"
+                  min="0"
+                  value={formData.ai.setupPhotoQaPasses}
+                  onChange={(e) => handleAiFieldChange('setupPhotoQaPasses', e.target.value)}
+                  placeholder="e.g. 50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_setup_marketing">Marketing images</Label>
+                <Input
+                  id="ai_setup_marketing"
+                  type="number"
+                  min="0"
+                  value={formData.ai.setupMarketingImages}
+                  onChange={(e) => handleAiFieldChange('setupMarketingImages', e.target.value)}
+                  placeholder="e.g. 15"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_setup_theme">Theme styling passes</Label>
+                <Input
+                  id="ai_setup_theme"
+                  type="number"
+                  min="0"
+                  value={formData.ai.setupThemeStylingPasses}
+                  onChange={(e) => handleAiFieldChange('setupThemeStylingPasses', e.target.value)}
+                  placeholder="e.g. 5"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai_setup_legal">Legal page drafts</Label>
+                <Input
+                  id="ai_setup_legal"
+                  type="number"
+                  min="0"
+                  value={formData.ai.setupLegalPageDrafts}
+                  onChange={(e) => handleAiFieldChange('setupLegalPageDrafts', e.target.value)}
+                  placeholder="e.g. 3"
                 />
               </div>
             </div>

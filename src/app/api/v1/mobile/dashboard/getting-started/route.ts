@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
       activeDemoProductCount,
       deliveryZoneCount,
       settings,
+      includeAssistantItem: true, // Flutter Phase 4 — the assistant now has a real center-tab entry point (/assistant)
     });
     const completionById = new Map(
       progress.items.map((item) => [item.id, item.completed] as const),
@@ -157,6 +158,15 @@ export async function GET(request: NextRequest) {
         cta: 'Add logo',
         priority: 8,
       },
+      {
+        id: 'assistant',
+        label: 'Try the DukaNest Assistant',
+        description: 'Ask it a question — about your store, a feature, or what to do next',
+        completed: completionById.get('assistant') ?? false,
+        href: '/assistant', // real Flutter router.dart path — the center bottom-nav tab, not a web dashboard URL like the other entries above
+        cta: 'Try it',
+        priority: 9,
+      },
     ];
 
     if (completionById.has('demo_products')) {
@@ -167,7 +177,7 @@ export async function GET(request: NextRequest) {
         completed: completionById.get('demo_products') ?? false,
         href: '/dashboard/products',
         cta: 'Remove demo products',
-        priority: 9,
+        priority: 10,
       });
     }
 
@@ -242,10 +252,17 @@ export async function POST(request: NextRequest) {
       await setStaticOption(user.tenant_id, 'getting_started_previewed_store', 'true');
       return NextResponse.json(mobileSuccess({ previewed: true }), { status: 200 });
     }
+    if (action === 'assistant_tried') {
+      // Mirrors the web getting-started route's action of the same name —
+      // Flutter Phase 4 (IMPLEMENTATION_TRACKER.md). Marked the moment a
+      // merchant sends their first message to the assistant tab.
+      await setStaticOption(user.tenant_id, 'getting_started_tried_assistant', 'true');
+      return NextResponse.json(mobileSuccess({ tried: true }), { status: 200 });
+    }
 
     return NextResponse.json(
       mobileError('VALIDATION_ERROR', 'Unknown action', [
-        { field: 'action', message: 'Use preview_done or share_done' },
+        { field: 'action', message: 'Use preview_done, share_done, or assistant_tried' },
       ]),
       { status: 400 },
     );

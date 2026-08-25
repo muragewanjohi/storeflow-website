@@ -57,6 +57,7 @@ export async function GET() {
       activeDemoProductCount,
       deliveryZoneCount,
       settings,
+      includeAssistantItem: true, // web-only for now — see the flag's doc comment
     });
     const completionById = new Map(
       progress.items.map((item) => [item.id, item.completed] as const),
@@ -137,6 +138,21 @@ export async function GET() {
         cta: 'Add logo',
         priority: 8,
       },
+      {
+        id: 'assistant',
+        label: 'Try the DukaNest Assistant 🤖',
+        description: 'Ask it a question — about your store, a feature, or what to do next',
+        completed: completionById.get('assistant') ?? false,
+        // Plain query-param navigation, not a special onClick handler — this
+        // renders through the same generic <Link href={item.href}> fallback
+        // every other non-special item already uses, so it needed zero
+        // changes to this page's (multi-instance) checklist rendering.
+        // AssistantPanel opens itself and strips the param on mount when it
+        // sees ?openAssistant=1 — see its docblock.
+        href: '/dashboard?openAssistant=1',
+        cta: 'Try it',
+        priority: 9,
+      },
     ];
 
     // Show cleanup task only when demo products exist.
@@ -148,7 +164,7 @@ export async function GET() {
         completed: completionById.get('demo_products') ?? false,
         href: '/dashboard/products',
         cta: 'Remove demo products',
-        priority: 9,
+        priority: 10,
       });
     }
 
@@ -203,6 +219,10 @@ export async function POST(request: NextRequest) {
     if (action === 'preview_done') {
       await setStaticOption(tenant.id, 'getting_started_previewed_store', 'true');
       return NextResponse.json({ success: true, data: { previewed: true } });
+    }
+    if (action === 'assistant_tried') {
+      await setStaticOption(tenant.id, 'getting_started_tried_assistant', 'true');
+      return NextResponse.json({ success: true, data: { tried: true } });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

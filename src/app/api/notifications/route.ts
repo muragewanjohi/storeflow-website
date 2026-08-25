@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { cache } from '@/lib/cache/simple-cache';
 import type { Notification } from '@/lib/notifications/types';
+import { getAiQuotaWarnings, formatAiQuotaWarning } from '@/lib/subscriptions/ai-quota-warnings';
 
 /**
  * GET /api/notifications - Get all notifications (cached for 30 seconds)
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       landlordUserIds,
       approvedDeliveryFees,
       rejectedDeliveryFees,
+      aiQuotaWarnings,
     ] = await Promise.all([
       // 1. Pending/processing orders (limit 10)
       prisma.orders.findMany({
@@ -201,6 +203,9 @@ export async function GET(request: NextRequest) {
         orderBy: { updated_at: 'desc' },
         take: 10,
       }),
+
+      // 7. AI Phase 8.2 — real usage vs real plan quota, only entries at/above 80%
+      getAiQuotaWarnings(tenant),
     ]);
 
     // Process pending orders
@@ -363,6 +368,32 @@ export async function GET(request: NextRequest) {
           order_number: order.order_number,
           delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
           rejection_reason: order.delivery_fee_notes || null,
+        },
+      });
+    }
+
+    // Process AI quota warnings (AI Phase 8.2) — real usage vs real plan
+    // quota, deterministic/templated, no AI call. Deliberately backdated to
+    // the start of the month (not "now") — these are computed fresh on
+    // every read with no real occurred-at time, and a low-urgency "you're
+    // close to a quota" nudge should never outrank a same-day pending
+    // payment or new order in the sort below just because it was computed
+    // this instant.
+    for (const warning of aiQuotaWarnings) {
+      const { title, message } = formatAiQuotaWarning(warning);
+      notifications.push({
+        id: warning.id,
+        type: warning.severity === 'reached' ? 'ai_quota_reached' : 'ai_quota_warning',
+        title,
+        message,
+        link: '/dashboard/subscription',
+        created_at: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        read: false,
+        metadata: {
+          limit_key: warning.limitKey,
+          current: warning.current,
+          limit: warning.limit,
+          severity: warning.severity,
         },
       });
     }

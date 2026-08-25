@@ -891,6 +891,7 @@ model tenants {
   countries                  countries[]
   coupons                    coupons[]
   expenses                   expenses[]
+  ai_usage_logs              ai_usage_log[]
   customers                  customers[]
   form_builders              form_builders[]
   form_submissions           form_submissions[]
@@ -1015,6 +1016,35 @@ model expense_categories {
 
   @@unique([tenant_id, slug], map: "idx_expense_categories_tenant_slug_unique")
   @@index([tenant_id], map: "idx_expense_categories_tenant_id")
+}
+
+/// Usage log for every Claude-powered AI feature call. Backs per-tenant quota
+/// enforcement (setup vs. monthly buckets — see docs/AI_FEATURES_PLAN.md) and
+/// cost/anomaly monitoring. One row per AI request, not per generated item —
+/// a batched call generating 10 product descriptions is one row.
+model ai_usage_log {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Nullable: Gemini's real call site (onboarding Store Starter Pack) can
+  // run before a tenant row exists — see migration
+  // 20260824180000_ai_usage_log_provider_and_nullable_tenant.sql. Every
+  // Claude call site always has a real tenant, so this stays non-null in
+  // practice for provider='claude' rows.
+  tenant_id        String?   @db.Uuid
+  feature          String    @db.VarChar(50) // e.g. 'product_description', 'expense_categorization', 'analytics_insight', 'theme_styling', 'photo_qa', 'marketing_image_prompt', 'legal_page_draft', 'delivery_zone_intake', 'starter_pack_content', 'starter_pack_image'
+  bucket           String    @db.VarChar(20) // 'setup' | 'monthly'
+  input_tokens     Int
+  output_tokens    Int
+  estimated_cost   Decimal   @db.Decimal(10, 6) // USD, at each provider's real list pricing (see @/lib/ai/claude-client.ts for Claude, @/lib/ai/gemini-cost.ts for Gemini)
+  item_count       Int?      @default(1) // items generated in this call, e.g. 10 for a batched description call
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  // 'claude' (default, every pre-existing row) | 'gemini'
+  provider         String    @default("claude") @db.VarChar(20)
+  tenants          tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_ai_usage_log_tenant_id")
+  @@index([tenant_id, bucket], map: "idx_ai_usage_log_tenant_bucket")
+  @@index([tenant_id, feature, created_at], map: "idx_ai_usage_log_tenant_feature_created")
+  @@index([provider, created_at], map: "idx_ai_usage_log_provider_created")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
