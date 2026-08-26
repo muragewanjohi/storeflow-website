@@ -121,6 +121,27 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // DA.21 secondary signal: the 5 generic homepage images (hero/3
+      // banners/split-layout) registration tries for every tenant now that
+      // there are no demo products to fall back on — flagged explicitly
+      // 'failed' by registration (or a prior repair attempt) rather than
+      // folded into onboarding_setup.status, since that field covers the
+      // whole background job and gets marked 'completed' even when just
+      // this sub-step silently failed.
+      const homepageGenericImages = isRecord(data.homepage_generic_images)
+        ? data.homepage_generic_images
+        : null;
+      if (typeof homepageGenericImages?.status === 'string' && homepageGenericImages.status === 'failed') {
+        needsRetry.push({
+          id: tenant.id,
+          name: tenant.name,
+          reason: 'homepage_generic_images.status=failed',
+          status,
+          stage,
+        });
+        continue;
+      }
+
       // Secondary signal: tenant has products but every one still uses the
       // onboarding placeholder (images simply never got generated even though
       // onboarding_setup may be missing or says "completed").

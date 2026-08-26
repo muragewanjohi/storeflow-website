@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '@/lib/auth/server';
 import { verifyCronJobAuth } from '@/lib/cron-jobs/auth';
 import { prisma } from '@/lib/prisma/client';
 import { isOnboardingPlaceholderUrl } from '@/lib/onboarding/image-placeholder';
+import { applyGenericImagesToPageBuilderData, isKnownStockHomepageImageUrl } from '@/lib/themes/homepage-templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,6 +121,58 @@ export async function POST(
       take: 4,
     });
 
+    // DA.21 registrations create zero demo products/sales — the
+    // product/sale-driven repair below (and the `starter-pack` generation
+    // call it makes) is a no-op for every such tenant. The 5 generic
+    // homepage images (hero/3 banners/split-layout) need their own
+    // detection + repair path, independent of products/sales existing.
+    const homePageForGenericCheck = await prisma.pages.findFirst({
+      where: { tenant_id: tenantId, slug: 'home' },
+      select: { id: true, content: true },
+    });
+
+    function homepageImageNeedsGeneration(url: unknown): boolean {
+      if (typeof url !== 'string' || url.trim().length === 0) return true;
+      const trimmed = url.trim();
+      return isOnboardingPlaceholderUrl(trimmed) || isKnownStockHomepageImageUrl(trimmed);
+    }
+
+    function homepageStillHasGenericImages(content: string | null | undefined): boolean {
+      if (!content) return false;
+      try {
+        const parsed = JSON.parse(content) as { sections?: Array<Record<string, unknown>> };
+        if (!Array.isArray(parsed.sections)) return false;
+        return parsed.sections.some((section) => {
+          if (section.type === 'hero') return homepageImageNeedsGeneration(section.image);
+          if (section.type === 'banners' && Array.isArray(section.banners)) {
+            return (section.banners as Array<Record<string, unknown>>).some((banner) =>
+              homepageImageNeedsGeneration(banner.image)
+            );
+          }
+          if (section.type === 'split_layout' && isRecord(section.left_side)) {
+            return homepageImageNeedsGeneration(section.left_side.image);
+          }
+          return false;
+        });
+      } catch {
+        return false;
+      }
+    }
+
+    const homepageGenericImagesMarker = isRecord(tenantData.homepage_generic_images)
+      ? tenantData.homepage_generic_images
+      : null;
+    const homepageGenericImagesMarkerStatus =
+      typeof homepageGenericImagesMarker?.status === 'string' ? homepageGenericImagesMarker.status : null;
+    // Explicit 'failed' always retries. Otherwise (no marker yet — an older
+    // tenant registered before this marker existed, or a non-'generic-demo'
+    // registration path) fall back to inspecting the actual homepage content.
+    // Never re-touches a homepage already marked 'succeeded'.
+    const needsGenericHomepageImages =
+      homepageGenericImagesMarkerStatus === 'failed' ||
+      (homepageGenericImagesMarkerStatus !== 'succeeded' &&
+        homepageStillHasGenericImages(homePageForGenericCheck?.content));
+
     // A product/sale "needs images" if it has no image at all OR if its
     // current image is the onboarding placeholder SVG (meaning Nano Banana
     // never filled it in). Either way we only bother if there is an image
@@ -223,11 +276,73 @@ export async function POST(
           repaired: false,
           productsMissingWithPrompt: productsNeedingImages.length,
           salesMissingWithPrompt: salesNeedingImages.length,
+          needsGenericHomepageImages,
           generationCandidates: {
             products: productsNeedingImages.map((item) => item.name),
             sales: salesNeedingImages.map((item) => item.name),
           },
         },
+      });
+    }
+
+    // DA.21 — repair the 5 generic homepage images (hero/3 banners/split-
+    // layout) independently of the products/sales-driven path below, which
+    // is a no-op for every tenant registered without demo products (i.e.
+    // effectively every tenant today). Reuses the exact same endpoint/cache/
+    // niche-grounding logic registration itself calls
+    // (POST /api/onboarding/starter-pack with genericImagesOnly:true), just
+    // re-triggered here for a tenant whose first attempt failed or was never
+    // marked complete.
+    let genericHomepageImagesRepaired = false;
+    let genericHomepageImagesError: string | null = null;
+    if (needsGenericHomepageImages) {
+      try {
+        const businessTypeForImages = toStringValue(tenantData.business_type) || 'General';
+        const nicheForImages =
+          toStringValue(tenantData.niche) || toStringValue(tenantData.selling) || undefined;
+
+        const genericRes = await fetch(`${request.nextUrl.origin}/api/onboarding/starter-pack`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessType: businessTypeForImages,
+            niche: nicheForImages,
+            tenantId,
+            genericImagesOnly: true,
+          }),
+        });
+        const genericBody = await genericRes.json().catch(() => ({}));
+        const images = genericBody?.data?.genericImages as
+          | { hero: string | null; banners: string[]; splitLayout: string | null }
+          | undefined;
+
+        if (genericRes.ok && genericBody?.success && images && (images.hero || images.banners.length > 0 || images.splitLayout)) {
+          if (homePageForGenericCheck?.content) {
+            const pageBuilderData = JSON.parse(homePageForGenericCheck.content) as {
+              sections?: Array<Record<string, unknown>>;
+            };
+            const updated = applyGenericImagesToPageBuilderData(pageBuilderData, images);
+            await prisma.pages.update({
+              where: { id: homePageForGenericCheck.id },
+              data: { content: JSON.stringify(updated) },
+            });
+            genericHomepageImagesRepaired = true;
+          } else {
+            genericHomepageImagesError = 'Homepage row had no content to patch';
+          }
+        } else {
+          genericHomepageImagesError =
+            genericBody?.error?.message || `Generic image generation failed (HTTP ${genericRes.status})`;
+        }
+      } catch (error) {
+        genericHomepageImagesError =
+          error instanceof Error ? error.message : 'Unknown generic homepage image repair error';
+      }
+
+      console.log('[StarterPackImageRepair] Generic homepage images repair attempt', {
+        tenantId,
+        repaired: genericHomepageImagesRepaired,
+        error: genericHomepageImagesError,
       });
     }
 
@@ -523,12 +638,23 @@ export async function POST(
       productsUpdated > 0 ||
       salesUpdated > 0 ||
       blogsUpdated > 0 ||
-      homepageSectionsUpdated > 0;
+      homepageSectionsUpdated > 0 ||
+      genericHomepageImagesRepaired;
     const priorOnboardingSetup = isRecord(tenantData.onboarding_setup)
       ? tenantData.onboarding_setup
       : {};
     const updatedTenantData = {
       ...tenantData,
+      ...(needsGenericHomepageImages
+        ? {
+            homepage_generic_images: {
+              status: genericHomepageImagesRepaired ? 'succeeded' : 'failed',
+              error: genericHomepageImagesError,
+              attemptedAt: new Date().toISOString(),
+              repairedBy: auth.actor,
+            },
+          }
+        : {}),
       onboarding_starter_pack: {
         ...(isRecord(existingStarterPack) ? existingStarterPack : {}),
         salesPromotions: generatedPromotions as Prisma.JsonValue,
@@ -575,6 +701,9 @@ export async function POST(
         blogsUpdated,
         homepageSectionsUpdated,
         starterPackSource,
+        needsGenericHomepageImages,
+        genericHomepageImagesRepaired,
+        genericHomepageImagesError,
       },
     });
   } catch (error) {

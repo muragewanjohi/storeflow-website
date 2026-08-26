@@ -179,10 +179,16 @@ export function convertLegacyLayoutToPageBuilder(
   };
 }
 
-/**
- * Get business-type-specific content for homepage sections
- */
-function getBusinessTypeContent(businessType: string): {
+function toTitleCase(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+type BusinessTypeContent = {
   hero: { title: string; subtitle: string; image: string };
   banners: Array<{ title: string; image: string; cta_link: string; background_color: string }>;
   features: Array<{ title: string; description: string; icon: string }>;
@@ -192,7 +198,63 @@ function getBusinessTypeContent(businessType: string): {
   ctaSubtitle: string;
   heroBackgroundColor?: string;
   ctaGradient?: string;
-} {
+};
+
+/**
+ * Get business-type-specific content for homepage sections.
+ *
+ * `niche` is the merchant's specific free-text answer to "what are you
+ * selling" (e.g. "Video Games"), as distinct from the coarse `businessType`
+ * bucket ("Electronics & Gadgets") the switch below matches on — a niche
+ * that isn't one of the hardcoded buckets below would otherwise fall through
+ * to that bucket's generic copy (or the fully generic default) with no
+ * mention of what the store actually sells. When a niche is given, it
+ * overrides just the hero title/subtitle with a niche-flavored template —
+ * everything else (image, banners, features, etc.) still comes from the
+ * matched business-type bucket.
+ */
+function getBusinessTypeContent(businessType: string, niche?: string): BusinessTypeContent {
+  const content = getBusinessTypeContentByBucket(businessType);
+
+  const trimmedNiche = niche?.trim();
+  if (trimmedNiche) {
+    const nicheTitle = toTitleCase(trimmedNiche);
+    content.hero = {
+      ...content.hero,
+      title: `Everything You Need for ${nicheTitle}`,
+      subtitle: `Quality ${nicheTitle} at great prices, delivered fast.`,
+    };
+
+    // The matched bucket's banners/split-layout link to business-type-
+    // specific collection slugs (e.g. '/collections/smartphones') that won't
+    // exist for a niche the bucket wasn't built for (e.g. "Video Games"
+    // matched via the coarser "electronics" bucket) — point them at the
+    // general catalog instead of a 404, and swap in niche-flavored banner
+    // titles so the copy matches what the merchant actually sells. Images
+    // stay as the bucket's stock photo here; real niche-specific photos come
+    // from the separate AI image-generation pass (buildGenericHomepageImageJobs)
+    // that runs after this template is created and patches image fields in
+    // place — see applyGenericImagesToPageBuilderData.
+    const nicheBannerTitles = [
+      `${nicheTitle} - New Arrivals`,
+      `${nicheTitle} Best Sellers`,
+      `Special Offers on ${nicheTitle}`,
+    ];
+    content.banners = content.banners.map((banner, index) => ({
+      ...banner,
+      title: nicheBannerTitles[index] ?? banner.title,
+      cta_link: '/products',
+    }));
+    content.splitLayout = {
+      ...content.splitLayout,
+      cta_link: '/products',
+    };
+  }
+
+  return content;
+}
+
+function getBusinessTypeContentByBucket(businessType: string): BusinessTypeContent {
   const type = businessType?.toLowerCase() || '';
   
   // Grocery Store / Supermarket
@@ -894,11 +956,48 @@ function getBusinessTypeContent(businessType: string): {
   };
 }
 
+/** Every business-type bucket keyword the switch in getBusinessTypeContentByBucket matches on, plus '' for the default fallback — used only to enumerate every hardcoded stock photo URL below. */
+const ALL_BUSINESS_TYPE_BUCKET_KEYWORDS = [
+  'grocery', 'pharmacy', 'fashion', 'electronics', 'beauty', 'home kitchen',
+  'baby', 'food', 'convenience', 'furniture', 'pets', 'hardware', 'shoes', '',
+];
+
+/**
+ * Every stock photo URL hardcoded into a business-type bucket above (hero,
+ * banners, split-layout) — i.e. every image a fresh homepage can start with
+ * before a real, niche-specific image has ever been generated for it.
+ */
+const KNOWN_STOCK_HOMEPAGE_IMAGE_URLS: Set<string> = (() => {
+  const urls = new Set<string>();
+  for (const keyword of ALL_BUSINESS_TYPE_BUCKET_KEYWORDS) {
+    const content = getBusinessTypeContentByBucket(keyword);
+    urls.add(content.hero.image);
+    for (const banner of content.banners) urls.add(banner.image);
+    urls.add(content.splitLayout.image);
+  }
+  return urls;
+})();
+
+/**
+ * True if `url` is one of the hardcoded stock photos above — meaning a
+ * homepage's hero/banner/split-layout section is still showing the generic,
+ * un-personalized bucket fallback rather than a real image generated for
+ * that specific store (either the DA.21 generic AI images, or a merchant's
+ * own product photos). Used by the starter-pack image repair endpoint and
+ * its retry cron to find homepages that still need generation, since these
+ * URLs look like legitimate images (unlike the onboarding placeholder SVG)
+ * and wouldn't otherwise be recognized as needing replacement.
+ */
+export function isKnownStockHomepageImageUrl(url: string | null | undefined): boolean {
+  if (typeof url !== 'string') return false;
+  return KNOWN_STOCK_HOMEPAGE_IMAGE_URLS.has(url.trim());
+}
+
 /**
  * Create grocery theme homepage template matching GroceryHomepage component
  */
-export function createGroceryHomepageTemplate(tenantName: string, businessType?: string): PageBuilderData {
-  const content = getBusinessTypeContent(businessType || 'Grocery Store / Supermarket');
+export function createGroceryHomepageTemplate(tenantName: string, businessType?: string, niche?: string): PageBuilderData {
+  const content = getBusinessTypeContent(businessType || 'Grocery Store / Supermarket', niche);
   
   return {
     sections: [
@@ -1064,25 +1163,32 @@ export interface GenericHomepageImages {
 /**
  * Create a simple default homepage template if theme-specific one doesn't exist
  * @param genericImages Real AI-generated images for a niche-less registration (DA.21) — when provided, replaces the plain hero and adds banners/split-layout sections using these real URLs instead of leaving them out.
+ * @param niche The merchant's specific free-text "what are you selling" answer (e.g. "Video Games"), when given — flavors the hero title/subtitle instead of the fully generic "Welcome to {tenantName}" copy.
  */
 export function createDefaultHomepageTemplate(
   themeSlug: string,
   tenantName: string,
   businessType?: string,
-  genericImages?: GenericHomepageImages
+  genericImages?: GenericHomepageImages,
+  niche?: string
 ): PageBuilderData {
   // Use grocery template for grocery theme
   if (themeSlug === 'grocery') {
-    return createGroceryHomepageTemplate(tenantName, businessType);
+    return createGroceryHomepageTemplate(tenantName, businessType, niche);
   }
+
+  const trimmedNiche = niche?.trim();
+  const nicheTitle = trimmedNiche ? toTitleCase(trimmedNiche) : null;
 
   const sections: PageSection[] = [
     {
       id: 'hero-1',
       type: 'hero' as const,
       order: 1,
-      title: `Welcome to ${tenantName}`,
-      subtitle: 'Discover amazing products and great deals',
+      title: nicheTitle ? `Everything You Need for ${nicheTitle}` : `Welcome to ${tenantName}`,
+      subtitle: nicheTitle
+        ? `Quality ${nicheTitle} at great prices, delivered fast.`
+        : 'Discover amazing products and great deals',
       cta_text: 'Shop Now',
       cta_link: '/products',
       ...(genericImages?.hero ? { image: genericImages.hero } : {}),

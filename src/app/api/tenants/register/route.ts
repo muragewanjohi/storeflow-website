@@ -2068,7 +2068,8 @@ export async function POST(request: NextRequest) {
                 theme.slug,
                 tenant.name,
                 validatedData.businessType || undefined,
-                placeholderSections
+                placeholderSections,
+                nicheGiven ? finalSelling : undefined
               );
             }
 
@@ -2545,6 +2546,20 @@ export async function POST(request: NextRequest) {
 
                 let resultPayload: Record<string, unknown> = {};
                 let appliedSource: 'starter-pack-job-or-api' | 'generic-demo' = 'generic-demo';
+                // Dedicated, retry-cron-visible marker for the 5 generic
+                // homepage images (hero/3 banners/split-layout) — separate
+                // from `onboarding_setup` below because that field covers
+                // this whole background job (categories/blogs/homepage/
+                // images) and getting marked 'completed' even when just the
+                // image sub-step silently failed, which is what actually
+                // happens today: the retry cron's only signals are
+                // `onboarding_setup.stage === 'images'` (never set here) and
+                // "tenant has products still on the placeholder" (there are
+                // no demo products at all under DA.21), so a failed generic-
+                // image call was previously invisible and unretryable. See
+                // /api/admin/onboarding/image-retry.
+                let homepageGenericImagesStatus: 'succeeded' | 'failed' | null = null;
+                let homepageGenericImagesError: string | null = null;
 
                 if (backgroundStarterPackPayload) {
                   if (finalSelling) {
@@ -2640,24 +2655,32 @@ export async function POST(request: NextRequest) {
                           data: { content: JSON.stringify(updated) },
                         });
                         genericImagesApplied = true;
+                      } else {
+                        homepageGenericImagesError = 'Homepage row had no content to patch';
                       }
                     } else {
+                      homepageGenericImagesError =
+                        genericBody?.error?.message ||
+                        `Generic image generation failed (HTTP ${genericRes.status})`;
                       console.warn('[Registration] Generic homepage image generation did not succeed', {
                         traceId: registrationTraceId,
                         tenantId: tenant.id,
                         status: genericRes.status,
+                        error: homepageGenericImagesError,
                       });
                     }
                   } catch (genericImagesError) {
+                    homepageGenericImagesError =
+                      genericImagesError instanceof Error
+                        ? genericImagesError.message
+                        : 'Unknown generic-images error';
                     console.warn('[Registration] Failed to generate/apply generic homepage images (non-fatal)', {
                       traceId: registrationTraceId,
                       tenantId: tenant.id,
-                      error:
-                        genericImagesError instanceof Error
-                          ? genericImagesError.message
-                          : 'Unknown generic-images error',
+                      error: homepageGenericImagesError,
                     });
                   }
+                  homepageGenericImagesStatus = genericImagesApplied ? 'succeeded' : 'failed';
                   resultPayload = {
                     source: appliedSource,
                     productsCreated: 0,
@@ -2725,6 +2748,15 @@ export async function POST(request: NextRequest) {
                         completedAt: new Date().toISOString(),
                         result: resultPayload,
                       },
+                      ...(homepageGenericImagesStatus
+                        ? {
+                            homepage_generic_images: {
+                              status: homepageGenericImagesStatus,
+                              error: homepageGenericImagesError,
+                              attemptedAt: new Date().toISOString(),
+                            },
+                          }
+                        : {}),
                     } as unknown as Prisma.InputJsonValue,
                   },
                 });
@@ -2797,9 +2829,15 @@ export async function POST(request: NextRequest) {
               
               if (slug === 'home') {
                 // Create homepage
-                const homePageBuilderData = createDefaultHomepageTemplate(theme.slug, tenantName, validatedData.businessType || undefined);
+                const homePageBuilderData = createDefaultHomepageTemplate(
+                  theme.slug,
+                  tenantName,
+                  validatedData.businessType || undefined,
+                  undefined,
+                  nicheGiven ? finalSelling : undefined
+                );
                 const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
-                
+
                 await prisma.pages.create({
                   data: {
                     tenant_id: tenant.id,
@@ -2949,7 +2987,13 @@ export async function POST(request: NextRequest) {
             });
 
             if (!existingHomepage) {
-              const homePageBuilderData = createDefaultHomepageTemplate('grocery', tenantName, validatedData.businessType || undefined);
+              const homePageBuilderData = createDefaultHomepageTemplate(
+                'grocery',
+                tenantName,
+                validatedData.businessType || undefined,
+                undefined,
+                nicheGiven ? finalSelling : undefined
+              );
               const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
 
               await prisma.pages.create({
@@ -3340,7 +3384,13 @@ export async function POST(request: NextRequest) {
                   // Use default 'grocery'
                 }
               }
-              const homePageBuilderData = createDefaultHomepageTemplate(themeSlug, tenantName, validatedData.businessType || undefined);
+              const homePageBuilderData = createDefaultHomepageTemplate(
+                themeSlug,
+                tenantName,
+                validatedData.businessType || undefined,
+                undefined,
+                nicheGiven ? finalSelling : undefined
+              );
               const cleanedHomePageData = cleanBlobUrlsFromPageBuilder(homePageBuilderData);
               
               // Handle global unique constraint on slug

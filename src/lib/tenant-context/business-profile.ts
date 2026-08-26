@@ -13,6 +13,14 @@ import type { Tenant } from '@/lib/tenant-context';
  */
 export function getBusinessProfile(tenant: Tenant): { businessType: string | null; niche: string | null } {
   const businessType = typeof tenant.data?.business_type === 'string' ? tenant.data.business_type : null;
-  const niche = typeof tenant.data?.niche === 'string' ? tenant.data.niche : null;
+  // `niche` is written by the separate onboarding-chat business-context PATCH
+  // (OC.1/OC.2). Most tenants never go through that flow — registration
+  // (POST /api/tenants/register) instead writes the merchant's free-text
+  // "what are you selling" answer to `selling`. Fall back to it so the
+  // assistant still knows the specific niche (e.g. "Video Games") instead of
+  // only the coarse business_type bucket (e.g. "Electronics & Gadgets").
+  const niche =
+    (typeof tenant.data?.niche === 'string' ? tenant.data.niche : null) ||
+    (typeof tenant.data?.selling === 'string' ? tenant.data.selling : null);
   return { businessType, niche };
 }
