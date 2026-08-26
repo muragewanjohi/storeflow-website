@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
 import { THEME_COLOR_SETTINGS } from '@/lib/themes/color-settings';
+import { FONT_OPTIONS, FONT_WEIGHTS } from '@/lib/themes/font-settings';
 import { hasCustomCssAccess } from '@/lib/themes/theme-access';
 import HomepageImagesTab from './homepage-images-tab';
 import LiveThemePreview from './live-theme-preview';
@@ -72,25 +73,6 @@ interface CurrentTheme {
   } | null;
 }
 
-const FONT_OPTIONS = [
-  { value: 'Inter', label: 'Inter' },
-  { value: 'Roboto', label: 'Roboto' },
-  { value: 'Open Sans', label: 'Open Sans' },
-  { value: 'Lato', label: 'Lato' },
-  { value: 'Montserrat', label: 'Montserrat' },
-  { value: 'Poppins', label: 'Poppins' },
-  { value: 'Playfair Display', label: 'Playfair Display' },
-  { value: 'Merriweather', label: 'Merriweather' },
-];
-
-const FONT_WEIGHTS = [
-  { value: '300', label: 'Light (300)' },
-  { value: '400', label: 'Regular (400)' },
-  { value: '500', label: 'Medium (500)' },
-  { value: '600', label: 'Semi Bold (600)' },
-  { value: '700', label: 'Bold (700)' },
-];
-
 export default function ThemeCustomizeClient({
   currentPlanName,
 }: Readonly<{ currentPlanName: string | null }>) {
@@ -111,6 +93,7 @@ export default function ThemeCustomizeClient({
   // Form state
   const [customColors, setCustomColors] = useState<ThemeColors>({});
   const [customFonts, setCustomFonts] = useState<ThemeTypography>({});
+  const [aiStylePrompt, setAiStylePrompt] = useState('');
   const [customLayouts, setCustomLayouts] = useState<ThemeLayout>({});
   const [customCss, setCustomCss] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -217,6 +200,47 @@ export default function ThemeCustomizeClient({
 
   const handleColorChange = (key: string, value: string) => {
     setCustomColors((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Theme Track B2.1 — AI-assisted styling from a free-text mood prompt.
+  // Generate-then-preview only: populates the SAME customColors/customFonts
+  // state the manual pickers and the live preview panel already read from,
+  // so the merchant sees the AI suggestion rendered live before deciding to
+  // Save (or tweak individual colors/fonts further) — nothing is persisted
+  // by this mutation itself.
+  const aiStyleMutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const response = await fetch('/api/themes/ai-style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate a style');
+      }
+      return response.json() as Promise<{
+        custom_colors: ThemeColors;
+        custom_fonts: { headingFont: string; bodyFont: string; headingWeight: number; bodyWeight: number };
+      }>;
+    },
+    onSuccess: (data) => {
+      setCustomColors((prev) => ({ ...prev, ...data.custom_colors }));
+      setCustomFonts((prev) => ({ ...prev, ...data.custom_fonts }));
+      toast.success('Applied your AI-generated style — review it below, then Save to keep it.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate a style');
+    },
+  });
+
+  const handleGenerateAiStyle = () => {
+    const trimmed = aiStylePrompt.trim();
+    if (!trimmed) {
+      toast.error('Describe the mood or style you want first (e.g. "warm and earthy").');
+      return;
+    }
+    aiStyleMutation.mutate(trimmed);
   };
 
   // Generate favicon from logo using Canvas API
@@ -546,6 +570,40 @@ export default function ThemeCustomizeClient({
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Theme Track B2.1 — AI-assisted styling */}
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    Style with AI
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                    Describe a mood — inspired by, not a clone of — and I&apos;ll suggest colors and fonts. Never changes your layout, images, or text.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={aiStylePrompt}
+                    onChange={(e) => setAiStylePrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !aiStyleMutation.isPending) handleGenerateAiStyle();
+                    }}
+                    placeholder='e.g. "warm and earthy" or "energetic and bold"'
+                    className="bg-background"
+                    disabled={aiStyleMutation.isPending}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateAiStyle}
+                    disabled={aiStyleMutation.isPending}
+                    className="shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {aiStyleMutation.isPending ? 'Generating…' : 'Generate'}
+                  </Button>
+                </div>
+              </div>
+
               {/* Recommended Color Schemes Info */}
               <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <h4 className="text-sm font-semibold mb-2 text-blue-900 dark:text-blue-100">

@@ -65,6 +65,7 @@
     "test:theme-tier-gating": "tsx scripts/test-theme-tier-gating.ts",
     "test:custom-css-sanitizer": "tsx scripts/test-custom-css-sanitizer.ts",
     "test:custom-css-gating-live": "tsx scripts/test-custom-css-gating-live.ts",
+    "test:theme-ai-style": "tsx scripts/test-theme-ai-style.ts",
     "test:security": "tsx scripts/security-regression-checks.ts",
     "test:tumizi": "tsx scripts/test-tumizi-connection.ts",
     "tumizi:enable-store": "tsx scripts/enable-tumizi-store.ts",
