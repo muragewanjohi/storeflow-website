@@ -66,6 +66,11 @@ import {
   renderAndSaveMarketingImages,
   MAX_MARKETING_IMAGES_PER_BATCH,
 } from '@/lib/marketing-images/marketing-image-shared';
+import {
+  getSocialContentContext,
+  generateSocialContentText,
+  generateSocialContentImage,
+} from '@/lib/social-content/social-content-shared';
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -73,7 +78,7 @@ export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 // Intent classification
 // ---------------------------------------------------------------------------
 
-export const SUPPORTED_INTENTS = ['data_query', 'help_question', 'configuration_guidance', 'next_steps', 'business_advice', 'unclear'] as const;
+export const SUPPORTED_INTENTS = ['data_query', 'help_question', 'configuration_guidance', 'next_steps', 'business_advice', 'social_content', 'unclear'] as const;
 export type Intent = (typeof SUPPORTED_INTENTS)[number];
 
 export function isIntent(value: string): value is Intent {
@@ -110,7 +115,8 @@ export function buildClassifySystemPrompt(includeConfigurationGuidance: boolean)
       : undefined,
     '"next_steps" — asking what to do next, how to get started, what is left to finish setting up their store, or for a general setup/progress overview — not about one specific feature, but the big picture (e.g. "what should I do next", "what should I do", "how do I get started", "what\'s left to set up", "am I ready to launch", "help me get my store ready").',
     '"business_advice" — asking for retail/business advice or opinion about THEIR BUSINESS, independent of DukaNest as a platform: what categories or product types fit their business, what attributes matter for a kind of product, general pricing strategy, how much to charge for a specific product, OR asking what their OWN recorded business type/niche IS (e.g. "what categories should I have", "how much should I charge for my leather bag", "what\'s my business type", "what niche did I register as", "remind me what kind of business I set up"). This is different from help_question — help_question is about how to USE DukaNest\'s features; business_advice covers both retail expertise and their own recorded business profile, neither of which any DukaNest document would contain.',
-    `"unclear" — anything else: small talk, requests outside all ${includeConfigurationGuidance ? 'five' : 'four'} categories, or genuinely ambiguous even with conversation context.`,
+    '"social_content" — asking for marketing/outreach CONTENT TO SEND OR POST to reach their own customers: a social media caption, a WhatsApp message, an SMS blurb, or "something to share" about a product, sale, or their store in general (e.g. "write me a post about my new arrivals", "make a WhatsApp message for my leather wallets", "give me something to share on Instagram for my sale", "help me promote this to my customers"). Distinct from configuration_guidance\'s marketing_images target: if they want ONLY an image/banner/graphic with no request for a caption, message, or text to send, that stays configuration_guidance; if they want TEXT content to send/post (optionally plus a matching image), that\'s social_content. IMPORTANT: if YOUR OWN previous message in this conversation already gave social/WhatsApp/SMS content and then offered a matching shareable image ("Want me to also whip up a shareable graphic for this?"), and the merchant\'s latest message confirms wanting that image (e.g. "yes", "make the graphic too", "do it") — that is STILL social_content, continuing the same request, even though the word "graphic"/"image" on its own might otherwise look like configuration_guidance\'s marketing_images target.',
+    `"unclear" — anything else: small talk, requests outside all ${includeConfigurationGuidance ? 'six' : 'five'} categories, or genuinely ambiguous even with conversation context.`,
     includeConfigurationGuidance
       ? 'Exception: ANY question about adding/creating a product OR a category — including "how do I add a product", "how do I add a category", "how do I create a product listing" — is ALWAYS configuration_guidance, never help_question. There is no help-center article that covers either topic, so treating it as help_question always leads to a dead end; the assistant can actually walk the merchant through it, so offer that instead.'
       : undefined,
@@ -134,7 +140,7 @@ export function unclearReply(includeProductIntake: boolean): string {
   // "help you add a new product" (not "walk you through...") so this reads
   // accurately on both platforms — web's is a multi-turn chat, mobile's is
   // a one-shot pointer to the native form.
-  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product,' : ''}, suggest categories/products/pricing for your business, or tell you what to set up next. Could you rephrase your question that way?`;
+  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product,' : ''}, suggest categories/products/pricing for your business, write a social/WhatsApp/SMS post to share with your customers, or tell you what to set up next. Could you rephrase your question that way?`;
 }
 
 export interface HandlerResult {
@@ -1274,5 +1280,160 @@ export async function handleBusinessAdvice(messages: ChatMessage[], tenant: Tena
     answer: `Your recorded cost for "${matched.name}" is ${formatKesAmount(costPrice)}.${currentPriceNote} A common retail margin of 40-60% would put a reasonable price between ${formatKesAmount(low)} and ${formatKesAmount(high)} — adjust based on your market, competition, and perceived value.`,
     data: { referencedProduct: matched.name, costPrice, suggestedRange: { low, high } },
     usage,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// social_content handler (AI Phase 10) — real generation core lives in
+// @/lib/social-content/social-content-shared; this is the classify-and-
+// dispatch layer, mirroring business_advice's own 2-step shape (top-level
+// intent classify -> this handler's own follow-up extraction call).
+// ---------------------------------------------------------------------------
+
+const socialContentIntentSchema = {
+  type: 'object',
+  properties: {
+    // Free text describing WHO/WHAT this outreach content is about — a
+    // product name, a sale, or a general theme like "new arrivals". Two
+    // cases: (a) first-time ask, extract from THIS message; (b) confirming
+    // a previously-proposed shareable image (imageConfirmed below), extract
+    // the SAME subject your own prior message proposed the image for —
+    // same "read your own previous proposal" pattern as homepage_image's
+    // imageSlot/marketing_images' marketingImageRequest.
+    productQuery: { type: 'string' },
+    // true ONLY when this message is confirming a shareable image YOUR OWN
+    // previous message offered (e.g. "yes", "make the graphic too", "do
+    // it") — mirrors marketingImageConfirmed's "real quota/cost, must never
+    // fire on first mention" discipline. false for a first-time ask, which
+    // always gets text content plus an offer to also make an image, never
+    // the image itself on that same turn.
+    imageConfirmed: { type: 'boolean' },
+  },
+  required: ['productQuery', 'imageConfirmed'],
+  additionalProperties: false,
+} as const;
+
+interface SocialContentIntentResult {
+  productQuery: string;
+  imageConfirmed: boolean;
+}
+
+function buildSocialContentIntentSystemPrompt(): string {
+  return [
+    'You are extracting details for a customer-outreach content request (social media caption, WhatsApp message, SMS blurb, possibly a shareable image) on a DukaNest merchant\'s behalf.',
+    'productQuery: free text naming what this is about — a product, a sale, or a general theme like "new arrivals" or "shop with us". If YOUR OWN previous message in this conversation already offered to make a shareable image for a specific subject and the merchant\'s latest message confirms it (e.g. "yes", "make the graphic too", "do it"), extract the SAME subject you previously offered it for.',
+    'imageConfirmed: true ONLY when the latest message is confirming a shareable image YOUR OWN previous message specifically offered. false for a first-time request, even if it clearly wants both text AND an image eventually — the image is always offered back for confirmation first, never generated on the same turn it\'s first mentioned.',
+    'Return ONLY valid JSON with no markdown and no extra prose.',
+  ].join(' ');
+}
+
+/**
+ * AI Phase 10 — customer outreach content. Two turns for the image, none
+ * for the text: the text (caption/WhatsApp/SMS) is written and returned
+ * directly on the FIRST ask (cheap, Claude-only, rides the shared
+ * 'assistant_query' bucket like every other intent), while any shareable
+ * IMAGE is only ever offered back for confirmation, then generated on a
+ * following "yes" — same real-cost-gate discipline as
+ * handleHomepageImageConfigTarget/handleMarketingImagesConfigTarget.
+ */
+export async function handleSocialContent(messages: ChatMessage[], tenant: Tenant): Promise<HandlerResult> {
+  const { businessType, niche } = getBusinessProfile(tenant);
+
+  const { data: intentData, usage: intentUsage } = await generateJsonFromConversation<SocialContentIntentResult>({
+    system: buildSocialContentIntentSystemPrompt(),
+    messages,
+    schema: socialContentIntentSchema,
+    maxTokens: 150,
+  });
+
+  const context = await getSocialContentContext(tenant.id);
+
+  if (intentData.imageConfirmed) {
+    const quota = await canUseAiFeature(tenant, 'marketing_image_prompt', 'monthly');
+    if (!quota.allowed) {
+      return {
+        intent: 'social_content',
+        answer:
+          quota.reason ??
+          "You've used all of your image generations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+        data: { target: 'social_content', imageGenerated: false, reason: 'quota_exceeded' },
+        usage: intentUsage,
+      };
+    }
+
+    const apiKey = process.env.NANO_BANANA_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+    if (!apiKey) {
+      return {
+        intent: 'social_content',
+        answer: "Image generation isn't configured right now — please try again later.",
+        data: { target: 'social_content', imageGenerated: false },
+        usage: intentUsage,
+      };
+    }
+
+    const imageResult = await generateSocialContentImage({
+      tenantId: tenant.id,
+      apiKey,
+      businessType,
+      niche,
+      groundedSubject: intentData.productQuery.trim() || 'your store',
+    });
+
+    const combinedUsage: AiUsage = {
+      inputTokens: intentUsage.inputTokens + imageResult.usage.inputTokens,
+      outputTokens: intentUsage.outputTokens + imageResult.usage.outputTokens,
+    };
+
+    if (!imageResult.success) {
+      return {
+        intent: 'social_content',
+        answer: `${imageResult.error} You can try again in a moment.`,
+        data: { target: 'social_content', imageGenerated: false },
+        usage: combinedUsage,
+      };
+    }
+
+    return {
+      intent: 'social_content',
+      answer: "Done! Here's your shareable graphic — you'll also find it in your Media Library.",
+      data: { target: 'social_content', imageGenerated: true, imageUrl: imageResult.imageUrl, mediaId: imageResult.mediaId },
+      usage: combinedUsage,
+    };
+  }
+
+  const requestDescription = intentData.productQuery.trim() || 'a general promotional post for the store';
+  const { data: content, usage: contentUsage } = await generateSocialContentText({
+    businessType,
+    niche,
+    context,
+    requestDescription,
+  });
+
+  const hashtagLine = content.hashtags.length > 0 ? content.hashtags.map((h) => `#${h.replace(/^#/, '')}`).join(' ') : '';
+  const answer = [
+    `Here's some content about ${content.groundedSubject}:`,
+    '',
+    `📱 Social caption:\n${content.socialCaption}${hashtagLine ? `\n${hashtagLine}` : ''}`,
+    '',
+    `💬 WhatsApp message:\n${content.whatsappMessage}`,
+    '',
+    `✉️ SMS blurb:\n${content.smsMessage}`,
+    '',
+    'Want me to also whip up a shareable graphic for this? Just say the word.',
+  ].join('\n');
+
+  return {
+    intent: 'social_content',
+    answer,
+    data: {
+      target: 'social_content',
+      groundedSubject: content.groundedSubject,
+      socialCaption: content.socialCaption,
+      hashtags: content.hashtags,
+      whatsappMessage: content.whatsappMessage,
+      smsMessage: content.smsMessage,
+      proposedImageFor: content.groundedSubject,
+    },
+    usage: { inputTokens: intentUsage.inputTokens + contentUsage.inputTokens, outputTokens: intentUsage.outputTokens + contentUsage.outputTokens },
   };
 }

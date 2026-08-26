@@ -134,7 +134,7 @@ interface CollectedZone {
 }
 
 const WELCOME_TEXT =
-  "Hi! I can answer questions about your store's data, help you understand DukaNest's features, walk you through adding a new product, suggest categories/pricing for your business, or tell you what to set up next. What can I help with?";
+  "Hi! I can answer questions about your store's data, help you understand DukaNest's features, walk you through adding a new product, suggest categories/pricing for your business, write a social/WhatsApp/SMS post to share with your customers, or tell you what to set up next. What can I help with?";
 const GENERIC_ERROR_TEXT = 'Something went wrong reaching the assistant. Please try again.';
 const INTAKE_START: ApiMessage = { role: 'user', content: '(Start the product intake conversation.)' };
 const ZONE_INTAKE_START: ApiMessage = { role: 'user', content: '(Start the delivery zone setup conversation.)' };
@@ -146,6 +146,7 @@ const SUGGESTED_PROMPTS = [
   'What should I do next?',
   'How do I add a product?',
   'How many orders do I have?',
+  'Write a social post about my new arrivals',
 ] as const;
 
 function newId(): string {

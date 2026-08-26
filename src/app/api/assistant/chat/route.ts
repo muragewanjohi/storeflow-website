@@ -40,6 +40,7 @@ import {
   handleHelpQuestion,
   handleNextSteps,
   handleBusinessAdvice,
+  handleSocialContent,
   handleCategoryConfigTarget,
   handleHomepageImageConfigTarget,
   handleMarketingImagesConfigTarget,
@@ -179,6 +180,8 @@ export async function POST(request: NextRequest) {
       result = await handleNextSteps(tenant, WEB_NEXT_STEPS_META, true);
     } else if (intent === 'business_advice') {
       result = await handleBusinessAdvice(input.messages, tenant);
+    } else if (intent === 'social_content') {
+      result = await handleSocialContent(input.messages, tenant);
     } else {
       result = { intent: 'unclear', answer: unclearReply(true), usage: { inputTokens: 0, outputTokens: 0 } };
     }
