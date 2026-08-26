@@ -67,6 +67,7 @@
     "test:custom-css-gating-live": "tsx scripts/test-custom-css-gating-live.ts",
     "test:theme-ai-style": "tsx scripts/test-theme-ai-style.ts",
     "test:social-content": "tsx scripts/test-social-content.ts",
+    "test:theme-recommendation": "tsx scripts/test-theme-recommendation.ts",
     "test:security": "tsx scripts/security-regression-checks.ts",
     "test:tumizi": "tsx scripts/test-tumizi-connection.ts",
     "tumizi:enable-store": "tsx scripts/enable-tumizi-store.ts",

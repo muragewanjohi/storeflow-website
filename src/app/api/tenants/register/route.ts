@@ -33,6 +33,9 @@ import {
   applyGenericImagesToPageBuilderData,
 } from '@/lib/themes/homepage-templates';
 import { getThemeDefaults } from '@/lib/themes/theme-defaults';
+import { recommendThemeForBusiness } from '@/lib/themes/recommend-theme';
+import { estimateCostUsd } from '@/lib/ai/claude-client';
+import { recordAiUsage } from '@/lib/ai/usage';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
 import {
@@ -1550,16 +1553,59 @@ export async function POST(request: NextRequest) {
 
     let effectiveThemeId = validatedData.themeId;
     if (!effectiveThemeId) {
-      const defaultTheme = await prisma.themes.findFirst({
-        where: {
-          status: true,
-          OR: [
-            { slug: { equals: 'multipurpose', mode: 'insensitive' } },
-            { slug: { equals: 'grocery', mode: 'insensitive' } },
-            { title: { contains: 'multipurpose', mode: 'insensitive' } },
-          ],
-        },
-      });
+      // AI Phase 4 — real theme recommendation instead of always the same
+      // hardcoded default. The registration form has no theme-picker UI
+      // (confirmed by reading it), so this is what EVERY real merchant
+      // without an explicit themeId has always gotten — grounded in their
+      // real business_type/selling answer when available. Must never block
+      // registration: any failure here (AI call error, no API key, etc.)
+      // falls straight through to the exact same hardcoded lookup that
+      // existed before this feature, unchanged.
+      let recommendedSlug: string | null = null;
+      if (validatedData.businessType) {
+        try {
+          const { data: recommendation, usage } = await recommendThemeForBusiness({
+            businessType: validatedData.businessType,
+            niche: validatedData.selling?.trim() || null,
+          });
+          recommendedSlug = recommendation.themeSlug;
+          // Pre-tenant — same real, documented exception as the Gemini
+          // starter-pack call site (@/lib/ai/usage.ts's RecordAiUsageParams
+          // docblock): no tenant row exists yet at this point in registration.
+          await recordAiUsage({
+            tenantId: null,
+            feature: 'theme_recommendation',
+            bucket: 'setup',
+            usage,
+            estimatedCost: estimateCostUsd(usage),
+            itemCount: 1,
+          });
+        } catch (recommendError) {
+          console.warn('[Registration] Theme recommendation failed (non-fatal — falling back to the default theme)', {
+            traceId: registrationTraceId,
+            error: recommendError instanceof Error ? recommendError.message : 'Unknown recommendation error',
+          });
+        }
+      }
+
+      const fallbackDefaultThemeQuery = {
+        status: true,
+        OR: [
+          { slug: { equals: 'multipurpose', mode: 'insensitive' as const } },
+          { slug: { equals: 'grocery', mode: 'insensitive' as const } },
+          { title: { contains: 'multipurpose', mode: 'insensitive' as const } },
+        ],
+      };
+      let defaultTheme = recommendedSlug
+        ? await prisma.themes.findFirst({ where: { status: true, slug: { equals: recommendedSlug, mode: 'insensitive' } } })
+        : null;
+      // Recommended slug's DB row missing/inactive (shouldn't normally
+      // happen — recommendThemeForBusiness only returns real
+      // theme-registry.ts slugs — but never leave effectiveThemeId unset
+      // over it) — fall back to the exact original lookup.
+      if (!defaultTheme) {
+        defaultTheme = await prisma.themes.findFirst({ where: fallbackDefaultThemeQuery });
+      }
       effectiveThemeId = defaultTheme?.id;
     }
 

@@ -14,6 +14,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   expense_categorization: 'Expense auto-categorization',
   analytics_insight: 'Analytics insight summaries',
   theme_styling: 'Theme styling',
+  theme_recommendation: 'Theme recommendation (registration)',
   photo_qa: 'Product photo QA',
   marketing_image_prompt: 'Marketing image prompts',
   legal_page_draft: 'Legal page drafts',

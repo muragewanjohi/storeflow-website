@@ -12,6 +12,7 @@ export type AiFeature =
   | 'expense_categorization'
   | 'analytics_insight'
   | 'theme_styling'
+  | 'theme_recommendation'
   | 'photo_qa'
   | 'marketing_image_prompt'
   | 'legal_page_draft'

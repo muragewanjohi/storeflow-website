@@ -25,6 +25,14 @@ const AI_RATE_LIMITS: Record<AiFeature, { limit: number; windowSeconds: number }
   expense_categorization: { limit: 60, windowSeconds: 60 },
   analytics_insight: { limit: 10, windowSeconds: 60 },
   theme_styling: { limit: 10, windowSeconds: 60 },
+  // Registration-time, unconditional, pre-tenant (same real reason as
+  // starter_pack_content/starter_pack_image below: checkAiRateLimit()
+  // requires a real tenantId, which doesn't exist yet at this point in
+  // registration) — exists only for AI_RATE_LIMITS exhaustiveness, not
+  // actually invoked. Registration itself has no per-request rate limiter
+  // of its own today (a real, separate gap, not introduced here) — this
+  // one extra ~$0.0005 Claude call doesn't materially change that.
+  theme_recommendation: { limit: 20, windowSeconds: 3600 },
   photo_qa: { limit: 30, windowSeconds: 60 },
   marketing_image_prompt: { limit: 10, windowSeconds: 60 },
   legal_page_draft: { limit: 5, windowSeconds: 60 },
