@@ -101,7 +101,7 @@ export default function FurnitureProductCard({ product, onProductClick }: Readon
           {isHovered && (
             <div className="absolute inset-0 bg-[#3a3a3a] bg-opacity-72 flex items-center justify-center">
               <div className="flex flex-col gap-6 items-center">
-                <button className="bg-white text-[#B88E2F] px-[59px] py-3 text-[16px] font-semibold hover:bg-[#B88E2F] hover:text-white transition-colors">
+                <button className="bg-white text-[var(--color-primary)] px-[59px] py-3 text-[16px] font-semibold hover:bg-[var(--color-primary)] hover:text-white transition-colors">
                   {isDemoProduct ? 'Preview only' : 'Add to cart'}
                 </button>
                 <div className="flex gap-5 items-center">

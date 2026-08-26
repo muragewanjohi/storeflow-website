@@ -221,7 +221,7 @@ export default function FurnitureProductDetail({
                   onClick={() => setSelectedImage(img)}
                   className={`relative w-[76px] h-[80px] rounded-[10px] overflow-hidden bg-[#f9f1e7] border-2 transition-all ${
                     selectedImage === img
-                      ? 'border-[#B88E2F]'
+                      ? 'border-[var(--color-primary)]'
                       : 'border-transparent hover:border-gray-300'
                   }`}
                 >
@@ -321,7 +321,7 @@ export default function FurnitureProductDetail({
                       onClick={() => setSelectedSize(size.id)}
                       className={`w-[30px] h-[30px] rounded-[5px] text-[13px] font-normal transition-all ${
                         selectedSize === size.id
-                          ? 'bg-[#B88E2F] text-white'
+                          ? 'bg-[var(--color-primary)] text-white'
                           : 'bg-[#f9f1e7] text-black hover:bg-[#e8dcc8]'
                       }`}
                       style={{ fontFamily: 'Poppins, sans-serif' }}
@@ -346,7 +346,7 @@ export default function FurnitureProductDetail({
                       onClick={() => setSelectedColor(color.id)}
                       className={`w-[30px] h-[30px] rounded-full border-2 transition-all ${
                         selectedColor === color.id
-                          ? 'border-[#B88E2F] scale-110'
+                          ? 'border-[var(--color-primary)] scale-110'
                           : 'border-transparent hover:border-gray-300'
                       }`}
                       style={{
@@ -384,7 +384,7 @@ export default function FurnitureProductDetail({
               <Button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || addingToCart}
-                className="bg-[#B88E2F] text-white border border-black h-[64px] px-8 rounded-[15px] text-[20px] font-normal hover:bg-[#a67d1e] transition-colors"
+                className="bg-[var(--color-primary)] text-white border border-black h-[64px] px-8 rounded-[15px] text-[20px] font-normal hover:brightness-90 transition"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 {addingToCart ? 'Adding...' : isOutOfStock ? 'Out of Stock' : 'Add To Cart'}
@@ -575,7 +575,7 @@ export default function FurnitureProductDetail({
           <div className="text-center">
             <Button
               variant="outline"
-              className="border border-[#B88E2F] text-[#B88E2F] px-[72px] py-3 text-[16px] font-semibold hover:bg-[#B88E2F] hover:text-white transition-colors"
+              className="border border-[var(--color-primary)] text-[var(--color-primary)] px-[72px] py-3 text-[16px] font-semibold hover:bg-[var(--color-primary)] hover:text-white transition-colors"
               style={{ fontFamily: 'Poppins, sans-serif' }}
             >
               Show More

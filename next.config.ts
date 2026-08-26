@@ -208,35 +208,40 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Static assets - Long cache
+      // Static assets - Long cache. PRODUCTION ONLY: Next.js content-hashes
+      // these filenames on a real build, so an immutable 1-year cache is
+      // correct there. In dev, route-level chunk filenames under
+      // /_next/static/chunks/app/** are NOT content-hashed (they're stable
+      // per-route names) — an immutable header on them means a browser tab
+      // that ever fetches a route once will keep serving that exact JS
+      // forever, silently ignoring every subsequent source change and
+      // dev-server recompile, no matter how many times the page is
+      // reloaded. Found live, twice, each time as a long, misleading
+      // "my fix isn't taking effect" debugging session before the real
+      // cause (this header, not the code) was identified via `curl -sD-`.
       {
         source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+        headers:
+          process.env.NODE_ENV === 'production'
+            ? [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }]
+            : [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }],
       },
-      // Images - Cache for 1 year (Next.js Image handles optimization)
+      // Images - Cache for 1 year in production (Next.js Image handles
+      // optimization); same dev-mode staleness risk as above otherwise.
       {
         source: '/images/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+        headers:
+          process.env.NODE_ENV === 'production'
+            ? [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }]
+            : [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }],
       },
-      // Fonts - Long cache
+      // Fonts - Long cache in production; same dev-mode staleness risk as above otherwise.
       {
         source: '/fonts/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+        headers:
+          process.env.NODE_ENV === 'production'
+            ? [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }]
+            : [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }],
       },
     ];
   },

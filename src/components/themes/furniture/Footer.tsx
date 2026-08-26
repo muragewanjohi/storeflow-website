@@ -34,7 +34,7 @@ export default function FurnitureFooter() {
                 <li key={link}>
                   <Link
                     href={link === 'Home' ? '/' : `/${link.toLowerCase()}`}
-                    className="text-[16px] font-medium text-black hover:text-[#B88E2F] transition-colors"
+                    className="text-[16px] font-medium text-black hover:text-[var(--color-primary)] transition-colors"
                     style={{ fontFamily: 'Poppins, sans-serif' }}
                   >
                     {link}
@@ -54,7 +54,7 @@ export default function FurnitureFooter() {
                 <li key={link}>
                   <Link
                     href={`/${link.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="text-[16px] font-medium text-black hover:text-[#B88E2F] transition-colors"
+                    className="text-[16px] font-medium text-black hover:text-[var(--color-primary)] transition-colors"
                     style={{ fontFamily: 'Poppins, sans-serif' }}
                   >
                     {link}
@@ -73,12 +73,12 @@ export default function FurnitureFooter() {
               <input
                 type="email"
                 placeholder="Enter Your Email Address"
-                className="w-full px-0 py-2 border-b border-[rgba(0,0,0,0.1)] focus:outline-none focus:border-[#B88E2F] text-[14px] text-[#9f9f9f]"
+                className="w-full px-0 py-2 border-b border-[rgba(0,0,0,0.1)] focus:outline-none focus:border-[var(--color-primary)] text-[14px] text-[#9f9f9f]"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               />
               <button
                 type="submit"
-                className="text-[14px] font-medium text-black hover:text-[#B88E2F] transition-colors border-b border-transparent hover:border-[#B88E2F]"
+                className="text-[14px] font-medium text-black hover:text-[var(--color-primary)] transition-colors border-b border-transparent hover:border-[var(--color-primary)]"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 SUBSCRIBE
