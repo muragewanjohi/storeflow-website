@@ -161,6 +161,7 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - [ ] M-Pesa API integration (automated verification)
 - [ ] Payment webhooks handling
 - [ ] Refund processing
+- [ ] Partial payment / deposit support — let a customer pay a deposit or partial amount at checkout (fixed amount or % of order total, configurable per merchant/product) with the remaining balance collected later, before fulfillment/delivery; needs a "partially paid" order/payment status distinct from paid/unpaid, balance-due tracking on the order, a follow-up flow for collecting the remainder (link or reminder), and support across the existing M-Pesa, Pesapal, and cash payment paths rather than a bolt-on to just one
 
 #### 2. Email Marketing
 - [ ] Email campaign builder
@@ -175,6 +176,13 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - [ ] Inventory history tracking
 - [ ] Stock transfer between locations
 - [ ] Barcode scanning support
+
+#### 3.5. Services (non-physical offerings, beyond products-only)
+- [ ] New "service" listing type alongside physical products — no stock/inventory tracking (or optional capacity-based availability instead of unit stock)
+- [ ] Service-specific fields (duration, location/online, assigned staff/provider, price — possibly variable/quote-based)
+- [ ] Checkout support for service bookings (date/time selection instead of a shipping/delivery step; may coexist with product line items in the same cart)
+- [ ] Service listings surfaced in storefront browsing, search, and category pages alongside products
+- [ ] Theme/component support for rendering a service (vs. a product) card and detail page across existing themes
 
 #### 4. Customer Features
 - [ ] Customer loyalty program
