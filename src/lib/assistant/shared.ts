@@ -53,7 +53,13 @@ import { getStaticOptions } from '@/lib/settings/static-options';
 import { buildGettingStartedProgress, GETTING_STARTED_OPTION_NAMES } from '@/lib/onboarding/getting-started-progress';
 import { generateSlug } from '@/lib/products/validation';
 import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
-import { regenerateHomepageImage, HOMEPAGE_IMAGE_SLOTS, HOMEPAGE_IMAGE_SLOT_LABELS, isHomepageImageSlot } from '@/lib/homepage-images/regenerate-shared';
+import {
+  regenerateHomepageImage,
+  regenerateAllHomepageImages,
+  HOMEPAGE_IMAGE_SLOTS,
+  HOMEPAGE_IMAGE_SLOT_LABELS,
+  isHomepageImageSlot,
+} from '@/lib/homepage-images/regenerate-shared';
 import { canUseAiFeature } from '@/lib/subscriptions/limits';
 import {
   writeMarketingImageBatch,
@@ -178,19 +184,23 @@ export const configTargetSchema = {
     // Populated when target === 'homepage_image' and YOUR OWN previous
     // message already proposed ONE specific slot (see proposedImageSlot
     // below) AND the merchant's latest message confirms it — one of
-    // "hero"|"banner1"|"banner2"|"banner3"|"split_layout". Empty string
-    // otherwise. This is the "ready to actually regenerate now" signal —
-    // mirrors categoryNames' case 2, but for a single fixed-enum slot
-    // instead of free-form names, since regenerating costs real quota/money
-    // and should never fire on the same turn it's first mentioned.
+    // "hero"|"banner1"|"banner2"|"banner3"|"split_layout", OR the literal
+    // string "all" if what was proposed (and is now being confirmed) was
+    // regenerating all 5 at once. Empty string otherwise. This is the
+    // "ready to actually regenerate now" signal — mirrors categoryNames'
+    // case 2, but for a fixed-enum slot (or "all") instead of free-form
+    // names, since regenerating costs real quota/money and should never
+    // fire on the same turn it's first mentioned.
     imageSlot: { type: 'string' },
     // Populated ONLY when target === 'homepage_image', imageSlot is empty,
     // and the merchant's THIS message clearly identifies (or you can
-    // confidently infer from context) exactly ONE of the 5 real slots —
-    // proposed back for confirmation, nothing regenerated yet. Empty string
-    // if the request is ambiguous (which of 3 banners? which of all 5?) —
-    // in that case leave this empty too and the merchant will be asked to
-    // pick one.
+    // confidently infer from context) exactly ONE of the 5 real slots, OR
+    // clearly wants ALL 5 regenerated (e.g. "all of them", "regenerate
+    // everything", "redo all my homepage images") — in the all-5 case, set
+    // this to the literal string "all". Proposed back for confirmation,
+    // nothing regenerated yet. Empty string if the request is genuinely
+    // ambiguous (which of 3 banners? some unspecified subset?) — in that
+    // case leave this empty too and the merchant will be asked to pick.
     proposedImageSlot: { type: 'string' },
     // Populated when target === 'marketing_images' — a free-text
     // description of what images the merchant wants, in EITHER case: (a)
@@ -263,9 +273,9 @@ export function buildConfigTargetSystemPrompt(
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
     `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} Never invent categories unrelated to their actual business.`,
-    'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image). There are two cases:',
-    '1. YOUR OWN previous message in this conversation already proposed ONE specific slot for confirmation AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact slot value now. proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention.',
-    '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If it is ambiguous which slot they mean (e.g. "update my banner images" could be any of the 3, or "improve my homepage pictures" could be any of the 5), leave proposedImageSlot empty too — you will ask them which one.',
+    'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image) — and all 5 together can also be requested at once, represented as the literal slot value "all". There are two cases:',
+    '1. YOUR OWN previous message in this conversation already proposed ONE SPECIFIC thing (a single named slot, or "all") and explicitly asked for a yes/no confirmation of THAT ONE THING (e.g. "Want me to regenerate your hero image?", "Want me to regenerate all 5 of your homepage images?") AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact value now ("hero"/"banner1"/"banner2"/"banner3"/"split_layout"/"all"). proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention. IMPORTANT: a message that merely LISTS multiple possible options for them to choose from (e.g. "which image would you like? Your options are: ... Or say all of them for all 5") is NOT a proposal of one specific thing, even though it mentions "all of them" as one of the choices — it is a question, not an offer. If their reply to a LIST like that names one option for the first time (including "all of them"), that is case 2 below, not case 1 — it still needs one more confirmation turn before anything is actually regenerated.',
+    '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If they clearly want ALL 5 regenerated (e.g. "all of them", "redo all my homepage images", "regenerate everything", "give me new images for my whole homepage"), set proposedImageSlot to "all" instead. If it is genuinely ambiguous which slot(s) they mean (e.g. "update my banner images" could be any of the 3, or a vague "make my homepage look better" with no clear scope), leave proposedImageSlot empty too — you will ask them which one(s).',
     'delivery_zone has no extra fields here — it is a pure hand-off, the actual name/areas/fee collection happens in a dedicated follow-up conversation, not in this classification step.',
     'If target is "marketing_images", there are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed generating images for a specific description AND their latest message clearly agrees (e.g. "yes", "go ahead", "do it") — set marketingImageRequest to that SAME description you previously proposed, set marketingImageCount to the SAME number you previously stated in that proposal (it will be written in your own prior message), set marketingImageConfirmed to true. This is how a proposal becomes a real generation request — generating costs real quota/money and must never happen on the very first mention.',
@@ -406,6 +416,94 @@ export async function handleHomepageImageConfigTarget(
 ): Promise<HandlerResult> {
   const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
   const quota = await canUseAiFeature(tenant, 'marketing_image_prompt', 'monthly');
+  const slotList = HOMEPAGE_IMAGE_SLOTS.map((slot) => HOMEPAGE_IMAGE_SLOT_LABELS[slot]).join(', ');
+
+  // Case 0: "all of them" — confirming a previously-proposed regenerate-all,
+  // or a first-time unambiguous "regenerate all 5" request. Handled before
+  // the single-slot cases below since 'all' is never a valid single slot.
+  if (imageSlot === 'all' || proposedImageSlot === 'all') {
+    // How many of the 5 remaining quota actually covers — computed the same
+    // way for both the propose and confirm branches so the number a
+    // merchant is told matches what they'd actually get.
+    const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0)) : null;
+    const slotsToDo = remaining === null ? HOMEPAGE_IMAGE_SLOTS.length : Math.min(HOMEPAGE_IMAGE_SLOTS.length, remaining);
+
+    if (imageSlot === 'all') {
+      // Confirmed — actually regenerate. Quota IS hard-enforced here (unlike
+      // the propose branch below), same discipline as the single-slot case.
+      if (!quota.allowed || slotsToDo === 0) {
+        return {
+          intent: 'configuration_guidance',
+          answer:
+            quota.reason ??
+            "You've used all of your homepage image regenerations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+          data: { target: 'homepage_image', slot: 'all', regenerated: false, reason: 'quota_exceeded' },
+          usage: zeroUsage,
+        };
+      }
+
+      const result = await regenerateAllHomepageImages({ tenant, maxSlots: slotsToDo });
+      if (!result.success) {
+        return {
+          intent: 'configuration_guidance',
+          answer: `I couldn't regenerate your homepage images — ${result.error} You can try again in a moment.`,
+          data: { target: 'homepage_image', slot: 'all', regenerated: false },
+          usage: zeroUsage,
+        };
+      }
+
+      const succeeded = result.slots.filter((s) => s.success);
+      const failed = result.slots.filter((s) => !s.success);
+      if (succeeded.length === 0) {
+        return {
+          intent: 'configuration_guidance',
+          answer: "I couldn't regenerate any of your homepage images — please try again in a moment.",
+          data: { target: 'homepage_image', slot: 'all', regenerated: false, results: result.slots },
+          usage: zeroUsage,
+        };
+      }
+
+      const doneList = succeeded.map((s) => HOMEPAGE_IMAGE_SLOT_LABELS[s.slot].toLowerCase()).join(', ');
+      const failedNote =
+        failed.length > 0
+          ? ` ${failed.length} failed and can be retried individually from the Homepage Images tab.`
+          : '';
+      const skippedNote =
+        slotsToDo < HOMEPAGE_IMAGE_SLOTS.length
+          ? ` I could only do ${slotsToDo} of the 5 — you're low on regenerations this month.`
+          : '';
+      const patchNote = result.pagePatched
+        ? ''
+        : " I couldn't automatically update your live homepage with them, though — check the Homepage Images tab in Theme Customize.";
+      const remainingAfter =
+        typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0) - succeeded.length) : null;
+      const remainingAfterNote =
+        remainingAfter !== null ? ` You have ${remainingAfter} regeneration${remainingAfter === 1 ? '' : 's'} left this month.` : '';
+
+      return {
+        intent: 'configuration_guidance',
+        answer: `Done! I've regenerated: ${doneList}.${patchNote}${failedNote}${skippedNote}${remainingAfterNote}`,
+        data: { target: 'homepage_image', slot: 'all', regenerated: true, results: result.slots, pagePatched: result.pagePatched },
+        usage: zeroUsage,
+      };
+    }
+
+    // Otherwise: proposedImageSlot === 'all' — offer it back for confirmation.
+    // Quota is deliberately NOT hard-blocked here, matching the single-slot
+    // propose case below — the real enforcement happens at confirm time.
+    const countNote =
+      remaining === null
+        ? ''
+        : slotsToDo >= HOMEPAGE_IMAGE_SLOTS.length
+          ? ` (this will use ${HOMEPAGE_IMAGE_SLOTS.length} of your ${remaining} remaining regenerations this month)`
+          : ` (you have ${remaining} regeneration${remaining === 1 ? '' : 's'} left this month, so I'd only be able to do ${remaining} of the 5)`;
+    return {
+      intent: 'configuration_guidance',
+      answer: `Want me to regenerate all 5 of your homepage images (${slotList})?${countNote} Just say the word.`,
+      data: { target: 'homepage_image', proposed: 'all' },
+      usage: zeroUsage,
+    };
+  }
 
   // Case 1: confirming a slot proposed last turn — actually regenerate now.
   if (isHomepageImageSlot(imageSlot)) {
@@ -457,11 +555,10 @@ export async function handleHomepageImageConfigTarget(
     };
   }
 
-  // Case 3: ambiguous — ask which of the 5 real slots they mean.
-  const slotList = HOMEPAGE_IMAGE_SLOTS.map((slot) => HOMEPAGE_IMAGE_SLOT_LABELS[slot]).join(', ');
+  // Case 3: ambiguous — ask which of the 5 real slots they mean (or all of them).
   return {
     intent: 'configuration_guidance',
-    answer: `Sure — which image would you like me to regenerate? Your options are: ${slotList}.`,
+    answer: `Sure — which image would you like me to regenerate? Your options are: ${slotList}. Or just say "all of them" to regenerate all 5.`,
     data: { target: 'homepage_image', options: HOMEPAGE_IMAGE_SLOTS },
     usage: zeroUsage,
   };

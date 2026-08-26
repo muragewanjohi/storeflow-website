@@ -36,7 +36,10 @@ import {
   isGenericImageSlot,
   type GenericImageSlot,
 } from '@/lib/onboarding/nano-banana-jobs';
-import { applySingleHomepageImageToPageBuilderData } from '@/lib/themes/homepage-templates';
+import {
+  applySingleHomepageImageToPageBuilderData,
+  applyGenericImagesToPageBuilderData,
+} from '@/lib/themes/homepage-templates';
 
 export { GENERIC_IMAGE_SLOTS as HOMEPAGE_IMAGE_SLOTS, isGenericImageSlot as isHomepageImageSlot };
 export type HomepageImageSlot = GenericImageSlot;
@@ -200,4 +203,114 @@ export async function regenerateHomepageImage(params: {
   }
 
   return { success: true, imageUrl: result.imageUrl, pagePatched, costUsd };
+}
+
+export interface RegenerateAllHomepageImagesSlotResult {
+  slot: HomepageImageSlot;
+  success: boolean;
+  imageUrl?: string;
+  error?: string;
+}
+
+export type RegenerateAllHomepageImagesResult =
+  | { success: true; slots: RegenerateAllHomepageImagesSlotResult[]; pagePatched: boolean; costUsd: number }
+  | { success: false; error: string };
+
+/**
+ * Regenerates multiple (up to all 5) homepage image slots in ONE batched
+ * call to executeNanoBananaJobs (real concurrent Gemini calls, same
+ * "one execution, not N separate round-trips" discipline as DA.28's
+ * marketing-image batching) and patches every successful result into the
+ * tenant's live homepage with a SINGLE page write, via
+ * applyGenericImagesToPageBuilderData() (the same all-5 patcher the
+ * registration-time pipeline uses) rather than N separate
+ * applySingleHomepageImageToPageBuilderData() + prisma.pages.update calls.
+ *
+ * `maxSlots` caps how many of the 5 (in their canonical hero -> banner1 ->
+ * banner2 -> banner3 -> split_layout order) are actually attempted — the
+ * caller computes this from real remaining quota (see
+ * handleHomepageImageConfigTarget's 'all' branch in @/lib/assistant/shared)
+ * so a merchant with, say, 2 regenerations left this month gets exactly 2
+ * real images generated and billed, not 5 attempted and 3 silently
+ * rejected downstream. `success: false` here means the call couldn't run
+ * AT ALL (no API key, or maxSlots resolved to 0) — a per-slot failure
+ * (one image's generation genuinely failing) still returns `success: true`
+ * with that slot's entry marked failed, same "partial success is still
+ * real success" philosophy as regenerateHomepageImage's pagePatched:false
+ * case and DA.28's `failed` count.
+ */
+export async function regenerateAllHomepageImages(params: {
+  tenant: Tenant;
+  maxSlots?: number;
+}): Promise<RegenerateAllHomepageImagesResult> {
+  const { tenant, maxSlots } = params;
+
+  const apiKey = process.env.NANO_BANANA_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    return { success: false, error: 'Image generation is not configured (missing Gemini API key).' };
+  }
+
+  const slotsToRegenerate =
+    typeof maxSlots === 'number' ? GENERIC_IMAGE_SLOTS.slice(0, Math.max(0, maxSlots)) : GENERIC_IMAGE_SLOTS;
+  if (slotsToRegenerate.length === 0) {
+    return { success: false, error: 'No regenerations remaining.' };
+  }
+
+  const { businessType, niche } = getBusinessProfile(tenant);
+  const themeSlug = await resolveActiveThemeSlug(tenant.id);
+
+  const jobs = slotsToRegenerate.map((slot) =>
+    buildSingleHomepageImageJob(slot, businessType || 'General retail', niche || undefined)
+  );
+  const execution = await executeNanoBananaJobs({
+    apiKey,
+    jobs,
+    tenantId: tenant.id,
+    feature: 'marketing_image_prompt',
+    bucket: 'monthly',
+  });
+
+  const slotResults: RegenerateAllHomepageImagesSlotResult[] = slotsToRegenerate.map((slot, i) => {
+    const result = execution.results[i];
+    if (result?.success && result.imageUrl) {
+      return { slot, success: true, imageUrl: result.imageUrl };
+    }
+    return { slot, success: false, error: result?.error || 'Image generation failed.' };
+  });
+  const costUsd = execution.results.reduce((sum, r) => sum + (r.imageCostUsd ?? 0), 0);
+
+  let pagePatched = false;
+  try {
+    const homePage = await prisma.pages.findFirst({
+      where: { tenant_id: tenant.id, slug: 'home' },
+      select: { id: true, content: true },
+    });
+    if (homePage?.content) {
+      const pageBuilderData = JSON.parse(homePage.content) as { sections?: Array<Record<string, unknown>> };
+      const bySlot = new Map(slotResults.map((r) => [r.slot, r]));
+      const updated = applyGenericImagesToPageBuilderData(pageBuilderData, {
+        hero: bySlot.get('hero')?.success ? bySlot.get('hero')!.imageUrl! : null,
+        banners: [
+          bySlot.get('banner1')?.success ? bySlot.get('banner1')!.imageUrl! : '',
+          bySlot.get('banner2')?.success ? bySlot.get('banner2')!.imageUrl! : '',
+          bySlot.get('banner3')?.success ? bySlot.get('banner3')!.imageUrl! : '',
+        ],
+        splitLayout: bySlot.get('split_layout')?.success ? bySlot.get('split_layout')!.imageUrl! : null,
+      });
+      await prisma.pages.update({
+        where: { id: homePage.id },
+        data: { content: JSON.stringify(updated) },
+      });
+      pagePatched = true;
+    }
+  } catch (error) {
+    console.warn('[HomepageImages][Trace] Regenerated images but failed to patch the live homepage page (non-fatal — real images + cost still stand)', {
+      tenantId: tenant.id,
+      slots: slotsToRegenerate,
+      themeSlug,
+      error: error instanceof Error ? error.message : 'Unknown patch error',
+    });
+  }
+
+  return { success: true, slots: slotResults, pagePatched, costUsd };
 }
