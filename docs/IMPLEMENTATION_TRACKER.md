@@ -113,7 +113,7 @@ Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEAT
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 8.1 | Due-date reminder job | 🔲 | Rules-based, no AI needed |
+| 8.1 | Due-date reminder job | ✅ | **Corrected (DA.36)** — already fully built and live, just never reflected here. `src/app/api/admin/subscriptions/payment-reminders/route.ts`, already registered in `vercel.json`'s crons (daily 09:00 UTC). Sends renewal reminders daily for 7 days before expiry and payment-due reminders through a 2-day grace period (both email + SMS via Ujumbe), tracks last-sent date per tenant in `tenants.data.subscription` to dedupe, exactly matching this row's "rules-based, no AI needed" scope. Confirmed via real `cron_job_logs` rows — 5 consecutive real daily runs (Aug 22-26), all `status: success`, 0 errors, real reminders sent each day |
 | 8.2 | Usage-vs-limit upgrade-suggestion job | ✅ | See DA.18 |
 
 ## AI Phase 9 — Scheduled Report Summaries via Batch API
