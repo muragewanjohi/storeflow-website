@@ -140,7 +140,7 @@ export function unclearReply(includeProductIntake: boolean): string {
   // "help you add a new product" (not "walk you through...") so this reads
   // accurately on both platforms — web's is a multi-turn chat, mobile's is
   // a one-shot pointer to the native form.
-  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product,' : ''}, suggest categories/products/pricing for your business, write a social/WhatsApp/SMS post to share with your customers, or tell you what to set up next. Could you rephrase your question that way?`;
+  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product' : ''}, suggest categories/products/pricing for your business, write a social/WhatsApp/SMS post to share with your customers, or tell you what to set up next. Could you rephrase your question that way?`;
 }
 
 export interface HandlerResult {
