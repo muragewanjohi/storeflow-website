@@ -53,6 +53,8 @@ async function main() {
     buildConfigTargetSystemPrompt,
     configTargetSchema,
     resolveConfigTarget,
+    buildClassifySystemPrompt,
+    classifySchema,
   } = await import('../src/lib/assistant/shared');
   const { runProductIntakeTurn } = await import('../src/lib/products/ai-intake-shared');
   const { generateSlug } = await import('../src/lib/products/validation');
@@ -266,6 +268,39 @@ async function main() {
     console.log('✅ Converged to ONE listing — name set, price=1200, stockQuantity=5 (never 5 separate listings)');
   } else {
     console.log(`❌ Final collected fields wrong: ${JSON.stringify(finalCollected)}`);
+    failures++;
+  }
+
+  // -------------------------------------------------------------------
+  // 4. REAL BUG REPRO (mobile screenshot): a vague "okay add them" reply
+  //    to the assistant's own "here's what I can help set up" decline
+  //    used to fall all the way to the generic unclearReply(), a jarring
+  //    non-sequitur that ignored the menu it had just offered. Should now
+  //    stay configuration_guidance so it gets a real chance to resolve
+  //    (or re-offer the same real menu) instead.
+  // -------------------------------------------------------------------
+  console.log('\n--- 4. REAL BUG REPRO: vague "okay add them" after an unsupported-request decline ---');
+  const reproMessages = [
+    { role: 'user' as const, content: 'create the website for me' },
+    {
+      role: 'assistant' as const,
+      content:
+        "I can help you add a new product or category, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.",
+    },
+    { role: 'user' as const, content: 'okay add them' },
+  ];
+  const { data: reproClassify, usage: reproUsage } = await generateJsonFromConversation<{ intent: string }>({
+    system: buildClassifySystemPrompt(true),
+    messages: reproMessages,
+    schema: classifySchema,
+    maxTokens: 60,
+  });
+  totalCost += estimateCostUsd(reproUsage);
+  console.log('classified intent:', reproClassify.intent);
+  if (reproClassify.intent === 'configuration_guidance') {
+    console.log('✅ "okay add them" stayed configuration_guidance, not unclear');
+  } else {
+    console.log(`❌ Expected configuration_guidance, got "${reproClassify.intent}"`);
     failures++;
   }
 

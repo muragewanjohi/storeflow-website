@@ -129,6 +129,9 @@ export function buildClassifySystemPrompt(includeConfigurationGuidance: boolean)
     includeConfigurationGuidance
       ? 'If your own previous message in this conversation proposed specific category names (or asked to confirm creating something) and the merchant\'s latest message is a short affirmative reply agreeing to it (e.g. "yes", "sure", "go ahead", "create those", "sounds good") — that is still configuration_guidance, continuing the same request, not unclear.'
       : undefined,
+    includeConfigurationGuidance
+      ? 'Similarly, if your own previous message listed what you CAN help set up right now (e.g. "I can help you add a new product or category, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone") and the merchant\'s latest message is a short reply agreeing to proceed without repeating which specific one (e.g. "okay add them", "yes please", "do it", "let\'s do that") — that is STILL configuration_guidance, not unclear, even though it doesn\'t name one specific option on its own. Let the target classification step try to work out which one from context, or ask which one if it genuinely can\'t.'
+      : undefined,
     'If in doubt between help_question/configuration_guidance and business_advice, ask: is this about DukaNest\'s UI (where a button is, how to save a setting) or retail judgment no DukaNest document would ever contain (what to sell, what to name things, what to charge)? "How do I add a category" is about the UI, not business_advice; "what categories should I add" is retail judgment, business_advice.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ]
