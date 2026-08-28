@@ -49,6 +49,7 @@ async function main() {
   const { prisma } = await import('../src/lib/prisma/client');
   const {
     handleCategoryConfigTarget,
+    handleSalesConfigTarget,
     getBusinessProfile,
     buildConfigTargetSystemPrompt,
     configTargetSchema,
@@ -301,6 +302,79 @@ async function main() {
     console.log('✅ "okay add them" stayed configuration_guidance, not unclear');
   } else {
     console.log(`❌ Expected configuration_guidance, got "${reproClassify.intent}"`);
+    failures++;
+  }
+
+  // -------------------------------------------------------------------
+  // 5. Sales creation (user request: "we want the AI to be able to do
+  //    everything on the store since we already have APIs" — starting with
+  //    the sale creation they explicitly asked for first).
+  // -------------------------------------------------------------------
+  console.log('\n--- 5. handleSalesConfigTarget: "create a sale called Test Repro Sale" ---');
+  const salesBeforeCount = await prisma.sales.count({ where: { tenant_id: TEST_TENANT_ID } });
+
+  const salesResult = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', { href: '/dashboard/sales/new', cta: 'Add sale' });
+  totalCost += estimateCostUsd(salesResult.usage);
+  console.log('answer:', salesResult.answer);
+  console.log('data:', salesResult.data);
+
+  const createdSale = await prisma.sales.findFirst({ where: { tenant_id: TEST_TENANT_ID, slug: 'test-repro-sale' } });
+  if (createdSale && createdSale.status === 'draft') {
+    console.log('✅ Sale genuinely created (confirmed via direct DB read), correctly saved as draft (not live)');
+  } else {
+    console.log('❌ Sale missing from DB, or not saved as draft — investigate');
+    failures++;
+  }
+
+  console.log('\n--- 5b. Re-requesting the same sale name should skip cleanly, not duplicate ---');
+  const salesResult2 = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', { href: '/dashboard/sales/new', cta: 'Add sale' });
+  totalCost += estimateCostUsd(salesResult2.usage);
+  console.log('answer:', salesResult2.answer);
+  const salesCountAfterRepeat = await prisma.sales.count({ where: { tenant_id: TEST_TENANT_ID, slug: 'test-repro-sale' } });
+  if (salesCountAfterRepeat === 1) {
+    console.log('✅ Correctly skipped — no duplicate created');
+  } else {
+    console.log(`❌ Expected exactly 1 matching sale, found ${salesCountAfterRepeat}`);
+    failures++;
+  }
+
+  // Clean up — this test tenant is reused by other tests.
+  await prisma.sales.deleteMany({ where: { tenant_id: TEST_TENANT_ID, slug: 'test-repro-sale' } });
+  const salesAfterCleanup = await prisma.sales.count({ where: { tenant_id: TEST_TENANT_ID } });
+  if (salesAfterCleanup === salesBeforeCount) {
+    console.log('✅ Cleaned up — sale count restored');
+  } else {
+    console.log(`❌ Cleanup failed — expected ${salesBeforeCount} sales, found ${salesAfterCleanup}`);
+    failures++;
+  }
+
+  console.log('\n--- 5c. Classification: "create a sale" (no name) should ask, never invent one ---');
+  const { data: noNameData } = await generateJsonFromConversation<any>({
+    system: buildConfigTargetSystemPrompt(businessType, niche, []),
+    messages: [{ role: 'user', content: 'create a sale' }],
+    schema: configTargetSchema,
+    maxTokens: 300,
+  });
+  console.log('parsed:', noNameData);
+  if (resolveConfigTarget(noNameData.target) === 'sales' && !noNameData.saleName) {
+    console.log('✅ Routed to sales target with no name given — will ask, not invent');
+  } else {
+    console.log(`❌ Expected target=sales with empty saleName, got target=${noNameData.target}, saleName="${noNameData.saleName}"`);
+    failures++;
+  }
+
+  console.log('\n--- 5d. Classification: "make me a banner for my sale" should stay marketing_images, not misfire into sales ---');
+  const { data: bannerData } = await generateJsonFromConversation<any>({
+    system: buildConfigTargetSystemPrompt(businessType, niche, []),
+    messages: [{ role: 'user', content: 'make me a banner for my sale' }],
+    schema: configTargetSchema,
+    maxTokens: 300,
+  });
+  console.log('parsed target:', bannerData.target);
+  if (resolveConfigTarget(bannerData.target) === 'marketing_images') {
+    console.log('✅ Correctly stayed marketing_images (an image, not the sale record itself)');
+  } else {
+    console.log(`❌ Expected target=marketing_images, got "${bannerData.target}"`);
     failures++;
   }
 

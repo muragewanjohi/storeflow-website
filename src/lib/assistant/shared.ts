@@ -52,6 +52,7 @@ import { countActiveDemoProducts } from '@/lib/products/demo-products';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { buildGettingStartedProgress, GETTING_STARTED_OPTION_NAMES } from '@/lib/onboarding/getting-started-progress';
 import { generateSlug } from '@/lib/products/validation';
+import { createSaleSchema, generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
 import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
 import {
   regenerateHomepageImage,
@@ -166,7 +167,7 @@ export interface HandlerResult {
 // like 'category', are simple enough that this module can just create them
 // directly and immediately when the merchant already named them, on BOTH
 // platforms — see handleCategoryConfigTarget() below.
-export const CONFIG_TARGETS = ['product_intake', 'category', 'homepage_image', 'delivery_zone', 'marketing_images', 'unsupported'] as const;
+export const CONFIG_TARGETS = ['product_intake', 'category', 'sales', 'homepage_image', 'delivery_zone', 'marketing_images', 'unsupported'] as const;
 export type ConfigTarget = (typeof CONFIG_TARGETS)[number];
 
 export const configTargetSchema = {
@@ -190,6 +191,16 @@ export const configTargetSchema = {
     // can confirm on their NEXT message to have them actually created. See
     // buildConfigTargetSystemPrompt()'s business-context grounding.
     suggestedCategoryNames: { type: 'array', items: { type: 'string' } },
+    // Populated when target === 'sales' and either (a) the merchant already
+    // named the sale explicitly in their message (e.g. "create a sale
+    // called Black Friday"), OR (b) YOUR OWN previous message asked "what
+    // would you like to name this sale?" and the merchant's latest message
+    // answers it — extract that answer as the name. Left empty for a bare
+    // "create a sale"/"I want to add a sale" with no name given or answered
+    // yet — never invent a sale name or theme, unlike category suggestions
+    // (a sale is a real promotional event tied to the merchant's own actual
+    // plans, not a generic catalog bucket).
+    saleName: { type: 'string' },
     // Populated when target === 'homepage_image' and YOUR OWN previous
     // message already proposed ONE specific slot (see proposedImageSlot
     // below) AND the merchant's latest message confirms it — one of
@@ -233,6 +244,7 @@ export const configTargetSchema = {
     'target',
     'categoryNames',
     'suggestedCategoryNames',
+    'saleName',
     'imageSlot',
     'proposedImageSlot',
     'marketingImageRequest',
@@ -246,6 +258,7 @@ export interface ConfigTargetParseResult {
   target: string;
   categoryNames: string[];
   suggestedCategoryNames: string[];
+  saleName: string;
   imageSlot: string;
   proposedImageSlot: string;
   marketingImageRequest: string;
@@ -276,12 +289,15 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing images (e.g. a banner for a sale, images for social media, a promo graphic) that are NOT one of the 5 fixed homepage slots.',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing image or images for some other purpose (a sale banner, a social media post, "make me a graphic for X") that is not one of the 5 fixed homepage slots, return target: "marketing_images".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "sales" — creating a new SALE/PROMOTION entity in the store (a real record on the Sales page — name only here, the merchant adds the banner/dates/discounted products afterward). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing IMAGES (e.g. a banner graphic referencing a sale, images for social media, a promo graphic) — a picture, not the sale record itself.',
+    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about creating/adding/setting up a SALE or PROMOTION as a real thing in the store (e.g. "create a sale", "add a promotion called Black Friday", "I want to set up a flash sale") — actually creating the sale record, not just an image about it — return target: "sales". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing IMAGE or images for some other purpose (a sale banner GRAPHIC, a social media post image, "make me a graphic for X") that is not one of the 5 fixed homepage slots and not a request to create the sale record itself, return target: "marketing_images".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
     `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} Never invent categories unrelated to their actual business.`,
+    'If target is "sales", there are two cases:',
+    '1. They already named the sale in THIS message (e.g. "create a sale called Black Friday", "add a promotion named Back to School"), OR YOUR OWN previous message asked "what would you like to name this sale?" and their latest message answers it — extract the exact name into saleName.',
+    '2. Otherwise — a first-time request with no name given (e.g. "create a sale", "I want to set up a promotion") — leave saleName empty; you will ask them to name it. NEVER invent a sale name or theme yourself (unlike category suggestions) — a sale is a real promotional event tied to the merchant\'s own actual plans, not a generic catalog bucket.',
     'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image) — and all 5 together can also be requested at once, represented as the literal slot value "all". There are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed ONE SPECIFIC thing (a single named slot, or "all") and explicitly asked for a yes/no confirmation of THAT ONE THING (e.g. "Want me to regenerate your hero image?", "Want me to regenerate all 5 of your homepage images?") AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact value now ("hero"/"banner1"/"banner2"/"banner3"/"split_layout"/"all"). proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention. IMPORTANT: a message that merely LISTS multiple possible options for them to choose from (e.g. "which image would you like? Your options are: ... Or say all of them for all 5") is NOT a proposal of one specific thing, even though it mentions "all of them" as one of the choices — it is a question, not an offer. If their reply to a LIST like that names one option for the first time (including "all of them"), that is case 2 below, not case 1 — it still needs one more confirmation turn before anything is actually regenerated.',
     '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If they clearly want ALL 5 regenerated (e.g. "all of them", "redo all my homepage images", "regenerate everything", "give me new images for my whole homepage"), set proposedImageSlot to "all" instead. If it is genuinely ambiguous which slot(s) they mean (e.g. "update my banner images" could be any of the 3, or a vague "make my homepage look better" with no clear scope), leave proposedImageSlot empty too — you will ask them which one(s).',
@@ -289,7 +305,7 @@ export function buildConfigTargetSystemPrompt(
     'If target is "marketing_images", there are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed generating images for a specific description AND their latest message clearly agrees (e.g. "yes", "go ahead", "do it") — set marketingImageRequest to that SAME description you previously proposed, set marketingImageCount to the SAME number you previously stated in that proposal (it will be written in your own prior message), set marketingImageConfirmed to true. This is how a proposal becomes a real generation request — generating costs real quota/money and must never happen on the very first mention.',
     '2. Otherwise — a first-time request — set marketingImageRequest to a clear paraphrase of what they described wanting, set marketingImageConfirmed to false. If they stated a specific number of images (e.g. "3 images", "a couple of banners" -> 2), set marketingImageCount to that number; otherwise leave it null.',
-    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a homepage image, a delivery zone, or a new marketing image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
+    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a sale, a homepage image, a delivery zone, or a new marketing image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
 }
@@ -338,6 +354,109 @@ async function createCategoriesFromNames(tenantId: string, rawNames: string[]): 
   }
 
   return { created, skippedExisting };
+}
+
+/**
+ * Real sale creation, mirroring POST /api/dashboard/sales's own validated
+ * logic exactly (createSaleSchema, generateSaleSlug()/sanitizeSaleName(),
+ * same slug-collision check) — same "run the real validated logic
+ * directly against Prisma instead of over HTTP" reasoning as
+ * createCategoriesFromNames() above. Deliberately name-only: unlike
+ * category suggestions, a sale is a real promotional event tied to the
+ * merchant's own actual plans (a real discount, a real date range, real
+ * products) — inventing a plausible-sounding sale name/theme the way
+ * category suggestions invent generic catalog buckets would risk
+ * fabricating something that reads as a real planned promotion. Created
+ * sales always land as `status: 'draft'` (the real API's own default —
+ * never overridden here), so nothing an AI creates ever goes live on the
+ * storefront without the merchant separately publishing it from the Sales
+ * page, where they'd also add the banner/dates/discounted products this
+ * flow deliberately doesn't touch.
+ */
+async function createSaleFromName(tenantId: string, rawName: string): Promise<{ created: string | null; skippedExisting: string | null; error: string | null }> {
+  let validated;
+  try {
+    validated = createSaleSchema.parse({ name: rawName });
+  } catch {
+    return { created: null, skippedExisting: null, error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.` };
+  }
+
+  const slug = generateSaleSlug(sanitizeSaleName(validated.name));
+  if (!slug) {
+    return { created: null, skippedExisting: null, error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.` };
+  }
+
+  const existing = await prisma.sales.findFirst({ where: { tenant_id: tenantId, slug } });
+  if (existing) {
+    return { created: null, skippedExisting: existing.name, error: null };
+  }
+
+  const sale = await prisma.sales.create({
+    data: {
+      tenant_id: tenantId,
+      name: validated.name,
+      slug,
+      badge_text: 'SALE',
+      badge_color: '#EF4444',
+      status: 'draft',
+      is_featured: false,
+      metadata: {},
+    },
+  });
+
+  return { created: sale.name, skippedExisting: null, error: null };
+}
+
+/**
+ * Answers a resolved 'sales' configuration_guidance target — shared
+ * verbatim by both platforms, same reasoning as handleCategoryConfigTarget:
+ * sale creation needs only a name, so both platforms can just do it. Two
+ * cases (deliberately simpler than category's three — see
+ * createSaleFromName()'s docblock for why no name-suggestion case exists):
+ *  1. The merchant already named the sale (this turn, or confirming their
+ *     own earlier answer to "what would you like to name this sale?") —
+ *     creates it for real (as a draft) and confirms with the actual result.
+ *  2. No name given — asks for one, creates nothing yet. A later message
+ *     naming it re-enters this function via case 1.
+ */
+export async function handleSalesConfigTarget(
+  tenant: Tenant,
+  saleName: string,
+  pointer: { href: string; cta: string },
+): Promise<HandlerResult> {
+  const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
+  const pointerStep = { id: 'sales', label: 'Add a sale', description: 'Opens the sale form', href: pointer.href, cta: pointer.cta };
+
+  const trimmedName = saleName.trim();
+  if (!trimmedName) {
+    return {
+      intent: 'configuration_guidance',
+      answer: 'Sure — what would you like to name this sale?',
+      data: { target: 'sales', steps: [pointerStep] },
+      usage: zeroUsage,
+    };
+  }
+
+  const { created, skippedExisting, error } = await createSaleFromName(tenant.id, trimmedName);
+
+  if (error) {
+    return { intent: 'configuration_guidance', answer: error, data: { target: 'sales', steps: [pointerStep] }, usage: zeroUsage };
+  }
+  if (skippedExisting) {
+    return {
+      intent: 'configuration_guidance',
+      answer: `"${skippedExisting}" already exists, so it was left as-is. You can edit it from the Sales page.`,
+      data: { target: 'sales', skippedExisting },
+      usage: zeroUsage,
+    };
+  }
+
+  return {
+    intent: 'configuration_guidance',
+    answer: `Created a new sale: "${created}" (saved as a draft — add a banner, dates, and products to it, then publish it from the Sales page when you're ready).`,
+    data: { target: 'sales', created, steps: [pointerStep] },
+    usage: zeroUsage,
+  };
 }
 
 /**

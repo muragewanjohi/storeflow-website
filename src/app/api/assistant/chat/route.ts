@@ -42,6 +42,7 @@ import {
   handleBusinessAdvice,
   handleSocialContent,
   handleCategoryConfigTarget,
+  handleSalesConfigTarget,
   handleHomepageImageConfigTarget,
   handleMarketingImagesConfigTarget,
   getBusinessProfile,
@@ -74,7 +75,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —
@@ -109,6 +110,14 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
     const result = await handleCategoryConfigTarget(tenant, data.categoryNames ?? [], data.suggestedCategoryNames ?? [], {
       href: '/dashboard/categories/new',
       cta: 'Add category',
+    });
+    return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'sales') {
+    const result = await handleSalesConfigTarget(tenant, data.saleName ?? '', {
+      href: '/dashboard/sales/new',
+      cta: 'Add sale',
     });
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
