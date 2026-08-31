@@ -47,7 +47,7 @@
 
 import type { Tenant } from '@/lib/tenant-context';
 import { prisma } from '@/lib/prisma/client';
-import { generateJsonFromConversation, type AiUsage } from '@/lib/ai/claude-client';
+import { generateJson, generateJsonFromConversation, type AiUsage } from '@/lib/ai/claude-client';
 import { countActiveDemoProducts } from '@/lib/products/demo-products';
 import { getStaticOptions } from '@/lib/settings/static-options';
 import { buildGettingStartedProgress, GETTING_STARTED_OPTION_NAMES } from '@/lib/onboarding/getting-started-progress';
@@ -521,6 +521,56 @@ export async function handleCategoryConfigTarget(
     answer: parts.join(' '),
     data: { target: 'category', created, skippedExisting },
     usage: zeroUsage,
+  };
+}
+
+const startingCategorySuggestionSchema = {
+  type: 'object',
+  properties: { suggestedCategoryNames: { type: 'array', items: { type: 'string' } } },
+  required: ['suggestedCategoryNames'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * User-requested change: a merchant should set up at least one category
+ * BEFORE adding their first product — a store with zero categories makes
+ * for poor customer browsing from day one. Both platforms call this right
+ * before handing off to product_intake (see each route's own dispatch);
+ * returns a real category-creation prompt (same suggest-then-confirm shape
+ * handleCategoryConfigTarget already offers, grounded in the tenant's real
+ * business context, never inventing categories unrelated to it) when the
+ * tenant genuinely has zero categories, or null when it's fine to proceed
+ * straight to product intake. The merchant's reply on their NEXT turn
+ * (naming categories, or confirming these suggestions) is handled by the
+ * existing 'category' classify target exactly as it already is elsewhere —
+ * this function only ever runs once, at the point product_intake would
+ * otherwise have started.
+ */
+export async function requireCategoryBeforeProductIntake(tenant: Tenant): Promise<HandlerResult | null> {
+  const categoryCount = await prisma.categories.count({ where: { tenant_id: tenant.id, status: 'active' } });
+  if (categoryCount > 0) return null;
+
+  const { businessType, niche } = getBusinessProfile(tenant);
+  const { data, usage } = await generateJson<{ suggestedCategoryNames: string[] }>({
+    system: [
+      'A merchant is about to add their first product but has zero categories set up yet.',
+      businessType
+        ? `Their recorded business type is "${businessType}"${niche ? ` and their niche is "${niche}"` : ''}.`
+        : 'Their business type has not been recorded yet — keep suggestions generic retail categories.',
+      'Propose 2-5 realistic, specific category names for a store like this. Never invent categories unrelated to their actual business.',
+      'Return ONLY valid JSON with no markdown and no extra prose.',
+    ].join(' '),
+    userContent: '(Suggest starter categories for this store.)',
+    schema: startingCategorySuggestionSchema,
+    maxTokens: 200,
+  });
+
+  const suggested = data.suggestedCategoryNames.slice(0, 5);
+  return {
+    intent: 'configuration_guidance',
+    answer: `Before adding your first product, let's set up at least one category so customers can browse your store easily. Based on your store, you could use: ${suggested.join(', ')}. Want me to create these for you? Just say the word — or tell me your own category name.`,
+    data: { target: 'category', suggested, blockedProductIntake: true },
+    usage,
   };
 }
 

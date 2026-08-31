@@ -421,9 +421,15 @@ export default function ProductFormClient({
         }
       }
       
-      // Validate category_id - ensure it's either null or a valid UUID
+      // Category is required — a product must always belong to a category
+      // (user-requested change: prompt for a category before the product
+      // can be saved, same discipline as requiring a name/price).
       let categoryId: string | null = null;
-      if (formData.category_id && formData.category_id !== 'none') {
+      if (!formData.category_id || formData.category_id === 'none') {
+        setValidationErrors({ category_id: 'Please select a category for this product' });
+        return;
+      }
+      {
         // Validate UUID format
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(formData.category_id)) {
@@ -659,6 +665,90 @@ export default function ProductFormClient({
                     <p className="text-sm text-destructive">{validationErrors.name}</p>
                   )}
                 </div>
+
+                {/* Category — required, prompted up front (user-requested
+                    change: every product must belong to a category, and
+                    picking one should be one of the first things a
+                    merchant does, not a buried, skippable afterthought). */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="category_id">
+                      Category <span className="text-destructive">*</span>
+                    </Label>
+                    <ContextualHelp
+                      title="Category"
+                      description="Every product needs a category so customers can browse your store easily. If available, add a subcategory for better organization."
+                      learnMoreHref="/help?article=managing-categories"
+                    />
+                  </div>
+                  <Select
+                    value={parentCategoryId || 'none'}
+                    onValueChange={(value) => {
+                      setParentCategoryId(value);
+                      // When parent changes, set category_id to parent (user can select subcategory after)
+                      setFormData({ ...formData, category_id: value });
+                      // Fetch subcategories for the selected parent
+                      fetchSubcategories(value);
+                    }}
+                  >
+                    <SelectTrigger id="category_id">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category: any) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {validationErrors.category_id && (
+                    <p className="text-sm text-destructive">{validationErrors.category_id}</p>
+                  )}
+                </div>
+
+                {/* Subcategory dropdown - only show if parent category has subcategories */}
+                {parentCategoryId && parentCategoryId !== 'none' && (
+                  <>
+                    {loadingSubcategories ? (
+                      <div className="text-xs text-muted-foreground">
+                        Loading subcategories...
+                      </div>
+                    ) : subcategories.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="subcategory_id">Subcategory</Label>
+                        <Select
+                          value={
+                            formData.category_id !== parentCategoryId &&
+                            subcategories.some((sc: any) => sc.id === formData.category_id)
+                              ? formData.category_id
+                              : 'none'
+                          }
+                          onValueChange={(value) => {
+                            // Use subcategory as category_id, or parent if "none" selected
+                            const finalCategoryId = value === 'none' ? parentCategoryId : value;
+                            setFormData({ ...formData, category_id: finalCategoryId });
+                          }}
+                        >
+                          <SelectTrigger id="subcategory_id">
+                            <SelectValue placeholder="Select a subcategory (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Subcategory</SelectItem>
+                            {subcategories.map((subcategory: any) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Select a subcategory or leave as parent category
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5">
@@ -1412,82 +1502,6 @@ export default function ProductFormClient({
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="category_id">Category</Label>
-                    <ContextualHelp
-                      title="Category"
-                      description="Choose the main category to help customers browse your products faster. If available, add a subcategory for better organization."
-                      learnMoreHref="/help?article=managing-categories"
-                    />
-                  </div>
-                  <Select
-                    value={parentCategoryId || 'none'}
-                    onValueChange={(value) => {
-                      const newParentId = value === 'none' ? 'none' : value;
-                      setParentCategoryId(newParentId);
-                      // When parent changes, set category_id to parent (user can select subcategory after)
-                      setFormData({ ...formData, category_id: newParentId });
-                      // Fetch subcategories for the selected parent
-                      fetchSubcategories(newParentId);
-                    }}
-                  >
-                    <SelectTrigger id="category_id">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Category</SelectItem>
-                      {categories.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Subcategory dropdown - only show if parent category has subcategories */}
-                {parentCategoryId !== 'none' && (
-                  <>
-                    {loadingSubcategories ? (
-                      <div className="text-xs text-muted-foreground">
-                        Loading subcategories...
-                      </div>
-                    ) : subcategories.length > 0 ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="subcategory_id">Subcategory</Label>
-                        <Select
-                          value={
-                            formData.category_id !== parentCategoryId && 
-                            subcategories.some((sc: any) => sc.id === formData.category_id)
-                              ? formData.category_id 
-                              : 'none'
-                          }
-                          onValueChange={(value) => {
-                            // Use subcategory as category_id, or parent if "none" selected
-                            const finalCategoryId = value === 'none' ? parentCategoryId : value;
-                            setFormData({ ...formData, category_id: finalCategoryId });
-                          }}
-                        >
-                          <SelectTrigger id="subcategory_id">
-                            <SelectValue placeholder="Select a subcategory (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Subcategory</SelectItem>
-                            {subcategories.map((subcategory: any) => (
-                              <SelectItem key={subcategory.id} value={subcategory.id}>
-                                {subcategory.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Optional: Select a subcategory or leave as parent category
-                        </p>
-                      </div>
-                    ) : null}
-                  </>
-                )}
               </CardContent>
             </Card>
 

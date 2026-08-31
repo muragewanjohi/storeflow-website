@@ -9,6 +9,7 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import ProductFormClient from '../product-form-client';
+import NoCategoriesPrompt from '../no-categories-prompt';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,13 @@ export default async function CreateProductPage() {
       slug: true,
     },
   });
+
+  // User-requested change: prompt for at least one category before letting
+  // a merchant add their first product — a store with zero categories
+  // makes for poor customer browsing from day one.
+  if (categories.length === 0) {
+    return <NoCategoriesPrompt />;
+  }
 
   return <ProductFormClient categories={categories} />;
 }

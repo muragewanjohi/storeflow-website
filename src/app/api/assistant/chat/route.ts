@@ -43,6 +43,7 @@ import {
   handleSocialContent,
   handleCategoryConfigTarget,
   handleSalesConfigTarget,
+  requireCategoryBeforeProductIntake,
   handleHomepageImageConfigTarget,
   handleMarketingImagesConfigTarget,
   getBusinessProfile,
@@ -144,6 +145,14 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
       data.marketingImageConfirmed ?? false,
     );
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  // User-requested change: a merchant must have at least one category
+  // before adding their first product — redirect to category creation
+  // instead of starting the intake conversation when they have none.
+  const categoryGate = await requireCategoryBeforeProductIntake(tenant);
+  if (categoryGate) {
+    return { ...categoryGate, usage: { inputTokens: usage.inputTokens + categoryGate.usage.inputTokens, outputTokens: usage.outputTokens + categoryGate.usage.outputTokens } };
   }
 
   return {

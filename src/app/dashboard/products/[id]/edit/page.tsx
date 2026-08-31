@@ -9,6 +9,7 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import ProductFormClient from '../../product-form-client';
+import NoCategoriesPrompt from '../../no-categories-prompt';
 
 export default async function EditProductPage({
   params,
@@ -113,6 +114,16 @@ export default async function EditProductPage({
       ...c,
       slug: c.slug || '',
     })) as any[];
+
+    // Category is now required (user-requested change) — a tenant with
+    // zero categories can't satisfy that in this form's category picker
+    // at all, so send them to create one first, same as the "new product"
+    // flow. Edge case: real tenants virtually always have categories by
+    // the time they have an existing product to edit, but never leave the
+    // form in an impossible-to-save state.
+    if (categoriesData.length === 0) {
+      return <NoCategoriesPrompt />;
+    }
 
     return <ProductFormClient product={productData} variants={variantsData} categories={categoriesData} />;
   } catch (error) {

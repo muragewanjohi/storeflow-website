@@ -294,6 +294,21 @@ export default function AssistantPanel() {
     }
 
     const category_id = await resolveCategoryId(collected.category);
+    // Category is required to save a product (user-requested change) — the
+    // AI intake prompt is instructed to always resolve one and never
+    // finish without it, but never trust that blindly: if resolution
+    // genuinely failed here, fail fast with a clear message instead of
+    // letting the save attempt below surface a generic "Validation error".
+    if (!category_id) {
+      pushMessage({
+        role: 'assistant',
+        text: collected.category
+          ? `I couldn't match "${collected.category}" to one of your existing categories — please finish adding this product from the Products page and pick a category there.`
+          : "I need a category to save this product, but didn't get one — please finish adding it from the Products page.",
+        isError: true,
+      });
+      return;
+    }
 
     try {
       const res = await fetch('/api/products', {
@@ -304,7 +319,7 @@ export default function AssistantPanel() {
           price: collected.price,
           stock_quantity: collected.stockQuantity ?? 0,
           sku: collected.sku || undefined,
-          category_id: category_id ?? undefined,
+          category_id,
         }),
       });
       const body = await res.json().catch(() => ({}));
