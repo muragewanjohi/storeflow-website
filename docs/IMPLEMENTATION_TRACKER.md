@@ -2,7 +2,7 @@
 
 Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEATURES_PLAN.md), [`THEME_SYSTEM_PLAN.md`](./THEME_SYSTEM_PLAN.md), [`ONBOARDING_AI_CHAT_PLAN.md`](./ONBOARDING_AI_CHAT_PLAN.md), and [`DASHBOARD_AI_ASSISTANT_PLAN.md`](./DASHBOARD_AI_ASSISTANT_PLAN.md). Update this file (not the plan docs) as work lands — the plan docs describe *what* and *why*; this tracks *is it done*.
 
-**Status legend:** 🔲 Not started · 🔄 In progress · ✅ Done · ⏸️ Blocked
+**Status legend:** 🔲 Not started · 🔄 In progress · ✅ Done · ⏸️ Blocked · ➖ N/A (investigated, deliberately not built)
 
 ---
 
@@ -120,7 +120,7 @@ Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEAT
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 9.1 | Swap live Messages API for Batch API in `send-scheduled-reports` | 🔲 | Do last — needs real usage data from earlier phases first |
+| 9.1 | Swap live Messages API for Batch API in `send-scheduled-reports` | ➖ N/A | **Investigated, not built — real premise didn't hold.** Read `src/app/api/admin/analytics/send-scheduled-reports/route.ts` directly: it never calls the Claude Messages API at all — it's pure Prisma-computed raw numbers (orders/revenue/customers) formatted as plain CSV/text, no AI summarization anywhere in the pipeline, so there was nothing to "swap." Separately queried real usage across all 18 active tenants' `tenants.data.scheduled_reports` directly — **zero** tenants have ever configured one, despite the feature having a real UI (`scheduled-reports-manager.tsx`) and a live daily cron (9am UTC, registered in `vercel.json`). This row's title assumed these reports would carry an AI-generated narrative (like AI Phase 3's `/api/analytics/ai-insights`), batched since it's a real once-daily/many-tenants scenario — that narration piece was never actually built into this cron, only the raw-numbers version exists. **User decision** (asked via `AskUserQuestion`, given the choice between building it now — Batch or live Messages API — vs. closing out): close it out as N/A rather than build AI summarization for a feature with zero real adoption. Revisit only if/when merchants actually start using scheduled reports |
 
 ---
 
