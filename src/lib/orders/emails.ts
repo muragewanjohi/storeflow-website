@@ -757,6 +757,10 @@ export async function sendPaymentStatusUpdateEmail({
   const paymentStatusLabels: Record<string, string> = {
     pending: 'Pending',
     paid: 'Paid',
+    // Basic deposit support (docs/SERVICES_PLAN.md) — a distinct status
+    // from 'paid' on purpose, so revenue/analytics never treats a
+    // deposit-only order as fully settled. See apply-payment-status.ts.
+    deposit_paid: 'Deposit Paid',
     failed: 'Failed',
     refunded: 'Refunded',
   };
@@ -764,6 +768,7 @@ export async function sendPaymentStatusUpdateEmail({
   const paymentStatusColor: Record<string, string> = {
     pending: '#f59e0b',
     paid: '#10b981',
+    deposit_paid: '#3b82f6',
     failed: '#ef4444',
     refunded: '#6b7280',
   };
@@ -773,9 +778,15 @@ export async function sendPaymentStatusUpdateEmail({
 
   let statusMessage = '';
   let statusIcon = '';
-  
+
   if (newPaymentStatus === 'paid') {
     statusMessage = 'Your payment has been confirmed!';
+    statusIcon = '✅';
+  } else if (newPaymentStatus === 'deposit_paid') {
+    const balance = (order as any).balance_amount != null ? Number((order as any).balance_amount) : null;
+    statusMessage = balance != null && balance > 0
+      ? `Your deposit has been confirmed! A balance of ${balance.toFixed(2)} remains — the store will contact you about settling it.`
+      : 'Your deposit has been confirmed!';
     statusIcon = '✅';
   } else if (newPaymentStatus === 'failed') {
     statusMessage = 'Unfortunately, your payment could not be processed.';

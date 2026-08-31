@@ -61,16 +61,44 @@ export function shouldSkipTumiziOrderPaymentDowngrade(
   nextPaymentStatus: 'paid' | 'pending' | 'failed' | 'refunded',
 ): boolean {
   return (
-    previousPaymentStatus === 'paid' &&
+    // 'deposit_paid' (basic deposit support, docs/SERVICES_PLAN.md) gets
+    // the same protection 'paid' already has — a stale/duplicate webhook
+    // must never downgrade an order that has genuinely received money.
+    (previousPaymentStatus === 'paid' || previousPaymentStatus === 'deposit_paid') &&
     nextPaymentStatus !== 'paid' &&
     nextPaymentStatus !== 'refunded'
   );
 }
 
+/**
+ * Basic deposit support (docs/SERVICES_PLAN.md). A Tumizi webhook only ever
+ * reports 'paid' for a successful charge — it has no concept of "was this
+ * the deposit leg or the balance leg." Distinguish by comparing what was
+ * ACTUALLY requested at initiation time (paymentLogAmount, from
+ * payment_logs — never trust anything from the webhook payload itself for
+ * this) against the order's own recorded balance_amount: if it matches the
+ * outstanding balance, the order is now genuinely fully settled ('paid');
+ * otherwise (no deposit involved, or this was the deposit leg) it's either
+ * 'paid' (no deposit_amount on the order at all) or 'deposit_paid'.
+ */
+export function resolveTumiziOrderPaymentStatus(
+  mappedStatus: 'paid' | 'pending' | 'failed' | 'refunded',
+  order: { deposit_amount: unknown; balance_amount: unknown } | null,
+  paymentLogAmount: unknown,
+): 'paid' | 'pending' | 'failed' | 'refunded' | 'deposit_paid' {
+  if (mappedStatus !== 'paid' || !order || order.deposit_amount == null) {
+    return mappedStatus;
+  }
+  const balance = order.balance_amount != null ? Number(order.balance_amount) : null;
+  const paidNow = Number(paymentLogAmount);
+  const isBalanceSettlement = balance != null && Math.abs(paidNow - balance) < 1;
+  return isBalanceSettlement ? 'paid' : 'deposit_paid';
+}
+
 export type ApplyTumiziPaymentResult = {
   applied: boolean;
   orderId?: string;
-  paymentStatus?: 'paid' | 'pending' | 'failed' | 'refunded';
+  paymentStatus?: 'paid' | 'pending' | 'failed' | 'refunded' | 'deposit_paid';
   previousPaymentStatus?: string | null;
   reason?: string;
 };
@@ -111,12 +139,16 @@ export async function applyTumiziCustomerPaymentStatus(params: {
   const orderId = typeof metadata.order_id === 'string' ? metadata.order_id : undefined;
 
   let previousPaymentStatus: string | null = null;
+  let orderDepositInfo: { deposit_amount: unknown; balance_amount: unknown } | null = null;
   if (orderId) {
     const existingOrder = await prisma.orders.findFirst({
       where: { id: orderId, tenant_id: tenantId },
-      select: { payment_status: true },
+      select: { payment_status: true, deposit_amount: true, balance_amount: true },
     });
     previousPaymentStatus = existingOrder?.payment_status ?? null;
+    orderDepositInfo = existingOrder
+      ? { deposit_amount: existingOrder.deposit_amount, balance_amount: existingOrder.balance_amount }
+      : null;
   }
 
   await prisma.payment_logs.update({
@@ -134,7 +166,8 @@ export async function applyTumiziCustomerPaymentStatus(params: {
     },
   });
 
-  let effectiveOrderPaymentStatus = orderPaymentStatus;
+  let effectiveOrderPaymentStatus: 'paid' | 'pending' | 'failed' | 'refunded' | 'deposit_paid' =
+    orderPaymentStatus;
   const skipOrderUpdate = shouldSkipTumiziOrderPaymentDowngrade(
     previousPaymentStatus,
     orderPaymentStatus,
@@ -142,8 +175,22 @@ export async function applyTumiziCustomerPaymentStatus(params: {
 
   if (orderId) {
     if (skipOrderUpdate) {
-      effectiveOrderPaymentStatus = 'paid';
+      // Preserve whatever the order genuinely already was (could be 'paid'
+      // OR 'deposit_paid' — see shouldSkipTumiziOrderPaymentDowngrade)
+      // rather than blindly promoting to 'paid'.
+      effectiveOrderPaymentStatus =
+        (previousPaymentStatus as typeof effectiveOrderPaymentStatus) ?? 'paid';
     } else {
+      // Basic deposit support (docs/SERVICES_PLAN.md) — a Tumizi 'paid'
+      // confirmation might be the deposit leg or a later balance
+      // settlement; resolve which against what was actually requested at
+      // initiation (payment_logs.amount), never anything from the webhook
+      // payload itself.
+      effectiveOrderPaymentStatus = resolveTumiziOrderPaymentStatus(
+        orderPaymentStatus,
+        orderDepositInfo,
+        paymentLog.amount,
+      );
       await prisma.orders.updateMany({
         where: { id: orderId, tenant_id: tenantId },
         data: {

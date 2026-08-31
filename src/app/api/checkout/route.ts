@@ -26,6 +26,7 @@ import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
 import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
 import { initiateTumiziCustomerPaymentForOrder } from '@/lib/tumizi/initiate-order-payment';
 import { rollbackCheckoutAfterFailedTumizi } from '@/lib/checkout/rollback-after-failed-tumizi';
+import { computeLineDepositDue, computeOrderDeposit } from '@/lib/orders/deposit';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
       total: number;
     }> = [];
     let totalAmount = 0;
+    // Basic deposit support (docs/SERVICES_PLAN.md) — the amount actually
+    // due now across the cart. Equals totalAmount unless a line item has a
+    // deposit configured, in which case that line only contributes its
+    // reduced deposit amount here (the rest becomes the order's balance).
+    let depositSubtotal = 0;
 
     for (const item of cartItems) {
       const product = await prisma.products.findFirst({
@@ -145,6 +151,8 @@ export async function POST(request: NextRequest) {
           sale_price: true,
           stock_quantity: true,
           metadata: true,
+          deposit_type: true,
+          deposit_value: true,
         },
       });
 
@@ -210,6 +218,7 @@ export async function POST(request: NextRequest) {
 
       const itemTotal = finalPrice * item.quantity;
       totalAmount += itemTotal;
+      depositSubtotal += computeLineDepositDue(itemTotal, product.deposit_type, product.deposit_value);
 
       orderItems.push({
         product_id: product.id,
@@ -376,6 +385,17 @@ export async function POST(request: NextRequest) {
       finalTotal += resolvedDeliveryFee;
     }
 
+    // Basic deposit support (docs/SERVICES_PLAN.md) — total_amount keeps
+    // its existing meaning (the full order value) unconditionally; these
+    // two stay null for every normal order.
+    const { depositAmount: resolvedDepositAmount, balanceAmount: resolvedBalanceAmount } = computeOrderDeposit({
+      itemsSubtotal: totalAmount,
+      depositSubtotal,
+      taxAmount,
+      deliveryFee: resolvedDeliveryFee,
+      finalTotal,
+    });
+
     // Generate invoice number
     const { generateInvoiceNumber } = await import('@/lib/invoices/generate-invoice-number');
     const invoiceNumber = await generateInvoiceNumber(tenant.id);
@@ -392,6 +412,8 @@ export async function POST(request: NextRequest) {
         email: customerInfo.email,
         phone: customerInfo.phone,
         total_amount: finalTotal,
+        deposit_amount: resolvedDepositAmount,
+        balance_amount: resolvedBalanceAmount,
         status: 'pending',
         // Never trust client-submitted payment verification payloads for paid status.
         // Payment state is promoted to "paid" only from verified provider callbacks.
@@ -503,7 +525,10 @@ export async function POST(request: NextRequest) {
             id: order.id,
             order_number: order.order_number,
             invoice_number: order.invoice_number,
-            total_amount: order.total_amount,
+            // Basic deposit support (docs/SERVICES_PLAN.md) — charge the
+            // reduced deposit amount when one applies, the full order
+            // total otherwise (unchanged behavior for every normal order).
+            total_amount: order.deposit_amount ?? order.total_amount,
             name: order.name,
             email: order.email,
           },

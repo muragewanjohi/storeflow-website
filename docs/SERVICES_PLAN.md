@@ -102,3 +102,56 @@ This is new work, not yet started. Suggested order:
 
 - [Shopify Help Center — Selling services or digital products](https://help.shopify.com/en/manual/products/digital-service-product/selling-services-or-digital-products)
 - [Shopify — The 9 Best Shopify Appointment Booking Apps (2026)](https://www.shopify.com/blog/appointment-booking-app)
+
+---
+
+## Deposits / Partial Payments
+
+**Requested directly by the user**, prompted by services being the trigger: *"some services require a deposit to be made, confirm that we have that payment option?"* Confirmed by reading the real payment code — **we don't**. Documented here first per the user's own request, then built as **basic deposit support**: a flat amount or percentage charged at order time via the Tumizi (M-Pesa STK) payment method. Collecting the balance later, and extending this to the manual M-Pesa-till/cash payment methods, are explicit, separate follow-ups — see "Deliberately deferred" below.
+
+### Current state (confirmed from real code)
+
+- `orders.payment_status` takes exactly three real values across the whole codebase: `pending`, `paid`, `refunded` (repo-wide search for every `payment_status = '...'`/`payment_status: '...'` literal). No partial/deposit state exists.
+- Both real payment paths charge the full amount, unconditionally: Tumizi's `initiateTumiziCustomerPaymentForOrder` ([`initiate-order-payment.ts:72`](../src/lib/tumizi/initiate-order-payment.ts)) does `const amount = Number(order.total_amount)`; the manual M-Pesa-till flow (`payment_verification` in `checkoutSchema`) just records whatever the customer self-reports against the same `total_amount`.
+- A repo-wide search for `deposit`, `partial payment`, `balance_due`, `amount_paid` returns **zero matches** anywhere in `src/` or the Prisma schema.
+- **Hard rule already enforced in this codebase, and one this design must not violate**: `checkout/route.ts` creates every order as `payment_status: 'pending'` with the comment *"Never trust client-submitted payment verification payloads for paid status. Payment state is promoted to 'paid' only from verified provider callbacks."* The actual promotion to `'paid'` happens in exactly three real write-paths, all outside `checkout/route.ts` itself: `applyTumiziCustomerPaymentStatus` (a real Tumizi webhook callback), `admin/orders/[id]/verify-payment/route.ts` (a merchant manually approving a customer-submitted M-Pesa till reference — no amount is ever submitted alongside it), and `orders/[id]/route.ts` + its mobile mirror (general order-edit routes a merchant can also use to mark an order paid, e.g. cash — again no amount field). **Only the first of these was made deposit-aware this pass** — see "Deliberately deferred."
+- **Real, load-bearing detail found while checking blast radius**: 15+ analytics routes filter `payment_status = 'paid'` for revenue (`analytics/overview`, `analytics/revenue`, `dashboard/overview`, both mobile mirrors, etc.). This is exactly why the design below introduces a **new, distinct** status value rather than overloading `'paid'` — a deposit-only order must not silently count as full revenue.
+- **Real, useful infrastructure found while investigating S-Dep.7 (balance collection)**: `orders/[id]/tumizi/initiate-payment/route.ts` (a tenant-admin/staff-only, already-built "retry/collect payment" route) already accepts an arbitrary client-supplied `amount` — it was built for retrying a failed/expired STK push, but it works exactly as-is for a merchant collecting a balance later (`amount: order.balance_amount`), with zero backend changes. Balance collection turned out to need a dashboard **button**, not a new payment mechanism — see the corrected S-Dep.7 scope below.
+
+### Design (as actually built)
+
+**Not `total_amount` redefined — a new pair of fields alongside it.** `orders.total_amount` keeps its existing meaning (the full order value) unconditionally; every place that already reads it (invoices, emails, dashboards, analytics) keeps working unchanged. Two new nullable columns carry the deposit-specific data, `NULL` for every normal (non-deposit) order — zero behavior change for the common case. Applied directly (`supabase/migrations/20260831140000_add_deposit_support.sql`, then `npx prisma generate`):
+
+```sql
+ALTER TABLE products ADD COLUMN deposit_type varchar(20) NOT NULL DEFAULT 'none';  -- 'none' | 'fixed' | 'percentage'
+ALTER TABLE products ADD COLUMN deposit_value numeric(10,2);                       -- KES amount, or a 0-100 percentage, per deposit_type
+
+ALTER TABLE orders ADD COLUMN deposit_amount numeric(10,2);  -- amount actually charged now; NULL = no deposit involved
+ALTER TABLE orders ADD COLUMN balance_amount numeric(10,2);  -- total_amount - deposit_amount; NULL when deposit_amount is NULL
+```
+
+- **Where deposits are configured**: per-product, mirroring `requires_shipping`'s own per-item (not whole-tenant) design — a merchant can require a deposit on a booked service while selling hair product outright, in the same catalog.
+- **The calculation is a real, exported, testable module** (`@/lib/orders/deposit.ts`), not inlined in the checkout route — `computeLineDepositDue()` per item (a fixed deposit is capped at what that line actually owes, never more than the item's own price; a line with no deposit contributes its full price, same as before) and `computeOrderDeposit()` for the whole cart. Tax and any resolved delivery fee are always charged now alongside the deposit, never deferred — only the item-price portion a merchant explicitly discounted is held back as `balance_amount`.
+- **The reduced amount is what gets charged, not `total_amount`.** `checkout/route.ts`'s Tumizi initiation call passes `order.deposit_amount ?? order.total_amount` — no new parameter needed on `initiateTumiziCustomerPaymentForOrder` itself, since it already treats whatever `total_amount` value it's given as "the amount to charge."
+- **New `payment_status` value: `'deposit_paid'`.** Resolved by a new `resolveTumiziOrderPaymentStatus()` (`@/lib/tumizi/apply-payment-status.ts`), called from the real Tumizi webhook path only, in place of `'paid'`, whenever the order being confirmed has a non-`NULL` `deposit_amount` — **and the confirmed amount doesn't match the outstanding `balance_amount`** (a real discriminator: it compares what was actually requested at initiation, `payment_logs.amount`, against the order's own `balance_amount`, so a genuine future balance-collection charge correctly resolves to `'paid'`, not a second `'deposit_paid'`). Never decided in `checkout/route.ts` itself, matching the existing "only verified callbacks promote payment state" rule exactly. Because it's a distinct string from `'paid'`, every one of the 15+ existing `payment_status = 'paid'` analytics/revenue queries **needed zero changes** — a deposit-only order simply doesn't count as revenue until the balance is actually collected and the order is flipped to `'paid'`, which is the financially correct behavior, not a workaround.
+- **Downgrade guard extended, not the double-charge guard.** `shouldSkipTumiziOrderPaymentDowngrade()` now also protects `'deposit_paid'` orders from a stale/duplicate webhook downgrading them back to `pending`/`failed` (mirroring the protection `'paid'` already had). Deliberately did **NOT** add `'deposit_paid'` to `initiateTumiziCustomerPaymentForOrder`'s existing "already paid" re-initiation guard (`payment_status === 'paid' || 'refunded'`) — doing so would have blocked the exact balance-collection mechanism described above (a merchant legitimately needs to trigger a second Tumizi charge on a `'deposit_paid'` order).
+
+### Deliberately deferred (not built this pass)
+
+- **Manual M-Pesa-till and cash payment methods don't support deposits yet.** Neither has any amount-reporting mechanism today (`verify-payment/route.ts`'s customer-submitted reference carries no amount at all) — making these deposit-aware without knowing what was actually paid would mean guessing, which this codebase's own "never trust unverified payment claims" discipline rules out. Real gap, honestly flagged rather than worked around; needs its own amount-capture design, not assumed away.
+- **Storefront/mobile checkout copy** ("Deposit due now: X · Balance due later: Y") and the **dashboard/mobile product-config UI** to actually set `deposit_type`/`deposit_value` on a product — the schema+checkout core lands first, per this project's own established "backend contract, then platforms" sequencing (see `ONBOARDING_AI_CHAT_PLAN.md`). A merchant cannot actually use this feature end-to-end until these land.
+- **Balance collection UI** — corrected scope per the finding above: the backend piece already exists (`orders/[id]/tumizi/initiate-payment/route.ts`'s pre-existing `amount` override), so this is now "add a dashboard button that calls the existing route with `amount: order.balance_amount`," not a new payment mechanism.
+- **AI product-intake question** ("does this need a deposit?") for `ai-intake-shared.ts`.
+
+### Tracker
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| S-Dep.1 | Schema: `products.deposit_type`/`deposit_value`, `orders.deposit_amount`/`balance_amount` | ✅ | Applied to the real dev database directly (SQL-first, then `npx prisma generate`), confirmed via `information_schema.columns` |
+| S-Dep.2 | Checkout: compute deposit/balance, charge the reduced amount via Tumizi | ✅ | `@/lib/orders/deposit.ts` (new, exported, testable) + `checkout/route.ts` |
+| S-Dep.3 | Tumizi webhook writes `'deposit_paid'` when applicable | ✅ | `resolveTumiziOrderPaymentStatus()` + extended downgrade guard, `@/lib/tumizi/apply-payment-status.ts`. **Scope narrowed from the original plan**: only the Tumizi write-path — see "Deliberately deferred" for why the two manual write-paths were left alone |
+| S-Dep.4 | Live-verify the deposit/balance math + guard logic | ✅ | `npm run test:deposit-support`, 17/17 checks, against the real exported functions (not reimplemented copies). No live checkout/STK side effects — same honest ceiling as every other payment-adjacent change this session |
+| S-Dep.5 | Dashboard/mobile UI to configure a product's deposit | 🔲 | Deferred — schema+checkout core first |
+| S-Dep.6 | Storefront/mobile checkout copy showing deposit vs. balance | 🔲 | Deferred |
+| S-Dep.7 | Balance collection UI (dashboard button) | 🔲 | Deferred, but now confirmed small — see the pre-existing `orders/[id]/tumizi/initiate-payment` finding above |
+| S-Dep.8 | Extend deposits to the manual M-Pesa-till and cash payment methods | 🔲 | Blocked on those flows gaining any amount-reporting mechanism at all — not just unstarted, genuinely can't be done honestly without one |

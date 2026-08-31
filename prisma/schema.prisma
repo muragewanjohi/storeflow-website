@@ -451,6 +451,8 @@ model orders {
   payment_meta             Json?
   coupon                   String?          @db.VarChar(100)
   coupon_discounted        Decimal?         @db.Decimal(10, 2)
+  deposit_amount           Decimal?         @db.Decimal(10, 2) // amount actually charged now; NULL = no deposit involved — see docs/SERVICES_PLAN.md
+  balance_amount           Decimal?         @db.Decimal(10, 2) // total_amount - deposit_amount; NULL when deposit_amount is NULL
   shipping_address_id      String?          @db.Uuid
   selected_shipping_option String?          @db.VarChar(255)
   checkout_type            String?          @db.VarChar(50)
@@ -662,6 +664,8 @@ model products {
   price                   Decimal              @db.Decimal(10, 2)
   cost_price              Decimal?             @db.Decimal(10, 2)
   sale_price              Decimal?             @db.Decimal(10, 2)
+  deposit_type            String               @default("none") @db.VarChar(20) // 'none' | 'fixed' | 'percentage' — see docs/SERVICES_PLAN.md
+  deposit_value           Decimal?             @db.Decimal(10, 2) // KES amount for 'fixed', 0-100 for 'percentage'
   sku                     String?              @db.VarChar(100)
   stock_quantity          Int?                 @default(0)
   status                  String?              @default("active") @db.VarChar(50)
