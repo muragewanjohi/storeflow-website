@@ -1,15 +1,20 @@
 /**
- * Theme Track B2.1 — AI-assisted styling from a free-text mood prompt
- * ("warm and earthy", "energetic and bold") -> a real `custom_colors` /
- * `custom_fonts` payload in the exact shape PUT /api/themes/current already
- * accepts and persists.
+ * Theme Track B2 — AI-assisted styling, two entry points producing the SAME
+ * output (`custom_colors`/`custom_fonts`, the exact shape
+ * PUT /api/themes/current already accepts and persists):
+ *
+ *  - B2.1: a free-text mood prompt ("warm and earthy", "energetic and
+ *    bold") -> generateThemeStyleFromPrompt(), a text-only Claude call.
+ *  - B2.2: a reference screenshot ("make it feel like this site") ->
+ *    generateThemeStyleFromScreenshot(), a Claude VISION call over a real
+ *    captured image (@/lib/themes/screenshot-capture.ts owns the actual
+ *    capture + SSRF hardening; this module never fetches a URL itself).
  *
  * "Two entry points, both producing the SAME output... Neither ever touches
- * layout, imagery, or copy." (docs/THEME_SYSTEM_PLAN.md) — this module is
- * the shared core for the text-prompt entry point (B2.1); the
- * reference-screenshot entry point (B2.2) is a separate, not-yet-built
- * piece that would feed the same schema/validation here, just from a vision
- * call instead of a text one.
+ * layout, imagery, or copy." (docs/THEME_SYSTEM_PLAN.md) — both functions
+ * share the exact same schema, defensive re-validation (validateRawThemeStyle
+ * below), and "inspired by, never a clone of" guardrail, so the two entry
+ * points can never drift into different quality/safety bars.
  *
  * Deliberately generate-then-preview, not generate-then-save: this module
  * only ever returns a proposed payload. Actually persisting it is the
@@ -19,7 +24,7 @@
  * button as a manual edit, after seeing it in the existing live preview.
  */
 
-import { generateJson } from '@/lib/ai/claude-client';
+import { generateJson, generateJsonFromImage } from '@/lib/ai/claude-client';
 import type { AiUsage } from '@/lib/ai/claude-client';
 import { THEME_COLOR_SETTINGS, type ThemeColorKey } from '@/lib/themes/color-settings';
 import { FONT_OPTIONS, FONT_WEIGHTS, isVettedFontName, isVettedFontWeight } from '@/lib/themes/font-settings';
@@ -106,33 +111,15 @@ function buildSystemPrompt(): string {
   ].join(' ');
 }
 
-export interface GenerateThemeStyleFromPromptParams {
-  prompt: string;
-}
-
-export interface GenerateThemeStyleFromPromptResult {
-  data: AiThemeStyleResult;
-  usage: AiUsage;
-}
-
 /**
- * Real generation + defensive re-validation — every field is checked
- * against its real, safe constraint (valid hex, vetted font, vetted
+ * Real defensive re-validation shared by BOTH entry points — every field is
+ * checked against its real, safe constraint (valid hex, vetted font, vetted
  * weight) and silently corrected to a safe default if Claude's output
  * doesn't comply, same "don't trust the model's output format, verify in
  * code" discipline as every other structured-output call in this codebase
  * (e.g. expense-categorize's allow-list re-check).
  */
-export async function generateThemeStyleFromPrompt(
-  params: GenerateThemeStyleFromPromptParams
-): Promise<GenerateThemeStyleFromPromptResult> {
-  const { data: raw, usage } = await generateJson<RawThemeStyleResult>({
-    system: buildSystemPrompt(),
-    userContent: `Mood/style request: "${params.prompt.trim()}"`,
-    schema: themeStyleSchema,
-    maxTokens: 400,
-  });
-
+function validateRawThemeStyle(raw: RawThemeStyleResult): AiThemeStyleResult {
   const colors = Object.fromEntries(
     COLOR_KEYS.map((key) => {
       const value = raw.colors?.[key];
@@ -147,10 +134,78 @@ export async function generateThemeStyleFromPrompt(
   const bodyWeight = isVettedFontWeight(raw.bodyWeight) ? raw.bodyWeight : DEFAULT_BODY_WEIGHT;
 
   return {
-    data: {
-      colors,
-      typography: { headingFont, bodyFont, headingWeight, bodyWeight },
-    },
-    usage,
+    colors,
+    typography: { headingFont, bodyFont, headingWeight, bodyWeight },
   };
+}
+
+export interface GenerateThemeStyleFromPromptParams {
+  prompt: string;
+}
+
+export interface GenerateThemeStyleFromPromptResult {
+  data: AiThemeStyleResult;
+  usage: AiUsage;
+}
+
+/** B2.1 — free-text mood prompt. See validateRawThemeStyle() for the shared safety net. */
+export async function generateThemeStyleFromPrompt(
+  params: GenerateThemeStyleFromPromptParams
+): Promise<GenerateThemeStyleFromPromptResult> {
+  const { data: raw, usage } = await generateJson<RawThemeStyleResult>({
+    system: buildSystemPrompt(),
+    userContent: `Mood/style request: "${params.prompt.trim()}"`,
+    schema: themeStyleSchema,
+    maxTokens: 400,
+  });
+
+  return { data: validateRawThemeStyle(raw), usage };
+}
+
+function buildVisionSystemPrompt(): string {
+  const colorList = THEME_COLOR_SETTINGS.map((s) => `"${s.key}" (${s.description.replace(/^Used for:\s*/, '')})`).join('; ');
+  const fontList = FONT_OPTIONS.map((f) => f.value).join(', ');
+  const weightList = FONT_WEIGHTS.map((w) => w.value).join(', ');
+
+  return [
+    "You are a color-and-typography stylist for DukaNest, a multi-tenant ecommerce platform. A merchant has shared a screenshot of another website whose overall FEELING they like — your job is ONLY to translate the general color palette and typography mood of that reference into a real color palette and font pairing for their own store.",
+    'CRITICAL: this is inspiration for a MOOD, never a clone. Do not attempt to reproduce the reference site\'s exact layout, exact imagery, logo, brand marks, or written copy — none of that is relevant here, and none of it would even be usable (you are only picking colors and fonts). Ignore any text, logos, or people visible in the screenshot entirely; look only at the general color palette and the typographic character (e.g. bold vs. delicate, modern vs. classic, rounded vs. sharp) of what you see.',
+    `Return exactly these 8 hex colors, each formatted as "#RRGGBB": ${colorList}.`,
+    'Colors must form a real, usable, accessible palette: "text" must have strong contrast against "background", "buttonText" must have strong contrast against "buttonBackground", and "background" should stay light/neutral enough for body text to be readable.',
+    `Pick "headingFont" and "bodyFont" EXACTLY, character-for-character, from this list only — never invent a font name, and never claim to match the reference site's actual font (you cannot know it from a screenshot, only its general character): ${fontList}. It is fine to pick the same font for both.`,
+    `Pick "headingWeight" and "bodyWeight" as integers from this list only: ${weightList}.`,
+    'Return ONLY valid JSON with no markdown and no extra prose.',
+  ].join(' ');
+}
+
+export interface GenerateThemeStyleFromScreenshotParams {
+  imageBase64: string;
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+}
+
+export interface GenerateThemeStyleFromScreenshotResult {
+  data: AiThemeStyleResult;
+  usage: AiUsage;
+}
+
+/**
+ * B2.2 — reference-screenshot styling. Takes an already-captured image
+ * (see @/lib/themes/screenshot-capture.ts for the real capture + SSRF
+ * hardening — this function never fetches a URL itself, only interprets an
+ * image it's handed). Same shared schema/safety net as B2.1 via
+ * validateRawThemeStyle().
+ */
+export async function generateThemeStyleFromScreenshot(
+  params: GenerateThemeStyleFromScreenshotParams
+): Promise<GenerateThemeStyleFromScreenshotResult> {
+  const { data: raw, usage } = await generateJsonFromImage<RawThemeStyleResult>({
+    system: buildVisionSystemPrompt(),
+    instructionText: 'Extract a color palette and font pairing inspired by the general mood of this reference screenshot.',
+    imageBase64: params.imageBase64,
+    imageMediaType: params.mediaType,
+    schema: themeStyleSchema,
+    maxTokens: 400,
+  });
+
+  return { data: validateRawThemeStyle(raw), usage };
 }

@@ -94,6 +94,7 @@ export default function ThemeCustomizeClient({
   const [customColors, setCustomColors] = useState<ThemeColors>({});
   const [customFonts, setCustomFonts] = useState<ThemeTypography>({});
   const [aiStylePrompt, setAiStylePrompt] = useState('');
+  const [aiStyleUrl, setAiStyleUrl] = useState('');
   const [customLayouts, setCustomLayouts] = useState<ThemeLayout>({});
   const [customCss, setCustomCss] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -241,6 +242,47 @@ export default function ThemeCustomizeClient({
       return;
     }
     aiStyleMutation.mutate(trimmed);
+  };
+
+  // Theme Track B2.2 — AI-assisted styling from a reference-site screenshot.
+  // Same generate-then-preview contract as B2.1's aiStyleMutation above —
+  // populates the same customColors/customFonts state, nothing persisted
+  // until Save. Can genuinely take 10-20+ seconds (real headless-browser
+  // capture + a Claude vision call), so the button below shows a real
+  // "this takes a moment" note rather than looking stuck.
+  const aiStyleFromUrlMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await fetch('/api/themes/ai-style-from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate a style from that site');
+      }
+      return response.json() as Promise<{
+        custom_colors: ThemeColors;
+        custom_fonts: { headingFont: string; bodyFont: string; headingWeight: number; bodyWeight: number };
+      }>;
+    },
+    onSuccess: (data) => {
+      setCustomColors((prev) => ({ ...prev, ...data.custom_colors }));
+      setCustomFonts((prev) => ({ ...prev, ...data.custom_fonts }));
+      toast.success('Applied a style inspired by that site — review it below, then Save to keep it.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate a style from that site');
+    },
+  });
+
+  const handleGenerateAiStyleFromUrl = () => {
+    const trimmed = aiStyleUrl.trim();
+    if (!trimmed) {
+      toast.error('Enter a website URL first (e.g. "https://example.com").');
+      return;
+    }
+    aiStyleFromUrlMutation.mutate(trimmed);
   };
 
   // Generate favicon from logo using Canvas API
@@ -602,6 +644,45 @@ export default function ThemeCustomizeClient({
                     {aiStyleMutation.isPending ? 'Generating…' : 'Generate'}
                   </Button>
                 </div>
+              </div>
+
+              {/* Theme Track B2.2 — AI-assisted styling from a reference site */}
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    Style from a reference site
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                    Share a link to a site whose overall feeling you like — inspired by, not a clone of. I&apos;ll look at its general colors and typography, never its layout, images, logo, or text.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={aiStyleUrl}
+                    onChange={(e) => setAiStyleUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !aiStyleFromUrlMutation.isPending) handleGenerateAiStyleFromUrl();
+                    }}
+                    placeholder="https://example.com"
+                    className="bg-background"
+                    disabled={aiStyleFromUrlMutation.isPending}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateAiStyleFromUrl}
+                    disabled={aiStyleFromUrlMutation.isPending}
+                    className="shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {aiStyleFromUrlMutation.isPending ? 'Capturing & generating…' : 'Generate'}
+                  </Button>
+                </div>
+                {aiStyleFromUrlMutation.isPending && (
+                  <p className="text-xs text-purple-700 dark:text-purple-300">
+                    This can take up to 20 seconds — capturing the page and analyzing its style.
+                  </p>
+                )}
               </div>
 
               {/* Recommended Color Schemes Info */}
