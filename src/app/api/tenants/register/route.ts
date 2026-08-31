@@ -1310,9 +1310,36 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = registerTenantSchema.parse(body);
-    // Clean install: no demo products, categories, sales, blogs, or generic demo content.
+    // Clean install: no FAKE demo products, categories, sales, or blogs.
     // Optional starterPackJobId may still supply theme colors only; applyStarterPackToTenant never runs.
     const includeDemoContent = false;
+    // Real bug found live (2026-08-31, via a real merchant's broken homepage
+    // screenshot): DA.21's own design keeps the 5 REAL, non-fake AI-
+    // generated homepage images (hero + 3 banners + split-layout —
+    // "generate exactly 5 generic images instead... never a fake specific
+    // product either way", see the `else if (!ENABLE_FULL_AI_STARTER_PACK)`
+    // branch below) deliberately SEPARATE from the fake demo content
+    // includeDemoContent disables — but that whole pathway lived entirely
+    // INSIDE the `if (includeDemoContent)` block, so setting
+    // includeDemoContent to false silently killed it too, contradicting the
+    // documented intent right there in that same block's own comments. This
+    // has been true for every registration, unconditionally, for a long
+    // time (confirmed live: `onboarding_setup`/`homepage_generic_images`
+    // are missing on every real tenant checked, going back months) — it
+    // just stayed invisible because virtually every registration defaulted
+    // to the `grocery` theme (no theme-picker UI existed until DA.35's
+    // theme-recommendation feature), and grocery's homepage builder
+    // (createGroceryHomepageTemplate) never uses the placeholder-then-patch
+    // mechanism this bug affects — it always uses hardcoded bucket stock
+    // photos instead, so a merchant on that theme was never left with a
+    // permanently-unpatched "Image loading" placeholder. Now that DA.35
+    // correctly routes merchants to non-grocery themes, this dormant bug
+    // surfaces for real. Independently re-enables JUST the real-image
+    // pathway below — every fake-content path still separately requires
+    // `starterPackPayload`, which independently still requires
+    // `includeDemoContent` (unaffected by this flag), so no demo
+    // product/category/sale/blog behavior changes.
+    const generateGenericHomepageImages = true;
 
     const phoneCountry = (
       validatedData.adminPhoneCountry?.toUpperCase() &&
@@ -2347,8 +2374,11 @@ export async function POST(request: NextRequest) {
           // Continue - pages are important but not critical for registration
         }
 
-        // Create demo content if requested
-        if (includeDemoContent) {
+        // Create demo content if requested, OR run the real generic-image
+        // pathway regardless (see generateGenericHomepageImages above) —
+        // starterPackPayload (the only source of fake demo content inside
+        // this block) still independently requires includeDemoContent.
+        if (includeDemoContent || generateGenericHomepageImages) {
           let appliedFromStarterPack = false;
           if (starterPackPayload) {
             try {
@@ -2850,7 +2880,7 @@ export async function POST(request: NextRequest) {
             });
           }
         } else {
-          console.log(`[Registration] Demo content not requested (includeDemoContent: false)`);
+          console.log(`[Registration] Demo content and generic homepage images both disabled (includeDemoContent: false, generateGenericHomepageImages: false)`);
         }
 
         console.log(`[Registration] ✅ Successfully installed theme ${theme.slug} for tenant ${tenant.subdomain}`);
