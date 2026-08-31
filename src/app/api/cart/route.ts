@@ -61,6 +61,12 @@ export async function GET(request: NextRequest) {
             sku: true,
             slug: true,
             estimated_delivery_days: true,
+            // Basic deposit support (docs/SERVICES_PLAN.md) — raw config,
+            // not a pre-computed amount, so checkout-client.tsx can preview
+            // the deposit/balance split live via the same
+            // computeLineDepositDue()/computeOrderDeposit() checkout uses.
+            deposit_type: true,
+            deposit_value: true,
           },
         },
       },
@@ -117,6 +123,9 @@ export async function GET(request: NextRequest) {
         sku: product.sku,
         slug: product.slug,
         estimated_delivery_days: product.estimated_delivery_days,
+        // Basic deposit support (docs/SERVICES_PLAN.md)
+        deposit_type: product.deposit_type,
+        deposit_value: product.deposit_value != null ? Number(product.deposit_value) : null,
       };
     }).filter(Boolean) as any[];
 

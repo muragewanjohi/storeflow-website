@@ -62,6 +62,9 @@ interface Order {
   total_amount: number;
   status: string | null;
   payment_status: string | null;
+  // Basic deposit support (docs/SERVICES_PLAN.md)
+  deposit_amount?: number | null;
+  balance_amount?: number | null;
   payment_gateway: string | null;
   transaction_id: string | null;
   payment_meta: any | null;
@@ -192,6 +195,10 @@ export default function OrderDetailClient({
       case 'pending':
         return 'secondary';
       case 'paid':
+        return 'default';
+      // Basic deposit support (docs/SERVICES_PLAN.md) — genuinely paid,
+      // but not fully settled, so distinct from both 'paid' and 'pending'.
+      case 'deposit_paid':
         return 'default';
       case 'failed':
         return 'destructive';
@@ -928,6 +935,18 @@ export default function OrderDetailClient({
                   </Badge>
                 </div>
               </div>
+              {order.deposit_amount != null && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Deposit Charged</Label>
+                    <p className="text-sm font-medium mt-1">{formatCurrency(order.deposit_amount)}</p>
+                  </div>
+                  <div>
+                    <Label>Balance Due</Label>
+                    <p className="text-sm font-medium mt-1">{formatCurrency(order.balance_amount ?? 0)}</p>
+                  </div>
+                </div>
+              )}
               {order.payment_gateway && (
                 <div>
                   <Label>Payment Gateway</Label>

@@ -19,6 +19,16 @@ export const createProductSchema = z.object({
   cost_price: z.number().min(0, 'Cost price cannot be negative').optional().nullable()
     .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sale_price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
+  // Basic deposit support (docs/SERVICES_PLAN.md) — 'fixed' is a KES
+  // amount (capped at the item's own total at checkout time, so it can
+  // never exceed what the line owes), 'percentage' is 0-100. No
+  // schema-level cross-check between the two here (would break
+  // updateProductSchema's .partial() chain below); the dashboard/mobile
+  // forms constrain the input, and checkout's computeLineDepositDue()
+  // already caps a runaway fixed value defensively either way.
+  deposit_type: z.enum(['none', 'fixed', 'percentage']).default('none').optional(),
+  deposit_value: z.number().min(0).optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sku: z.string().max(100, 'SKU must be less than 100 characters').optional().nullable(),
   stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').default(0).optional(),
   status: z.enum(['active', 'inactive', 'draft', 'archived']).default('active').optional(),

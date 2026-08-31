@@ -28,6 +28,7 @@ import { useAnalytics } from '@/lib/analytics/use-analytics';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { identifyTikTokPixelUser, trackTikTokPixelEvent } from '@/lib/analytics/tiktok-pixel';
 import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+import { computeLineDepositDue, computeOrderDeposit } from '@/lib/orders/deposit';
 
 interface CartItem {
   product_id: string;
@@ -39,6 +40,9 @@ interface CartItem {
   sku: string | null;
   slug?: string | null;
   estimated_delivery_days?: number | null;
+  // Basic deposit support (docs/SERVICES_PLAN.md)
+  deposit_type?: string | null;
+  deposit_value?: number | null;
 }
 
 interface Cart {
@@ -2305,6 +2309,53 @@ export default function CheckoutClient({
                       Delivery fee will be quoted and confirmed by the store after you order.
                     </p>
                   )}
+
+                  {/* Basic deposit support (docs/SERVICES_PLAN.md) — preview
+                      only, using the exact same computeOrderDeposit() the
+                      real checkout route charges from, so this can never
+                      drift from what actually gets billed. */}
+                  {(() => {
+                    const depositSubtotal = cart.items.reduce(
+                      (sum, item) =>
+                        sum + computeLineDepositDue(item.price * item.quantity, item.deposit_type, item.deposit_value),
+                      0
+                    );
+                    let taxAmount = 0;
+                    if (checkoutSettings?.tax_enabled && checkoutSettings.default_tax_rate) {
+                      const taxRate = checkoutSettings.default_tax_rate / 100;
+                      taxAmount = checkoutSettings.tax_pricing_type === 'inclusive'
+                        ? cart.total - (cart.total / (1 + taxRate))
+                        : cart.total * taxRate;
+                    }
+                    const deliveryFeeAmount = deliveryMethod === 'delivery' && deliveryFee ? deliveryFee : 0;
+                    const taxExclusiveAddOn = checkoutSettings?.tax_enabled && checkoutSettings.default_tax_rate && checkoutSettings.tax_pricing_type === 'exclusive'
+                      ? taxAmount
+                      : 0;
+                    const finalTotal = cart.total + taxExclusiveAddOn + deliveryFeeAmount;
+                    const { depositAmount, balanceAmount } = computeOrderDeposit({
+                      itemsSubtotal: cart.total,
+                      depositSubtotal,
+                      taxAmount,
+                      deliveryFee: deliveryFeeAmount,
+                      finalTotal,
+                    });
+                    if (depositAmount == null) return null;
+                    return (
+                      <div className="rounded-md bg-primary/5 border border-primary/20 p-3 space-y-1">
+                        <div className="flex justify-between text-sm font-semibold">
+                          <span>Pay now (deposit)</span>
+                          <span>{formatPrice(depositAmount)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Balance due later</span>
+                          <span>{formatPrice(balanceAmount ?? 0)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground pt-1">
+                          One or more items only require a deposit today — the store will follow up about the remaining balance.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>

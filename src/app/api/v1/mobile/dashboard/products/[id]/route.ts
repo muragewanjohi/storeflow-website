@@ -114,6 +114,9 @@ async function updateProduct(request: NextRequest, params: Promise<{ id: string 
     if (validatedData.estimated_delivery_days !== undefined) {
       updateData.estimated_delivery_days = validatedData.estimated_delivery_days;
     }
+    // Basic deposit support (docs/SERVICES_PLAN.md)
+    if (validatedData.deposit_type !== undefined) updateData.deposit_type = validatedData.deposit_type;
+    if (validatedData.deposit_value !== undefined) updateData.deposit_value = validatedData.deposit_value;
 
     const product = await prisma.products.update({
       where: { id },

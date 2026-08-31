@@ -362,6 +362,9 @@ function formatCurrency(amount: number, currency: {
  * Format payment status
  */
 function formatPaymentStatus(status: string): string {
+  // Basic deposit support (docs/SERVICES_PLAN.md) — 'deposit_paid' would
+  // otherwise render as the ugly, wrong "Deposit_paid".
+  if (status === 'deposit_paid') return 'Deposit Paid';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 

@@ -40,6 +40,8 @@ interface Product {
   image?: string | null;
   category_id?: string | null;
   estimated_delivery_days?: number | null;
+  deposit_type?: 'none' | 'fixed' | 'percentage' | null;
+  deposit_value?: number | null;
 }
 
 interface Category {
@@ -173,6 +175,8 @@ export default function ProductFormClient({
     category_id: product?.category_id || 'none',
     image: product?.image || '',
     estimated_delivery_days: product?.estimated_delivery_days?.toString() || '',
+    deposit_type: product?.deposit_type || ('none' as 'none' | 'fixed' | 'percentage'),
+    deposit_value: product?.deposit_value?.toString() || '',
   });
 
   // Initialize variants from props if editing, or empty array if creating
@@ -366,6 +370,16 @@ export default function ProductFormClient({
       }
     }
 
+    // Basic deposit support (docs/SERVICES_PLAN.md)
+    if (formData.deposit_type !== 'none') {
+      const depositValue = parseFloat(formData.deposit_value);
+      if (!formData.deposit_value.trim() || isNaN(depositValue) || depositValue <= 0) {
+        errors.deposit_value = 'Enter a deposit amount greater than zero';
+      } else if (formData.deposit_type === 'percentage' && depositValue > 100) {
+        errors.deposit_value = 'A percentage deposit cannot exceed 100';
+      }
+    }
+
     // Only validate product-level stock if no variants exist
     if (variants.length === 0) {
       const stockQuantity = parseInt(formData.stock_quantity, 10);
@@ -455,8 +469,13 @@ export default function ProductFormClient({
         status: formData.status,
         category_id: categoryId,
         // Estimated delivery days (null means use tenant default)
-        estimated_delivery_days: formData.estimated_delivery_days 
-          ? parseInt(formData.estimated_delivery_days, 10) 
+        estimated_delivery_days: formData.estimated_delivery_days
+          ? parseInt(formData.estimated_delivery_days, 10)
+          : null,
+        // Basic deposit support (docs/SERVICES_PLAN.md)
+        deposit_type: formData.deposit_type,
+        deposit_value: formData.deposit_type !== 'none' && formData.deposit_value.trim()
+          ? parseFloat(formData.deposit_value)
           : null,
       };
 
@@ -884,6 +903,51 @@ export default function ProductFormClient({
                     />
                     {validationErrors.sale_price && (
                       <p className="text-sm text-destructive">{validationErrors.sale_price}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="deposit_type">Deposit</Label>
+                    <ContextualHelp
+                      title="Deposit"
+                      description="Charge only part of the price now and collect the rest later — useful for services like a booking or a made-to-order item. Leave as 'No deposit' to charge the full price at checkout, as before."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select
+                      value={formData.deposit_type}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, deposit_type: value as 'none' | 'fixed' | 'percentage' })
+                      }
+                    >
+                      <SelectTrigger id="deposit_type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No deposit — charge full price</SelectItem>
+                        <SelectItem value="fixed">Fixed amount</SelectItem>
+                        <SelectItem value="percentage">Percentage of price</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formData.deposit_type !== 'none' && (
+                      <div className="space-y-2">
+                        <Input
+                          id="deposit_value"
+                          type="number"
+                          step={formData.deposit_type === 'percentage' ? '1' : '0.01'}
+                          min="0"
+                          max={formData.deposit_type === 'percentage' ? '100' : undefined}
+                          value={formData.deposit_value}
+                          onChange={(e) => setFormData({ ...formData, deposit_value: e.target.value })}
+                          placeholder={formData.deposit_type === 'percentage' ? 'e.g. 30' : 'e.g. 500'}
+                        />
+                        {validationErrors.deposit_value && (
+                          <p className="text-sm text-destructive">{validationErrors.deposit_value}</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

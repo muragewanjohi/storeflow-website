@@ -319,6 +319,10 @@ export default function OrdersListClient({
         return 'outline'; // use outline so pendingBadgeClass can apply amber without conflict
       case 'paid':
         return 'default';
+      // Basic deposit support (docs/SERVICES_PLAN.md) — genuinely paid,
+      // but not fully settled, so distinct from both 'paid' and 'pending'.
+      case 'deposit_paid':
+        return 'default';
       case 'failed':
         return 'destructive';
       case 'refunded':

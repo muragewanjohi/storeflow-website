@@ -68,6 +68,8 @@ export function formatPaymentStatus(status: string): string {
   const statusMap: Record<string, string> = {
     pending: 'Pending',
     paid: 'Paid',
+    // Basic deposit support (docs/SERVICES_PLAN.md)
+    deposit_paid: 'Deposit Paid',
     failed: 'Failed',
     refunded: 'Refunded',
   };

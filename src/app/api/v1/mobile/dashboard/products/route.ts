@@ -263,6 +263,9 @@ export async function POST(request: NextRequest) {
             ? validatedData.metadata
             : {},
         estimated_delivery_days: validatedData.estimated_delivery_days ?? null,
+        // Basic deposit support (docs/SERVICES_PLAN.md)
+        deposit_type: validatedData.deposit_type ?? 'none',
+        deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
       },
     });
 

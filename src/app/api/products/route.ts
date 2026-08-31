@@ -850,14 +850,17 @@ export async function POST(request: NextRequest) {
       created_by: String(user.id),
       metadata: validatedData.metadata && typeof validatedData.metadata === 'object' ? validatedData.metadata : {},
       estimated_delivery_days: validatedData.estimated_delivery_days ? Number(validatedData.estimated_delivery_days) : null,
+      // Basic deposit support (docs/SERVICES_PLAN.md)
+      deposit_type: String(validatedData.deposit_type || 'none'),
+      deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
     };
-    
+
     // Final safety check: ensure no unexpected keys exist
     const allowedProductFields = [
       'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
       'cost_price',
       'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-      'created_by', 'metadata', 'estimated_delivery_days'
+      'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value'
     ];
     const productDataKeys = Object.keys(productData);
     const unexpectedProductFields = productDataKeys.filter(key => !allowedProductFields.includes(key));
@@ -905,6 +908,8 @@ export async function POST(request: NextRequest) {
         created_by: string;
         metadata: any;
         estimated_delivery_days: number | null;
+        deposit_type: string;
+        deposit_value: number | null;
       } = {
         tenant_id: productData.tenant_id,
         name: productData.name,
@@ -924,15 +929,17 @@ export async function POST(request: NextRequest) {
         created_by: productData.created_by,
         metadata: productData.metadata,
         estimated_delivery_days: productData.estimated_delivery_days,
+        deposit_type: productData.deposit_type,
+        deposit_value: productData.deposit_value,
       };
-      
+
       // Verify finalProductData has no unexpected fields
       const finalKeys = Object.keys(finalProductData);
       const allowedFinalFields = [
         'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
         'cost_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-        'created_by', 'metadata', 'estimated_delivery_days'
+        'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value'
       ];
       const unexpectedFinalFields = finalKeys.filter(key => !allowedFinalFields.includes(key));
       if (unexpectedFinalFields.length > 0) {
@@ -999,6 +1006,8 @@ export async function POST(request: NextRequest) {
         created_by: String(ultraCleanData.created_by),
         metadata: ultraCleanData.metadata && typeof ultraCleanData.metadata === 'object' ? ultraCleanData.metadata : {},
         estimated_delivery_days: ultraCleanData.estimated_delivery_days ? Number(ultraCleanData.estimated_delivery_days) : null,
+        deposit_type: ultraCleanData.deposit_type ? String(ultraCleanData.deposit_type) : 'none',
+        deposit_value: ultraCleanData.deposit_value != null ? Number(ultraCleanData.deposit_value) : null,
       };
       
       // Final verification - ensure no 'new' field exists
