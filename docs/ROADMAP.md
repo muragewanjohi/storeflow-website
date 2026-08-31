@@ -184,6 +184,27 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - [ ] Service listings surfaced in storefront browsing, search, and category pages alongside products
 - [ ] Theme/component support for rendering a service (vs. a product) card and detail page across existing themes
 
+#### 3.7. Point of Sale (POS) — offline-capable
+
+**Status:** In progress — Phase 1 (backend + online flow) started.
+
+**Goal:** A counter-sale / walk-in flow in the Flutter store-owner app that rings up a sale (catalog search, line items, ad-hoc discount, payment, receipt), records it as a first-class `orders` row (`channel = 'pos'`), and **works with no connectivity** for cash sales — the sale completes locally, produces a receipt, and syncs to the server automatically on reconnect.
+
+**Design:** `storeflow/docs/POS_OFFLINE_DESIGN.md` (full spec, decisions, conflict matrix). Builds on the offline layer scoped in `flutter/docs/offline_support_plan.md`.
+
+- [x] Schema: `orders.channel` / `client_sale_id` (idempotency) / `served_by` / `amount_tendered` / `change_due` / `offline_created_at`, `order_products.discount_amount`, `products.barcode` + `product_variants.barcode` — migration `20260831120000_add_pos_offline_support.sql` **(applied to remote DB 2026-08-31)**
+- [x] `GET /api/v1/mobile/pos/bootstrap` — catalog + settings snapshot for the offline cache
+- [x] `POST /api/v1/mobile/pos/sales` — idempotent sale create (dedupe on `client_sale_id`), stock decrement + `inventory_history`, COGS capture, oversell allowed + flagged, plan-limit advisory (never blocks)
+- [x] Flutter `ApiClient.getPosBootstrap` / `postPosSale`
+- [x] Tests — backend 36 passing (`src/lib/pos/__tests__/`, `src/app/api/v1/mobile/pos/__tests__/`); Flutter 8 passing (`flutter/test/features/pos/pos_totals_test.dart` — totals port, oversell, UUID strictness)
+- [x] Flutter `lib/features/pos/` — register → cart → tender → receipt screens (online-only), reachable from the More menu; live totals mirroring server math, oversell / over-limit surfacing, share-text receipt
+- [x] M-Pesa STK from POS via **Tumizi** — `create-sale.ts` fires `initiateTumiziCustomerPaymentForOrder` (order created `pending`, rolled back on STK failure); bootstrap exposes `mpesa_stk_enabled`; tender screen has an M-Pesa method + phone field + a poll-for-confirmation wait screen (reuses `.../tumizi/sync-payment`) with "confirm later" / "resend" outs; receipt shows Paid vs Awaiting
+- [ ] Thermal / PDF receipt variant of the invoice (share is plain text for now)
+- [ ] Barcode scanning (needs `mobile_scanner`; search matches barcode text today)
+- [ ] Plan gate — `pos_enabled` in `price_plans.features` (Pro/Premium)
+- [ ] Phase 2: `lib/core/storage/` + `lib/core/sync/` offline layer (Hive catalog cache, `pos_sales_outbox`, `SyncManager` with backoff), offline banner + pending-sync indicator, local receipt render
+- [ ] Phase 3: cash drawer / shift open-close + Z-report; online-only `/dashboard/pos` web page; barcode field in product editor
+
 #### 4. Customer Features
 - [ ] Customer loyalty program
 - [ ] Wishlist functionality
@@ -557,9 +578,10 @@ Full Instagram Shopping integration that allows tenants to tag products in Insta
 1. **Plan limits enforcement & usage visibility** (staff ✅; products/orders ✅ in API; storage, orders-per-month, full usage display, UI blocks + upgrade CTA)
 2. **Theme selector on demo websites** (one website per business type; visitors can switch themes on the same demo store)
 3. **User Learning & Onboarding System** (Help center, contextual help, setup checklist, welcome emails)
-4. Payment gateway integrations (Stripe, PayPal)
-5. Email marketing features
-6. Inventory management enhancements
+4. **Point of Sale (POS)** — offline-capable counter sales in the Flutter app (`docs/POS_OFFLINE_DESIGN.md`; Phase 1 started)
+5. Payment gateway integrations (Stripe, PayPal)
+6. Email marketing features
+7. Inventory management enhancements
 
 ### Medium Priority (3-6 Months)
 6. User Learning & Onboarding (Video tutorials, interactive tours, community forum)
