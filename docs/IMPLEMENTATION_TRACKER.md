@@ -1,6 +1,6 @@
 # Implementation Tracker — AI Features + Theme System
 
-Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEATURES_PLAN.md), [`THEME_SYSTEM_PLAN.md`](./THEME_SYSTEM_PLAN.md), [`ONBOARDING_AI_CHAT_PLAN.md`](./ONBOARDING_AI_CHAT_PLAN.md), and [`DASHBOARD_AI_ASSISTANT_PLAN.md`](./DASHBOARD_AI_ASSISTANT_PLAN.md). Update this file (not the plan docs) as work lands — the plan docs describe *what* and *why*; this tracks *is it done*.
+Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEATURES_PLAN.md), [`THEME_SYSTEM_PLAN.md`](./THEME_SYSTEM_PLAN.md), [`ONBOARDING_AI_CHAT_PLAN.md`](./ONBOARDING_AI_CHAT_PLAN.md), [`DASHBOARD_AI_ASSISTANT_PLAN.md`](./DASHBOARD_AI_ASSISTANT_PLAN.md), and [`SERVICES_PLAN.md`](./SERVICES_PLAN.md). Update this file (not the plan docs) as work lands — the plan docs describe *what* and *why*; this tracks *is it done*.
 
 **Status legend:** 🔲 Not started · 🔄 In progress · ✅ Done · ⏸️ Blocked · ➖ N/A (investigated, deliberately not built)
 
@@ -229,6 +229,23 @@ Requested directly by the user: make the assistant the prominent, **center** tab
 | **5** | `configuration_guidance` / guided product-add hand-off parity | ✅ | Brought forward from "optional, only if feedback shows it's needed" — feedback arrived immediately: real click-testing on the actual Flutter app hit the "how do I add a product" dead end (see DA.8) the same day Phase 3 shipped, answered first with a real (non-chat) pointer. **Completed by DA.11**: mobile now drives the full conversational `product_intake` flow (same shared prompt as web) and creates the product for real via the existing mobile products endpoint, plus real category creation — see DA.11 for the full breakdown |
 
 **Flagged, not decided**: demoting Analytics from a primary tab to a More-menu item is a real reachability downgrade for merchants who check it often — confirmed as the user's intended tradeoff (AI's discoverability > Analytics' one-tap access), not re-litigated here.
+
+---
+
+## Services — Selling Non-Shipped Items (new, own plan doc)
+
+Full detail in [`SERVICES_PLAN.md`](./SERVICES_PLAN.md). **Requested directly by the user**: "kindly analyse how we can include services in our app, currently we only support products." Investigated the real gap before proposing anything — `products` has no `type`/`is_service`/`booking` concept anywhere in the schema, yet the platform's own `/register` business-type list already includes service businesses ("Beauty & Personal Care — barbershops, salons"). Researched how Shopify solves this (no native "service" entity — a single `requires_shipping` boolean on the product/variant, checkout skips shipping when false; booking/scheduling deliberately left to third-party apps even at Shopify's scale) and borrowed that boundary directly: Phase 1 below is scoped to "sell a non-shipped item," not scheduling.
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| S1.1 | `requires_shipping` column on `products` (SQL-first migration + Prisma regen) | 🔲 | Foundation — every other row unaffected by the default `true` |
+| S1.2 | Checkout: skip delivery-zone/shipping-address collection when every cart item has `requires_shipping: false` | 🔲 | Reuses the existing lightweight `pickup`-style contact-only fields already in `checkoutSchema` — no new checkout type invented |
+| S1.3 | Web dashboard product form + storefront theme CTA | 🔲 | Hide stock field when non-shipped; per-item CTA copy, not a whole-tenant flag |
+| S1.4 | Flutter product editor + storefront-equivalent | 🔲 | Mirrors S1.3 |
+| S1.5 | AI product-intake question update (`ai-intake-shared.ts`) | 🔲 | "Does this need to be shipped?" — sits after DA.41's category-required gate, before price |
+| S1.6 | Live-verify: real service-only order end-to-end | 🔲 | Create a `requires_shipping: false` product, add to cart, checkout, confirm no shipping/delivery fields were required or charged |
+| S2 | Real scheduling (`service_bookings` table, calendar UI, time-slot picker, staff/resource assignment) | 🔲 | **Deliberately deferred** — see plan doc's "Why booking is a separate phase." Build only once Phase 1 usage shows real merchant demand for it, not ahead of usage |
+| S3 | Booking reminders, staff availability, deposits/no-show handling | 🔲 | Depends on S2 existing first. Reuses the SMS/push infra already built for DA.36's subscription reminders — no new notification pipeline needed |
 
 ---
 
