@@ -27,6 +27,11 @@
  * side conversation table. Designed to be the reusable pattern AI Phase 1.1
  * (product intake) and 7.1 (delivery-zone intake) build on later, with
  * their own system prompt + schema, not their own chat plumbing.
+ *
+ * The system prompt, response schema, and turn-shaping logic live in
+ * @/lib/onboarding/chat-shared so the mobile bearer-token mirror (OC.3,
+ * POST /api/v1/mobile/onboarding/chat) runs the identical conversation, not
+ * a re-typed copy that can drift.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -36,10 +41,15 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { generateJsonFromConversation, estimateCostUsd } from '@/lib/ai/claude-client';
 import { recordAiUsage } from '@/lib/ai/usage';
 import { guardAiRequest } from '@/lib/ai/guard';
+import {
+  ONBOARDING_CHAT_MAX_MESSAGES,
+  onboardingChatResponseSchema,
+  buildOnboardingChatSystemPrompt,
+  withOnboardingChatKickoff,
+  type OnboardingChatTurnResponse,
+} from '@/lib/onboarding/chat-shared';
 
 export const dynamic = 'force-dynamic';
-
-const MAX_MESSAGES = 40; // generous for a real conversation; a hard stop against unbounded/abusive threads
 
 const requestSchema = z.object({
   messages: z
@@ -49,55 +59,10 @@ const requestSchema = z.object({
         content: z.string().min(1),
       })
     )
-    .max(MAX_MESSAGES, 'Conversation is too long — please restart onboarding.'),
+    .max(ONBOARDING_CHAT_MAX_MESSAGES, 'Conversation is too long — please restart onboarding.'),
   storeName: z.string().optional(),
   knownBusinessType: z.string().optional(),
 });
-
-const responseSchema = {
-  type: 'object',
-  properties: {
-    reply: { type: 'string' },
-    done: { type: 'boolean' },
-    collected: {
-      type: 'object',
-      properties: {
-        businessType: { type: ['string', 'null'] },
-        niche: { type: ['string', 'null'] },
-      },
-      required: ['businessType', 'niche'],
-      additionalProperties: false,
-    },
-  },
-  required: ['reply', 'done', 'collected'],
-  additionalProperties: false,
-} as const;
-
-function buildSystemPrompt(storeName?: string, knownBusinessType?: string): string {
-  return [
-    'You are a friendly onboarding assistant for DukaNest, a Kenyan multi-tenant ecommerce platform.',
-    knownBusinessType
-      ? `You already know the merchant's businessType: "${knownBusinessType}". Do not ask for it again — you may confirm it naturally in your first message, but your only real job now is finding out their niche (their specific focus within it, e.g. "women's handbags", "phone accessories", "organic produce"). Always return businessType as exactly "${knownBusinessType}" in collected.`
-      : 'Your job in this conversation is to find out two things: businessType (a general category, e.g. "fashion", "electronics", "grocery") and niche (their specific focus within it, e.g. "women\'s handbags", "phone accessories", "organic produce").',
-    'Ask one short, friendly question at a time. Do not ask about pricing, products, delivery, themes, or anything else — those come later in separate steps.',
-    storeName
-      ? `The merchant's store is already named "${storeName}" — do not ask for it, you may reference it naturally.`
-      : undefined,
-    knownBusinessType
-      ? 'Once you clearly have niche, set done to true, fill in collected (businessType as given above, niche as discovered), and set reply to a short (max 2 sentences) friendly confirmation.'
-      : 'Once you clearly have both businessType and niche, set done to true, fill in collected with both fields, and set reply to a short (max 2 sentences) friendly confirmation telling them their store is being set up.',
-    'Until then, set done to false and leave collected fields null for whatever you do not have yet.',
-    'Keep every reply under 3 sentences. Return ONLY valid JSON with no markdown and no extra prose.',
-  ]
-    .filter(Boolean)
-    .join(' ');
-}
-
-interface ChatTurnResponse {
-  reply: string;
-  done: boolean;
-  collected: { businessType: string | null; niche: string | null };
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -110,17 +75,12 @@ export async function POST(request: NextRequest) {
     const guard = await guardAiRequest(tenant, 'onboarding_intake', 'setup');
     if (!guard.ok) return guard.response;
 
-    // Messages API requires the first turn to be 'user' — inject a synthetic
-    // kickoff so the frontend can call this with an empty array on page load.
-    const messages =
-      input.messages.length > 0
-        ? input.messages
-        : [{ role: 'user' as const, content: '(Start the onboarding conversation.)' }];
+    const messages = withOnboardingChatKickoff(input.messages);
 
-    const { data, usage } = await generateJsonFromConversation<ChatTurnResponse>({
-      system: buildSystemPrompt(input.storeName, input.knownBusinessType),
+    const { data, usage } = await generateJsonFromConversation<OnboardingChatTurnResponse>({
+      system: buildOnboardingChatSystemPrompt(input.storeName, input.knownBusinessType),
       messages,
-      schema: responseSchema,
+      schema: onboardingChatResponseSchema,
       maxTokens: 500,
     });
 

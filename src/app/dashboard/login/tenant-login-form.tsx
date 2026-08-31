@@ -33,6 +33,14 @@ function otpHelpKindFromApiCode(code: unknown): OtpHelpKind {
 export default function TenantLoginForm() {
   const router = useRouter();
   const [tenantName, setTenantName] = useState<string | null>(null);
+  // OC.4 (docs/IMPLEMENTATION_TRACKER.md, "UI — Onboarding AI Chat") — whether
+  // this tenant hasn't told us their niche yet (tenants.data.niche unset).
+  // GET /api/tenant/current already returns the full tenant row (including
+  // `data`) to every visitor of this page, authenticated or not, so this is
+  // not a new exposure — just reading a field this same effect already
+  // fetches. Used only to pick the post-login landing page below; never
+  // blocks login itself, and the chat screen (OC.2/OC.5) is always skippable.
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -103,6 +111,9 @@ export default function TenantLoginForm() {
         if (response.ok) {
           const data = await response.json();
           setTenantName(data.tenant?.name || null);
+          const tenantData = data.tenant?.data;
+          const niche = tenantData && typeof tenantData === 'object' ? tenantData.niche : undefined;
+          setNeedsOnboarding(!(typeof niche === 'string' && niche.trim().length > 0));
         }
       } catch (err) {
         // Ignore errors - tenant name is optional for login page
@@ -136,7 +147,10 @@ export default function TenantLoginForm() {
 
         if (response.ok && data.success) {
           await new Promise(resolve => setTimeout(resolve, 200));
-          const redirectTo = data.redirectTo || '/dashboard';
+          // Only fall back to the onboarding-chat landing when the server
+          // didn't already hand us a specific redirectTo (e.g. a stored
+          // return URL) — that case is left completely alone.
+          const redirectTo = data.redirectTo || (needsOnboarding ? '/dashboard/onboarding/chat' : '/dashboard');
           setIsRedirecting(true);
           window.location.href = redirectTo;
           return;
@@ -191,7 +205,7 @@ export default function TenantLoginForm() {
 
       // No 2FA - direct login
       setIsRedirecting(true);
-      window.location.href = '/dashboard';
+      window.location.href = needsOnboarding ? '/dashboard/onboarding/chat' : '/dashboard';
       return;
     } catch (err) {
       setError('An error occurred. Please try again.');

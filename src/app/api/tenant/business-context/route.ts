@@ -13,6 +13,10 @@
  * for future AI personalization (product descriptions, marketing tone) —
  * regenerating/enriching the actual demo catalog from it is a deliberately
  * separate follow-up, not bundled into this endpoint.
+ *
+ * The actual merge-into-tenants.data logic lives in
+ * @/lib/onboarding/chat-shared's mergeBusinessContext() so the mobile mirror
+ * (OC.3, PATCH /api/v1/mobile/onboarding/business-context) shares it exactly.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,6 +24,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
+import { mergeBusinessContext } from '@/lib/onboarding/chat-shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,10 +34,6 @@ const requestSchema = z.object({
 }).refine((v) => Boolean(v.businessType || v.niche), {
   message: 'businessType or niche is required',
 });
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -46,16 +47,11 @@ export async function PATCH(request: NextRequest) {
       where: { id: tenant.id },
       select: { data: true },
     });
-    const existingData = isRecord(current?.data) ? current.data : {};
 
     const updated = await prisma.tenants.update({
       where: { id: tenant.id },
       data: {
-        data: {
-          ...existingData,
-          ...(input.businessType ? { business_type: input.businessType } : {}),
-          ...(input.niche ? { niche: input.niche } : {}),
-        },
+        data: mergeBusinessContext(current?.data, input),
       },
       select: { data: true },
     });
