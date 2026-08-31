@@ -36,6 +36,12 @@ const AI_RATE_LIMITS: Record<AiFeature, { limit: number; windowSeconds: number }
   photo_qa: { limit: 30, windowSeconds: 60 },
   marketing_image_prompt: { limit: 10, windowSeconds: 60 },
   legal_page_draft: { limit: 5, windowSeconds: 60 },
+  // Unlimited-by-design at the quota layer (see getAiFeatureLimit() in
+  // subscriptions/limits.ts — not listed there, falls through to
+  // "no cap defined", same category as expense_categorization) — a
+  // single Haiku call per draft, trivial cost. This rate limit is the
+  // real abuse guard.
+  blog_draft: { limit: 10, windowSeconds: 60 },
   delivery_zone_intake: { limit: 30, windowSeconds: 60 },
   // Wider window than the others: a real conversation is several turns
   // (question, answer, question, answer...) over a few minutes, not one

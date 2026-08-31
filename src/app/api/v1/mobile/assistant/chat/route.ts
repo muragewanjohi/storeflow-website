@@ -71,6 +71,7 @@ import {
   requireCategoryBeforeProductIntake,
   handleHomepageImageConfigTarget,
   handleMarketingImagesConfigTarget,
+  handleBlogDraftConfigTarget,
   getBusinessProfile,
   configTargetSchema,
   buildConfigTargetSystemPrompt,
@@ -115,7 +116,7 @@ const MOBILE_NEXT_STEPS_META: Record<string, NextStepsNavMeta> = {
 };
 
 const MOBILE_CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
+  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
 
 /**
  * Mobile's answer for a resolved configuration_guidance target. See module
@@ -176,6 +177,14 @@ async function handleMobileConfigurationGuidance(messages: ChatMessage[], tenant
       data.marketingImageCount ?? null,
       data.marketingImageConfirmed ?? false,
     );
+    return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'blog_draft') {
+    const result = await handleBlogDraftConfigTarget(tenant, data.blogTopic ?? '', {
+      buildHref: (blogId) => `/blog-post/edit/${blogId}`,
+      cta: 'Review post',
+    });
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
 

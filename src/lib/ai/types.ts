@@ -16,6 +16,7 @@ export type AiFeature =
   | 'photo_qa'
   | 'marketing_image_prompt'
   | 'legal_page_draft'
+  | 'blog_draft'
   | 'delivery_zone_intake'
   | 'onboarding_intake'
   | 'assistant_query'

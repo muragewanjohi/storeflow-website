@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { Sparkles } from 'lucide-react';
 // Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
@@ -66,6 +67,44 @@ export default function BlogFormClient({ blog, categories }: Readonly<BlogFormCl
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // AI-assisted blog drafting — generate-then-save (Pattern A), never
+  // auto-publishes; fills the form below for review/edit before Save.
+  const [aiTopic, setAiTopic] = useState('');
+  const [isDraftingWithAi, setIsDraftingWithAi] = useState(false);
+  const [aiDraftError, setAiDraftError] = useState<string | null>(null);
+
+  const handleGenerateBlogDraft = async () => {
+    if (!aiTopic.trim() || isDraftingWithAi) return;
+    setIsDraftingWithAi(true);
+    setAiDraftError(null);
+    try {
+      const response = await fetch('/api/blogs/ai-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: aiTopic.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAiDraftError(data.error || 'Could not draft a post right now. Please try again.');
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        content: data.content || prev.content,
+        excerpt: data.excerpt || prev.excerpt,
+        meta_title: data.meta_title || prev.meta_title,
+        meta_description: data.meta_description || prev.meta_description,
+      }));
+      // The draft is always simple HTML, not page-builder JSON.
+      setContentMode('rich-text');
+    } catch {
+      setAiDraftError('Could not draft a post right now. Please try again.');
+    } finally {
+      setIsDraftingWithAi(false);
+    }
+  };
 
   // Detect content mode: if content is valid JSON with sections, use page builder
   const detectContentMode = (content: string | null | undefined): 'rich-text' | 'page-builder' => {
@@ -214,6 +253,47 @@ export default function BlogFormClient({ blog, categories }: Readonly<BlogFormCl
 
       <form onSubmit={handleSubmit} className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
         <div className="space-y-6">
+          {/* AI-assisted blog drafting — generate-then-save, same pattern as
+              theme-customize-client.tsx's "Style with AI" card. */}
+          <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+            <div>
+              <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4" />
+                Draft with AI
+              </h4>
+              <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                Describe a topic and I&apos;ll write a full draft (title, body, excerpt, SEO fields) below for you to review and edit — nothing is published until you save it.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!isDraftingWithAi) handleGenerateBlogDraft();
+                  }
+                }}
+                placeholder='e.g. "5 tips for choosing the right handbag"'
+                className="bg-background"
+                disabled={isDraftingWithAi}
+              />
+              <Button
+                type="button"
+                onClick={handleGenerateBlogDraft}
+                disabled={isDraftingWithAi || !aiTopic.trim()}
+                className="shrink-0"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {isDraftingWithAi ? 'Drafting…' : 'Draft post'}
+              </Button>
+            </div>
+            {aiDraftError && (
+              <p className="text-xs text-destructive">{aiDraftError}</p>
+            )}
+          </div>
+
           {/* Basic Information */}
           <Card>
             <CardHeader>

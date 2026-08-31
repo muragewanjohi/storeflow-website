@@ -18,6 +18,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   photo_qa: 'Product photo QA',
   marketing_image_prompt: 'Marketing image prompts',
   legal_page_draft: 'Legal page drafts',
+  blog_draft: 'Blog post drafts',
   delivery_zone_intake: 'Delivery zone setup',
   onboarding_intake: 'Onboarding chat',
   assistant_query: 'Dashboard AI Assistant',

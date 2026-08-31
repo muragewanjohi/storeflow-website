@@ -72,6 +72,8 @@ import {
   generateSocialContentText,
   generateSocialContentImage,
 } from '@/lib/social-content/social-content-shared';
+import { runBlogDraft } from '@/lib/blog/blog-draft-shared';
+import { generateSlug as generateBlogSlug } from '@/lib/content/validation';
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -112,11 +114,11 @@ export function buildClassifySystemPrompt(includeConfigurationGuidance: boolean)
     '"data_query" — asking about their OWN store\'s numbers: sales, revenue, orders, expenses, product/category counts (e.g. "how many shoes did I sell this month", "what was my revenue last week", "how many products do I have").',
     '"help_question" — asking to UNDERSTAND how something works or what a feature does — an informational, read-about-it question (e.g. "how do I create a discount code", "what is the page builder", "where do I set my delivery zones").',
     includeConfigurationGuidance
-      ? '"configuration_guidance" — asking the assistant to ACTIVELY walk them through doing/setting up ONE SPECIFIC thing right now, not just explain it (e.g. "help me add a product", "walk me through adding a new product", "how do I add a category", "set up a product for me").'
+      ? '"configuration_guidance" — asking the assistant to ACTIVELY walk them through doing/setting up ONE SPECIFIC thing right now, not just explain it (e.g. "help me add a product", "walk me through adding a new product", "how do I add a category", "set up a product for me", "write a blog post about X", "draft a blog article").'
       : undefined,
     '"next_steps" — asking what to do next, how to get started, what is left to finish setting up their store, or for a general setup/progress overview — not about one specific feature, but the big picture (e.g. "what should I do next", "what should I do", "how do I get started", "what\'s left to set up", "am I ready to launch", "help me get my store ready").',
     '"business_advice" — asking for retail/business advice or opinion about THEIR BUSINESS, independent of DukaNest as a platform: what categories or product types fit their business, what attributes matter for a kind of product, general pricing strategy, how much to charge for a specific product, OR asking what their OWN recorded business type/niche IS (e.g. "what categories should I have", "how much should I charge for my leather bag", "what\'s my business type", "what niche did I register as", "remind me what kind of business I set up"). This is different from help_question — help_question is about how to USE DukaNest\'s features; business_advice covers both retail expertise and their own recorded business profile, neither of which any DukaNest document would contain.',
-    '"social_content" — asking for marketing/outreach CONTENT TO SEND OR POST to reach their own customers: a social media caption, a WhatsApp message, an SMS blurb, or "something to share" about a product, sale, or their store in general (e.g. "write me a post about my new arrivals", "make a WhatsApp message for my leather wallets", "give me something to share on Instagram for my sale", "help me promote this to my customers"). Distinct from configuration_guidance\'s marketing_images target: if they want ONLY an image/banner/graphic with no request for a caption, message, or text to send, that stays configuration_guidance; if they want TEXT content to send/post (optionally plus a matching image), that\'s social_content. IMPORTANT: if YOUR OWN previous message in this conversation already gave social/WhatsApp/SMS content and then offered a matching shareable image ("Want me to also whip up a shareable graphic for this?"), and the merchant\'s latest message confirms wanting that image (e.g. "yes", "make the graphic too", "do it") — that is STILL social_content, continuing the same request, even though the word "graphic"/"image" on its own might otherwise look like configuration_guidance\'s marketing_images target.',
+    '"social_content" — asking for marketing/outreach CONTENT TO SEND OR POST to reach their own customers: a social media caption, a WhatsApp message, an SMS blurb, or "something to share" about a product, sale, or their store in general (e.g. "write me a post about my new arrivals", "make a WhatsApp message for my leather wallets", "give me something to share on Instagram for my sale", "help me promote this to my customers"). Distinct from configuration_guidance\'s marketing_images target: if they want ONLY an image/banner/graphic with no request for a caption, message, or text to send, that stays configuration_guidance; if they want TEXT content to send/post (optionally plus a matching image), that\'s social_content. ALSO distinct from configuration_guidance\'s blog_draft target: a bare "post" (no word "blog") means a short social/WhatsApp/SMS message and stays social_content; the word "blog" (e.g. "write a blog post", "draft a blog article", "post for my blog") always means the long-form, saved-to-the-Blog article instead — that is configuration_guidance, never social_content, even though both start with "write me a...". IMPORTANT: if YOUR OWN previous message in this conversation already gave social/WhatsApp/SMS content and then offered a matching shareable image ("Want me to also whip up a shareable graphic for this?"), and the merchant\'s latest message confirms wanting that image (e.g. "yes", "make the graphic too", "do it") — that is STILL social_content, continuing the same request, even though the word "graphic"/"image" on its own might otherwise look like configuration_guidance\'s marketing_images target.',
     `"unclear" — anything else: small talk, requests outside all ${includeConfigurationGuidance ? 'six' : 'five'} categories, or genuinely ambiguous even with conversation context.`,
     includeConfigurationGuidance
       ? 'Exception: ANY question about adding/creating a product OR a category — including "how do I add a product", "how do I add a category", "how do I create a product listing" — is ALWAYS configuration_guidance, never help_question. There is no help-center article that covers either topic, so treating it as help_question always leads to a dead end; the assistant can actually walk the merchant through it, so offer that instead.'
@@ -144,7 +146,7 @@ export function unclearReply(includeProductIntake: boolean): string {
   // "help you add a new product" (not "walk you through...") so this reads
   // accurately on both platforms — web's is a multi-turn chat, mobile's is
   // a one-shot pointer to the native form.
-  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product' : ''}, suggest categories/products/pricing for your business, write a social/WhatsApp/SMS post to share with your customers, or tell you what to set up next. Could you rephrase your question that way?`;
+  return `I can answer questions about your store's data (like units sold, revenue, order count, or expenses for a time period), help you understand how to use DukaNest's features${includeProductIntake ? ', help you add a new product' : ''}, suggest categories/products/pricing for your business, write a social/WhatsApp/SMS post or a blog post to share with your customers, or tell you what to set up next. Could you rephrase your question that way?`;
 }
 
 export interface HandlerResult {
@@ -167,7 +169,7 @@ export interface HandlerResult {
 // like 'category', are simple enough that this module can just create them
 // directly and immediately when the merchant already named them, on BOTH
 // platforms — see handleCategoryConfigTarget() below.
-export const CONFIG_TARGETS = ['product_intake', 'category', 'sales', 'homepage_image', 'delivery_zone', 'marketing_images', 'unsupported'] as const;
+export const CONFIG_TARGETS = ['product_intake', 'category', 'sales', 'homepage_image', 'delivery_zone', 'marketing_images', 'blog_draft', 'unsupported'] as const;
 export type ConfigTarget = (typeof CONFIG_TARGETS)[number];
 
 export const configTargetSchema = {
@@ -239,6 +241,14 @@ export const configTargetSchema = {
     // generation happens (real quota + real cost, same discipline as
     // homepage_image).
     marketingImageConfirmed: { type: 'boolean' },
+    // Populated when target === 'blog_draft' and either (a) the merchant
+    // already stated a topic in THIS message (e.g. "write a blog post about
+    // our new arrivals"), OR (b) YOUR OWN previous message asked "what
+    // would you like the post to be about?" and the merchant's latest
+    // message answers it — extract that answer as the topic. Empty for a
+    // bare "write me a blog post" with no topic given yet — never invent a
+    // topic, same discipline as saleName.
+    blogTopic: { type: 'string' },
   },
   required: [
     'target',
@@ -250,6 +260,7 @@ export const configTargetSchema = {
     'marketingImageRequest',
     'marketingImageCount',
     'marketingImageConfirmed',
+    'blogTopic',
   ],
   additionalProperties: false,
 } as const;
@@ -264,6 +275,7 @@ export interface ConfigTargetParseResult {
   marketingImageRequest: string;
   marketingImageCount: number | null;
   marketingImageConfirmed: boolean;
+  blogTopic: string;
 }
 
 /**
@@ -289,8 +301,8 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "sales" — creating a new SALE/PROMOTION entity in the store (a real record on the Sales page — name only here, the merchant adds the banner/dates/discounted products afterward). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing IMAGES (e.g. a banner graphic referencing a sale, images for social media, a promo graphic) — a picture, not the sale record itself.',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about creating/adding/setting up a SALE or PROMOTION as a real thing in the store (e.g. "create a sale", "add a promotion called Black Friday", "I want to set up a flash sale") — actually creating the sale record, not just an image about it — return target: "sales". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing IMAGE or images for some other purpose (a sale banner GRAPHIC, a social media post image, "make me a graphic for X") that is not one of the 5 fixed homepage slots and not a request to create the sale record itself, return target: "marketing_images".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "sales" — creating a new SALE/PROMOTION entity in the store (a real record on the Sales page — name only here, the merchant adds the banner/dates/discounted products afterward). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing IMAGES (e.g. a banner graphic referencing a sale, images for social media, a promo graphic) — a picture, not the sale record itself. "blog_draft" — writing a full DRAFT BLOG POST (title, body, excerpt, SEO fields) on a topic and saving it to the store\'s Blog as a draft for review — not a short social caption (that\'s a different, separate capability), a real long-form blog article.',
+    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about creating/adding/setting up a SALE or PROMOTION as a real thing in the store (e.g. "create a sale", "add a promotion called Black Friday", "I want to set up a flash sale") — actually creating the sale record, not just an image about it — return target: "sales". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing IMAGE or images for some other purpose (a sale banner GRAPHIC, a social media post image, "make me a graphic for X") that is not one of the 5 fixed homepage slots and not a request to create the sale record itself, return target: "marketing_images". If it is about writing, drafting, or creating a BLOG POST or blog article for the store (e.g. "write a blog post about our new arrivals", "draft a blog article", "can you write a post for my blog") — a real long-form article, not a short social/WhatsApp/SMS message — return target: "blog_draft".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
@@ -302,10 +314,13 @@ export function buildConfigTargetSystemPrompt(
     '1. YOUR OWN previous message in this conversation already proposed ONE SPECIFIC thing (a single named slot, or "all") and explicitly asked for a yes/no confirmation of THAT ONE THING (e.g. "Want me to regenerate your hero image?", "Want me to regenerate all 5 of your homepage images?") AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact value now ("hero"/"banner1"/"banner2"/"banner3"/"split_layout"/"all"). proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention. IMPORTANT: a message that merely LISTS multiple possible options for them to choose from (e.g. "which image would you like? Your options are: ... Or say all of them for all 5") is NOT a proposal of one specific thing, even though it mentions "all of them" as one of the choices — it is a question, not an offer. If their reply to a LIST like that names one option for the first time (including "all of them"), that is case 2 below, not case 1 — it still needs one more confirmation turn before anything is actually regenerated.',
     '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If they clearly want ALL 5 regenerated (e.g. "all of them", "redo all my homepage images", "regenerate everything", "give me new images for my whole homepage"), set proposedImageSlot to "all" instead. If it is genuinely ambiguous which slot(s) they mean (e.g. "update my banner images" could be any of the 3, or a vague "make my homepage look better" with no clear scope), leave proposedImageSlot empty too — you will ask them which one(s).',
     'delivery_zone has no extra fields here — it is a pure hand-off, the actual name/areas/fee collection happens in a dedicated follow-up conversation, not in this classification step.',
+    'If target is "blog_draft", there are two cases:',
+    '1. They already stated a topic in THIS message (e.g. "write a blog post about our new arrivals", "draft a post about caring for leather bags"), OR YOUR OWN previous message asked "what would you like the post to be about?" and their latest message answers it — extract the topic into blogTopic.',
+    '2. Otherwise — a first-time request with no topic given (e.g. "write me a blog post", "can you draft something for my blog") — leave blogTopic empty; you will ask them what it should be about. NEVER invent a topic yourself.',
     'If target is "marketing_images", there are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed generating images for a specific description AND their latest message clearly agrees (e.g. "yes", "go ahead", "do it") — set marketingImageRequest to that SAME description you previously proposed, set marketingImageCount to the SAME number you previously stated in that proposal (it will be written in your own prior message), set marketingImageConfirmed to true. This is how a proposal becomes a real generation request — generating costs real quota/money and must never happen on the very first mention.',
     '2. Otherwise — a first-time request — set marketingImageRequest to a clear paraphrase of what they described wanting, set marketingImageConfirmed to false. If they stated a specific number of images (e.g. "3 images", "a couple of banners" -> 2), set marketingImageCount to that number; otherwise leave it null.',
-    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a sale, a homepage image, a delivery zone, or a new marketing image), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
+    'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a sale, a homepage image, a delivery zone, a new marketing image, or a blog post), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
 }
@@ -456,6 +471,114 @@ export async function handleSalesConfigTarget(
     answer: `Created a new sale: "${created}" (saved as a draft — add a banner, dates, and products to it, then publish it from the Sales page when you're ready).`,
     data: { target: 'sales', created, steps: [pointerStep] },
     usage: zeroUsage,
+  };
+}
+
+/**
+ * Real blog post creation from an AI-generated draft, mirroring
+ * POST /api/blogs's own validated logic exactly (createBlogSchema's slug
+ * generation via @/lib/content/validation, same slug-collision check) —
+ * same "run the real validated logic directly against Prisma instead of
+ * over HTTP" reasoning as createCategoriesFromNames/createSaleFromName
+ * above. Always created as `status: 'draft'` — the real API's own default,
+ * never overridden here — so nothing an AI writes ever goes live on the
+ * storefront without the merchant separately reviewing and publishing it
+ * from the Blog page.
+ */
+async function createBlogPostFromDraft(
+  tenantId: string,
+  draft: { title: string; content: string; excerpt: string; metaTitle: string; metaDescription: string },
+): Promise<{ id: string; title: string; slug: string }> {
+  const baseSlug = generateBlogSlug(draft.title) || `blog-${Date.now()}`;
+  let slug = baseSlug;
+  let suffix = 1;
+  // A generated title colliding with an existing slug is plausible (e.g.
+  // two "5 Tips for..." posts) — unlike category/sale names, a blog post
+  // isn't a unique catalog entry the merchant would want blocked on
+  // collision, so append a numeric suffix instead of skipping creation.
+  while (await prisma.blogs.findFirst({ where: { tenant_id: tenantId, slug } })) {
+    suffix += 1;
+    slug = `${baseSlug}-${suffix}`;
+  }
+
+  const blog = await prisma.blogs.create({
+    data: {
+      tenant_id: tenantId,
+      title: draft.title,
+      slug,
+      content: draft.content,
+      excerpt: draft.excerpt,
+      meta_title: draft.metaTitle,
+      meta_description: draft.metaDescription,
+      status: 'draft',
+    },
+  });
+
+  return { id: blog.id, title: blog.title, slug: blog.slug ?? slug };
+}
+
+/**
+ * Answers a resolved 'blog_draft' configuration_guidance target — shared
+ * verbatim by both platforms, same reasoning as handleSalesConfigTarget:
+ * generation + creation needs only a topic, so both platforms can just do
+ * it. Two cases (mirroring sales, not category — a blog topic is the
+ * merchant's own actual idea, never an AI-invented guess the way category
+ * suggestions are):
+ *  1. The merchant already gave a topic (this turn, or confirming their
+ *     own earlier answer to "what should the post be about?") — generates
+ *     the draft via runBlogDraft() and creates it for real (as a draft,
+ *     never published), confirms with a link to review/edit it.
+ *  2. No topic given — asks for one, generates nothing yet. A later
+ *     message naming one re-enters this function via case 1.
+ *
+ * No separate quota/rate-limit guard here, and no dedicated recordAiUsage
+ * call — runBlogDraft()'s usage flows back into the caller's combined
+ * total the same way handleCategoryConfigTarget's suggestion-generation
+ * call already does (a text-only Claude call, same modality and a
+ * comparable cost class to that one), recorded once under 'assistant_query'
+ * at the outer route level. blog_draft as its own AiFeature/quota/rate-limit
+ * entry exists only for the standalone "Draft with AI" button
+ * (POST /api/blogs/ai-draft), a separate, unrelated entry point into the
+ * same runBlogDraft() core.
+ */
+export async function handleBlogDraftConfigTarget(
+  tenant: Tenant,
+  blogTopic: string,
+  pointer: { buildHref: (blogId: string) => string; cta: string },
+): Promise<HandlerResult> {
+  const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
+  const trimmedTopic = blogTopic.trim();
+  if (!trimmedTopic) {
+    return {
+      intent: 'configuration_guidance',
+      answer: 'Sure — what would you like the blog post to be about?',
+      data: { target: 'blog_draft' },
+      usage: zeroUsage,
+    };
+  }
+
+  const { businessType, niche } = getBusinessProfile(tenant);
+  const { data, usage } = await runBlogDraft({
+    topic: trimmedTopic,
+    storeName: tenant.name,
+    businessType,
+    niche,
+  });
+
+  const post = await createBlogPostFromDraft(tenant.id, data);
+  const pointerStep = {
+    id: 'blog_draft',
+    label: 'Review blog post',
+    description: 'Opens the draft in the blog editor',
+    href: pointer.buildHref(post.id),
+    cta: pointer.cta,
+  };
+
+  return {
+    intent: 'configuration_guidance',
+    answer: `Drafted a new blog post: "${post.title}" (saved as a draft — review, edit, and publish it from the Blog page whenever you're ready).`,
+    data: { target: 'blog_draft', created: post.title, blogId: post.id, steps: [pointerStep] },
+    usage,
   };
 }
 

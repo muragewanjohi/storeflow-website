@@ -46,6 +46,7 @@ import {
   requireCategoryBeforeProductIntake,
   handleHomepageImageConfigTarget,
   handleMarketingImagesConfigTarget,
+  handleBlogDraftConfigTarget,
   getBusinessProfile,
   WEB_NEXT_STEPS_META,
   configTargetSchema,
@@ -76,7 +77,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —
@@ -144,6 +145,14 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
       data.marketingImageCount ?? null,
       data.marketingImageConfirmed ?? false,
     );
+    return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
+  }
+
+  if (target === 'blog_draft') {
+    const result = await handleBlogDraftConfigTarget(tenant, data.blogTopic ?? '', {
+      buildHref: (blogId) => `/dashboard/blogs/${blogId}/edit`,
+      cta: 'Review post',
+    });
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
 

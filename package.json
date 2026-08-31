@@ -48,6 +48,7 @@
     "test:claude-chat-known-business-type": "tsx scripts/test-claude-chat-known-business-type.ts",
     "test:onboarding-chat-mobile": "tsx scripts/test-onboarding-chat-mobile.ts",
     "test:deposit-support": "tsx scripts/test-deposit-support.ts",
+    "test:blog-draft": "tsx scripts/test-blog-draft.ts",
     "test:claude-product-intake": "tsx scripts/test-claude-product-intake.ts",
     "test:claude-assistant-query": "tsx scripts/test-claude-assistant-query.ts",
     "test:claude-assistant-next-steps": "tsx scripts/test-claude-assistant-next-steps.ts",
