@@ -6,33 +6,51 @@
  * input anything yet they are of the same niche" (with a Jiji.co.ke
  * category-browser screenshot as the reference point).
  *
- * Scoped deliberately narrow for a first version, per user decision: a
- * flat list (no subcategories/tree yet — `categories.parent_id` already
- * supports one, but real usage today barely uses it, so building a
- * two-level tree now would be curating content nobody's asked to browse
- * yet) of ~8-15 real category names per business type, not Jiji's full
- * marketplace-wide breadth (dozens of top-level categories).
+ * Two real, live uses (both explicit selection — nothing here is ever
+ * auto-created without the merchant choosing it):
+ *  1. Registration: register/page.tsx shows a second, filterable "Category"
+ *     dropdown scoped to whichever business type the merchant picked
+ *     (@/components/shared/filterable-select.tsx) — "what are you selling"
+ *     — and that ONE chosen category is created for real for the new
+ *     tenant. This replaced an earlier auto-create-every-category-in-the-
+ *     list design: the user pointed out that e.g. "Aquarium & Fish
+ *     Supplies" and "Pet Carriers & Housing" are very different niches
+ *     within "Pets & Animals", so a tenant who only does one of them
+ *     shouldn't have all of them created as siblings — they should pick
+ *     the one that's actually theirs.
+ *     (Historical note: an earlier version of this registration step ran
+ *     through applyStarterPackToTenant(), which turned out to be dead code
+ *     for real registrations — includeDemoContent is hardcoded false and
+ *     no real registration path ever supplies a starterPackJobId, so that
+ *     function never actually ran. The current registration-time category
+ *     creation is a small, direct, unconditional prisma.categories.create
+ *     call instead — see src/app/api/tenants/register/route.ts.)
+ *  2. AI Assistant chat: grounds handleCategoryConfigTarget's suggestions
+ *     (@/lib/assistant/shared.ts) against this REAL list instead of
+ *     letting Claude invent fresh names every conversation — before this,
+ *     two tenants with the identical business type could get two
+ *     completely different sets of AI-suggested category names.
  *
- * First real use: grounds handleCategoryConfigTarget's AI suggestions
- * (@/lib/assistant/shared.ts) against this REAL list instead of letting
- * Claude invent fresh names every conversation — the same "never invent
- * when a real source exists" discipline this app already applies
- * everywhere else (expense categories, legal-page drafts, etc.). Before
- * this, two tenants with the identical business type could get two
- * completely different sets of AI-suggested category names, since nothing
- * grounded the suggestion in a shared vocabulary.
- *
- * Deliberately includes real SERVICE-flavored categories where a business
- * type's own description already implies services (e.g. Beauty & Personal
- * Care's "barbershops, salons" — see docs/SERVICES_PLAN.md) — a category
- * can legitimately contain a mix of requires_shipping: true/false products
- * since Phase 1 of that work made the decision per-product, not per-category
- * or per-tenant.
+ * Deliberately includes explicit SERVICE business types (Repair &
+ * Technical Services, Home & Trade Services, Cleaning Services, Beauty,
+ * Salon & Spa Services, Events/Photography/Entertainment Services,
+ * Transport, Moving & Logistics Services, Professional & Business
+ * Services, Health, Fitness & Wellness Services, Education & Training
+ * Services, Construction & Contracting Services) alongside the original
+ * product-oriented types — mirroring how Jiji.co.ke's own "Services" is a
+ * full top-level category with ~25 real subcategories, not a single line
+ * item buried inside a product type. Existing product-oriented types (e.g.
+ * Beauty & Personal Care) keep their own service-flavored category entries
+ * too (Salon Services, Barbershop Services, etc.) for businesses that mix
+ * retail and services — a category can legitimately contain a mix of
+ * requires_shipping: true/false products, since Services Phase 1 made that
+ * decision per-product, not per-category or per-tenant (docs/SERVICES_PLAN.md).
  *
  * "Other" has no entry here on purpose — a merchant who picked "Other" at
- * registration has no fixed business type to curate against; suggestion
+ * registration has no fixed business type to curate against; the category
+ * dropdown simply doesn't appear for that case, and AI suggestion
  * generation falls back to free generation (grounded in niche/business
- * context prose only) for that case, same as before this file existed.
+ * context prose only), same as before this file existed.
  */
 
 export const BUSINESS_TYPE_CATEGORIES: Record<string, string[]> = {
@@ -187,10 +205,123 @@ export const BUSINESS_TYPE_CATEGORIES: Record<string, string[]> = {
     'Pet Carriers & Housing',
     'Veterinary Services',
   ],
+
+  // --- Explicit service business types (Jiji.co.ke's "Services" is a full
+  // top-level category with ~25 real subcategories — these mirror that
+  // breadth as separate, granular business types instead of one catch-all). ---
+  'Repair & Technical Services': [
+    'Phone & Tablet Repair',
+    'Laptop & Computer Repair',
+    'TV & Electronics Repair',
+    'Home Appliance Repair',
+    'Vehicle Repair & Mechanic Services',
+    'Watch & Jewelry Repair',
+    'Shoe & Bag Repair',
+    'Furniture Repair & Upholstery',
+  ],
+  'Home & Trade Services': [
+    'Plumbing Services',
+    'Electrical Installation & Repair',
+    'Carpentry & Furniture Making',
+    'Painting Services',
+    'Masonry Services',
+    'Welding & Metal Fabrication',
+    'Pest Control & Fumigation',
+    'Handyman Services',
+  ],
+  'Cleaning Services': [
+    'House Cleaning',
+    'Office Cleaning',
+    'Carpet & Sofa Cleaning',
+    'Fumigation Services',
+    'Laundry & Dry Cleaning',
+    'Post-Construction Cleaning',
+    'Compound & Garden Cleaning',
+  ],
+  'Beauty, Salon & Spa Services': [
+    'Hair Styling & Braiding',
+    'Barbershop Services',
+    'Nail Technician Services',
+    'Makeup Artist Services',
+    'Spa & Massage Therapy',
+    'Eyelash & Eyebrow Services',
+    'Mobile Beauty Services',
+  ],
+  'Events, Photography & Entertainment Services': [
+    'Photography & Videography',
+    'Event Planning & Decor',
+    'DJ & MC Services',
+    'Catering Services',
+    'Wedding Planning',
+    'Sound & Stage Hire',
+    'Tent, Chair & Furniture Hire',
+    'Live Band & Entertainment',
+  ],
+  'Transport, Moving & Logistics Services': [
+    'Movers & Packers',
+    'Courier & Delivery Services',
+    'Trailer & Truck Hire',
+    'Car Hire & Chauffeur Services',
+    'Boda Boda & Taxi Services',
+    'Freight & Cargo Services',
+  ],
+  'Professional & Business Services': [
+    'Legal Services',
+    'Accounting & Tax Services',
+    'Business Consulting',
+    'Graphic Design & Branding',
+    'Web & Software Development',
+    'Printing & Signage',
+    'Translation Services',
+    'Recruitment & HR Services',
+  ],
+  'Health, Fitness & Wellness Services': [
+    'Personal Training',
+    'Physiotherapy',
+    'Nutrition & Diet Consulting',
+    'Home Nursing & Caregiving',
+    'Counseling & Therapy',
+    'Massage Therapy',
+    'Mobile Veterinary Services',
+  ],
+  'Education & Training Services': [
+    'Private Tutoring',
+    'Driving Lessons',
+    'Music Lessons',
+    'Vocational Training',
+    'Language Classes',
+    'Exam Coaching',
+    'Computer & Digital Skills Training',
+  ],
+  'Construction & Contracting Services': [
+    'General Contracting',
+    'Architecture & Design Services',
+    'Interior Design',
+    'Landscaping & Gardening',
+    'Solar Installation',
+    'Borehole Drilling',
+    'Roofing Services',
+  ],
 };
 
 /** Real curated list for a business type, or empty when unrecognized (e.g. "Other") — never invented here. */
 export function getCategoriesForBusinessType(businessType: string | null | undefined): string[] {
   if (!businessType) return [];
   return BUSINESS_TYPE_CATEGORIES[businessType] ?? [];
+}
+
+/**
+ * True when `category` is a real, curated category for `businessType` —
+ * used to defensively validate a client-submitted registration-time
+ * category selection server-side before creating it for real (never trust
+ * the client to only send back what the dropdown actually offered).
+ */
+export function isValidCategoryForBusinessType(
+  businessType: string | null | undefined,
+  category: string | null | undefined,
+): boolean {
+  if (!businessType || !category) return false;
+  const trimmed = category.trim();
+  if (!trimmed) return false;
+  return getCategoriesForBusinessType(businessType).includes(trimmed);
 }

@@ -50,6 +50,16 @@ const REAL_BUSINESS_TYPES = [
   'Sports & Outdoor',
   'Toys, Kids & Baby Products',
   'Pets & Animals',
+  'Repair & Technical Services',
+  'Home & Trade Services',
+  'Cleaning Services',
+  'Beauty, Salon & Spa Services',
+  'Events, Photography & Entertainment Services',
+  'Transport, Moving & Logistics Services',
+  'Professional & Business Services',
+  'Health, Fitness & Wellness Services',
+  'Education & Training Services',
+  'Construction & Contracting Services',
   // 'Other' deliberately excluded — no curated entry exists for it.
 ];
 
@@ -59,7 +69,7 @@ async function main() {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required in .env.local');
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required in .env.local');
 
-  const { BUSINESS_TYPE_CATEGORIES, getCategoriesForBusinessType } = await import('../src/lib/categories/business-type-taxonomy');
+  const { BUSINESS_TYPE_CATEGORIES, getCategoriesForBusinessType, isValidCategoryForBusinessType } = await import('../src/lib/categories/business-type-taxonomy');
   const { generateJsonFromConversation } = await import('../src/lib/ai/claude-client');
   const { buildConfigTargetSystemPrompt, configTargetSchema } = await import('../src/lib/assistant/shared');
   const { prisma } = await import('../src/lib/prisma/client');
@@ -86,6 +96,29 @@ async function main() {
   check('unrecognized business type falls back to empty (never throws)', getCategoriesForBusinessType('Some Made Up Type').length === 0);
   check('null business type falls back to empty', getCategoriesForBusinessType(null).length === 0);
   console.log(`Total real business types covered: ${Object.keys(BUSINESS_TYPE_CATEGORIES).length}`);
+
+  console.log('\n--- Part 1b: isValidCategoryForBusinessType (registration-time server-side validation) ---');
+  check(
+    'a real curated category for its real business type validates true',
+    isValidCategoryForBusinessType('Pets & Animals', 'Aquarium & Fish Supplies') === true,
+  );
+  check(
+    'a real category name under the WRONG business type validates false',
+    isValidCategoryForBusinessType('Fashion & Clothing', 'Aquarium & Fish Supplies') === false,
+  );
+  check(
+    'a made-up category name validates false (never trusts client-supplied free text)',
+    isValidCategoryForBusinessType('Pets & Animals', 'Definitely Not A Real Category') === false,
+  );
+  check(
+    '"Other" business type (no curated list) never validates true',
+    isValidCategoryForBusinessType('Other', 'Anything') === false,
+  );
+  check('null/undefined category validates false', isValidCategoryForBusinessType('Pets & Animals', null) === false);
+  check(
+    'a new service business type\'s own category validates true',
+    isValidCategoryForBusinessType('Repair & Technical Services', 'Phone & Tablet Repair') === true,
+  );
 
   console.log('\n--- Part 2: real Claude call grounds suggestions in the curated list ---');
   const tenant = await prisma.tenants.findUnique({ where: { id: TEST_TENANT_ID }, select: { data: true } });

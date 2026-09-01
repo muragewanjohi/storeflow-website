@@ -37,7 +37,7 @@ import { recommendThemeForBusiness } from '@/lib/themes/recommend-theme';
 import { estimateCostUsd } from '@/lib/ai/claude-client';
 import { recordAiUsage } from '@/lib/ai/usage';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
-import { getCategoriesForBusinessType } from '@/lib/categories/business-type-taxonomy';
+import { getCategoriesForBusinessType, isValidCategoryForBusinessType } from '@/lib/categories/business-type-taxonomy';
 import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
 import {
   getOnboardingImagePlaceholderUrl,
@@ -1864,6 +1864,49 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Registration-time category creation — real, direct, unconditional
+    // (not routed through applyStarterPackToTenant(), which turned out to
+    // be dead code for every real registration — see
+    // business-type-taxonomy.ts's header comment for the full trace). The
+    // merchant explicitly picked this ONE category from register/page.tsx's
+    // curated, business-type-scoped dropdown ("Category (what are you
+    // selling)"), so we create exactly that one category for real — never
+    // the whole business type's curated list, since the user pointed out
+    // that e.g. "Aquarium & Fish Supplies" and "Pet Carriers & Housing" are
+    // different niches within "Pets & Animals" and a tenant who only does
+    // one of them shouldn't get both. Validated server-side against the
+    // same curated list the dropdown was built from — never trust the
+    // client to only send back what the dropdown actually offered.
+    let primaryCategoryCreated: string | null = null;
+    if (isValidCategoryForBusinessType(validatedData.businessType, finalSelling)) {
+      try {
+        const categoryName = finalSelling!.trim();
+        const categorySlug = generateSlug(categoryName);
+        const existingCategory = await prisma.categories.findFirst({
+          where: { tenant_id: tenant.id, slug: categorySlug },
+          select: { id: true },
+        });
+        if (!existingCategory) {
+          await prisma.categories.create({
+            data: {
+              tenant_id: tenant.id,
+              name: categoryName,
+              slug: categorySlug,
+              status: 'active',
+            },
+          });
+          primaryCategoryCreated = categoryName;
+          console.log('[Registration] Created real primary category from registration selection', {
+            traceId: registrationTraceId,
+            tenantId: tenant.id,
+            category: categoryName,
+          });
+        }
+      } catch (primaryCategoryError) {
+        console.error('[Registration] Failed to create primary category:', primaryCategoryError);
+      }
+    }
+
     if (validatedData.referrerSubdomain) {
       const referrerSubdomainValidation = validateSubdomain(validatedData.referrerSubdomain);
       if (!referrerSubdomainValidation.isValid) {
@@ -3648,6 +3691,7 @@ export async function POST(request: NextRequest) {
         subdomain: tenant.subdomain,
       },
       loginUrl,
+      primaryCategoryCreated,
       demoContentCreated,
       demoProductsCreated,
       demoCategoriesCreated,

@@ -13,7 +13,8 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FilterableSelect } from '@/components/shared/filterable-select';
+import { getCategoriesForBusinessType } from '@/lib/categories/business-type-taxonomy';
 import { Loader2, CheckCircle2, Check, Store, Palette, Settings, Sparkles } from 'lucide-react';
 import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 import { identifyTikTokPixelUser } from '@/lib/analytics/tiktok-pixel';
@@ -277,10 +278,55 @@ function TenantRegisterForm() {
       description: 'Pet food, accessories, ornamental fish, pet stores.',
     },
     {
+      value: 'Repair & Technical Services',
+      description: 'Phone, laptop, appliance, and vehicle repair.',
+    },
+    {
+      value: 'Home & Trade Services',
+      description: 'Plumbing, electrical, carpentry, painting, welding.',
+    },
+    {
+      value: 'Cleaning Services',
+      description: 'House, office, carpet cleaning, fumigation, laundry.',
+    },
+    {
+      value: 'Beauty, Salon & Spa Services',
+      description: 'Hairstyling, barbershop, nails, makeup, spa, massage.',
+    },
+    {
+      value: 'Events, Photography & Entertainment Services',
+      description: 'Photography, event planning, DJ/MC, catering, hire.',
+    },
+    {
+      value: 'Transport, Moving & Logistics Services',
+      description: 'Movers, courier, trailer/truck hire, car hire.',
+    },
+    {
+      value: 'Professional & Business Services',
+      description: 'Legal, accounting, consulting, design, development.',
+    },
+    {
+      value: 'Health, Fitness & Wellness Services',
+      description: 'Personal training, physiotherapy, nursing, therapy.',
+    },
+    {
+      value: 'Education & Training Services',
+      description: 'Tutoring, driving lessons, music, vocational training.',
+    },
+    {
+      value: 'Construction & Contracting Services',
+      description: 'Contracting, architecture, interior design, landscaping.',
+    },
+    {
       value: 'Other',
       description: 'Choose this if your business does not fit the categories above.',
     },
   ];
+
+  const categoryOptions = getCategoriesForBusinessType(businessType).map((name) => ({
+    value: name,
+    label: name,
+  }));
 
 
   // Fetch all plans on component mount
@@ -1301,35 +1347,25 @@ function TenantRegisterForm() {
               <Label htmlFor="business-type" className="text-sm font-bold text-[#101828]">
                 Business Type
               </Label>
-              <Select
+              <FilterableSelect
+                id="business-type"
                 value={businessType}
-                onValueChange={(value) => {
+                onChange={(value) => {
                   setBusinessType(value);
+                  // A category picked for the previous business type almost
+                  // never belongs to the new one — clear it so a stale
+                  // selection can't slip through unnoticed.
+                  setSelling('');
                   clearFieldError('businessType');
                   clearFieldError('otherBusinessType');
                 }}
-              >
-                <SelectTrigger
-                  id="business-type"
-                  aria-invalid={Boolean(fieldErrors.businessType)}
-                  aria-describedby={fieldErrors.businessType ? 'businessType-error' : undefined}
-                  className={`mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] ${
-                    fieldErrors.businessType ? 'border-red-500 focus-visible:ring-red-500' : ''
-                  }`}
-                >
-                  <SelectValue placeholder="Select your business type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {businessTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value} className="py-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{type.value}</span>
-                        <span className="text-xs text-[#6a7282]">{type.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={businessTypes.map((type) => ({ value: type.value, label: type.value, description: type.description }))}
+                placeholder="Select your business type"
+                searchPlaceholder="Search business types..."
+                className="mt-2"
+                aria-invalid={Boolean(fieldErrors.businessType)}
+                aria-describedby={fieldErrors.businessType ? 'businessType-error' : undefined}
+              />
               {businessType === 'Other' && (
                 <div className="mt-2">
                   <Input
@@ -1356,15 +1392,35 @@ function TenantRegisterForm() {
             </div>
 
             <div>
-              <Label htmlFor="selling" className="text-sm font-bold text-[#101828]">What are you selling?</Label>
-              <Input
-                id="selling"
-                type="text"
-                value={selling}
-                onChange={(e) => setSelling(e.target.value)}
-                placeholder="What are you selling"
-                className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af]"
-              />
+              <Label htmlFor="selling" className="text-sm font-bold text-[#101828]">
+                {categoryOptions.length > 0 ? 'Category (what are you selling)' : 'What are you selling?'}
+              </Label>
+              {categoryOptions.length > 0 ? (
+                <FilterableSelect
+                  id="selling"
+                  value={selling}
+                  onChange={(value) => setSelling(value)}
+                  options={categoryOptions}
+                  placeholder="Select your category"
+                  searchPlaceholder="Search categories..."
+                  emptyMessage="No matching category."
+                  className="mt-2"
+                />
+              ) : (
+                <Input
+                  id="selling"
+                  type="text"
+                  value={selling}
+                  onChange={(e) => setSelling(e.target.value)}
+                  placeholder="What are you selling"
+                  className="mt-2 h-[60px] rounded-2xl border-[#e5e7eb] bg-[#f9fafb] text-base placeholder:text-[#99a1af]"
+                />
+              )}
+              {categoryOptions.length > 0 && (
+                <p className="mt-1 text-xs text-[#6a7282]">
+                  Not seeing an exact match? Pick the closest one — you can add more categories any time from your dashboard.
+                </p>
+              )}
             </div>
 
             <RegistrationPhoneField
