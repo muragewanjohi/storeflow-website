@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
             // computeLineDepositDue()/computeOrderDeposit() checkout uses.
             deposit_type: true,
             deposit_value: true,
+            // Basic services support (docs/SERVICES_PLAN.md) — lets the
+            // checkout client know when the whole cart is non-shipped
+            // items, so it can skip the delivery-method UI accordingly.
+            requires_shipping: true,
           },
         },
       },
@@ -126,6 +130,8 @@ export async function GET(request: NextRequest) {
         // Basic deposit support (docs/SERVICES_PLAN.md)
         deposit_type: product.deposit_type,
         deposit_value: product.deposit_value != null ? Number(product.deposit_value) : null,
+        // Basic services support (docs/SERVICES_PLAN.md)
+        requires_shipping: product.requires_shipping !== false,
       };
     }).filter(Boolean) as any[];
 

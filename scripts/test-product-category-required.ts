@@ -93,8 +93,24 @@ async function main() {
   ]);
   console.log('\nturn2 reply:', turn2.data.reply);
   console.log('turn2 done:', turn2.data.done, 'collected:', turn2.data.collected);
-  check('finishes with done:true once a real category is given', turn2.data.done === true, turn2.data);
   check('collected.category matches the real category name given', turn2.data.collected.category === 'Cookware', turn2.data.collected.category);
+  // Basic services support (docs/SERVICES_PLAN.md) added a second required
+  // field (requiresShipping) — a category alone no longer finishes the
+  // conversation, same "never done while a required field is null"
+  // discipline this test already covers for category itself.
+  check('does NOT finish (done:true) without requiresShipping answered, even with category given', turn2.data.done !== true || turn2.data.collected.requiresShipping !== null, turn2.data);
+
+  const turn3 = await runProductIntakeTurn(TEST_TENANT_ID, [
+    { role: 'user', content: 'add a product called Bamboo Cutting Board, price 1500' },
+    { role: 'assistant', content: JSON.stringify(turn1.data) },
+    { role: 'user', content: 'put it under Cookware, no SKU or stock needed' },
+    { role: 'assistant', content: JSON.stringify(turn2.data) },
+    { role: 'user', content: 'yes it ships, physical product' },
+  ]);
+  console.log('\nturn3 reply:', turn3.data.reply);
+  console.log('turn3 done:', turn3.data.done, 'collected:', turn3.data.collected);
+  check('finishes with done:true once category AND requiresShipping are both given', turn3.data.done === true, turn3.data);
+  check('collected.requiresShipping is true for a physical product', turn3.data.collected.requiresShipping === true, turn3.data.collected.requiresShipping);
 
   console.log(`\n${passed}/${total} checks passed.`);
   await prisma.$disconnect();

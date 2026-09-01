@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -35,13 +36,14 @@ interface Product {
   price: number;
   cost_price?: number | null;
   sale_price?: number | null;
-  stock_quantity: number;
+  stock_quantity: number | null;
   status: 'active' | 'inactive' | 'draft' | 'archived';
   image?: string | null;
   category_id?: string | null;
   estimated_delivery_days?: number | null;
   deposit_type?: 'none' | 'fixed' | 'percentage' | null;
   deposit_value?: number | null;
+  requires_shipping?: boolean | null;
 }
 
 interface Category {
@@ -177,6 +179,7 @@ export default function ProductFormClient({
     estimated_delivery_days: product?.estimated_delivery_days?.toString() || '',
     deposit_type: product?.deposit_type || ('none' as 'none' | 'fixed' | 'percentage'),
     deposit_value: product?.deposit_value?.toString() || '',
+    requires_shipping: product?.requires_shipping !== false,
   });
 
   // Initialize variants from props if editing, or empty array if creating
@@ -380,8 +383,9 @@ export default function ProductFormClient({
       }
     }
 
-    // Only validate product-level stock if no variants exist
-    if (variants.length === 0) {
+    // Only validate product-level stock if no variants exist and this
+    // product actually ships (a service has no stock field shown at all).
+    if (variants.length === 0 && formData.requires_shipping) {
       const stockQuantity = parseInt(formData.stock_quantity, 10);
       if (isNaN(stockQuantity) || stockQuantity < 0) {
         errors.stock_quantity = 'Stock quantity must be a non-negative number';
@@ -461,11 +465,15 @@ export default function ProductFormClient({
         // Send null if description is empty (not empty string)
         description: formData.description.trim() || null,
         price: parsedPrice,
-        // When variants exist, product-level stock is calculated from variants (set to 0 or sum)
-        // When no variants exist, use the product-level stock
-        stock_quantity: variants.length > 0 
-          ? totalVariantStock // Use calculated total when variants exist
-          : parseInt(formData.stock_quantity, 10) || 0, // Use product-level stock when no variants
+        // When variants exist, product-level stock is calculated from variants (set to 0 or sum).
+        // When this doesn't ship (a service), stock isn't tracked at all — null, not 0 (0 would
+        // read as "out of stock" at checkout, see docs/SERVICES_PLAN.md).
+        // Otherwise, use the product-level stock entered above.
+        stock_quantity: !formData.requires_shipping
+          ? null
+          : variants.length > 0
+            ? totalVariantStock
+            : parseInt(formData.stock_quantity, 10) || 0,
         status: formData.status,
         category_id: categoryId,
         // Estimated delivery days (null means use tenant default)
@@ -477,6 +485,8 @@ export default function ProductFormClient({
         deposit_value: formData.deposit_type !== 'none' && formData.deposit_value.trim()
           ? parseFloat(formData.deposit_value)
           : null,
+        // Basic services support (docs/SERVICES_PLAN.md)
+        requires_shipping: formData.requires_shipping,
       };
 
       if (parsedSalePrice !== null) {
@@ -952,49 +962,75 @@ export default function ProductFormClient({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="stock_quantity">
-                      Stock Quantity
-                      {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
-                    </Label>
-                    <ContextualHelp
-                      title="Stock Quantity"
-                      description="If your product has no variants, set stock here. If variants exist, stock is calculated from variant stock values."
-                      learnMoreHref="/help?article=managing-products"
-                    />
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="requires_shipping">This is a physical product</Label>
+                      <ContextualHelp
+                        title="Shipping"
+                        description="Turn this off for a service, booking, or digital item — checkout won't ask for a delivery address or charge a delivery fee for it. Leave it on for anything you ship or hand over in person as a physical good."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.requires_shipping
+                        ? 'Ships to the customer — delivery/pickup is collected at checkout.'
+                        : "Doesn't ship — a service or digital item. No delivery address or fee at checkout."}
+                    </p>
                   </div>
-                  <Input
-                    id="stock_quantity"
-                    type="number"
-                    min="0"
-                    value={hasVariants ? totalVariantStock.toString() : formData.stock_quantity}
-                    onChange={(e) => {
-                      if (!hasVariants) {
-                        setFormData({ ...formData, stock_quantity: e.target.value });
-                      }
-                    }}
-                    placeholder="0"
-                    disabled={hasVariants}
-                    className={hasVariants ? 'bg-muted cursor-not-allowed' : ''}
+                  <Switch
+                    id="requires_shipping"
+                    checked={formData.requires_shipping}
+                    onCheckedChange={(checked) => setFormData({ ...formData, requires_shipping: checked })}
+                    aria-label="Toggle whether this product requires shipping"
                   />
-                  {validationErrors.stock_quantity && (
-                    <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
-                  )}
-                  {hasVariants ? (
-                    <p className="text-xs text-muted-foreground">
-                      Total stock: {totalVariantStock} units (sum of all variant stocks).
-                      <span className="block mt-1 text-blue-600">
-                        When variants exist, only variant stock quantities are used for inventory tracking. 
-                        Edit stock in the Variants section below.
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Set the stock quantity for this product. Add variants below to manage stock per variant.
-                    </p>
-                  )}
                 </div>
+
+                {formData.requires_shipping && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="stock_quantity">
+                        Stock Quantity
+                        {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
+                      </Label>
+                      <ContextualHelp
+                        title="Stock Quantity"
+                        description="If your product has no variants, set stock here. If variants exist, stock is calculated from variant stock values."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      min="0"
+                      value={hasVariants ? totalVariantStock.toString() : formData.stock_quantity}
+                      onChange={(e) => {
+                        if (!hasVariants) {
+                          setFormData({ ...formData, stock_quantity: e.target.value });
+                        }
+                      }}
+                      placeholder="0"
+                      disabled={hasVariants}
+                      className={hasVariants ? 'bg-muted cursor-not-allowed' : ''}
+                    />
+                    {validationErrors.stock_quantity && (
+                      <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
+                    )}
+                    {hasVariants ? (
+                      <p className="text-xs text-muted-foreground">
+                        Total stock: {totalVariantStock} units (sum of all variant stocks).
+                        <span className="block mt-1 text-blue-600">
+                          When variants exist, only variant stock quantities are used for inventory tracking.
+                          Edit stock in the Variants section below.
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Set the stock quantity for this product. Add variants below to manage stock per variant.
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

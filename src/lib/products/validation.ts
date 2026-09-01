@@ -30,7 +30,13 @@ export const createProductSchema = z.object({
   deposit_value: z.number().min(0).optional().nullable()
     .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sku: z.string().max(100, 'SKU must be less than 100 characters').optional().nullable(),
-  stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').default(0).optional(),
+  // Nullable so a non-shipped item (requires_shipping: false) can be
+  // explicitly unlimited — checkout's stock check already treats NULL as
+  // "not tracked" (@/lib/checkout/no-shipping.ts's sibling logic in
+  // checkout/route.ts); previously unreachable from this schema since it
+  // had no way to actually send null, only ever a real number defaulting
+  // to 0 — see docs/SERVICES_PLAN.md.
+  stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').nullable().default(0).optional(),
   status: z.enum(['active', 'inactive', 'draft', 'archived']).default('active').optional(),
   image: z.string().url().optional().nullable(),
   gallery: z.array(z.string().url()).default([]).optional().or(z.literal(undefined).transform(() => [])),
@@ -44,6 +50,11 @@ export const createProductSchema = z.object({
   // Estimated delivery time in days (null means use tenant default)
   estimated_delivery_days: z.number().int().min(1).max(365).optional().nullable()
     .or(z.string().transform((val) => val ? parseInt(val, 10) : null).optional().nullable()),
+  // Basic services support (docs/SERVICES_PLAN.md) — false means a
+  // service/digital item: checkout skips delivery-zone/shipping-fee
+  // collection entirely for a cart made only of these. Defaults true
+  // (ships normally), matching the DB column's own default.
+  requires_shipping: z.boolean().default(true).optional(),
 }).strip(); // Strip unknown fields to prevent Prisma errors
 
 /**

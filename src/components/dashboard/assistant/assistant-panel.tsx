@@ -125,6 +125,8 @@ interface CollectedProduct {
   stockQuantity: number | null;
   category: string | null;
   sku: string | null;
+  // Basic services support (docs/SERVICES_PLAN.md)
+  requiresShipping?: boolean | null;
 }
 
 interface CollectedZone {
@@ -318,9 +320,13 @@ export default function AssistantPanel() {
         body: JSON.stringify({
           name: collected.name,
           price: collected.price,
-          stock_quantity: collected.stockQuantity ?? 0,
+          // A non-shipped item (service) has no stock tracked at all —
+          // null, not 0 (0 would read as "out of stock" at checkout, see
+          // docs/SERVICES_PLAN.md).
+          stock_quantity: collected.requiresShipping === false ? null : collected.stockQuantity ?? 0,
           sku: collected.sku || undefined,
           category_id,
+          requires_shipping: collected.requiresShipping !== false,
         }),
       });
       const body = await res.json().catch(() => ({}));

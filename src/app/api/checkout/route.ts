@@ -27,6 +27,7 @@ import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
 import { initiateTumiziCustomerPaymentForOrder } from '@/lib/tumizi/initiate-order-payment';
 import { rollbackCheckoutAfterFailedTumizi } from '@/lib/checkout/rollback-after-failed-tumizi';
 import { computeLineDepositDue, computeOrderDeposit } from '@/lib/orders/deposit';
+import { computeAllItemsNoShipping } from '@/lib/checkout/no-shipping';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -136,6 +137,11 @@ export async function POST(request: NextRequest) {
     // deposit configured, in which case that line only contributes its
     // reduced deposit amount here (the rest becomes the order's balance).
     let depositSubtotal = 0;
+    // Basic services support (docs/SERVICES_PLAN.md) — per-item shipping
+    // requirement, collected here and resolved via computeAllItemsNoShipping()
+    // after the loop. Decided server-side from the real product rows, never
+    // trusted from whatever delivery_method the client happened to send.
+    const shippingRequirements: Array<{ requires_shipping: boolean }> = [];
 
     for (const item of cartItems) {
       const product = await prisma.products.findFirst({
@@ -153,6 +159,7 @@ export async function POST(request: NextRequest) {
           metadata: true,
           deposit_type: true,
           deposit_value: true,
+          requires_shipping: true,
         },
       });
 
@@ -219,6 +226,7 @@ export async function POST(request: NextRequest) {
       const itemTotal = finalPrice * item.quantity;
       totalAmount += itemTotal;
       depositSubtotal += computeLineDepositDue(itemTotal, product.deposit_type, product.deposit_value);
+      shippingRequirements.push({ requires_shipping: product.requires_shipping !== false });
 
       orderItems.push({
         product_id: product.id,
@@ -255,7 +263,13 @@ export async function POST(request: NextRequest) {
 
     // Determine delivery method and address
     const deliveryMethod = validatedData.delivery_method || 'delivery';
-    const isPickup = deliveryMethod === 'pickup';
+    // Basic services support (docs/SERVICES_PLAN.md) — a cart made entirely
+    // of non-shipped items always takes the pickup-equivalent path
+    // (contact info only, no delivery zone/fee), regardless of what
+    // delivery_method the client sent. Reuses the existing pickup
+    // mechanism as-is rather than inventing a new checkout_type — see the
+    // plan doc's "Architecture" section for why.
+    const isPickup = deliveryMethod === 'pickup' || computeAllItemsNoShipping(shippingRequirements);
 
     const shippingOpts = await getStaticOptions(tenant.id, ['shipping_method_type', 'flat_rate_amount', 'shipping_enabled']);
     const shippingEnabled = shippingOpts.shipping_enabled !== 'false';

@@ -689,6 +689,7 @@ model products {
   created_by              String?              @db.Uuid
   metadata                Json?                @default("{}")
   estimated_delivery_days Int?                 // Product-specific delivery time override (in days). NULL means use tenant default.
+  requires_shipping       Boolean              @default(true) // false = a service/digital item — see docs/SERVICES_PLAN.md
   created_at              DateTime?            @default(now()) @db.Timestamp(6)
   updated_at              DateTime?            @default(now()) @db.Timestamp(6)
   cart_items         cart_items[]

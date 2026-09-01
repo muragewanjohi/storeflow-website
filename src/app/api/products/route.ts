@@ -841,7 +841,9 @@ export async function POST(request: NextRequest) {
       sale_price: validatedData.sale_price ? Number(validatedData.sale_price) : null,
       cost_price: validatedData.cost_price != null ? Number(validatedData.cost_price) : null,
       sku: String(finalSKU), // Always use generated SKU
-      stock_quantity: Number(validatedData.stock_quantity || 0),
+      // null means unlimited/not tracked (a service — see docs/SERVICES_PLAN.md);
+      // preserved explicitly here since `|| 0` would silently coerce it to 0.
+      stock_quantity: validatedData.stock_quantity === null ? null : Number(validatedData.stock_quantity ?? 0),
       status: String(validatedData.status || 'active'),
       image: imageUrl ? String(imageUrl) : null,
       gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
@@ -853,6 +855,8 @@ export async function POST(request: NextRequest) {
       // Basic deposit support (docs/SERVICES_PLAN.md)
       deposit_type: String(validatedData.deposit_type || 'none'),
       deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
+      // Basic services support (docs/SERVICES_PLAN.md)
+      requires_shipping: validatedData.requires_shipping !== false,
     };
 
     // Final safety check: ensure no unexpected keys exist
@@ -860,7 +864,7 @@ export async function POST(request: NextRequest) {
       'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
       'cost_price',
       'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-      'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value'
+      'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping'
     ];
     const productDataKeys = Object.keys(productData);
     const unexpectedProductFields = productDataKeys.filter(key => !allowedProductFields.includes(key));
@@ -899,7 +903,7 @@ export async function POST(request: NextRequest) {
         sale_price: number | null;
         cost_price: number | null;
         sku: string;
-        stock_quantity: number;
+        stock_quantity: number | null;
         status: string;
         image: string | null;
         gallery: string[];
@@ -910,6 +914,7 @@ export async function POST(request: NextRequest) {
         estimated_delivery_days: number | null;
         deposit_type: string;
         deposit_value: number | null;
+        requires_shipping: boolean;
       } = {
         tenant_id: productData.tenant_id,
         name: productData.name,
@@ -931,6 +936,7 @@ export async function POST(request: NextRequest) {
         estimated_delivery_days: productData.estimated_delivery_days,
         deposit_type: productData.deposit_type,
         deposit_value: productData.deposit_value,
+        requires_shipping: productData.requires_shipping,
       };
 
       // Verify finalProductData has no unexpected fields
@@ -939,7 +945,7 @@ export async function POST(request: NextRequest) {
         'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
         'cost_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-        'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value'
+        'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping'
       ];
       const unexpectedFinalFields = finalKeys.filter(key => !allowedFinalFields.includes(key));
       if (unexpectedFinalFields.length > 0) {
@@ -997,7 +1003,7 @@ export async function POST(request: NextRequest) {
         sale_price: ultraCleanData.sale_price ? Number(ultraCleanData.sale_price) : null,
         cost_price: ultraCleanData.cost_price != null ? Number(ultraCleanData.cost_price) : null,
         sku: String(ultraCleanData.sku),
-        stock_quantity: Number(ultraCleanData.stock_quantity),
+        stock_quantity: ultraCleanData.stock_quantity === null ? null : Number(ultraCleanData.stock_quantity),
         status: String(ultraCleanData.status),
         image: ultraCleanData.image ? String(ultraCleanData.image) : null,
         gallery: Array.isArray(ultraCleanData.gallery) ? ultraCleanData.gallery : [],
@@ -1008,6 +1014,7 @@ export async function POST(request: NextRequest) {
         estimated_delivery_days: ultraCleanData.estimated_delivery_days ? Number(ultraCleanData.estimated_delivery_days) : null,
         deposit_type: ultraCleanData.deposit_type ? String(ultraCleanData.deposit_type) : 'none',
         deposit_value: ultraCleanData.deposit_value != null ? Number(ultraCleanData.deposit_value) : null,
+        requires_shipping: ultraCleanData.requires_shipping !== false,
       };
       
       // Final verification - ensure no 'new' field exists

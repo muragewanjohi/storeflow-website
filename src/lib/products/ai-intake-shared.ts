@@ -35,8 +35,12 @@ export const productIntakeResponseSchema = {
         // exist for this tenant. See buildProductIntakeSystemPrompt().
         category: { type: ['string', 'null'] },
         sku: { type: ['string', 'null'] },
+        // Basic services support (docs/SERVICES_PLAN.md) — true (ships),
+        // false (a service/digital item — stockQuantity is skipped
+        // entirely when this is false), or null while not yet asked.
+        requiresShipping: { type: ['boolean', 'null'] },
       },
-      required: ['name', 'price', 'stockQuantity', 'category', 'sku'],
+      required: ['name', 'price', 'stockQuantity', 'category', 'sku', 'requiresShipping'],
       additionalProperties: false,
     },
   },
@@ -53,6 +57,7 @@ export interface ProductIntakeTurnResponse {
     stockQuantity: number | null;
     category: string | null;
     sku: string | null;
+    requiresShipping: boolean | null;
   };
 }
 
@@ -74,9 +79,14 @@ export function buildProductIntakeSystemPrompt(existingCategoryNames: string[]):
     'If the merchant already stated multiple facts at once, extract everything unambiguous immediately — do not re-ask for something they already told you. But a bare product TYPE or category (e.g. "electric shavers", "shoes") is a quantity/category hint, not a specific product name — never invent a specific name like "Electric Shaver" from it. Always ask what they want the exact listing name to be.',
     'Ask for name, price, and category first — these are ALL required (user-requested change: every product must belong to a category). Ask one short, friendly question at a time for whatever is still missing, in that order.',
     categoryList,
-    'Once you have name, price, and category, ask once whether they want to specify stock quantity or SKU now, or skip and set them later. Do not insist — one offer is enough.',
-    'SKU is optional — if they do not have one, leave it null; the system generates one automatically.',
-    'Once you have name, price, and category (and have given them the one chance to add stock/SKU), set done to true, fill in collected with whatever you have (nulls only for stock/SKU if skipped), and reply with a short (max 2 sentences) confirmation. NEVER set done to true while category is still null, unless the merchant genuinely has no categories at all (see above).',
+    // Basic services support (docs/SERVICES_PLAN.md) — a service/digital
+    // item never has stock tracked, so this question decides whether to
+    // ask about stock at all, not just another optional field.
+    'Once you have name, price, and category, ask ONE more required question: does this need to be shipped, or is it a service, booking, or digital item that does not ship (e.g. a haircut, a consultation, a downloadable file)? Set requiresShipping to true or false based on their answer — never guess or default it, always ask.',
+    'If requiresShipping is true, ask once whether they want to specify stock quantity or SKU now, or skip and set them later. Do not insist — one offer is enough, and stockQuantity stays null if skipped.',
+    'If requiresShipping is false, do NOT ask about stock quantity at all — it does not apply. You may still ask once whether they want to add a SKU, or skip.',
+    'SKU is optional either way — if they do not have one, leave it null; the system generates one automatically.',
+    'Once you have name, price, category, and requiresShipping (and have given them the one chance to add stock/SKU when it applies), set done to true, fill in collected with whatever you have (nulls only for stock/SKU if skipped or not applicable), and reply with a short (max 2 sentences) confirmation. NEVER set done to true while category or requiresShipping is still null, unless the merchant genuinely has no categories at all (see above).',
     'Until then, set done to false and leave collected fields null for whatever you do not have yet.',
     'Keep every reply under 3 sentences. Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');

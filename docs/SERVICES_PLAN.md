@@ -1,6 +1,6 @@
 # Selling Services — Plan
 
-**Confirmed scope (from user decision):** support service businesses (salons, barbershops, tailors, consultants) alongside the existing product catalog — not a separate app or a rewrite. **Phase 1** (this doc's near-term target) makes a catalog item sellable without shipping/stock, reusing every existing cart/checkout/order/AI-intake/theme surface. **Phase 2+** (real scheduling) is deliberately out of scope for the first build — see "Why booking is a separate phase" below, which borrows this boundary directly from how Shopify itself draws it.
+**Confirmed scope (from user decision):** support service businesses (salons, barbershops, tailors, consultants) alongside the existing product catalog — not a separate app or a rewrite. **Phase 1 (✅ done — see tracker rows S1.1-S1.6)** makes a catalog item sellable without shipping/stock, reusing every existing cart/checkout/order/AI-intake/theme surface. **Phase 2+** (real scheduling) is deliberately out of scope for the first build — see "Why booking is a separate phase" below, which borrows this boundary directly from how Shopify itself draws it.
 
 ---
 
@@ -75,25 +75,25 @@ Time-slot scheduling is a genuinely different data shape than anything `products
 
 ---
 
-## Open decisions to make when building (not blocking the plan)
+## Decisions made while building (Phase 1, ✅ done)
 
-- Exact migration path for `requires_shipping` — SQL-first per this project's own DB workflow (`ALTER TABLE products ADD COLUMN requires_shipping boolean DEFAULT true`, then `npx prisma generate`), not `prisma migrate dev`.
-- Whether `requires_shipping` lives on `products` only (simpler, matches most real service catalogs) or also needs a `product_variants` override — Shopify puts it on the variant; DukaNest's variants are much more lightly used today (mostly attribute-based, e.g. size/color), so product-level is likely sufficient for v1 unless a real use case surfaces (e.g. "30-min vs 60-min session" as variants with different shipping-irrelevance — both would be `false` anyway, so this may be moot).
-- Exact checkout schema shape for a no-shipping cart — reuse `pickup_address`'s existing fields as-is, or trim to name/email/phone only (no `address` string) since a service redemption may not need any address at all.
-- Storefront copy: is "Book" the right default CTA for a `requires_shipping: false` item, or should it stay "Add to Cart" until Phase 2 scheduling actually exists (since Phase 1 has no appointment to "book" yet — might read as broken if it says "Book" but immediately adds to cart with no time picker)?
-- Where the AI intake's new "does this need shipping?" question fits relative to the existing category-required gate (DA.41) — likely right after category, before price.
+- **Migration**: SQL-first (`ALTER TABLE products ADD COLUMN requires_shipping boolean NOT NULL DEFAULT true`), applied directly to the real dev database, then `npx prisma generate` — exactly as planned.
+- **`requires_shipping` lives on `products` only**, not `product_variants` — v1 confirmed sufficient; no real use case surfaced during the build that needed a variant-level override.
+- **Checkout schema needed zero changes.** `pickup_address` already resolves to just name/email/phone at the UI layer — the `address` field is auto-filled from the tenant's own `store_full_address` setting, never typed by the customer (confirmed by reading `checkout-client.tsx` directly). A no-shipping cart reuses this exact mechanism unmodified; `isPickup` is forced server-side (`computeAllItemsNoShipping()`) regardless of what `delivery_method` the client sent.
+- **Storefront copy: kept "Add to Cart," did not introduce "Book."** Phase 2 (real scheduling) doesn't exist yet — "Book" would read as broken with no time picker following it. Instead, `checkout-client.tsx` auto-selects the pickup-equivalent path and shows an explanatory banner ("Your order doesn't require delivery...") in place of the delivery/pickup chooser when the whole cart is non-shipped items — a real UX improvement without implying a feature that isn't built.
+- **AI intake question placement**: right after category is confirmed, as a REQUIRED field (`requiresShipping`, not optional) — the conversation cannot finish without an explicit answer, same discipline as DA.41's category requirement. When the answer is "no," the stock-quantity question is skipped entirely rather than asked and ignored.
+- **Real bug found and fixed while wiring this through, not part of the original plan**: `stock_quantity` was nullable in the database and checkout already treated `null` as "unlimited, don't check," but `createProductSchema` had no way to actually send `null` — every create path coerced it to a real number (defaulting to 0) via `|| 0`/`Number(null)`-style casts. This meant "unlimited stock" was completely unreachable from any create path before this — not something Phase 1 introduced, but something Phase 1's own `requires_shipping: false` case would have silently created a "0 stock = out of stock" service otherwise. Fixed in 3 real spots (web create route x2, mobile create route) plus the two AI-intake completion handlers (web `assistant-panel.tsx`, Flutter `assistant_chat_provider.dart`).
 
 ---
 
-## Sequencing
+## Sequencing (as actually built)
 
-This is new work, not yet started. Suggested order:
-1. `requires_shipping` migration + Prisma regen (schema foundation, unblocks everything else)
-2. Checkout no-shipping-cart path (highest-value backend change, unblocks both clients)
-3. Web dashboard product form + storefront theme CTA changes
-4. Flutter product editor + storefront-equivalent changes
-5. AI product-intake question update
-6. Live-verify: a real service-only order end-to-end (create a `requires_shipping: false` product, add to cart, checkout, confirm no shipping/delivery fields were required or charged)
+1. `requires_shipping` migration + Prisma regen
+2. Checkout no-shipping-cart path (`@/lib/checkout/no-shipping.ts` + `checkout/route.ts`)
+3. Web dashboard product form + storefront checkout UI changes
+4. Flutter product editor (no storefront-equivalent needed — see S1.4's tracker note)
+5. AI product-intake question update, both platforms' completion handlers
+6. Live-verify (`npm run test:services-no-shipping`, 20/20 checks)
 7. Revisit Phase 2 (real scheduling) only once real merchant demand justifies it — do not build ahead of usage, same discipline already applied to closing out AI Phase 9.1
 
 ---

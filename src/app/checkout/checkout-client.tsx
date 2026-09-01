@@ -43,6 +43,8 @@ interface CartItem {
   // Basic deposit support (docs/SERVICES_PLAN.md)
   deposit_type?: string | null;
   deposit_value?: number | null;
+  // Basic services support (docs/SERVICES_PLAN.md)
+  requires_shipping?: boolean | null;
 }
 
 interface Cart {
@@ -598,6 +600,25 @@ export default function CheckoutClient({
     fetchCart();
     fetchCheckoutSettings();
   }, [fetchCart, fetchCheckoutSettings]);
+
+  // Basic services support (docs/SERVICES_PLAN.md) — true only when every
+  // item in the cart is a non-shipped item (a service/digital item). This
+  // is a UI convenience only (skips the delivery-method chooser and forces
+  // the pickup-equivalent contact-info flow) — the real enforcement (no
+  // delivery fee charged, no delivery zone required) happens server-side
+  // in checkout/route.ts regardless of what this computes, so a stale
+  // client never under- or over-charges.
+  const cartRequiresNoShipping = Boolean(
+    cart && cart.items.length > 0 && cart.items.every((item) => item.requires_shipping === false)
+  );
+
+  // Force the pickup-equivalent path for an all-services cart — there's
+  // nothing to choose between "delivery" and "pickup" when nothing ships.
+  useEffect(() => {
+    if (cartRequiresNoShipping && deliveryMethod !== 'pickup') {
+      setDeliveryMethod('pickup');
+    }
+  }, [cartRequiresNoShipping, deliveryMethod]);
 
   // Fetch delivery zones when delivery method is selected
   useEffect(() => {
@@ -1166,8 +1187,17 @@ export default function CheckoutClient({
                       </div>
                     </div>
                   )}
+                  {/* Basic services support (docs/SERVICES_PLAN.md) — nothing
+                      to choose between delivery and pickup when every item
+                      in the cart is a non-shipped service/digital item. */}
+                  {cartRequiresNoShipping && (
+                    <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                      Your order doesn&apos;t require delivery — we just need a few contact details below.
+                    </div>
+                  )}
+
                   {/* Delivery Method Selection (if both options available) */}
-                  {checkoutSettings && checkoutSettings.pickup_enabled && checkoutSettings.shipping_enabled && (
+                  {!cartRequiresNoShipping && checkoutSettings && checkoutSettings.pickup_enabled && checkoutSettings.shipping_enabled && (
                     <div className="space-y-2">
                       <Label>Choose how you want to receive your order</Label>
                       <RadioGroup
@@ -1195,7 +1225,7 @@ export default function CheckoutClient({
                       </RadioGroup>
                     </div>
                   )}
-                  
+
                   {/* Show pickup location info when pickup is selected */}
                   {deliveryMethod === 'pickup' && checkoutSettings?.store_full_address && (
                     <div className="p-4 border rounded-lg bg-primary/5 space-y-3">

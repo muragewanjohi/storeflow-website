@@ -251,7 +251,11 @@ export async function POST(request: NextRequest) {
         cost_price: validatedData.cost_price != null ? Number(validatedData.cost_price) : null,
         sale_price: validatedData.sale_price != null ? Number(validatedData.sale_price) : null,
         sku: finalSku,
-        stock_quantity: validatedData.stock_quantity ?? 0,
+        // null means unlimited/not tracked (a service — see docs/SERVICES_PLAN.md);
+        // preserved explicitly since `?? 0` would only apply to undefined,
+        // but a bare `|| 0`-style coercion elsewhere in this codebase has
+        // gotten this wrong before, so this stays explicit.
+        stock_quantity: validatedData.stock_quantity === null ? null : (validatedData.stock_quantity ?? 0),
         status: validatedData.status ?? 'active',
         image: validatedData.image ?? null,
         gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
@@ -266,6 +270,8 @@ export async function POST(request: NextRequest) {
         // Basic deposit support (docs/SERVICES_PLAN.md)
         deposit_type: validatedData.deposit_type ?? 'none',
         deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
+        // Basic services support (docs/SERVICES_PLAN.md)
+        requires_shipping: validatedData.requires_shipping !== false,
       },
     });
 

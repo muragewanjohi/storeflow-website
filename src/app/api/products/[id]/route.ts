@@ -168,6 +168,8 @@ export async function PUT(
     // Basic deposit support (docs/SERVICES_PLAN.md)
     if (validatedData.deposit_type !== undefined) updateData.deposit_type = validatedData.deposit_type;
     if (validatedData.deposit_value !== undefined) updateData.deposit_value = validatedData.deposit_value;
+    // Basic services support (docs/SERVICES_PLAN.md)
+    if (validatedData.requires_shipping !== undefined) updateData.requires_shipping = validatedData.requires_shipping;
 
     // Update product
     const product = await prisma.products.update({
