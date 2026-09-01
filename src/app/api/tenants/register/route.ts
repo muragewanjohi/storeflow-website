@@ -37,6 +37,7 @@ import { recommendThemeForBusiness } from '@/lib/themes/recommend-theme';
 import { estimateCostUsd } from '@/lib/ai/claude-client';
 import { recordAiUsage } from '@/lib/ai/usage';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
+import { getCategoriesForBusinessType } from '@/lib/categories/business-type-taxonomy';
 import { createDemoAttributes, createDemoContent } from '@/lib/themes/demo-content';
 import {
   getOnboardingImagePlaceholderUrl,
@@ -557,7 +558,21 @@ async function applyStarterPackToTenant(
   businessType?: string,
   selling?: string
 ): Promise<{ applied: boolean; categoriesCreated: number; productsCreated: number; salesCreated: number; blogsCreated: number }> {
-  const categories = (starterPack.categories ?? []).slice(0, 12);
+  // Category taxonomy grounding (docs/IMPLEMENTATION_TRACKER.md, "Category
+  // Taxonomy" section) — prefer the same real, curated per-business-type
+  // list the AI Assistant's category suggestions already draw from
+  // (@/lib/categories/business-type-taxonomy.ts) over Gemini's freely
+  // re-invented starterPack.categories, so a tenant's registration-time
+  // demo categories and any later AI-assistant-suggested categories are
+  // always the same shared vocabulary — not two different AI guesses for
+  // the same real business type. Falls back to Gemini's own output only
+  // when no curated entry exists (unrecognized/"Other" business type).
+  // Demo products are assigned to categories by simple round-robin index
+  // (see the loop below), not by name-matching against Gemini's own
+  // category intent, so swapping this array is safe — nothing else
+  // downstream depends on these specific strings being Gemini's.
+  const curatedCategories = getCategoriesForBusinessType(businessType);
+  const categories = (curatedCategories.length > 0 ? curatedCategories : starterPack.categories ?? []).slice(0, 12);
   const products = (starterPack.demoProducts ?? []).slice(0, 40);
   const salesPromotions = (starterPack.salesPromotions ?? []).slice(0, 2);
   const blogPosts = (starterPack.blogPosts ?? []).slice(0, 4);
