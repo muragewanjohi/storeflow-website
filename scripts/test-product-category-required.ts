@@ -6,6 +6,11 @@
  *  - The AI product-intake conversation (@/lib/products/ai-intake-shared)
  *    now insists on a real category before finishing, never leaves it null
  *    when the tenant has real categories to pick from.
+ *  - Part D: a tenant whose recorded business_type is one of the 10
+ *    service-only types (@/lib/categories/business-type-taxonomy.ts) gets a
+ *    shipping CONFIRMATION instead of a cold question — user-requested
+ *    connection between registration's business type/category and
+ *    requires_shipping.
  *
  * Uses the real "testtwo" test tenant (8 real categories: Cookware,
  * Kitchen Appliances, Dining & Serving, Storage & Organization, Bakeware,
@@ -111,6 +116,73 @@ async function main() {
   console.log('turn3 done:', turn3.data.done, 'collected:', turn3.data.collected);
   check('finishes with done:true once category AND requiresShipping are both given', turn3.data.done === true, turn3.data);
   check('collected.requiresShipping is true for a physical product', turn3.data.collected.requiresShipping === true, turn3.data.collected.requiresShipping);
+
+  // --- Part D: a service-only business type gets a CONFIRMATION, not a cold question ---
+  // User-requested connection: "when the store is registered do we track
+  // what is a service based on what the user selects as a business type /
+  // category?" — temporarily switches testtwo's recorded business_type to
+  // a service-only type to exercise buildProductIntakeSystemPrompt's
+  // confirm-instead-of-ask-cold branch, then restores it.
+  console.log('\n--- Part D: service-only business type gets a shipping confirmation, not a cold question ---');
+  const tenantRow = await prisma.tenants.findUnique({ where: { id: TEST_TENANT_ID }, select: { data: true } });
+  const originalData = (tenantRow?.data ?? {}) as Record<string, unknown>;
+  const originalBusinessType = originalData.business_type;
+  try {
+    await prisma.tenants.update({
+      where: { id: TEST_TENANT_ID },
+      data: { data: { ...originalData, business_type: 'Repair & Technical Services' } },
+    });
+
+    // Deliberately assertive about the category ("that's fine") — testtwo's
+    // real categories are all Home & Kitchen-themed since only business_type
+    // is swapped here, not the categories table, and this part is testing
+    // the requiresShipping confirmation, not category-matching semantics.
+    const serviceTurn1 = await runProductIntakeTurn(TEST_TENANT_ID, [
+      {
+        role: 'user',
+        content: 'add a product called Phone Screen Replacement, price 2500. Put it under Cookware, that\'s fine, I know it is not a perfect fit.',
+      },
+    ]);
+    console.log('serviceTurn1 reply:', serviceTurn1.data.reply);
+    console.log('serviceTurn1 done:', serviceTurn1.data.done, 'collected:', serviceTurn1.data.collected);
+    check('collected.category was accepted as given', serviceTurn1.data.collected.category === 'Cookware', serviceTurn1.data.collected.category);
+    const replyLower = serviceTurn1.data.reply.toLowerCase();
+    check(
+      "reply confirms an assumption (mentions 'assume'/'shipping'/business type) rather than asking a neutral yes/no question",
+      replyLower.includes('assume') || replyLower.includes("doesn't need shipping") || replyLower.includes('repair & technical services'),
+      serviceTurn1.data.reply,
+    );
+
+    const serviceTurn2 = await runProductIntakeTurn(TEST_TENANT_ID, [
+      {
+        role: 'user',
+        content: 'add a product called Phone Screen Replacement, price 2500. Put it under Cookware, that\'s fine, I know it is not a perfect fit.',
+      },
+      { role: 'assistant', content: JSON.stringify(serviceTurn1.data) },
+      { role: 'user', content: "yes that's right, no sku needed" },
+    ]);
+    console.log('\nserviceTurn2 reply:', serviceTurn2.data.reply);
+    console.log('serviceTurn2 done:', serviceTurn2.data.done, 'collected:', serviceTurn2.data.collected);
+    check('finishes with done:true once confirmed', serviceTurn2.data.done === true, serviceTurn2.data);
+    check(
+      'collected.requiresShipping is false once the merchant confirms the service assumption',
+      serviceTurn2.data.collected.requiresShipping === false,
+      serviceTurn2.data.collected.requiresShipping,
+    );
+    check(
+      'stockQuantity was never asked about (service item)',
+      serviceTurn2.data.collected.stockQuantity === null,
+      serviceTurn2.data.collected.stockQuantity,
+    );
+  } finally {
+    await prisma.tenants.update({
+      where: { id: TEST_TENANT_ID },
+      data: { data: { ...originalData, business_type: originalBusinessType } },
+    });
+    const restoredTenant = await prisma.tenants.findUnique({ where: { id: TEST_TENANT_ID }, select: { data: true } });
+    const restoredBusinessType = (restoredTenant?.data as Record<string, unknown> | null)?.business_type;
+    check('original business_type restored', restoredBusinessType === originalBusinessType, restoredBusinessType);
+  }
 
   console.log(`\n${passed}/${total} checks passed.`);
   await prisma.$disconnect();

@@ -325,3 +325,48 @@ export function isValidCategoryForBusinessType(
   if (!trimmed) return false;
   return getCategoriesForBusinessType(businessType).includes(trimmed);
 }
+
+/**
+ * The 10 business types added this session that are 100% service
+ * businesses by definition — no physical product path exists for any of
+ * them (contrast with e.g. "Beauty & Personal Care" or "Automotive &
+ * Motorbike", which mix real retail with service-flavored category line
+ * items, so nothing there can be assumed shipping-free by business type
+ * alone). User-requested connection: "when the store is registered do we
+ * track what is a service based on what the user selects as a business
+ * type / category?" — this is that connection, feeding a smarter (never
+ * silent) `requires_shipping` default at product-creation time, both in
+ * the manual product forms and the AI product-intake conversation.
+ */
+export const SERVICE_ONLY_BUSINESS_TYPES: readonly string[] = [
+  'Repair & Technical Services',
+  'Home & Trade Services',
+  'Cleaning Services',
+  'Beauty, Salon & Spa Services',
+  'Events, Photography & Entertainment Services',
+  'Transport, Moving & Logistics Services',
+  'Professional & Business Services',
+  'Health, Fitness & Wellness Services',
+  'Education & Training Services',
+  'Construction & Contracting Services',
+];
+
+/** True when `businessType` is one of the explicit service-only business types above. */
+export function isServiceOnlyBusinessType(businessType: string | null | undefined): boolean {
+  if (!businessType) return false;
+  return SERVICE_ONLY_BUSINESS_TYPES.includes(businessType);
+}
+
+/**
+ * Sensible starting point for a NEW product's `requires_shipping` toggle,
+ * derived from the tenant's registered business type — `true` (ships) for
+ * everything except the 10 service-only business types. Never used to
+ * silently skip asking/showing the choice — the manual product form still
+ * renders the toggle (just pre-set), and the AI intake conversation still
+ * confirms out loud rather than assuming quietly (see
+ * ai-intake-shared.ts's buildProductIntakeSystemPrompt). Editing an
+ * existing product never uses this — its own stored value always wins.
+ */
+export function defaultRequiresShippingForBusinessType(businessType: string | null | undefined): boolean {
+  return !isServiceOnlyBusinessType(businessType);
+}

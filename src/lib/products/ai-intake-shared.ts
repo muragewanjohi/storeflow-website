@@ -16,6 +16,7 @@
 
 import { prisma } from '@/lib/prisma/client';
 import { generateJsonFromConversation, type AiUsage } from '@/lib/ai/claude-client';
+import { isServiceOnlyBusinessType } from '@/lib/categories/business-type-taxonomy';
 
 export type ProductIntakeMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -61,7 +62,10 @@ export interface ProductIntakeTurnResponse {
   };
 }
 
-export function buildProductIntakeSystemPrompt(existingCategoryNames: string[]): string {
+export function buildProductIntakeSystemPrompt(
+  existingCategoryNames: string[],
+  businessType?: string | null,
+): string {
   // The caller (requireCategoryBeforeProductIntake, @/lib/assistant/shared)
   // guarantees the tenant has at least one real category before this
   // conversation ever starts — a merchant with zero categories is
@@ -73,6 +77,17 @@ export function buildProductIntakeSystemPrompt(existingCategoryNames: string[]):
       ? `The merchant's existing categories are: ${existingCategoryNames.join(', ')}. Category is REQUIRED — if the product clearly fits one of these, use that exact name for "category". If none fit well, ask the merchant which of their existing categories it belongs to, or whether to use the closest one — never invent a category name that isn't in this list, and never leave category null.`
       : 'This merchant unexpectedly has no categories set up yet — set category to null and mention in your reply that they should add a category from the Categories page.';
 
+  // User-requested connection: "when the store is registered do we track
+  // what is a service based on what the user selects as a business type /
+  // category?" — for the 10 explicit service-only business types
+  // (@/lib/categories/business-type-taxonomy.ts), confirm rather than ask
+  // cold. Still a real confirmation, not a silent default — the merchant
+  // can always correct it (a service business can still sell a physical
+  // add-on item).
+  const shippingQuestionInstruction = isServiceOnlyBusinessType(businessType)
+    ? `Once you have name, price, and category, confirm shipping instead of asking cold: this merchant's registered business type is "${businessType}", a service business, so lead with an assumption they can correct, e.g. "I'll assume this doesn't need shipping since you're a ${businessType} business — sound right, or is this a physical item?" Set requiresShipping to false if they confirm/say nothing contradicts it, or true if they correct you. Still REQUIRED — never leave it null without asking this once.`
+    : 'Once you have name, price, and category, ask ONE more required question: does this need to be shipped, or is it a service, booking, or digital item that does not ship (e.g. a haircut, a consultation, a downloadable file)? Set requiresShipping to true or false based on their answer — never guess or default it, always ask.';
+
   return [
     'You are a product-intake assistant for DukaNest, a Kenyan multi-tenant ecommerce platform.',
     'This conversation creates exactly ONE product listing — never more, even if the merchant mentions a number. If they say something like "add 5 new electric shavers", that is ONE listing (one name, one price) with stockQuantity 5 — the number is how many units they have in stock, not a request for 5 separate listings. Do not ask whether they meant several different products; assume one listing with that stock count unless they explicitly describe several different items.',
@@ -82,7 +97,7 @@ export function buildProductIntakeSystemPrompt(existingCategoryNames: string[]):
     // Basic services support (docs/SERVICES_PLAN.md) — a service/digital
     // item never has stock tracked, so this question decides whether to
     // ask about stock at all, not just another optional field.
-    'Once you have name, price, and category, ask ONE more required question: does this need to be shipped, or is it a service, booking, or digital item that does not ship (e.g. a haircut, a consultation, a downloadable file)? Set requiresShipping to true or false based on their answer — never guess or default it, always ask.',
+    shippingQuestionInstruction,
     'If requiresShipping is true, ask once whether they want to specify stock quantity or SKU now, or skip and set them later. Do not insist — one offer is enough, and stockQuantity stays null if skipped.',
     'If requiresShipping is false, do NOT ask about stock quantity at all — it does not apply. You may still ask once whether they want to add a SKU, or skip.',
     'SKU is optional either way — if they do not have one, leave it null; the system generates one automatically.',
@@ -92,23 +107,30 @@ export function buildProductIntakeSystemPrompt(existingCategoryNames: string[]):
   ].join(' ');
 }
 
-/** Runs one turn of the conversation — fetches the tenant's real categories, calls Claude, returns the parsed turn + usage. */
+/** Runs one turn of the conversation — fetches the tenant's real categories and recorded business type, calls Claude, returns the parsed turn + usage. */
 export async function runProductIntakeTurn(
   tenantId: string,
   messages: ProductIntakeMessage[],
 ): Promise<{ data: ProductIntakeTurnResponse; usage: AiUsage }> {
-  const categories = await prisma.categories.findMany({
-    where: { tenant_id: tenantId, status: 'active' },
-    select: { name: true },
-    take: 100,
-  });
+  const [categories, tenant] = await Promise.all([
+    prisma.categories.findMany({
+      where: { tenant_id: tenantId, status: 'active' },
+      select: { name: true },
+      take: 100,
+    }),
+    prisma.tenants.findUnique({ where: { id: tenantId }, select: { data: true } }),
+  ]);
   const categoryNames = categories.map((c) => c.name);
+  const businessType =
+    typeof (tenant?.data as Record<string, unknown> | null)?.business_type === 'string'
+      ? ((tenant!.data as Record<string, unknown>).business_type as string)
+      : null;
 
   const effectiveMessages =
     messages.length > 0 ? messages : [{ role: 'user' as const, content: '(Start the product intake conversation.)' }];
 
   return generateJsonFromConversation<ProductIntakeTurnResponse>({
-    system: buildProductIntakeSystemPrompt(categoryNames),
+    system: buildProductIntakeSystemPrompt(categoryNames, businessType),
     messages: effectiveMessages,
     schema: productIntakeResponseSchema,
     maxTokens: 500,

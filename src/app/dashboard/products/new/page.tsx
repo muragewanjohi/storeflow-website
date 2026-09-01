@@ -7,6 +7,7 @@
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
 import { prisma } from '@/lib/prisma/client';
 import ProductFormClient from '../product-form-client';
 import NoCategoriesPrompt from '../no-categories-prompt';
@@ -49,6 +50,11 @@ export default async function CreateProductPage() {
     return <NoCategoriesPrompt />;
   }
 
-  return <ProductFormClient categories={categories} />;
+  // User-requested connection: default the "physical product" toggle from
+  // the tenant's registered business type (never silently — the toggle
+  // still renders and is still editable, just pre-set sensibly).
+  const { businessType } = getBusinessProfile(tenant);
+
+  return <ProductFormClient categories={categories} businessType={businessType} />;
 }
 

@@ -25,6 +25,7 @@ import ProductSalesSection from './product-sales-section';
 import RichTextEditor from '@/components/content/rich-text-editor';
 import ContextualHelp from '@/components/dashboard/contextual-help';
 import { compressImageForMobile, uploadImageWithProgress } from '@/lib/media/mobile-image-upload';
+import { defaultRequiresShippingForBusinessType } from '@/lib/categories/business-type-taxonomy';
 
 interface Product {
   id: string;
@@ -93,12 +94,17 @@ interface ProductFormClientProps {
   product?: Product;
   variants?: Variant[];
   categories: Category[];
+  /** Tenant's registered business type (register/page.tsx) — used only to
+   * pre-set the "physical product" toggle sensibly for a NEW product; an
+   * existing product's own stored value always wins. */
+  businessType?: string | null;
 }
 
 export default function ProductFormClient({
   product,
   variants: initialVariants = [],
   categories,
+  businessType,
 }: Readonly<ProductFormClientProps>) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -179,7 +185,15 @@ export default function ProductFormClient({
     estimated_delivery_days: product?.estimated_delivery_days?.toString() || '',
     deposit_type: product?.deposit_type || ('none' as 'none' | 'fixed' | 'percentage'),
     deposit_value: product?.deposit_value?.toString() || '',
-    requires_shipping: product?.requires_shipping !== false,
+    // User-requested connection: for a NEW product, start from the
+    // tenant's registered business type (false only for the 10
+    // service-only business types) instead of always defaulting to true —
+    // still just a starting point, the toggle below remains fully
+    // editable. Editing an existing product always keeps its own stored
+    // value regardless of business type.
+    requires_shipping: product
+      ? product.requires_shipping !== false
+      : defaultRequiresShippingForBusinessType(businessType),
   });
 
   // Initialize variants from props if editing, or empty array if creating
