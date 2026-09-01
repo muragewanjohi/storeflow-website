@@ -158,6 +158,22 @@ Single source of truth for build status across [`AI_FEATURES_PLAN.md`](./AI_FEAT
 
 ---
 
+## Category Taxonomy — Business-Type-Grounded Suggestions (✅ done)
+
+**User-requested directly**, prompted by a Jiji.co.ke category-browser screenshot: *"is it possible to have a list of what someone is selling based on business type, since anyone can input anything yet they are of the same niche?"* Confirmed by direct code search before building anything — no such list existed: categories were either merchant-typed free text or freely re-invented by Claude per conversation (`handleCategoryConfigTarget`'s suggestion path), grounded only in `businessType`/`niche` prose, not a shared, canonical vocabulary. Two tenants with the identical recorded business type could get two completely different AI-suggested category sets.
+
+Scoped deliberately narrow per two `AskUserQuestion` decisions: **a flat list (no subcategories/tree yet)** of real category names per business type — `categories.parent_id` already supports a tree, but nothing today actually uses it, so building one now would curate content nobody's asked to browse — and **grounding the AI's existing suggestion flow first**, not a new picker UI.
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| CT.1 | Curated taxonomy data | ✅ | New `@/lib/categories/business-type-taxonomy.ts` — `BUSINESS_TYPE_CATEGORIES`, one real ~7-11 name list per business type, keyed to the exact strings in `register/page.tsx`'s own `businessTypes` array (all 15 real types; "Other" deliberately has no entry — nothing to curate against for a merchant-typed override). Deliberately includes real SERVICE-flavored category names where a business type's own description already implies services (e.g. Beauty & Personal Care → "Salon Services", "Barbershop Services"; Automotive → "Repair & Mechanic Services") — ties directly into the just-shipped `requires_shipping` work (a category can legitimately mix physical and non-shipped products, since that decision is per-product) |
+| CT.2 | Ground `handleCategoryConfigTarget`'s AI suggestions in the real list | ✅ | `buildConfigTargetSystemPrompt()` (`@/lib/assistant/shared.ts`) now instructs Claude to pick 2-5 names FROM the curated list for the tenant's recorded business type (skipping any it already has) instead of inventing fresh ones — falls back to the original free-generation behavior only when no curated entry exists (unrecognized/"Other" business type), so nothing regresses for that case |
+| CT.3 | Live-verify | ✅ | New `npm run test:category-taxonomy`, 38/38 checks — all 15 real business types have a real, deduplicated curated list; "Other" and unrecognized/null inputs correctly return empty rather than throwing; one real Claude call against a real tenant (`businessType: 'Home & Kitchen'`, 8 real existing categories) confirmed every suggested name was drawn from the curated list (not invented) and none duplicated an existing category. Re-verified zero regression on `test-product-category-required.ts` (11/11) and `test-blog-draft.ts` (17/17) after the shared prompt edit — both also exercise `buildConfigTargetSystemPrompt`. Same pre-existing, unrelated product-intake turn-pacing flake observed again in `test-claude-assistant-config-actions.ts` (a different prompt module, not touched by this work, already disclosed during the Services Phase 1 work) — everything category-related in that same run passed, including a real suggestion visibly drawn from the curated `Home & Kitchen` list |
+
+**Deliberately deferred, not part of this pass**: a registration/onboarding "Products / Services / Both" question was discussed alongside this (to also steer starter-pack demo-content generation) — found to have a real sequencing conflict (the onboarding chat runs *after* the starter pack already generated demo content, so it can't influence that pipeline for the same tenant) and was explicitly scoped down to "chat-only, lower-risk version" per `AskUserQuestion`; not yet built as of this entry.
+
+---
+
 ## UI — Onboarding AI Chat (new, cross-platform, own plan doc)
 
 Full detail in [`ONBOARDING_AI_CHAT_PLAN.md`](./ONBOARDING_AI_CHAT_PLAN.md) — **that doc's "Current state" section is now known-inaccurate, see the OC.2 correction below; treat this tracker as authoritative over it for scope.**

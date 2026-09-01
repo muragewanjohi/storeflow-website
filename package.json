@@ -50,6 +50,7 @@
     "test:deposit-support": "tsx scripts/test-deposit-support.ts",
     "test:blog-draft": "tsx scripts/test-blog-draft.ts",
     "test:services-no-shipping": "tsx scripts/test-services-no-shipping.ts",
+    "test:category-taxonomy": "tsx scripts/test-category-taxonomy.ts",
     "test:claude-product-intake": "tsx scripts/test-claude-product-intake.ts",
     "test:claude-assistant-query": "tsx scripts/test-claude-assistant-query.ts",
     "test:claude-assistant-next-steps": "tsx scripts/test-claude-assistant-next-steps.ts",

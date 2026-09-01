@@ -74,6 +74,7 @@ import {
 } from '@/lib/social-content/social-content-shared';
 import { runBlogDraft } from '@/lib/blog/blog-draft-shared';
 import { generateSlug as generateBlogSlug } from '@/lib/content/validation';
+import { getCategoriesForBusinessType } from '@/lib/categories/business-type-taxonomy';
 
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -285,6 +286,19 @@ export interface ConfigTargetParseResult {
  * generic retail categories, same discipline as business_advice.
  * @param existingCategoryNames Real current categories, so a suggestion
  * never duplicates one they already have.
+ *
+ * Category suggestions are grounded in a REAL curated list per business
+ * type (@/lib/categories/business-type-taxonomy.ts) when one exists for
+ * this tenant's recorded businessType — Claude picks from it rather than
+ * inventing fresh names each conversation, so two tenants with the
+ * identical business type land on the same shared vocabulary instead of
+ * two different AI-generated guesses (user-requested, prompted by
+ * observing that free-text/AI-invented categories don't stay consistent
+ * across same-niche tenants the way a real marketplace's fixed category
+ * tree does — see Jiji.co.ke as the reference point). Falls back to free
+ * generation (grounded in niche/business-context prose only, same as
+ * before this taxonomy existed) when the business type is unrecognized
+ * (e.g. "Other") or has no curated entry.
  */
 export function buildConfigTargetSystemPrompt(
   businessType: string | null,
@@ -298,6 +312,11 @@ export function buildConfigTargetSystemPrompt(
     existingCategoryNames.length > 0
       ? `Their existing categories are: ${existingCategoryNames.join(', ')}. Never suggest one of these again.`
       : 'They have no categories yet.';
+  const curatedCategories = getCategoriesForBusinessType(businessType);
+  const curatedInstruction =
+    curatedCategories.length > 0
+      ? `A real, curated category list exists for their business type: ${curatedCategories.join(', ')}. When suggesting categories, choose 2-5 names FROM THIS LIST ONLY (skipping any they already have) — do not invent new names when this list is available.`
+      : undefined;
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
@@ -306,7 +325,7 @@ export function buildConfigTargetSystemPrompt(
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
-    `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} Never invent categories unrelated to their actual business.`,
+    `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} ${curatedInstruction ?? 'No curated category list exists for their recorded business type — never invent categories unrelated to their actual business.'}`,
     'If target is "sales", there are two cases:',
     '1. They already named the sale in THIS message (e.g. "create a sale called Black Friday", "add a promotion named Back to School"), OR YOUR OWN previous message asked "what would you like to name this sale?" and their latest message answers it — extract the exact name into saleName.',
     '2. Otherwise — a first-time request with no name given (e.g. "create a sale", "I want to set up a promotion") — leave saleName empty; you will ask them to name it. NEVER invent a sale name or theme yourself (unlike category suggestions) — a sale is a real promotional event tied to the merchant\'s own actual plans, not a generic catalog bucket.',
