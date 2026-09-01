@@ -21,7 +21,7 @@ Give a store owner (or staff) a **point-of-sale / counter-sale** flow in the Duk
 - Offline card / M-Pesa / Pesapal payments (impossible — see §4).
 - Multi-register / multi-cashier reconciliation, cash-drawer shift close-out (Z-report). *(Phase 2.)*
 - Multi-location / per-outlet stock. Inventory is a single pool per product today (`products.stock_quantity`); "stock transfer between locations" is unbuilt (ROADMAP §3).
-- A web-dashboard POS. The Next.js app is not a PWA; offline POS = Flutter only for now. A thin online-only `/dashboard/pos` page can come later reusing the same endpoint.
+- An **offline** web POS. The Next.js app is not a PWA; offline POS = Flutter only. **An online-only web POS at `/dashboard/pos` now exists** (see §7c) — it shares the sale core but always needs a connection.
 
 ---
 
@@ -271,6 +271,36 @@ pos/
 
 ---
 
+## 7c. Web dashboard POS (`/dashboard/pos`) — **built, online-only**
+
+The web POS shares the sale core with mobile and always requires a connection —
+no Hive, no outbox. It exists because a merchant at a desktop till shouldn't
+have to reach for a phone.
+
+**Shared core:** the bootstrap query moved out of the mobile route into
+`src/lib/pos/load-bootstrap.ts` (`loadPosBootstrap(tenant, {since})`); both the
+mobile route and the web page/route call it. `src/lib/pos/bootstrap-types.ts`
+holds the payload types (no Prisma import, so the client component can use them).
+
+**Auth:** `src/lib/pos/dashboard-auth.ts` — `requireAuth()` + `requireTenant()`
++ `tenant_admin`/`tenant_staff` + own-tenant check (same as `/api/dashboard/sales`).
+
+**Routes** (`src/app/api/dashboard/pos/`):
+- `GET  /bootstrap` — refresh the catalogue snapshot (initial load is server-side in the page).
+- `POST /sales` — cookie-auth wrapper around `createPosSale`; `{ success, sale }`, 201 new / 200 dedup.
+- `GET  /sales/[id]/status` — polls `syncTumiziOrderPaymentByOrderId` for M-Pesa confirmation.
+
+**Page:** `src/app/dashboard/pos/page.tsx` (server: auth + `loadPosBootstrap` →
+`<PosClient>`) + `pos-client.tsx` — two-pane register/cart, per-line + order
+discount, customer fields, cash (with change) / M-Pesa STK (with poll-for-confirm) /
+"other", printable receipt (`window.print()` + `@media print`). Sidebar entry
+under Orders (`CalculatorIcon`). Totals math is a second port of `create-sale`
+steps 3–4 (`computeTotals` in `pos-client.tsx`).
+
+**Not carried over from mobile:** offline, barcode scan, thermal printing.
+
+---
+
 ## 8. Sync conflict matrix
 
 | Scenario | Resolution |
@@ -309,7 +339,7 @@ pos/
 **Phase 3 — later**
 - Cash drawer / shift open-close + Z-report.
 - Extend the offline layer to order-status updates and stock adjustments (already scoped in `offline_support_plan.md`).
-- Online-only `/dashboard/pos` web page reusing `/pos/sales`.
+- ~~Online-only `/dashboard/pos` web page~~ — **done**, see §7c.
 - Barcode field surfaced in product editor (web + mobile).
 - Bring online `checkout` in line: write `inventory_history` on every order.
 

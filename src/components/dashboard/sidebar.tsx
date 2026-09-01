@@ -16,6 +16,7 @@ import {
   CubeIcon,
   FolderIcon,
   ShoppingCartIcon,
+  CalculatorIcon,
   UsersIcon,
   UserGroupIcon,
   Cog6ToothIcon,
@@ -66,6 +67,7 @@ const navigation: NavigationItem[] = [
   
   // 3. Orders (Second most important - revenue center)
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
+  { name: 'Point of Sale', href: '/dashboard/pos', icon: CalculatorIcon },
   
   // 4. Products group (Catalog management)
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Products' },

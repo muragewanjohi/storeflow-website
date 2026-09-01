@@ -196,14 +196,15 @@ This document outlines planned features and enhancements for DukaNest. Features 
 - [x] `GET /api/v1/mobile/pos/bootstrap` — catalog + settings snapshot for the offline cache
 - [x] `POST /api/v1/mobile/pos/sales` — idempotent sale create (dedupe on `client_sale_id`), stock decrement + `inventory_history`, COGS capture, oversell allowed + flagged, plan-limit advisory (never blocks)
 - [x] Flutter `ApiClient.getPosBootstrap` / `postPosSale`
-- [x] Tests — backend 36 passing (`src/lib/pos/__tests__/`, `src/app/api/v1/mobile/pos/__tests__/`); Flutter 8 passing (`flutter/test/features/pos/pos_totals_test.dart` — totals port, oversell, UUID strictness)
+- [x] Tests — backend 44 passing (`src/lib/pos/__tests__/`, mobile + web `pos/__tests__/`); Flutter 8 passing (`flutter/test/features/pos/pos_totals_test.dart` — totals port, oversell, UUID strictness)
+- [x] **Web dashboard POS** — `/dashboard/pos` (server-loaded catalogue via shared `loadPosBootstrap`) + `POST /api/dashboard/pos/sales` (cookie auth, reuses `createPosSale`) + `.../sales/[id]/status` for M-Pesa polling. Two-pane register/cart, cash + M-Pesa (Tumizi STK) + "other", printable receipt. Sidebar entry under Orders.
 - [x] Flutter `lib/features/pos/` — register → cart → tender → receipt screens (online-only), reachable from the More menu; live totals mirroring server math, oversell / over-limit surfacing, share-text receipt
 - [x] M-Pesa STK from POS via **Tumizi** — `create-sale.ts` fires `initiateTumiziCustomerPaymentForOrder` (order created `pending`, rolled back on STK failure); bootstrap exposes `mpesa_stk_enabled`; tender screen has an M-Pesa method + phone field + a poll-for-confirmation wait screen (reuses `.../tumizi/sync-payment`) with "confirm later" / "resend" outs; receipt shows Paid vs Awaiting
 - [ ] Thermal / PDF receipt variant of the invoice (share is plain text for now)
 - [ ] Barcode scanning (needs `mobile_scanner`; search matches barcode text today)
 - [ ] Plan gate — `pos_enabled` in `price_plans.features` (Pro/Premium)
-- [ ] Phase 2: `lib/core/storage/` + `lib/core/sync/` offline layer (Hive catalog cache, `pos_sales_outbox`, `SyncManager` with backoff), offline banner + pending-sync indicator, local receipt render
-- [ ] Phase 3: cash drawer / shift open-close + Z-report; online-only `/dashboard/pos` web page; barcode field in product editor
+- [ ] Phase 2 (Flutter): `lib/core/storage/` + `lib/core/sync/` offline layer (Hive catalog cache, `pos_sales_outbox`, `SyncManager` with backoff), offline banner + pending-sync indicator, local receipt render
+- [ ] Phase 3: cash drawer / shift open-close + Z-report; barcode field in product editor; thermal receipt printing
 
 #### 4. Customer Features
 - [ ] Customer loyalty program
