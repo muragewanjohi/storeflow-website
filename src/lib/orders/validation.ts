@@ -73,6 +73,20 @@ export const checkoutSchema = z.object({
   }).optional().nullable(),
   coupon_code: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — one entry per
+  // bookable cart item, matched by product_id server-side (never trusted
+  // to line up positionally with `items`). A cart item whose product is
+  // is_bookable but has no matching entry here is rejected at checkout.
+  bookings: z
+    .array(
+      z.object({
+        product_id: z.string().uuid(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+        start_time: z.string().regex(/^\d{2}:\d{2}$/, 'start_time must be HH:mm'),
+      }),
+    )
+    .optional()
+    .default([]),
 });
 
 /**

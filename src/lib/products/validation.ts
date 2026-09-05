@@ -55,6 +55,20 @@ export const createProductSchema = z.object({
   // collection entirely for a cart made only of these. Defaults true
   // (ships normally), matching the DB column's own default.
   requires_shipping: z.boolean().default(true).optional(),
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — capacity, not
+  // named staff (user-confirmed scope): booking_capacity is "how many
+  // concurrent bookings this service supports" (e.g. 3 chairs), never a
+  // specific staff member. booking_duration_minutes is required in
+  // practice once is_bookable is true (enforced in the dashboard/mobile
+  // forms and the AI intake conversation, not here — mirrors how
+  // requires_shipping's own stock-quantity coupling is enforced at the UI
+  // layer, not the schema layer, since updateProductSchema's .partial()
+  // must stay valid for a same-toggle-unchanged edit).
+  is_bookable: z.boolean().default(false).optional(),
+  booking_duration_minutes: z.number().int().positive().optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseInt(val, 10))).optional().nullable()),
+  booking_capacity: z.number().int().positive().default(1).optional()
+    .or(z.string().transform((val) => (val === '' ? 1 : parseInt(val, 10))).optional()),
 }).strip(); // Strip unknown fields to prevent Prisma errors
 
 /**

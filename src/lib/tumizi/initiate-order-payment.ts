@@ -35,18 +35,29 @@ export async function initiateTumiziCustomerPaymentForOrder(params: {
     throw error;
   }
 
-  const completedPayment = await prisma.payment_logs.findFirst({
-    where: {
-      tenant_id: tenantId,
-      gateway: 'tumizi_customer_payment',
-      status: 'completed',
-      metadata: {
-        path: ['order_id'],
-        equals: order.id,
-      },
-    },
-    orderBy: { created_at: 'desc' },
-  });
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.7): a
+  // 'deposit_paid' order has a real, EXPECTED completed
+  // 'tumizi_customer_payment' row already (the deposit leg itself) — the
+  // stale-payment auto-heal below exists to recover a normal order whose
+  // status update failed after a real charge succeeded, not to fire on an
+  // order that's only partially settled by design. Skip it here so
+  // collecting the balance for a deposit order can proceed to a real new
+  // STK push instead of being incorrectly short-circuited to "already paid".
+  const completedPayment =
+    existingOrder?.payment_status === 'deposit_paid'
+      ? null
+      : await prisma.payment_logs.findFirst({
+          where: {
+            tenant_id: tenantId,
+            gateway: 'tumizi_customer_payment',
+            status: 'completed',
+            metadata: {
+              path: ['order_id'],
+              equals: order.id,
+            },
+          },
+          orderBy: { created_at: 'desc' },
+        });
 
   if (completedPayment) {
     await prisma.orders.update({

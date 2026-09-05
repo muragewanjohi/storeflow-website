@@ -119,6 +119,10 @@ async function updateProduct(request: NextRequest, params: Promise<{ id: string 
     if (validatedData.deposit_value !== undefined) updateData.deposit_value = validatedData.deposit_value;
     // Basic services support (docs/SERVICES_PLAN.md)
     if (validatedData.requires_shipping !== undefined) updateData.requires_shipping = validatedData.requires_shipping;
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    if (validatedData.is_bookable !== undefined) updateData.is_bookable = validatedData.is_bookable;
+    if (validatedData.booking_duration_minutes !== undefined) updateData.booking_duration_minutes = validatedData.booking_duration_minutes;
+    if (validatedData.booking_capacity !== undefined) updateData.booking_capacity = validatedData.booking_capacity;
 
     const product = await prisma.products.update({
       where: { id },

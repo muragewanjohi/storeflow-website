@@ -38,6 +38,8 @@ interface BuildProgressInput {
   categoryCount?: number;
   activeDemoProductCount?: number;
   deliveryZoneCount: number;
+  /** Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — unlike the assistant item, bookings are real on both platforms, so this item is unconditional (no includeXItem flag needed). */
+  bookableProductCount?: number;
   settings: SettingsMap;
   /**
    * Include the 'assistant' item ("Try the DukaNest Assistant"). Defaults to
@@ -59,7 +61,7 @@ function hasValue(value: string | null | undefined): boolean {
 }
 
 export function buildGettingStartedProgress(input: BuildProgressInput): GettingStartedProgressSummary {
-  const { productCount, categoryCount = 0, activeDemoProductCount = 0, deliveryZoneCount, settings, includeAssistantItem = false } = input;
+  const { productCount, categoryCount = 0, activeDemoProductCount = 0, deliveryZoneCount, bookableProductCount = 0, settings, includeAssistantItem = false } = input;
 
   const hasLogo = hasValue(settings.store_logo);
   const hasContactPhone = hasValue(settings.store_phone);
@@ -128,6 +130,15 @@ export function buildGettingStartedProgress(input: BuildProgressInput): GettingS
       label: 'Add your store logo',
       description: 'Brand your storefront with a logo',
       completed: hasLogo,
+    },
+    {
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — optional,
+      // not everyone sells a bookable service, but surfaced so merchants
+      // who do discover it. Real on both platforms, unlike 'assistant'.
+      id: 'bookings',
+      label: 'Set up a bookable service (optional)',
+      description: 'Sell an appointment or consultation customers book a real time slot for',
+      completed: bookableProductCount > 0,
     },
   ];
 

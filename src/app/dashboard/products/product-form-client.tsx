@@ -45,6 +45,9 @@ interface Product {
   deposit_type?: 'none' | 'fixed' | 'percentage' | null;
   deposit_value?: number | null;
   requires_shipping?: boolean | null;
+  is_bookable?: boolean | null;
+  booking_duration_minutes?: number | null;
+  booking_capacity?: number | null;
 }
 
 interface Category {
@@ -194,6 +197,10 @@ export default function ProductFormClient({
     requires_shipping: product
       ? product.requires_shipping !== false
       : defaultRequiresShippingForBusinessType(businessType),
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    is_bookable: product?.is_bookable === true,
+    booking_duration_minutes: product?.booking_duration_minutes?.toString() || '',
+    booking_capacity: product?.booking_capacity?.toString() || '1',
   });
 
   // Initialize variants from props if editing, or empty array if creating
@@ -397,6 +404,18 @@ export default function ProductFormClient({
       }
     }
 
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    if (formData.is_bookable) {
+      const duration = parseInt(formData.booking_duration_minutes, 10);
+      if (!formData.booking_duration_minutes.trim() || isNaN(duration) || duration <= 0) {
+        errors.booking_duration_minutes = 'Enter how many minutes a booking takes';
+      }
+      const capacity = parseInt(formData.booking_capacity, 10);
+      if (!formData.booking_capacity.trim() || isNaN(capacity) || capacity <= 0) {
+        errors.booking_capacity = 'Enter how many bookings this service can handle at once';
+      }
+    }
+
     // Only validate product-level stock if no variants exist and this
     // product actually ships (a service has no stock field shown at all).
     if (variants.length === 0 && formData.requires_shipping) {
@@ -501,6 +520,14 @@ export default function ProductFormClient({
           : null,
         // Basic services support (docs/SERVICES_PLAN.md)
         requires_shipping: formData.requires_shipping,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        is_bookable: formData.is_bookable,
+        booking_duration_minutes: formData.is_bookable && formData.booking_duration_minutes.trim()
+          ? parseInt(formData.booking_duration_minutes, 10)
+          : null,
+        booking_capacity: formData.is_bookable && formData.booking_capacity.trim()
+          ? parseInt(formData.booking_capacity, 10)
+          : 1,
       };
 
       if (parsedSalePrice !== null) {
@@ -1043,6 +1070,77 @@ export default function ProductFormClient({
                         Set the stock quantity for this product. Add variants below to manage stock per variant.
                       </p>
                     )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="is_bookable">This is a bookable service</Label>
+                      <ContextualHelp
+                        title="Bookings"
+                        description="Turn this on for a service customers book a specific time slot for — a haircut, a consultation, a repair appointment. Customers pick an available slot at checkout; you manage bookings from the Bookings page."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.is_bookable
+                        ? 'Customers pick a real available time slot at checkout.'
+                        : "Doesn't require a booked time slot — sold like a regular item/service."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_bookable"
+                    checked={formData.is_bookable}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_bookable: checked })}
+                    aria-label="Toggle whether this product requires a booked time slot"
+                  />
+                </div>
+
+                {formData.is_bookable && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="booking_duration_minutes">Duration (minutes)</Label>
+                        <ContextualHelp
+                          title="Booking duration"
+                          description="How long one booking of this service takes, e.g. 30 for a quick haircut, 60 for a full consultation."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
+                      <Input
+                        id="booking_duration_minutes"
+                        type="number"
+                        min="1"
+                        value={formData.booking_duration_minutes}
+                        onChange={(e) => setFormData({ ...formData, booking_duration_minutes: e.target.value })}
+                        placeholder="e.g. 30"
+                      />
+                      {validationErrors.booking_duration_minutes && (
+                        <p className="text-sm text-destructive">{validationErrors.booking_duration_minutes}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="booking_capacity">Capacity</Label>
+                        <ContextualHelp
+                          title="Capacity"
+                          description="How many of these bookings you can handle at the exact same time slot — e.g. 3 if you have 3 chairs/stylists. Leave at 1 if only one at a time."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
+                      <Input
+                        id="booking_capacity"
+                        type="number"
+                        min="1"
+                        value={formData.booking_capacity}
+                        onChange={(e) => setFormData({ ...formData, booking_capacity: e.target.value })}
+                        placeholder="1"
+                      />
+                      {validationErrors.booking_capacity && (
+                        <p className="text-sm text-destructive">{validationErrors.booking_capacity}</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>

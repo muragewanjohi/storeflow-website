@@ -75,6 +75,21 @@ Time-slot scheduling is a genuinely different data shape than anything `products
 
 ---
 
+## Phase 2 — built (✅ done, real scheduling)
+
+**Built speculatively, on explicit user request** ("let's build it speculatively and also as a way to advertise our features") — the "build only once real demand shows" deferral above was deliberately overridden, not forgotten. Full detail in `IMPLEMENTATION_TRACKER.md`'s S2 row.
+
+**Deviations from the original Phase 2 sketch above, each a deliberate, user-confirmed scope decision** (not silent drift):
+- **Capacity (`products.booking_capacity`, an int), not named staff/resource assignment.** Staff turned out to live entirely in Supabase Auth (`adminClient.auth.admin.listUsers()`), not a Prisma-modeled table — real per-staff conflict-checking would mean pulling Admin API calls into the booking hot path, a materially bigger build than this pass's speculative scope justified. A booking still carries an optional free-text `staff_label` for the cosmetic "which chair/stylist" note this plan originally asked for, just not tied to a real account.
+- **Both self-service storefront picking AND dashboard management shipped together**, not staged.
+- **Deposits already existed** (S-Dep, built before this) and needed zero changes — a bookable product can already require a deposit via the same `deposit_type`/`deposit_value` fields every other product uses; nothing bookable-specific was added there.
+- **Booking hours live in the real `static_options` table** (`option_name: 'booking_hours'`), not a new column/table — the same mechanism already used for the near-identical `pickup_hours` setting.
+- **No calendar-grid UI library added**, on either platform — matches this codebase's consistent choice (delivery zones, scheduled sales, analytics ranges) of native date/time inputs over a calendar dependency.
+
+**Deliberately still deferred, unchanged from the Phase 3 sketch above**: booking reminders, staff availability windows, cancellation policies. Real, reusable SMS/push infra confirmed to exist (DA.36) — a clean fast-follow once real usage data exists to prioritize it against.
+
+---
+
 ## Decisions made while building (Phase 1, ✅ done)
 
 - **Migration**: SQL-first (`ALTER TABLE products ADD COLUMN requires_shipping boolean NOT NULL DEFAULT true`), applied directly to the real dev database, then `npx prisma generate` — exactly as planned.

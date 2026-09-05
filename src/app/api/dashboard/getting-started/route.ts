@@ -37,7 +37,7 @@ export async function GET() {
     const storeUrl = `https://${tenant.subdomain}.${baseDomain}`;
 
     // Fetch data in parallel
-    const [productCount, categoryCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
+    const [productCount, categoryCount, activeDemoProductCount, deliveryZoneCount, bookableProductCount, settings] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: tenant.id, status: 'active', created_by: { not: null } },
       }),
@@ -48,6 +48,10 @@ export async function GET() {
       prisma.delivery_zones.count({
         where: { tenant_id: tenant.id, is_active: true },
       }),
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+      prisma.products.count({
+        where: { tenant_id: tenant.id, is_bookable: true },
+      }),
       getStaticOptions(tenant.id, [...GETTING_STARTED_OPTION_NAMES]),
     ]);
 
@@ -56,6 +60,7 @@ export async function GET() {
       categoryCount,
       activeDemoProductCount,
       deliveryZoneCount,
+      bookableProductCount,
       settings,
       includeAssistantItem: true, // web-only for now — see the flag's doc comment
     });
@@ -153,6 +158,16 @@ export async function GET() {
         cta: 'Try it',
         priority: 9,
       },
+      {
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        id: 'bookings',
+        label: 'Set up a bookable service 📅',
+        description: 'Sell an appointment or consultation customers book a real time slot for',
+        completed: completionById.get('bookings') ?? false,
+        href: '/dashboard/products/new',
+        cta: 'Add a service',
+        priority: 10,
+      },
     ];
 
     // Show cleanup task only when demo products exist.
@@ -164,7 +179,7 @@ export async function GET() {
         completed: completionById.get('demo_products') ?? false,
         href: '/dashboard/products',
         cta: 'Remove demo products',
-        priority: 10,
+        priority: 11,
       });
     }
 

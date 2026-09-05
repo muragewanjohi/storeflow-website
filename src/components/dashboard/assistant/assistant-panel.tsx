@@ -127,6 +127,36 @@ interface CollectedProduct {
   sku: string | null;
   // Basic services support (docs/SERVICES_PLAN.md)
   requiresShipping?: boolean | null;
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9)
+  depositType?: string | null;
+  depositValue?: number | null;
+}
+
+/**
+ * Re-validated the same way every other model-produced value in this
+ * codebase is (e.g. B2.1's color/font re-checking) — never trusted raw
+ * against the real 'none'|'fixed'|'percentage' enum
+ * (@/lib/products/validation.ts), since the create-product route's zod
+ * schema REJECTS (400s) an off-enum string outright rather than
+ * defaulting it, which would otherwise silently break this flow on a rare
+ * model slip.
+ */
+function sanitizeCollectedDeposit(
+  depositType: string | null | undefined,
+  depositValue: number | null | undefined,
+): { deposit_type: 'none' | 'fixed' | 'percentage'; deposit_value: number | null } {
+  if (depositType === 'fixed' && typeof depositValue === 'number' && depositValue > 0) {
+    return { deposit_type: 'fixed', deposit_value: depositValue };
+  }
+  if (
+    depositType === 'percentage' &&
+    typeof depositValue === 'number' &&
+    depositValue > 0 &&
+    depositValue <= 100
+  ) {
+    return { deposit_type: 'percentage', deposit_value: depositValue };
+  }
+  return { deposit_type: 'none', deposit_value: null };
 }
 
 interface CollectedZone {
@@ -313,6 +343,11 @@ export default function AssistantPanel() {
       return;
     }
 
+    const { deposit_type, deposit_value } = sanitizeCollectedDeposit(
+      collected.depositType,
+      collected.depositValue,
+    );
+
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
@@ -327,6 +362,8 @@ export default function AssistantPanel() {
           sku: collected.sku || undefined,
           category_id,
           requires_shipping: collected.requiresShipping !== false,
+          deposit_type,
+          deposit_value,
         }),
       });
       const body = await res.json().catch(() => ({}));

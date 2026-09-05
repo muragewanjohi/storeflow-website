@@ -48,6 +48,7 @@
     "test:claude-chat-known-business-type": "tsx scripts/test-claude-chat-known-business-type.ts",
     "test:onboarding-chat-mobile": "tsx scripts/test-onboarding-chat-mobile.ts",
     "test:deposit-support": "tsx scripts/test-deposit-support.ts",
+    "test:bookings": "tsx scripts/test-bookings.ts",
     "test:blog-draft": "tsx scripts/test-blog-draft.ts",
     "test:services-no-shipping": "tsx scripts/test-services-no-shipping.ts",
     "test:category-taxonomy": "tsx scripts/test-category-taxonomy.ts",

@@ -122,6 +122,21 @@ export default function OrderDetailClient({
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [isSyncingTumizi, setIsSyncingTumizi] = useState(false);
 
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.7) — collecting the
+  // remaining balance on a 'deposit_paid' Tumizi order.
+  const [showCollectBalanceDialog, setShowCollectBalanceDialog] = useState(false);
+  const [collectBalancePhone, setCollectBalancePhone] = useState('');
+  const [isCollectingBalance, setIsCollectingBalance] = useState(false);
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.8) — the real
+  // amount a tenant admin/staff is personally confirming they received for
+  // a manually-verified (M-Pesa till or cash) payment. Only shown/used
+  // when the order has a deposit configured; every normal order keeps the
+  // pre-deposit one-click "Verify Payment" behavior untouched.
+  const [manualVerifiedAmount, setManualVerifiedAmount] = useState<string>(
+    order?.deposit_amount != null ? String(order.deposit_amount) : ''
+  );
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
   const isTumiziOrder = order?.payment_gateway === 'tumizi';
 
   const handleTumiziPaymentSync = async () => {
@@ -146,6 +161,38 @@ export default function OrderDetailClient({
       toast.error('Failed to refresh payment from Tumizi');
     } finally {
       setIsSyncingTumizi(false);
+    }
+  };
+
+  const handleCollectBalance = async () => {
+    if (!order) return;
+    const rawPhone = collectBalancePhone.trim().replace(/\s+/g, '');
+    if (!rawPhone) return;
+    setIsCollectingBalance(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/tumizi/initiate-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: rawPhone,
+          // Real amount override (S-Dep.7) — the STK push must ask for
+          // exactly the outstanding balance, never the full order total.
+          amount: order.balance_amount ?? undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        toast.error(data.error || 'Failed to send STK push');
+        return;
+      }
+      setShowCollectBalanceDialog(false);
+      setCollectBalancePhone('');
+      toast.success('STK push sent for the remaining balance');
+      router.refresh();
+    } catch {
+      toast.error('Failed to send STK push');
+    } finally {
+      setIsCollectingBalance(false);
     }
   };
 
@@ -979,8 +1026,11 @@ export default function OrderDetailClient({
                 </div>
               )}
               
-              {/* Payment Verification Details (for M-Pesa) */}
-              {order.payment_gateway === 'mpesa' && order.payment_meta && (
+              {/* Payment Verification Details (manual M-Pesa till or cash —
+                  basic deposit support, docs/SERVICES_PLAN.md, S-Dep.8:
+                  cash orders never got this block before, so they had no
+                  way to be verified/rejected at all here) */}
+              {(order.payment_gateway === 'mpesa' || order.payment_gateway === 'cash') && order.payment_meta && (
                 <div className="mt-4 rounded-lg border bg-primary/10 p-4">
                   <h4 className="font-semibold text-sm mb-3">Payment Verification Details</h4>
                   <div className="space-y-2 text-sm">
@@ -1036,20 +1086,61 @@ export default function OrderDetailClient({
                   
                   {/* Admin Verification Actions */}
                   {order.payment_meta.verification_status === 'pending' && (
-                    <div className="mt-4 flex flex-col gap-2 border-t pt-4 sm:flex-row">
+                    <div className="mt-4 flex flex-col gap-2 border-t pt-4">
+                      {/* Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.8) —
+                          only shown when this order actually has a deposit
+                          configured; every normal order never sees this and
+                          keeps the plain one-click flow below unchanged. */}
+                      {order.deposit_amount != null && (
+                        <div>
+                          <Label htmlFor="manual_verified_amount">Amount you actually received</Label>
+                          <Input
+                            id="manual_verified_amount"
+                            type="number"
+                            step="0.01"
+                            value={manualVerifiedAmount}
+                            onChange={(e) => setManualVerifiedAmount(e.target.value)}
+                            className="mt-2"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This order has a deposit configured (balance {formatCurrency(order.balance_amount ?? 0)}). Enter the
+                            real amount confirmed — a full settlement marks the order Paid, a partial one marks it Deposit Paid.
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-2 sm:flex-row">
                       <Button
                         size="sm"
+                        disabled={isVerifyingPayment}
                         onClick={async () => {
+                          setIsVerifyingPayment(true);
                           try {
+                            const parsedAmount =
+                              order.deposit_amount != null && manualVerifiedAmount.trim()
+                                ? Number(manualVerifiedAmount)
+                                : undefined;
                             const response = await fetch(`/api/admin/orders/${order.id}/verify-payment`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'verify' }),
+                              body: JSON.stringify({
+                                action: 'verify',
+                                ...(parsedAmount != null && Number.isFinite(parsedAmount)
+                                  ? { verifiedAmount: parsedAmount }
+                                  : {}),
+                              }),
                             });
                             if (response.ok) {
                               const data = await response.json();
-                              setOrder({ ...order, payment_meta: data.order.payment_meta });
-                              toast.success('Payment verified successfully');
+                              setOrder({
+                                ...order,
+                                payment_status: data.order.payment_status,
+                                payment_meta: data.order.payment_meta,
+                              });
+                              toast.success(
+                                data.order.payment_status === 'deposit_paid'
+                                  ? 'Partial payment verified — balance still outstanding'
+                                  : 'Payment verified successfully',
+                              );
                               router.refresh();
                             } else {
                               const data = await response.json();
@@ -1057,6 +1148,8 @@ export default function OrderDetailClient({
                             }
                           } catch (error) {
                             toast.error('Failed to verify payment');
+                          } finally {
+                            setIsVerifyingPayment(false);
                           }
                         }}
                       >
@@ -1093,11 +1186,12 @@ export default function OrderDetailClient({
                         <XMarkIcon className="h-4 w-4 mr-2" />
                         Reject Payment
                       </Button>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
-              
+
               {order.payment_status !== 'refunded' && (
                 isTumiziOrder ? (
                   <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
@@ -1121,6 +1215,19 @@ export default function OrderDetailClient({
                         ) : (
                           'Refresh from Tumizi'
                         )}
+                      </Button>
+                    )}
+                    {/* Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.7) */}
+                    {order.payment_status === 'deposit_paid' && order.balance_amount != null && order.balance_amount > 0 && (
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={() => {
+                          setCollectBalancePhone(order.phone || '');
+                          setShowCollectBalanceDialog(true);
+                        }}
+                      >
+                        Collect Balance ({formatCurrency(order.balance_amount)})
                       </Button>
                     )}
                   </div>
@@ -1271,6 +1378,51 @@ export default function OrderDetailClient({
                 </>
               ) : (
                 'Cancel Order'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Collect Balance Dialog (docs/SERVICES_PLAN.md, S-Dep.7) */}
+      <AlertDialog open={showCollectBalanceDialog} onOpenChange={setShowCollectBalanceDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Collect remaining balance</AlertDialogTitle>
+            <AlertDialogDescription>
+              Send an M-Pesa STK push for {order.balance_amount != null ? formatCurrency(order.balance_amount) : 'the remaining balance'} to
+              the phone number below.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="collect_balance_phone">Phone number</Label>
+              <Input
+                id="collect_balance_phone"
+                value={collectBalancePhone}
+                onChange={(e) => setCollectBalancePhone(e.target.value)}
+                placeholder="e.g. 2547XXXXXXXX"
+                className="mt-2"
+                disabled={isCollectingBalance}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCollectingBalance}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCollectBalance();
+              }}
+              disabled={isCollectingBalance || !collectBalancePhone.trim()}
+            >
+              {isCollectingBalance ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send STK Push'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

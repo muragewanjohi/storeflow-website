@@ -45,6 +45,9 @@ interface CartItem {
   deposit_value?: number | null;
   // Basic services support (docs/SERVICES_PLAN.md)
   requires_shipping?: boolean | null;
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+  is_bookable?: boolean | null;
+  booking_duration_minutes?: number | null;
 }
 
 interface Cart {
@@ -131,6 +134,9 @@ export default function CheckoutClient({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState<Step>('shipping');
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — keyed by
+  // product_id, one selection per bookable cart item.
+  const [bookingSelections, setBookingSelections] = useState<Record<string, { date: string; startTime: string }>>({});
   
   // Form state
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -857,6 +863,16 @@ export default function CheckoutClient({
       }
     }
 
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — every bookable
+    // cart item must have a real selected slot before submitting.
+    const bookableItems = cart.items.filter((item) => item.is_bookable);
+    for (const item of bookableItems) {
+      if (!bookingSelections[item.product_id]) {
+        toast.error(`Please select a time slot for ${item.name}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -931,6 +947,12 @@ export default function CheckoutClient({
         } : null,
         coupon_code: couponCode || null,
         notes: notes || null,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        bookings: Object.entries(bookingSelections).map(([productId, sel]) => ({
+          product_id: productId,
+          date: sel.date,
+          start_time: sel.startTime,
+        })),
       };
 
       // Track checkout attempt
@@ -2216,6 +2238,15 @@ export default function CheckoutClient({
                               {itemDeliveryDays === 1 ? '1 day' : `${itemDeliveryDays} days`}
                             </p>
                           )}
+                          {item.is_bookable && (
+                            <BookingSlotPicker
+                              productId={item.product_id}
+                              selection={bookingSelections[item.product_id] ?? null}
+                              onSelect={(date, startTime) =>
+                                setBookingSelections((prev) => ({ ...prev, [item.product_id]: { date, startTime } }))
+                              }
+                            />
+                          )}
                         </div>
                         <div className="text-sm font-medium">
                           {formatPrice(item.price * item.quantity)}
@@ -2392,6 +2423,104 @@ export default function CheckoutClient({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — per-bookable-cart-
+ * item date/slot picker, the only theme-adjacent surface this feature
+ * touches (no theme ProductCard/ProductDetail changes — mirrors exactly
+ * how the no-shipping banner (S1.3) and deposit preview already live in
+ * this file only). Manages its own date/slots-loading state; reports the
+ * final choice up via onSelect.
+ */
+function BookingSlotPicker({
+  productId,
+  selection,
+  onSelect,
+}: {
+  productId: string;
+  selection: { date: string; startTime: string } | null;
+  onSelect: (date: string, startTime: string) => void;
+}) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(selection?.date ?? todayStr);
+  const [slots, setSlots] = useState<Array<{ startTime: string; endTime: string; capacityRemaining: number }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/bookings/availability?productId=${encodeURIComponent(productId)}&date=${encodeURIComponent(date)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (!data.success) {
+          setError(data.error || 'Could not load available times');
+          setSlots([]);
+          return;
+        }
+        setSlots(data.slots || []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Could not load available times');
+          setSlots([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, date]);
+
+  return (
+    <div className="mt-2 space-y-2 rounded-md border p-2">
+      <Label htmlFor={`booking-date-${productId}`} className="text-xs">
+        Pick a date and time
+      </Label>
+      <Input
+        id={`booking-date-${productId}`}
+        type="date"
+        min={todayStr}
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        className="h-8 text-xs"
+      />
+      {loading && <p className="text-xs text-muted-foreground">Loading available times...</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {!loading && !error && slots.length === 0 && (
+        <p className="text-xs text-muted-foreground">No available times on this date.</p>
+      )}
+      {!loading && slots.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {slots.map((slot) => {
+            const isSelected = selection?.date === date && selection?.startTime === slot.startTime;
+            return (
+              <button
+                key={slot.startTime}
+                type="button"
+                onClick={() => onSelect(date, slot.startTime)}
+                className={`rounded border px-2 py-1 text-xs ${
+                  isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input hover:bg-muted'
+                }`}
+              >
+                {slot.startTime}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {selection && (
+        <p className="text-xs text-muted-foreground">
+          Selected: {selection.date} at {selection.startTime}
+        </p>
+      )}
     </div>
   );
 }

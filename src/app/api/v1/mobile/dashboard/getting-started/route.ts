@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     const storeUrl = `https://${tenant.subdomain}.${BASE_DOMAIN}`;
 
-    const [productCount, categoryCount, activeDemoProductCount, deliveryZoneCount, settings] = await Promise.all([
+    const [productCount, categoryCount, activeDemoProductCount, deliveryZoneCount, bookableProductCount, settings] = await Promise.all([
       prisma.products.count({
         where: { tenant_id: tenantId, status: 'active', created_by: { not: null } },
       }),
@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
       prisma.delivery_zones.count({
         where: { tenant_id: tenantId, is_active: true },
       }),
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+      prisma.products.count({
+        where: { tenant_id: tenantId, is_bookable: true },
+      }),
       getStaticOptions(tenantId, [...GETTING_STARTED_OPTION_NAMES]),
     ]);
 
@@ -75,6 +79,7 @@ export async function GET(request: NextRequest) {
       categoryCount,
       activeDemoProductCount,
       deliveryZoneCount,
+      bookableProductCount,
       settings,
       includeAssistantItem: true, // Flutter Phase 4 — the assistant now has a real center-tab entry point (/assistant)
     });
@@ -167,6 +172,18 @@ export async function GET(request: NextRequest) {
         cta: 'Try it',
         priority: 9,
       },
+      {
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — real Flutter
+        // router.dart path (confirmed), a plain top-level GoRoute reachable
+        // from the More menu.
+        id: 'bookings',
+        label: 'Set up a bookable service',
+        description: 'Sell an appointment or consultation customers book a real time slot for',
+        completed: completionById.get('bookings') ?? false,
+        href: '/dashboard/products/new', // matches this array's dominant convention (see 'product'/'demo_products' above) — the Flutter getting-started widget doesn't currently consume `href` for navigation at all
+        cta: 'Add a service',
+        priority: 10,
+      },
     ];
 
     if (completionById.has('demo_products')) {
@@ -177,7 +194,7 @@ export async function GET(request: NextRequest) {
         completed: completionById.get('demo_products') ?? false,
         href: '/dashboard/products',
         cta: 'Remove demo products',
-        priority: 10,
+        priority: 11,
       });
     }
 

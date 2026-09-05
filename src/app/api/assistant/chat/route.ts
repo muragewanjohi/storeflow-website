@@ -77,7 +77,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available yet — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes, or turning a product into a bookable service — that's a toggle on the product's edit page, with hours configurable in Settings) isn't available yet in chat — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —

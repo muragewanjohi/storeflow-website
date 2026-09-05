@@ -857,6 +857,10 @@ export async function POST(request: NextRequest) {
       deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
       // Basic services support (docs/SERVICES_PLAN.md)
       requires_shipping: validatedData.requires_shipping !== false,
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+      is_bookable: validatedData.is_bookable === true,
+      booking_duration_minutes: validatedData.booking_duration_minutes != null ? Number(validatedData.booking_duration_minutes) : null,
+      booking_capacity: validatedData.booking_capacity != null ? Number(validatedData.booking_capacity) : 1,
     };
 
     // Final safety check: ensure no unexpected keys exist
@@ -864,7 +868,8 @@ export async function POST(request: NextRequest) {
       'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
       'cost_price',
       'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-      'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping'
+      'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping',
+      'is_bookable', 'booking_duration_minutes', 'booking_capacity'
     ];
     const productDataKeys = Object.keys(productData);
     const unexpectedProductFields = productDataKeys.filter(key => !allowedProductFields.includes(key));
@@ -915,6 +920,9 @@ export async function POST(request: NextRequest) {
         deposit_type: string;
         deposit_value: number | null;
         requires_shipping: boolean;
+        is_bookable: boolean;
+        booking_duration_minutes: number | null;
+        booking_capacity: number;
       } = {
         tenant_id: productData.tenant_id,
         name: productData.name,
@@ -937,6 +945,9 @@ export async function POST(request: NextRequest) {
         deposit_type: productData.deposit_type,
         deposit_value: productData.deposit_value,
         requires_shipping: productData.requires_shipping,
+        is_bookable: productData.is_bookable,
+        booking_duration_minutes: productData.booking_duration_minutes,
+        booking_capacity: productData.booking_capacity,
       };
 
       // Verify finalProductData has no unexpected fields
@@ -945,7 +956,8 @@ export async function POST(request: NextRequest) {
         'tenant_id', 'name', 'slug', 'description', 'short_description', 'price', 'sale_price',
         'cost_price',
         'sku', 'stock_quantity', 'status', 'image', 'gallery', 'category_id', 'brand_id',
-        'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping'
+        'created_by', 'metadata', 'estimated_delivery_days', 'deposit_type', 'deposit_value', 'requires_shipping',
+        'is_bookable', 'booking_duration_minutes', 'booking_capacity'
       ];
       const unexpectedFinalFields = finalKeys.filter(key => !allowedFinalFields.includes(key));
       if (unexpectedFinalFields.length > 0) {
@@ -1015,6 +1027,9 @@ export async function POST(request: NextRequest) {
         deposit_type: ultraCleanData.deposit_type ? String(ultraCleanData.deposit_type) : 'none',
         deposit_value: ultraCleanData.deposit_value != null ? Number(ultraCleanData.deposit_value) : null,
         requires_shipping: ultraCleanData.requires_shipping !== false,
+        is_bookable: ultraCleanData.is_bookable === true,
+        booking_duration_minutes: ultraCleanData.booking_duration_minutes != null ? Number(ultraCleanData.booking_duration_minutes) : null,
+        booking_capacity: ultraCleanData.booking_capacity != null ? Number(ultraCleanData.booking_capacity) : 1,
       };
       
       // Final verification - ensure no 'new' field exists

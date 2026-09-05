@@ -28,6 +28,7 @@ import { initiateTumiziCustomerPaymentForOrder } from '@/lib/tumizi/initiate-ord
 import { rollbackCheckoutAfterFailedTumizi } from '@/lib/checkout/rollback-after-failed-tumizi';
 import { computeLineDepositDue, computeOrderDeposit } from '@/lib/orders/deposit';
 import { computeAllItemsNoShipping } from '@/lib/checkout/no-shipping';
+import { createBookingWithCapacityCheck, BookingUnavailableError } from '@/lib/bookings/availability';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -142,6 +143,12 @@ export async function POST(request: NextRequest) {
     // after the loop. Decided server-side from the real product rows, never
     // trusted from whatever delivery_method the client happened to send.
     const shippingRequirements: Array<{ requires_shipping: boolean }> = [];
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — one entry per
+    // bookable cart item, resolved to its matching `bookings[]` request
+    // below. Bookings are created BEFORE the order (real capacity check,
+    // no external calls) so checkout never ends up with a paid order and
+    // no corresponding booking — see the order-creation block below.
+    const bookingRequests: Array<{ productId: string; date: string; startTime: string }> = [];
 
     for (const item of cartItems) {
       const product = await prisma.products.findFirst({
@@ -160,6 +167,8 @@ export async function POST(request: NextRequest) {
           deposit_type: true,
           deposit_value: true,
           requires_shipping: true,
+          is_bookable: true,
+          booking_duration_minutes: true,
         },
       });
 
@@ -221,6 +230,29 @@ export async function POST(request: NextRequest) {
           { error: `Insufficient stock for ${product.name}. Available: ${stockQuantity}` },
           { status: 400 }
         );
+      }
+
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — a bookable
+      // item must be exactly quantity 1 (booking the same slot twice in
+      // one order doesn't mean anything) and must carry a matching
+      // bookings[] entry naming the real date/slot the customer picked at
+      // checkout. Never guessed or defaulted, same "never trust a client
+      // delivery_method" discipline as isPickup below.
+      if (product.is_bookable) {
+        if (item.quantity !== 1) {
+          return NextResponse.json(
+            { error: `${product.name} is a booked service — quantity must be 1.` },
+            { status: 400 },
+          );
+        }
+        const bookingRequest = validatedData.bookings.find((b) => b.product_id === product.id);
+        if (!bookingRequest) {
+          return NextResponse.json(
+            { error: `Please select a time slot for ${product.name}.` },
+            { status: 400 },
+          );
+        }
+        bookingRequests.push({ productId: product.id, date: bookingRequest.date, startTime: bookingRequest.start_time });
       }
 
       const itemTotal = finalPrice * item.quantity;
@@ -414,6 +446,42 @@ export async function POST(request: NextRequest) {
     const { generateInvoiceNumber } = await import('@/lib/invoices/generate-invoice-number');
     const invoiceNumber = await generateInvoiceNumber(tenant.id);
 
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — created BEFORE
+    // the order (real, transactional capacity check, no external calls)
+    // so a slot is never sold twice; linked to the real order/order_product
+    // ids once the order below exists. `status: 'pending'` until the order
+    // actually gets paid — promoted to 'confirmed' from the same real
+    // payment-confirmation paths that already promote payment_status
+    // (Tumizi webhook, manual verify-payment).
+    const createdBookings: Array<{ id: string; productId: string }> = [];
+    for (const req of bookingRequests) {
+      try {
+        const booking = await createBookingWithCapacityCheck({
+          tenantId: tenant.id,
+          productId: req.productId,
+          date: req.date,
+          startTime: req.startTime,
+          customerName: customerInfo.name,
+          customerPhone: customerInfo.phone,
+          customerEmail: customerInfo.email,
+          status: 'pending',
+        });
+        createdBookings.push({ id: booking.id, productId: req.productId });
+      } catch (bookingError: unknown) {
+        // Release any bookings already reserved earlier in this same loop
+        // before failing — never leave a partial set of tentative bookings
+        // behind for a checkout that's about to be rejected.
+        for (const created of createdBookings) {
+          await prisma.service_bookings.update({ where: { id: created.id }, data: { status: 'cancelled' } });
+        }
+        const message =
+          bookingError instanceof BookingUnavailableError
+            ? bookingError.message
+            : 'Could not reserve the selected time slot. Please try again.';
+        return NextResponse.json({ error: message }, { status: 409 });
+      }
+    }
+
     // Create order
     // For guest orders, user_id will be null (order tracked by email + order_number)
     const order = await prisma.orders.create({
@@ -494,6 +562,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — link each
+    // just-created booking to the now-real order/order_product ids.
+    for (const created of createdBookings) {
+      const matchingOrderProduct = order.order_products.find((op) => op.product_id === created.productId);
+      await prisma.service_bookings.update({
+        where: { id: created.id },
+        data: { order_id: order.id, order_product_id: matchingOrderProduct?.id ?? null },
+      });
+    }
+
     // Update inventory (decrease stock)
     // Track which products have variants so we can sync product-level stock
     const productsWithVariants = new Set<string>();
@@ -559,6 +637,7 @@ export async function POST(request: NextRequest) {
             variant_id: item.variant_id,
             quantity: item.quantity,
           })),
+          bookingIds: createdBookings.map((b) => b.id),
         });
         const message =
           tumiziError instanceof Error

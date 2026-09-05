@@ -40,8 +40,29 @@ export const productIntakeResponseSchema = {
         // false (a service/digital item — stockQuantity is skipped
         // entirely when this is false), or null while not yet asked.
         requiresShipping: { type: ['boolean', 'null'] },
+        // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) — unlike
+        // requiresShipping this is genuinely OPTIONAL: 'none' (the common
+        // case, no deposit) is a real answer, not a "not yet asked"
+        // placeholder. null means not yet asked; the model is instructed to
+        // never leave it null once done:true (defaults to 'none' if the
+        // merchant declines or doesn't respond after one offer). Re-checked
+        // against the real 'none'|'fixed'|'percentage' enum in code before
+        // ever reaching product creation — never trusted raw from the model.
+        depositType: { type: ['string', 'null'] },
+        // Only meaningful when depositType is 'fixed' (a KES amount) or
+        // 'percentage' (0-100); null whenever depositType is 'none' or null.
+        depositValue: { type: ['number', 'null'] },
       },
-      required: ['name', 'price', 'stockQuantity', 'category', 'sku', 'requiresShipping'],
+      required: [
+        'name',
+        'price',
+        'stockQuantity',
+        'category',
+        'sku',
+        'requiresShipping',
+        'depositType',
+        'depositValue',
+      ],
       additionalProperties: false,
     },
   },
@@ -59,7 +80,35 @@ export interface ProductIntakeTurnResponse {
     category: string | null;
     sku: string | null;
     requiresShipping: boolean | null;
+    depositType: string | null;
+    depositValue: number | null;
   };
+}
+
+/**
+ * Re-validates depositType/depositValue exactly like every other
+ * model-produced value in this codebase (e.g. B2.1's color/font
+ * re-checking) — never trusted raw. Falls back to 'none'/null for
+ * anything off the real `deposit_type` enum (@/lib/products/validation.ts)
+ * or a non-positive/out-of-range value, so a malformed model output can
+ * never reach real product creation as a bogus deposit.
+ */
+export function sanitizeCollectedDeposit(
+  depositType: string | null,
+  depositValue: number | null,
+): { depositType: 'none' | 'fixed' | 'percentage'; depositValue: number | null } {
+  if (depositType === 'fixed' && typeof depositValue === 'number' && depositValue > 0) {
+    return { depositType: 'fixed', depositValue };
+  }
+  if (
+    depositType === 'percentage' &&
+    typeof depositValue === 'number' &&
+    depositValue > 0 &&
+    depositValue <= 100
+  ) {
+    return { depositType: 'percentage', depositValue };
+  }
+  return { depositType: 'none', depositValue: null };
 }
 
 export function buildProductIntakeSystemPrompt(
@@ -101,7 +150,11 @@ export function buildProductIntakeSystemPrompt(
     'If requiresShipping is true, ask once whether they want to specify stock quantity or SKU now, or skip and set them later. Do not insist — one offer is enough, and stockQuantity stays null if skipped.',
     'If requiresShipping is false, do NOT ask about stock quantity at all — it does not apply. You may still ask once whether they want to add a SKU, or skip.',
     'SKU is optional either way — if they do not have one, leave it null; the system generates one automatically.',
-    'Once you have name, price, category, and requiresShipping (and have given them the one chance to add stock/SKU when it applies), set done to true, fill in collected with whatever you have (nulls only for stock/SKU if skipped or not applicable), and reply with a short (max 2 sentences) confirmation. NEVER set done to true while category or requiresShipping is still null, unless the merchant genuinely has no categories at all (see above).',
+    // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) — genuinely
+    // optional, unlike requiresShipping: ask once, do not insist, and
+    // default to no deposit rather than blocking completion.
+    'After the stock/SKU offer, ask ONE more optional question: does this need a deposit or partial payment upfront before it ships/is delivered/performed? If yes, ask whether it is a fixed KES amount or a percentage of the price, and how much. Set depositType to "fixed" or "percentage" with depositValue set to that number (a percentage must be between 1 and 100). If they say no, or do not want one, or do not answer, set depositType to "none" and depositValue to null — do not ask again or insist.',
+    'Once you have name, price, category, requiresShipping, and depositType (and have given them the one chance to add stock/SKU when it applies, and the one chance to add a deposit), set done to true, fill in collected with whatever you have (nulls only for stock/SKU/depositValue if skipped or not applicable), and reply with a short (max 2 sentences) confirmation. NEVER set done to true while category or requiresShipping is still null, unless the merchant genuinely has no categories at all (see above); depositType, unlike those two, may become "none" instead of staying null — but never leave it as a literal null once done is true.',
     'Until then, set done to false and leave collected fields null for whatever you do not have yet.',
     'Keep every reply under 3 sentences. Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');

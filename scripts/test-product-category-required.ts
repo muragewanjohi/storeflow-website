@@ -114,8 +114,27 @@ async function main() {
   ]);
   console.log('\nturn3 reply:', turn3.data.reply);
   console.log('turn3 done:', turn3.data.done, 'collected:', turn3.data.collected);
-  check('finishes with done:true once category AND requiresShipping are both given', turn3.data.done === true, turn3.data);
   check('collected.requiresShipping is true for a physical product', turn3.data.collected.requiresShipping === true, turn3.data.collected.requiresShipping);
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) added a 3rd
+  // optional-but-asked-once field — category+requiresShipping alone no
+  // longer finishes the conversation, same "never done while a field that
+  // was just asked about is still null" discipline as the requiresShipping
+  // check above.
+  check('does NOT finish (done:true) without depositType answered, even with requiresShipping given', turn3.data.done !== true || turn3.data.collected.depositType !== null, turn3.data);
+
+  const turn4 = await runProductIntakeTurn(TEST_TENANT_ID, [
+    { role: 'user', content: 'add a product called Bamboo Cutting Board, price 1500' },
+    { role: 'assistant', content: JSON.stringify(turn1.data) },
+    { role: 'user', content: 'put it under Cookware, no SKU or stock needed' },
+    { role: 'assistant', content: JSON.stringify(turn2.data) },
+    { role: 'user', content: 'yes it ships, physical product' },
+    { role: 'assistant', content: JSON.stringify(turn3.data) },
+    { role: 'user', content: 'no deposit needed' },
+  ]);
+  console.log('\nturn4 reply:', turn4.data.reply);
+  console.log('turn4 done:', turn4.data.done, 'collected:', turn4.data.collected);
+  check('finishes with done:true once category, requiresShipping, AND depositType are all given', turn4.data.done === true, turn4.data);
+  check('collected.depositType is "none" after declining', turn4.data.collected.depositType === 'none', turn4.data.collected.depositType);
 
   // --- Part D: a service-only business type gets a CONFIRMATION, not a cold question ---
   // User-requested connection: "when the store is registered do we track
@@ -163,7 +182,6 @@ async function main() {
     ]);
     console.log('\nserviceTurn2 reply:', serviceTurn2.data.reply);
     console.log('serviceTurn2 done:', serviceTurn2.data.done, 'collected:', serviceTurn2.data.collected);
-    check('finishes with done:true once confirmed', serviceTurn2.data.done === true, serviceTurn2.data);
     check(
       'collected.requiresShipping is false once the merchant confirms the service assumption',
       serviceTurn2.data.collected.requiresShipping === false,
@@ -173,6 +191,34 @@ async function main() {
       'stockQuantity was never asked about (service item)',
       serviceTurn2.data.collected.stockQuantity === null,
       serviceTurn2.data.collected.stockQuantity,
+    );
+
+    // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) — a service
+    // is exactly the kind of item a deposit makes sense for (e.g. a repair
+    // booking), so this confirms the fixed/percentage path, not just "none"
+    // (already covered by test-services-no-shipping.ts).
+    const serviceTurn3 = await runProductIntakeTurn(TEST_TENANT_ID, [
+      {
+        role: 'user',
+        content: 'add a product called Phone Screen Replacement, price 2500. Put it under Cookware, that\'s fine, I know it is not a perfect fit.',
+      },
+      { role: 'assistant', content: JSON.stringify(serviceTurn1.data) },
+      { role: 'user', content: "yes that's right, no sku needed" },
+      { role: 'assistant', content: JSON.stringify(serviceTurn2.data) },
+      { role: 'user', content: 'yes, a fixed KES 500 deposit upfront' },
+    ]);
+    console.log('\nserviceTurn3 reply:', serviceTurn3.data.reply);
+    console.log('serviceTurn3 done:', serviceTurn3.data.done, 'collected:', serviceTurn3.data.collected);
+    check('finishes with done:true once confirmed', serviceTurn3.data.done === true, serviceTurn3.data);
+    check(
+      'collected.depositType is "fixed" for a stated fixed deposit',
+      serviceTurn3.data.collected.depositType === 'fixed',
+      serviceTurn3.data.collected.depositType,
+    );
+    check(
+      'collected.depositValue is 500 for the stated fixed deposit',
+      serviceTurn3.data.collected.depositValue === 500,
+      serviceTurn3.data.collected.depositValue,
     );
   } finally {
     await prisma.tenants.update({

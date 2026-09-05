@@ -423,6 +423,7 @@ model order_products {
   orders     orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   products   products? @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service_bookings service_bookings[]
 
   @@index([order_id], map: "idx_order_products_order_id")
   @@index([product_id], map: "idx_order_products_product_id")
@@ -477,6 +478,7 @@ model orders {
   order_products           order_products[]
   tenants                  tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   delivery_zone            delivery_zones?  @relation(fields: [delivery_zone_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  service_bookings         service_bookings[]
 
   @@unique([tenant_id, client_sale_id], map: "idx_orders_tenant_client_sale_id")
   @@index([order_number], map: "idx_orders_order_number")
@@ -690,6 +692,9 @@ model products {
   metadata                Json?                @default("{}")
   estimated_delivery_days Int?                 // Product-specific delivery time override (in days). NULL means use tenant default.
   requires_shipping       Boolean              @default(true) // false = a service/digital item — see docs/SERVICES_PLAN.md
+  is_bookable             Boolean              @default(false) // real scheduling/booking (S2) — see docs/SERVICES_PLAN.md
+  booking_duration_minutes Int?                // required when is_bookable
+  booking_capacity        Int                  @default(1) // concurrent bookings this service supports (capacity, not named staff — see S2)
   created_at              DateTime?            @default(now()) @db.Timestamp(6)
   updated_at              DateTime?            @default(now()) @db.Timestamp(6)
   cart_items         cart_items[]
@@ -700,6 +705,7 @@ model products {
   product_variants   product_variants[]
   product_wishlists  product_wishlists[]
   product_sales      product_sales[]
+  service_bookings   service_bookings[]
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([slug], map: "idx_products_slug")
@@ -985,6 +991,7 @@ model tenants {
   wallets                    wallets[]
   sales                      sales[]
   product_sales              product_sales[]
+  service_bookings           service_bookings[]
   expense_categories         expense_categories[]
   tenant_tumizi_integrations tenant_tumizi_integrations[]
   tumizi_webhook_events      tumizi_webhook_events[]
@@ -1296,6 +1303,39 @@ model product_sales {
   @@index([product_id], map: "idx_product_sales_product")
   @@index([sale_id], map: "idx_product_sales_sale")
   @@index([tenant_id, sale_id, order_index], map: "idx_product_sales_active")
+}
+
+/// Real scheduling/booking (S2, docs/SERVICES_PLAN.md). Capacity, not named
+/// staff — see products.booking_capacity; staff_label is free text only,
+/// staff accounts live in Supabase Auth (no Prisma model), not referenced
+/// here.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model service_bookings {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  order_id         String?   @db.Uuid
+  order_product_id String?   @db.Uuid
+  product_id       String?   @db.Uuid
+  customer_name    String?   @db.VarChar(255)
+  customer_phone   String?   @db.VarChar(50)
+  customer_email   String?   @db.VarChar(255)
+  booking_date     DateTime  @db.Date
+  start_time       DateTime  @db.Time
+  end_time         DateTime  @db.Time
+  staff_label      String?   @db.VarChar(100)
+  status           String    @default("pending") @db.VarChar(20) // pending|confirmed|completed|cancelled|no_show
+  notes            String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  tenants          tenants        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orders           orders?        @relation(fields: [order_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  order_products   order_products? @relation(fields: [order_product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  products         products?      @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([tenant_id, booking_date], map: "idx_service_bookings_tenant_date")
+  @@index([tenant_id, status], map: "idx_service_bookings_tenant_status")
+  @@index([order_id], map: "idx_service_bookings_order_id")
+  @@index([product_id, booking_date], map: "idx_service_bookings_product_date")
 }
 
 /// User Guide Categories - Central table (for public help page)

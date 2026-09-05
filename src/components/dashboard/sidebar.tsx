@@ -38,6 +38,7 @@ import {
   BookOpenIcon,
   ArrowTopRightOnSquareIcon,
   GiftIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -67,6 +68,7 @@ const navigation: NavigationItem[] = [
   
   // 3. Orders (Second most important - revenue center)
   { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
+  { name: 'Bookings', href: '/dashboard/bookings', icon: CalendarDaysIcon },
   { name: 'Point of Sale', href: '/dashboard/pos', icon: CalculatorIcon },
   
   // 4. Products group (Catalog management)

@@ -116,7 +116,7 @@ const MOBILE_NEXT_STEPS_META: Record<string, NextStepsNavMeta> = {
 };
 
 const MOBILE_CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
+  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes, or turning a product into a bookable service — that's a toggle on the product's edit screen, with hours configurable in Settings) isn't available from here yet — check the relevant Settings screen for that in the meantime.";
 
 /**
  * Mobile's answer for a resolved configuration_guidance target. See module

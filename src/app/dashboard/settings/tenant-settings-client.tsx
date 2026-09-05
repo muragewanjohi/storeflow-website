@@ -44,7 +44,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MapPinIcon, AlertCircle, AlertTriangle } from 'lucide-react';
+import { MapPinIcon, AlertCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
@@ -783,6 +783,26 @@ export default function TenantSettingsClient({
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
+          {/* Booking Hours Link — real scheduling/booking (S2, docs/SERVICES_PLAN.md) */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Booking Hours</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Set your working hours for bookable services (appointments, consultations, repairs)
+                  </p>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="/dashboard/settings/booking-hours">
+                    <Clock className="mr-2 h-4 w-4" />
+                    Manage Hours
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Sign-in Methods</CardTitle>

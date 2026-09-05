@@ -201,6 +201,18 @@ export async function applyTumiziCustomerPaymentStatus(params: {
       });
     }
 
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — a booking is
+    // created 'pending' at checkout (before payment is confirmed) and only
+    // promoted to 'confirmed' once the order's payment is genuinely
+    // verified here — never at checkout time itself. Idempotent (a
+    // repeat webhook finds nothing left in 'pending' to update).
+    if (effectiveOrderPaymentStatus === 'paid' || effectiveOrderPaymentStatus === 'deposit_paid') {
+      await prisma.service_bookings.updateMany({
+        where: { order_id: orderId, tenant_id: tenantId, status: 'pending' },
+        data: { status: 'confirmed' },
+      });
+    }
+
     if (
       !skipOrderUpdate &&
       previousPaymentStatus &&

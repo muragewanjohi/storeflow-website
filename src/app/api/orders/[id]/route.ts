@@ -86,6 +86,10 @@ export async function GET(
         email: order.email,
         phone: order.phone,
         total_amount: Number(order.total_amount),
+        // Basic deposit support (docs/SERVICES_PLAN.md) — null for every
+        // normal order, real values only when a deposit was configured.
+        deposit_amount: order.deposit_amount != null ? Number(order.deposit_amount) : null,
+        balance_amount: order.balance_amount != null ? Number(order.balance_amount) : null,
         status: order.status,
         payment_status: order.payment_status,
         payment_gateway: order.payment_gateway,

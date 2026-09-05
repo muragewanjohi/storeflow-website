@@ -47,6 +47,11 @@ const whoIsThisFor = [
     title: 'Budget-Conscious Entrepreneurs',
     description: 'Developers quote Ksh 50,000+. DukaNest gives you a full store from just Ksh 1,000/month &mdash; no hidden costs.',
   },
+  {
+    emoji: '💇',
+    title: 'Service & Appointment Businesses',
+    description: 'Salons, barbershops, repair shops, consultants &mdash; let customers book and pay for a real time slot online, deposit optional.',
+  },
 ];
 
 export function MoreFeatures() {

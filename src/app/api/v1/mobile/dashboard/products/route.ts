@@ -272,6 +272,10 @@ export async function POST(request: NextRequest) {
         deposit_value: validatedData.deposit_value != null ? Number(validatedData.deposit_value) : null,
         // Basic services support (docs/SERVICES_PLAN.md)
         requires_shipping: validatedData.requires_shipping !== false,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        is_bookable: validatedData.is_bookable === true,
+        booking_duration_minutes: validatedData.booking_duration_minutes != null ? Number(validatedData.booking_duration_minutes) : null,
+        booking_capacity: validatedData.booking_capacity != null ? Number(validatedData.booking_capacity) : 1,
       },
     });
 

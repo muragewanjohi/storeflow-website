@@ -143,10 +143,19 @@ async function main() {
   });
   let messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   const scriptedTurns = [
-    'I want to add a 30-minute business consultation',
-    `KES 2000, category ${existingCategories[0]?.name ?? ''}`,
+    'I want to add a service',
+    // Explicit name given up front (a bare "30-minute business
+    // consultation" description alone is a category/type hint, not a
+    // specific listing name per this prompt's own rule — the model
+    // correctly keeps asking for one otherwise, which starved this
+    // script's fixed turn budget once the deposit question below added a
+    // 5th required turn).
+    `Call it "30-Minute Business Consultation", KES 2000, category ${existingCategories[0]?.name ?? ''}`,
     "No, it's a service — I meet clients in person, nothing ships",
     'skip',
+    // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) — one more
+    // scripted turn now that the conversation asks this too.
+    'no deposit needed',
   ];
   let done = false;
   let finalCollected: any = null;
@@ -174,6 +183,9 @@ async function main() {
   check('final requiresShipping is false', finalCollected?.requiresShipping === false, finalCollected);
   check('final stockQuantity is null (never asked, never invented)', finalCollected?.stockQuantity === null, finalCollected);
   check('name/price/category still collected correctly', !!finalCollected?.name && finalCollected?.price === 2000 && !!finalCollected?.category, finalCollected);
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9)
+  check('final depositType is "none" after declining', finalCollected?.depositType === 'none', finalCollected);
+  check('final depositValue is null when depositType is "none"', finalCollected?.depositValue === null, finalCollected);
 
   console.log(`\n${passed}/${total} checks passed.`);
   await prisma.$disconnect();

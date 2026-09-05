@@ -252,16 +252,35 @@ async function main() {
   let finalCollected = turn2.data.collected;
   if (!turn2.data.done) {
     messages.push({ role: 'assistant', content: turn2.data.reply });
-    messages.push({ role: 'user', content: 'no SKU or category, that is all' });
+    // Consolidated, unambiguous reply (category named explicitly, shipping
+    // confirmed) so this doesn't also become a test of category-matching
+    // non-determinism for a mismatched product — that's not this test's
+    // purpose; it's testing the "one listing, never 5" batching behavior.
+    messages.push({ role: 'user', content: 'put it under Cleaning, no SKU, and yes it ships' });
     const turn3 = await runProductIntakeTurn(TEST_TENANT_ID, messages);
     totalCost += estimateCostUsd(turn3.usage);
     console.log('\nreply:', turn3.data.reply);
     console.log('done:', turn3.data.done);
     console.log('collected:', turn3.data.collected);
     finalCollected = turn3.data.collected;
+    // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.9) added a 4th
+    // optional-but-asked-once field on top of the 3 this test already
+    // budgeted turns for — give it one more real turn before treating
+    // non-convergence as a failure, same allowance already given to SKU
+    // above.
     if (!turn3.data.done) {
-      console.log('❌ Conversation did not converge to done:true within 3 turns — investigate');
-      failures++;
+      messages.push({ role: 'assistant', content: turn3.data.reply });
+      messages.push({ role: 'user', content: 'no deposit needed' });
+      const turn4 = await runProductIntakeTurn(TEST_TENANT_ID, messages);
+      totalCost += estimateCostUsd(turn4.usage);
+      console.log('\nreply:', turn4.data.reply);
+      console.log('done:', turn4.data.done);
+      console.log('collected:', turn4.data.collected);
+      finalCollected = turn4.data.collected;
+      if (!turn4.data.done) {
+        console.log('❌ Conversation did not converge to done:true within 4 turns — investigate');
+        failures++;
+      }
     }
   }
 

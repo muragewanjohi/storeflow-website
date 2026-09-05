@@ -5,9 +5,24 @@ export async function rollbackCheckoutAfterFailedTumizi(params: {
   tenantId: string;
   orderId: string;
   orderItems: Array<{ product_id: string; variant_id: string | null; quantity: number }>;
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — any bookings
+  // tentatively reserved for this now-aborted checkout. Cancelled (never
+  // hard-deleted, matching the codebase's soft-cancel convention), freeing
+  // the capacity they held back up. `orders.delete` below would also
+  // null out their order_id via ON DELETE SET NULL either way, but
+  // leaving them 'pending' with no order would misleadingly still occupy
+  // real capacity for that slot.
+  bookingIds?: string[];
 }): Promise<void> {
-  const { tenantId, orderId, orderItems } = params;
+  const { tenantId, orderId, orderItems, bookingIds } = params;
   const productsWithVariants = new Set<string>();
+
+  if (bookingIds && bookingIds.length > 0) {
+    await prisma.service_bookings.updateMany({
+      where: { id: { in: bookingIds }, tenant_id: tenantId },
+      data: { status: 'cancelled' },
+    });
+  }
 
   for (const item of orderItems) {
     if (item.variant_id) {

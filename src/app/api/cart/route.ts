@@ -71,6 +71,10 @@ export async function GET(request: NextRequest) {
             // checkout client know when the whole cart is non-shipped
             // items, so it can skip the delivery-method UI accordingly.
             requires_shipping: true,
+            // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — lets
+            // checkout-client.tsx show the time-slot picker for this item.
+            is_bookable: true,
+            booking_duration_minutes: true,
           },
         },
       },
@@ -132,6 +136,9 @@ export async function GET(request: NextRequest) {
         deposit_value: product.deposit_value != null ? Number(product.deposit_value) : null,
         // Basic services support (docs/SERVICES_PLAN.md)
         requires_shipping: product.requires_shipping !== false,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        is_bookable: product.is_bookable === true,
+        booking_duration_minutes: product.booking_duration_minutes,
       };
     }).filter(Boolean) as any[];
 
