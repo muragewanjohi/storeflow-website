@@ -226,9 +226,25 @@ export default function ThemeCustomizeClient({
       }>;
     },
     onSuccess: (data) => {
-      setCustomColors((prev) => ({ ...prev, ...data.custom_colors }));
-      setCustomFonts((prev) => ({ ...prev, ...data.custom_fonts }));
-      toast.success('Applied your AI-generated style — review it below, then Save to keep it.');
+      // Bug fix: this used to only populate local state and leave the Save
+      // button (further down the page) for the merchant to notice and click
+      // — easy to miss, so the AI-generated style silently reverted on
+      // navigation. Save immediately with the merged values (not the stale
+      // `customColors`/`customFonts` closures) so nothing is lost.
+      const mergedColors = { ...customColors, ...data.custom_colors };
+      const mergedFonts = { ...customFonts, ...data.custom_fonts };
+      setCustomColors(mergedColors);
+      setCustomFonts(mergedFonts);
+      updateMutation.mutate({
+        custom_colors: mergedColors,
+        custom_fonts: mergedFonts,
+        custom_css: canUseCustomCss ? customCss : '',
+        logo_url: logoUrl,
+        favicon_url: faviconUrl,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+      });
+      toast.success('Applied and saved your AI-generated style.');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to generate a style');
@@ -267,9 +283,21 @@ export default function ThemeCustomizeClient({
       }>;
     },
     onSuccess: (data) => {
-      setCustomColors((prev) => ({ ...prev, ...data.custom_colors }));
-      setCustomFonts((prev) => ({ ...prev, ...data.custom_fonts }));
-      toast.success('Applied a style inspired by that site — review it below, then Save to keep it.');
+      // Same immediate-save fix as aiStyleMutation above.
+      const mergedColors = { ...customColors, ...data.custom_colors };
+      const mergedFonts = { ...customFonts, ...data.custom_fonts };
+      setCustomColors(mergedColors);
+      setCustomFonts(mergedFonts);
+      updateMutation.mutate({
+        custom_colors: mergedColors,
+        custom_fonts: mergedFonts,
+        custom_css: canUseCustomCss ? customCss : '',
+        logo_url: logoUrl,
+        favicon_url: faviconUrl,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+      });
+      toast.success('Applied and saved a style inspired by that site.');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to generate a style from that site');

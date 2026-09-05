@@ -98,7 +98,11 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
     end_time: sale?.end_date
       ? (typeof sale.end_date === 'string' ? sale.end_date.split('T')[1]?.split('.')[0]?.substring(0, 5) || '' : new Date(sale.end_date).toTimeString().substring(0, 5))
       : '',
-    status: sale?.status || ('draft' as 'draft' | 'active' | 'scheduled' | 'ended'),
+    // Bug fix: a brand-new sale used to default to Draft, and it's easy to
+    // forget the status dropdown is even there — merchants would build out a
+    // whole sale, publish products to it, and then wonder why it wasn't live.
+    // Editing an existing sale still shows its real saved status.
+    status: sale?.status || ('active' as 'draft' | 'active' | 'scheduled' | 'ended'),
     is_featured: sale?.is_featured || false,
   });
 
