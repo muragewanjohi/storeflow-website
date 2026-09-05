@@ -87,7 +87,7 @@ export default function MinimalHeader() {
                       onNavigate(item.href);
                     }}
                     className={`text-xs font-light tracking-widest uppercase transition-colors ${
-                      isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      isActive ? 'text-[var(--color-primary)]' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {item.name}

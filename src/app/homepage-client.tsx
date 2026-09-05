@@ -69,9 +69,10 @@ export default function HomepageClient({
                     </svg>
                   </Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="text-base px-8 py-6">
+                <Button asChild variant="outline" size="lg" className="text-base px-8 py-6 group">
                   <Link href="/products">
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    Sign Up
+                    <svg className="ml-2 h-5 w-5 inline-block group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>

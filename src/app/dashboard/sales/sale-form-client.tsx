@@ -17,11 +17,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
 import ImageUploadField from '@/components/content/image-upload-field';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useCurrency } from '@/lib/currency/currency-context';
+import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
+import { generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
+import { toast } from 'sonner';
 
 interface Sale {
   id: string;
@@ -93,7 +98,11 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
     end_time: sale?.end_date
       ? (typeof sale.end_date === 'string' ? sale.end_date.split('T')[1]?.split('.')[0]?.substring(0, 5) || '' : new Date(sale.end_date).toTimeString().substring(0, 5))
       : '',
-    status: sale?.status || ('draft' as 'draft' | 'active' | 'scheduled' | 'ended'),
+    // Bug fix: a brand-new sale used to default to Draft, and it's easy to
+    // forget the status dropdown is even there — merchants would build out a
+    // whole sale, publish products to it, and then wonder why it wasn't live.
+    // Editing an existing sale still shows its real saved status.
+    status: sale?.status || ('active' as 'draft' | 'active' | 'scheduled' | 'ended'),
     is_featured: sale?.is_featured || false,
   });
 
@@ -116,6 +125,10 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
   const [salePrice, setSalePrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('basic');
+  const [editingProductSale, setEditingProductSale] = useState<NonNullable<Sale['product_sales']>[number] | null>(null);
+  const [editSalePriceValue, setEditSalePriceValue] = useState('');
+  const [isUpdatingSalePrice, setIsUpdatingSalePrice] = useState(false);
 
   // Load available products for assignment
   useEffect(() => {
@@ -179,7 +192,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       }
 
       const saleData = {
-        name: formData.name.trim(),
+        name: sanitizeSaleName(formData.name.trim()),
         slug: formData.slug.trim() || undefined,
         description: formData.description.trim() || null,
         banner_image: formData.banner_image || null,
@@ -211,7 +224,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       if (!isEditing) {
         router.push(`/dashboard/sales/${savedSale.id}`);
       } else {
-        // Refresh the page
+        toast.success('Sale updated successfully');
+        setActiveTab('preview');
         router.refresh();
       }
     } catch (err) {
@@ -259,6 +273,43 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
     }
   };
 
+  const handleUpdateSalePrice = async () => {
+    if (!sale?.id || !editingProductSale) return;
+    const salePriceNum = editSalePriceValue.trim() === '' ? null : parseFloat(editSalePriceValue);
+    if (salePriceNum !== null && (isNaN(salePriceNum) || salePriceNum < 0)) {
+      setError('Please enter a valid sale price');
+      return;
+    }
+    setIsUpdatingSalePrice(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/dashboard/sales/${sale.id}/products`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: editingProductSale.products.id,
+          sale_price: salePriceNum,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update sale price');
+      }
+      const saleResponse = await fetch(`/api/dashboard/sales/${sale.id}`);
+      if (saleResponse.ok) {
+        const data = await saleResponse.json();
+        setProducts(data.sale?.product_sales || []);
+      }
+      setEditingProductSale(null);
+      setEditSalePriceValue('');
+      toast.success('Sale price updated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update sale price');
+    } finally {
+      setIsUpdatingSalePrice(false);
+    }
+  };
+
   const handleRemoveProduct = async (productSaleId: string) => {
     if (!sale?.id) return;
 
@@ -286,7 +337,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
     p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
 
-  const saleUrl = sale?.slug ? `${baseUrl}/sales/${sale.slug}` : null;
+  const saleUrl =
+    sale?.slug && baseUrl ? `${baseUrl.replace(/\/$/, '')}${storefrontSalePath(sale.slug)}` : null;
 
   return (
     <div className="space-y-6">
@@ -307,12 +359,22 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
           </div>
         </div>
         {saleUrl && (
-          <Button variant="outline" asChild>
-            <Link href={saleUrl} target="_blank">
-              <EyeIcon className="mr-2 h-4 w-4" />
-              Preview Sale
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <AdminShareButtons
+              title={formData.name || 'Sale'}
+              url={sale?.slug ? storefrontSalePath(sale.slug) : storefrontSalePath(formData.slug.trim() || '')}
+              image={formData.banner_image}
+              description={formData.description}
+              type="sale"
+              storeUrl={baseUrl}
+            />
+            <Button variant="outline" asChild>
+              <Link href={saleUrl} target="_blank">
+                <EyeIcon className="mr-2 h-4 w-4" />
+                Preview Sale
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -323,11 +385,26 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
       )}
 
       <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="basic" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="products">Products ({safeProducts.length})</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50 border border-border">
+            <TabsTrigger 
+              value="basic"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Basic Info
+            </TabsTrigger>
+            <TabsTrigger 
+              value="products"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Products ({safeProducts.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="preview"
+              className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+            >
+              Preview
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">
@@ -345,6 +422,12 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                    onBlur={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        name: sanitizeSaleName(e.target.value),
+                      }))
+                    }
                     placeholder="Black Friday 2024"
                     required
                   />
@@ -356,10 +439,16 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+                    onBlur={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        slug: generateSaleSlug(e.target.value),
+                      }))
+                    }
                     placeholder="black-friday-2024"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave empty to auto-generate from name
+                    Letters, numbers, and hyphens only. Leave empty to auto-generate from name.
                   </p>
                 </div>
 
@@ -381,6 +470,8 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                     value={formData.banner_image || null}
                     onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
                     aspectRatio={16 / 9}
+                    allowSkipCrop={true}
+                    recommendedDimensions="1920×1080 or larger (16:9). Use “Use full image (no crop)” in the crop dialog to upload without cropping."
                     helpText="Upload a banner image for this sale (max 5MB)"
                   />
                 </div>
@@ -603,14 +694,29 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
                               )}
                             </div>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveProduct(productSale.id)}
-                          >
-                            <TrashIcon className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingProductSale(productSale);
+                                setEditSalePriceValue(productSale.sale_price != null ? String(productSale.sale_price) : '');
+                              }}
+                              title="Edit sale price"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveProduct(productSale.id)}
+                              title="Remove from sale"
+                            >
+                              <TrashIcon className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
@@ -685,7 +791,7 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
           <AlertDialogHeader>
             <AlertDialogTitle>Add Product to Sale</AlertDialogTitle>
             <AlertDialogDescription>
-              Select a product to add to this sale
+              Select one product to add. You can add more products one at a time after this.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
@@ -703,35 +809,35 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
               ) : filteredProducts.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">No products found</div>
               ) : (
-                filteredProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    className={`flex cursor-pointer items-center gap-4 rounded-lg border p-3 transition-colors ${
-                      selectedProductId === product.id ? 'border-primary bg-primary/5' : 'hover:bg-muted'
-                    }`}
-                    onClick={() => setSelectedProductId(product.id)}
-                  >
-                    <Checkbox
-                      checked={selectedProductId === product.id}
-                      onCheckedChange={() =>
-                        setSelectedProductId(selectedProductId === product.id ? '' : product.id)
-                      }
-                    />
-                    {product.image && (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="h-12 w-12 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatCurrency(Number(product.price))}
+                <RadioGroup
+                  value={selectedProductId}
+                  onValueChange={setSelectedProductId}
+                  className="space-y-2"
+                >
+                  {filteredProducts.map((product) => (
+                    <label
+                      key={product.id}
+                      className={`flex cursor-pointer items-center gap-4 rounded-lg border p-3 transition-colors ${
+                        selectedProductId === product.id ? 'border-primary bg-primary/5' : 'hover:bg-muted'
+                      }`}
+                    >
+                      <RadioGroupItem value={product.id} id={`product-${product.id}`} />
+                      {product.image && (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="h-12 w-12 rounded object-cover"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatCurrency(Number(product.price))}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))
+                    </label>
+                  ))}
+                </RadioGroup>
               )}
             </div>
             {selectedProductId && (
@@ -759,6 +865,51 @@ export default function SaleFormClient({ sale, baseUrl }: Readonly<SaleFormClien
               disabled={!selectedProductId || !isEditing}
             >
               Add Product
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Sale Price Dialog */}
+      <AlertDialog open={!!editingProductSale} onOpenChange={(open) => !open && setEditingProductSale(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Sale Price</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editingProductSale && (
+                <>Set the sale price for {editingProductSale.products.name}. Leave empty to clear.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {editingProductSale && (
+            <div className="space-y-4 py-4">
+              <div className="text-sm text-muted-foreground">
+                Regular price: {formatCurrency(Number(editingProductSale.products.price))}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_sale_price">Sale Price</Label>
+                <Input
+                  id="edit_sale_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editSalePriceValue}
+                  onChange={(e) => setEditSalePriceValue(e.target.value)}
+                  placeholder="e.g. 999.00"
+                />
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEditingProductSale(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleUpdateSalePrice();
+              }}
+              disabled={isUpdatingSalePrice}
+            >
+              {isUpdatingSalePrice ? 'Saving...' : 'Save'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

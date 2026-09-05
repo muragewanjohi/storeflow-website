@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
-import { sendSubscriptionExpiredEmail } from '@/lib/subscriptions/emails';
+import { sendSubscriptionExpiredEmail, sendSubscriptionSuspendedEmail } from '@/lib/subscriptions/emails';
 import { getTenantSubscriptionPricing } from '@/lib/subscriptions/pricing';
 import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
@@ -33,48 +33,30 @@ export async function GET(request: NextRequest) {
 
   try {
     // Security: Check for Vercel Cron header OR valid token
-    // Vercel Cron automatically sends 'x-vercel-cron' header (case-insensitive check)
-    // Manual calls require CRON_SECRET_TOKEN via Authorization header or query parameter
-    const allHeaders = Object.fromEntries(
-      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
-    );
-    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
-    const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
+    // Import the shared auth utility
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
     
     // Debug logging (only in production to help diagnose issues)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[Expiry Checker] Auth check:', {
-        hasVercelCronHeader: !!vercelCronHeader,
-        hasAuthHeader: !!authHeader,
-        hasQueryToken: !!queryToken,
-        hasExpectedToken: !!expectedToken,
-        allHeaderKeys: Object.keys(allHeaders).filter(k => k.includes('vercel') || k.includes('cron') || k.includes('authorization')),
-      });
+    if (process.env.NODE_ENV === 'production' && !authResult.authorized) {
+      console.log('[Expiry Checker] Auth check failed:', authResult.debug);
     }
     
-    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
-    // OR if token is provided and valid
-    // OR if no token is configured (development mode)
-    if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '').trim();
-      const providedToken = queryToken || headerToken;
+    if (!authResult.authorized) {
+      const debugInfo = authResult.debug 
+        ? `hasVercelCronHeader: ${authResult.debug.hasVercelCronHeader}, hasAuthHeader: ${authResult.debug.hasAuthHeader}, hasQueryToken: ${authResult.debug.hasQueryToken}, hasExpectedToken: ${authResult.debug.hasExpectedToken}`
+        : 'No debug info available';
       
-      if (!providedToken || providedToken !== expectedToken) {
-        const debugInfo = `hasVercelCronHeader: ${!!vercelCronHeader}, hasAuthHeader: ${!!authHeader}, hasQueryToken: ${!!queryToken}, hasExpectedToken: ${!!expectedToken}`;
-        await completeCronJobLog(logId, 'failed', {
-          error: `Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
-        });
-        return NextResponse.json(
-          { 
-            message: 'Unauthorized',
-            error: 'Invalid token. Ensure CRON_SECRET_TOKEN is set in Vercel environment variables and cron jobs are configured correctly.',
-          },
-          { status: 401 }
-        );
-      }
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
+      });
+      return NextResponse.json(
+        { 
+          message: 'Unauthorized',
+          error: authResult.reason || 'Invalid token. Ensure CRON_SECRET_TOKEN is set in Vercel environment variables and cron jobs are configured correctly.',
+        },
+        { status: 401 }
+      );
     }
 
     const now = new Date();
@@ -137,6 +119,11 @@ export async function GET(request: NextRequest) {
                 )
               : null;
 
+            // Detect if tenant is from Kenya
+            const tenantCountry = tenant.country || (tenant.data as any)?.subscription?.countryCode || (tenant.data as any)?.settings?.store_country || '';
+            const tenantCurrency = (tenant.data as any)?.subscription?.currency || '';
+            const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA' || tenantCurrency === 'KES';
+
             // Send expired email notification (only once when status changes)
             sendSubscriptionExpiredEmail({
               tenant: tenant as any,
@@ -155,6 +142,7 @@ export async function GET(request: NextRequest) {
                     duration_months: tenant.price_plans.duration_months,
                   }
                 : null,
+              isKenya,
             }).catch((error) => {
               console.error(`Error sending expired email to tenant ${tenant.id}:`, error);
             });
@@ -167,6 +155,46 @@ export async function GET(request: NextRequest) {
               data: { status: 'suspended' },
             });
             results.suspended++;
+            
+            // Send suspension email notification (only once when status changes)
+            const { sendSubscriptionSuspendedEmail } = await import('@/lib/subscriptions/emails');
+            const subscriptionPricing = tenant.price_plans
+              ? getTenantSubscriptionPricing(
+                  tenant as any,
+                  {
+                    name: tenant.price_plans.name,
+                    price: tenant.price_plans.price,
+                  },
+                  (tenant.data as any)?.subscription?.currency === 'KES'
+                )
+              : null;
+
+            // Detect if tenant is from Kenya
+            const suspTenantCountry = tenant.country || (tenant.data as any)?.subscription?.countryCode || (tenant.data as any)?.settings?.store_country || '';
+            const suspTenantCurrency = (tenant.data as any)?.subscription?.currency || '';
+            const suspIsKenya = suspTenantCountry?.toUpperCase() === 'KE' || suspTenantCountry?.toUpperCase() === 'KENYA' || suspTenantCurrency === 'KES';
+
+            sendSubscriptionSuspendedEmail({
+              tenant: tenant as any,
+              plan: subscriptionPricing
+                ? {
+                    name: subscriptionPricing.planName,
+                    price: subscriptionPricing.price,
+                    currency: subscriptionPricing.currency,
+                    currencySymbol: subscriptionPricing.currencySymbol,
+                    duration_months: tenant.price_plans?.duration_months || 0,
+                  }
+                : tenant.price_plans
+                ? {
+                    name: tenant.price_plans.name,
+                    price: Number(tenant.price_plans.price),
+                    duration_months: tenant.price_plans.duration_months,
+                  }
+                : null,
+              isKenya: suspIsKenya,
+            }).catch((error) => {
+              console.error(`Error sending suspended email to tenant ${tenant.id}:`, error);
+            });
           }
         }
       } catch (error) {

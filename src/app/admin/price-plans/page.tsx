@@ -24,8 +24,11 @@ export default async function PricePlansPage() {
       id: true,
       name: true,
       price: true,
+      price_kes: true,
       duration_months: true,
       trial_days: true,
+      onboarding_reward_window_days: true,
+      onboarding_reward_bonus_days: true,
       features: true,
       status: true,
       created_at: true,
@@ -42,6 +45,7 @@ export default async function PricePlansPage() {
   const pricePlans = pricePlansData.map((plan: any) => ({
     ...plan,
     price: Number(plan.price),
+    price_kes: plan.price_kes != null ? Number(plan.price_kes) : null,
   }));
 
   return (
@@ -49,7 +53,8 @@ export default async function PricePlansPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Price Plans</h1>
         <p className="text-muted-foreground mt-2">
-          Manage subscription plans and pricing tiers
+          Manage USD and Kenya (KES) monthly prices for each plan. Changes apply to the tenant dashboard,
+          marketing site, and payment amounts.
         </p>
       </div>
       <PricePlansListClient pricePlans={pricePlans} />

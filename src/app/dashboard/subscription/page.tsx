@@ -62,24 +62,19 @@ export default async function TenantSubscriptionPage() {
   ]);
 
   // Convert Prisma Decimal to number for client component
-  const currentPlan = currentPlanData
-    ? {
-        ...currentPlanData,
-        price: Number(currentPlanData.price),
-      }
-    : null;
-
-  const availablePlans = availablePlansData.map((plan: any) => ({
+  const mapPlanPrices = <T extends { price: unknown; price_kes?: unknown | null }>(
+    plan: T,
+  ): T & { price: number; price_kes: number | null } => ({
     ...plan,
     price: Number(plan.price),
-  }));
+    price_kes: plan.price_kes != null ? Number(plan.price_kes) : null,
+  });
 
-  const scheduledPlan = scheduledPlanData
-    ? {
-        ...scheduledPlanData,
-        price: Number(scheduledPlanData.price),
-      }
-    : null;
+  const currentPlan = currentPlanData ? mapPlanPrices(currentPlanData) : null;
+
+  const availablePlans = availablePlansData.map((plan: any) => mapPlanPrices(plan));
+
+  const scheduledPlan = scheduledPlanData ? mapPlanPrices(scheduledPlanData) : null;
 
   const usageStats = {
     products: usage[0],

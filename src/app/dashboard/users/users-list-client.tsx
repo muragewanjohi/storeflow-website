@@ -36,6 +36,7 @@ interface User {
   email: string;
   name: string;
   role: 'tenant_admin' | 'tenant_staff';
+  customPermissions?: string[];
   created_at: string;
   last_sign_in_at?: string | null;
 }
@@ -115,30 +116,35 @@ export default function UsersListClient({ users, currentUserId, canAddUsers, pla
             Manage your team members and their permissions
           </p>
         </div>
-        {canAddUsers ? (
-          <Button asChild>
-            <Link href="/dashboard/users/new">Add User</Link>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/users/roles">View Roles & Permissions</Link>
           </Button>
-        ) : (
-          <div className="flex flex-col items-end gap-2">
-            <Button 
-              onClick={() => setShowUpgradeDialog(true)}
-              className="cursor-pointer"
-            >
-              Add User
+          {canAddUsers ? (
+            <Button asChild>
+              <Link href="/dashboard/users/new">Add User</Link>
             </Button>
-            <p className="text-xs text-muted-foreground text-right max-w-[200px]">
-              Upgrade your plan to add staff or admins
-            </p>
-            <Button 
-              onClick={() => setShowUpgradeDialog(true)}
-              variant="outline" 
-              size="sm"
-            >
-              Upgrade Plan
-            </Button>
-          </div>
-        )}
+          ) : (
+            <div className="flex flex-col items-end gap-2">
+              <Button 
+                onClick={() => setShowUpgradeDialog(true)}
+                className="cursor-pointer"
+              >
+                Add User
+              </Button>
+              <p className="text-xs text-muted-foreground text-right max-w-[200px]">
+                Upgrade your plan to add staff or admins
+              </p>
+              <Button 
+                onClick={() => setShowUpgradeDialog(true)}
+                variant="outline" 
+                size="sm"
+              >
+                Upgrade Plan
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -203,11 +209,18 @@ export default function UsersListClient({ users, currentUserId, canAddUsers, pla
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getRoleBadgeColor(user.role)}`}
-                      >
-                        {user.role === 'tenant_admin' ? 'Admin' : 'Staff'}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getRoleBadgeColor(user.role)}`}
+                        >
+                          {user.role === 'tenant_admin' ? 'Admin' : 'Staff'}
+                        </span>
+                        {user.customPermissions && user.customPermissions.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Custom ({user.customPermissions.length})
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {user.last_sign_in_at

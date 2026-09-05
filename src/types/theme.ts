@@ -1,6 +1,6 @@
 /**
  * Theme System Type Definitions
- * Component-Based Theme Architecture for StoreFlow
+ * Component-Based Theme Architecture for DukaNest
  */
 
 // ============================================

@@ -7,6 +7,7 @@
 import { sendCustomerEmail } from '@/lib/email/service';
 import { getTenantContactEmail } from '@/lib/orders/emails';
 import type { Tenant } from '@/lib/tenant-context';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 interface Customer {
   id: string;
@@ -26,7 +27,7 @@ export async function sendCustomerWelcomeEmail({
   tenant: Tenant;
   verificationToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const verificationUrl = `${storeUrl}/verify-email?token=${verificationToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 
@@ -110,9 +111,13 @@ export async function sendCustomerPasswordResetEmail({
   tenant: Tenant;
   resetToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
-  const resetUrl = `${storeUrl}/reset-password?token=${resetToken}`;
+  const storeUrl = getTenantStoreUrl(tenant);
+  const resetUrl = `${storeUrl}/customer-reset-password?token=${resetToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
+  const customerName = customer.name || 'Customer';
+  const tenantName = tenant.name || 'Our Store';
+
+  console.log('Sending password reset email to:', customer.email, 'Reset URL:', resetUrl);
 
   const html = `
     <!DOCTYPE html>
@@ -128,9 +133,9 @@ export async function sendCustomerPasswordResetEmail({
         </div>
         
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p>Hello ${customer.name},</p>
+          <p>Hello ${customerName},</p>
           
-          <p>We received a request to reset your password for your account at <strong>${tenant.name}</strong>.</p>
+          <p>We received a request to reset your password for your account at <strong>${tenantName}</strong>.</p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
             <h2 style="margin-top: 0; color: #ef4444;">Reset Your Password</h2>
@@ -158,19 +163,26 @@ export async function sendCustomerPasswordResetEmail({
           
           <p style="color: #666; font-size: 14px;">
             Best regards,<br>
-            The ${tenant.name} Team
+            The ${tenantName} Team
           </p>
         </div>
       </body>
     </html>
   `;
 
-  return sendCustomerEmail({
-    to: customer.email,
-    subject: `Reset Your Password - ${tenant.name}`,
-    html,
-    tenant,
-  });
+  try {
+    const result = await sendCustomerEmail({
+      to: customer.email,
+      subject: `Reset Your Password - ${tenantName}`,
+      html,
+      tenant,
+    });
+    console.log('Password reset email sent successfully to:', customer.email);
+    return result;
+  } catch (error) {
+    console.error('Failed to send password reset email to:', customer.email, error);
+    throw error;
+  }
 }
 
 /**
@@ -185,7 +197,7 @@ export async function sendCustomerEmailVerificationEmail({
   tenant: Tenant;
   verificationToken: string;
 }) {
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const verificationUrl = `${storeUrl}/verify-email?token=${verificationToken}`;
   const tenantEmail = getTenantContactEmail(tenant);
 

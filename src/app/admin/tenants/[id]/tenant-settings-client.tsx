@@ -13,16 +13,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 // Note: Alert component may need to be created if it doesn't exist
 // For now, using inline divs for alerts
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  ExclamationTriangleIcon,
+import {
+  BanknotesIcon,
+  CheckCircleIcon,
+  CreditCardIcon,
   TrashIcon,
-  ArrowTopRightOnSquareIcon
+  WalletIcon,
+  XCircleIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
 
 interface Tenant {
   id: string;
@@ -34,6 +47,8 @@ interface Tenant {
   expire_date: Date | null;
   plan_id: string | null;
   data: any;
+  country: string | null;
+  contact_email: string | null;
   price_plans: {
     id: string;
     name: string;
@@ -41,6 +56,24 @@ interface Tenant {
     duration_months: number;
   } | null;
 }
+
+interface Country {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+// Fallback when no countries in DB (e.g. Kenya, US for pricing)
+const FALLBACK_COUNTRIES: Country[] = [
+  { id: 'KE', name: 'Kenya', code: 'KE' },
+  { id: 'US', name: 'United States', code: 'US' },
+  { id: 'GB', name: 'United Kingdom', code: 'GB' },
+  { id: 'CA', name: 'Canada', code: 'CA' },
+  { id: 'NG', name: 'Nigeria', code: 'NG' },
+  { id: 'ZA', name: 'South Africa', code: 'ZA' },
+  { id: 'TZ', name: 'Tanzania', code: 'TZ' },
+  { id: 'UG', name: 'Uganda', code: 'UG' },
+];
 
 interface PricePlan {
   id: string;
@@ -50,12 +83,51 @@ interface PricePlan {
   features: any;
 }
 
+interface OnboardingJourneyItem {
+  id: string;
+  label: string;
+  description: string;
+  completed: boolean;
+}
+
+interface OnboardingJourney {
+  items: OnboardingJourneyItem[];
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+}
+
+interface TenantBillingPayment {
+  id: string;
+  gateway: string | null;
+  amount: number;
+  currency: string | null;
+  status: string | null;
+  payment_id: string | null;
+  transaction_id: string | null;
+  plan_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+type BillingPaymentTab = 'mpesa' | 'pesapal' | 'tumizi';
+
 interface TenantSettingsClientProps {
   tenant: Tenant;
   pricePlans: PricePlan[];
+  countries: Country[];
+  contactPhone: string;
+  onboardingJourney: OnboardingJourney;
 }
 
-export default function TenantSettingsClient({ tenant, pricePlans }: TenantSettingsClientProps) {
+export default function TenantSettingsClient({
+  tenant,
+  pricePlans,
+  countries,
+  contactPhone,
+  onboardingJourney,
+}: TenantSettingsClientProps) {
+  const countryOptions = countries.length > 0 ? countries : FALLBACK_COUNTRIES;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +142,10 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
   const [expireDate, setExpireDate] = useState(
     tenant.expire_date ? new Date(tenant.expire_date).toISOString().split('T')[0] : ''
   );
+  const [country, setCountry] = useState(tenant.country || '');
+  const [contactEmail, setContactEmail] = useState(tenant.contact_email || '');
+  const businessType = (tenant.data as any)?.business_type || 'Not provided';
+  const sellingCategory = (tenant.data as any)?.selling || businessType;
 
   // Subdomain change state
   const [newSubdomain, setNewSubdomain] = useState('');
@@ -78,6 +154,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
 
   // Delete state
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Subscription management state
   const [isChangingSubscription, setIsChangingSubscription] = useState(false);
@@ -87,7 +164,10 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
   const [subscriptionSuccess, setSubscriptionSuccess] = useState<string | null>(null);
 
   // Billing history state
-  const [billingHistory, setBillingHistory] = useState<any[]>([]);
+  const [billingMpesaPayments, setBillingMpesaPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingPesapalPayments, setBillingPesapalPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingTumiziPayments, setBillingTumiziPayments] = useState<TenantBillingPayment[]>([]);
+  const [billingActiveTab, setBillingActiveTab] = useState<BillingPaymentTab>('mpesa');
   const [isLoadingBilling, setIsLoadingBilling] = useState(false);
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -108,6 +188,8 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
           status,
           plan_id: planId || null,
           expire_date: expireDate || null,
+          country: country || null,
+          contact_email: contactEmail || null,
         }),
       });
 
@@ -152,7 +234,8 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(`Subdomain changed successfully to ${newSubdomain}.dukanest.com`);
+        const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+        setSuccess(`Subdomain changed successfully to ${newSubdomain}.${baseDomain}`);
         setSubdomain(newSubdomain);
         setNewSubdomain('');
         router.refresh();
@@ -238,6 +321,35 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
     }
   };
 
+  const handleRestore = async () => {
+    if (!confirm(`Restore "${tenant.name}" and reactivate the account?`)) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(`/api/admin/tenants/${tenant.id}/restore`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus('active');
+        setSuccess('Tenant restored and reactivated successfully');
+        router.refresh();
+      } else {
+        setError(data.message || 'Failed to restore tenant');
+      }
+    } catch (err) {
+      setError('An error occurred while restoring tenant');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const handleSubscriptionChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsChangingSubscription(true);
@@ -265,6 +377,15 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       const data = await response.json();
 
       if (response.ok) {
+        if (subscriptionAction === 'renew') {
+          trackMetaPixelEvent('Subscribe', {
+            content_name: 'Subscription renewed',
+            content_category: 'subscription_renewal',
+            subscription_type: 'renewal',
+            status: 'completed',
+            source: 'admin',
+          });
+        }
         setSubscriptionSuccess(
           `Subscription ${subscriptionAction === 'renew' ? 'renewed' : subscriptionAction === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
         );
@@ -287,7 +408,9 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       const response = await fetch(`/api/admin/tenants/${tenant.id}/billing`);
       const data = await response.json();
       if (response.ok) {
-        setBillingHistory(data.billingHistory || []);
+        setBillingMpesaPayments(data.payments?.mpesa ?? []);
+        setBillingPesapalPayments(data.payments?.pesapal ?? []);
+        setBillingTumiziPayments(data.payments?.tumizi ?? []);
       }
     } catch (err) {
       console.error('Failed to load billing history:', err);
@@ -300,6 +423,100 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
     loadBillingHistory();
   }, [loadBillingHistory]);
 
+  const getPaymentStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500">Paid</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500">Pending</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-500">Cancelled</Badge>;
+      case 'timeout':
+        return <Badge className="bg-orange-500">Timeout</Badge>;
+      default:
+        return <Badge variant="secondary">{status || 'Unknown'}</Badge>;
+    }
+  };
+
+  const formatBillingCurrency = (amount: number, currency: string | null) => {
+    const currencyCode = currency || 'KES';
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: currencyCode,
+    }).format(amount);
+  };
+
+  const billingTabPayments: Record<BillingPaymentTab, TenantBillingPayment[]> = {
+    mpesa: billingMpesaPayments,
+    pesapal: billingPesapalPayments,
+    tumizi: billingTumiziPayments,
+  };
+
+  const billingTabLabels: Record<BillingPaymentTab, string> = {
+    mpesa: 'Mpesa',
+    pesapal: 'PesaPal',
+    tumizi: 'Tumizi',
+  };
+
+  const renderBillingPaymentsTable = (rows: TenantBillingPayment[], showPlan = false) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {showPlan ? <TableHead>Plan</TableHead> : null}
+          <TableHead>Amount</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Payment ID</TableHead>
+          <TableHead>Transaction ID</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead>Updated</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((payment) => (
+          <TableRow key={payment.id}>
+            {showPlan ? (
+              <TableCell>
+                {payment.plan_name ?? <span className="text-muted-foreground">—</span>}
+              </TableCell>
+            ) : null}
+            <TableCell>{formatBillingCurrency(payment.amount, payment.currency)}</TableCell>
+            <TableCell>{getPaymentStatusBadge(payment.status)}</TableCell>
+            <TableCell>
+              {payment.payment_id ? (
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {payment.payment_id.slice(0, 20)}...
+                </code>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {payment.transaction_id ? (
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {payment.transaction_id}
+                </code>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {payment.created_at
+                ? new Date(payment.created_at).toLocaleString()
+                : '—'}
+            </TableCell>
+            <TableCell>
+              {payment.updated_at
+                ? new Date(payment.updated_at).toLocaleString()
+                : '—'}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'active':
@@ -308,10 +525,15 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
         return <Badge className="bg-yellow-500">Suspended</Badge>;
       case 'expired':
         return <Badge className="bg-red-500">Expired</Badge>;
+      case 'deleted':
+        return <Badge variant="secondary">Deleted</Badge>;
       default:
         return <Badge variant="secondary">{status || 'Unknown'}</Badge>;
     }
   };
+
+  const completedOnboardingItems = onboardingJourney.items.filter((item) => item.completed);
+  const incompleteOnboardingItems = onboardingJourney.items.filter((item) => !item.completed);
 
   return (
     <div className="space-y-6">
@@ -333,6 +555,75 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
         </div>
       )}
 
+      <Tabs defaultValue="store-details" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="store-details">Store Details</TabsTrigger>
+          <TabsTrigger value="tenant-details">Tenant Details</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="store-details" className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Onboarding Journey</CardTitle>
+          <CardDescription>
+            Setup completion for this tenant store
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-2xl font-bold">
+                {Math.round(onboardingJourney.progressPercent)}%
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {onboardingJourney.completedCount} of {onboardingJourney.totalCount} steps completed
+              </p>
+            </div>
+            <Badge variant={onboardingJourney.progressPercent >= 100 ? 'default' : 'secondary'}>
+              {onboardingJourney.progressPercent >= 100 ? 'Complete' : 'In progress'}
+            </Badge>
+          </div>
+          <Progress value={onboardingJourney.progressPercent} className="h-2" />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border p-4">
+              <h4 className="mb-3 text-sm font-semibold">Completed Steps</h4>
+              <div className="space-y-2">
+                {completedOnboardingItems.length > 0 ? (
+                  completedOnboardingItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2">
+                      <CheckCircleIcon className="mt-0.5 h-4 w-4 text-green-600" />
+                      <p className="text-sm">{item.label}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No completed steps yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <h4 className="mb-3 text-sm font-semibold">Incomplete Steps</h4>
+              <div className="space-y-2">
+                {incompleteOnboardingItems.length > 0 ? (
+                  incompleteOnboardingItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2">
+                      <XCircleIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">All onboarding steps are complete.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Basic Information */}
       <Card>
         <CardHeader>
@@ -346,7 +637,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
               asChild
             >
               <a
-                href={`https://${subdomain}.dukanest.com/dashboard`}
+                href={`https://${subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}/dashboard`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -378,6 +669,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="deleted" disabled>Deleted (restore from Danger Zone)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -421,7 +713,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
         <CardHeader>
           <CardTitle>Subdomain</CardTitle>
           <CardDescription>
-            Current subdomain: <code className="text-sm bg-muted px-2 py-1 rounded">{subdomain}.dukanest.com</code>
+            Current subdomain: <code className="text-sm bg-muted px-2 py-1 rounded">{subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}</code>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -438,7 +730,7 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
                   minLength={3}
                   maxLength={63}
                 />
-                <span className="flex items-center text-muted-foreground">.dukanest.com</span>
+                <span className="flex items-center text-muted-foreground">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}</span>
               </div>
               {subdomainError && (
                 <p className="text-sm text-destructive">{subdomainError}</p>
@@ -713,32 +1005,53 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
-          <CardDescription>View subscription and payment history</CardDescription>
+          <CardDescription>
+            Subscription payments for this store across Mpesa, PesaPal, and Tumizi
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoadingBilling ? (
             <p className="text-sm text-muted-foreground">Loading billing history...</p>
-          ) : billingHistory.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No billing history available</p>
           ) : (
-            <div className="space-y-4">
-              {billingHistory.map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.description}</p>
+            <Tabs
+              value={billingActiveTab}
+              onValueChange={(value) => setBillingActiveTab(value as BillingPaymentTab)}
+              className="space-y-4"
+            >
+              <TabsList>
+                <TabsTrigger value="mpesa">
+                  <BanknotesIcon className="mr-2 h-4 w-4" />
+                  Mpesa
+                </TabsTrigger>
+                <TabsTrigger value="pesapal">
+                  <CreditCardIcon className="mr-2 h-4 w-4" />
+                  PesaPal
+                </TabsTrigger>
+                <TabsTrigger value="tumizi">
+                  <WalletIcon className="mr-2 h-4 w-4" />
+                  Tumizi
+                </TabsTrigger>
+              </TabsList>
+
+              {(['mpesa', 'pesapal', 'tumizi'] as const).map((tab) => {
+                const rows = billingTabPayments[tab];
+                return (
+                  <TabsContent key={tab} value={tab} className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      {item.date ? new Date(item.date).toLocaleDateString() : 'N/A'}
+                      {rows.length} {billingTabLabels[tab]} transaction
+                      {rows.length !== 1 ? 's' : ''}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${item.amount}</p>
-                    <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
-                      {item.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    {rows.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-8 text-center">
+                        No {billingTabLabels[tab]} subscription payments for this store
+                      </p>
+                    ) : (
+                      renderBillingPaymentsTable(rows, true)
+                    )}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           )}
         </CardContent>
       </Card>
@@ -760,15 +1073,114 @@ export default function TenantSettingsClient({ tenant, pricePlans }: TenantSetti
               <Button
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={isDeleting}
+                disabled={isDeleting || status === 'deleted'}
               >
                 <TrashIcon className="mr-2 h-4 w-4" />
                 {isDeleting ? 'Deleting...' : 'Delete Tenant'}
               </Button>
+
+              {status === 'deleted' && (
+                <Button
+                  variant="outline"
+                  onClick={handleRestore}
+                  disabled={isRestoring}
+                >
+                  {isRestoring ? 'Restoring...' : 'Restore Tenant'}
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="tenant-details" className="space-y-6">
+      {/* Tenant Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tenant Details</CardTitle>
+          <CardDescription>Manage tenant contact and location information</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Select value={country || 'none'} onValueChange={(value) => setCountry(value === 'none' ? '' : value)}>
+                <SelectTrigger id="country">
+                  <SelectValue placeholder="Select a country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No country selected</SelectItem>
+                  {countryOptions.filter((c) => c.code).map((c) => (
+                    <SelectItem key={c.id} value={c.code!}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Country affects pricing and payment options (e.g. Kenya for M-Pesa, KES)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact_email">Contact Email</Label>
+              <Input
+                id="contact_email"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="contact@example.com"
+              />
+              <p className="text-sm text-muted-foreground">
+                Primary contact email for this tenant
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact_phone">Contact Phone Number</Label>
+              <Input
+                id="contact_phone"
+                type="text"
+                value={contactPhone || 'Not provided yet'}
+                disabled
+              />
+              <p className="text-sm text-muted-foreground">
+                Set by tenant in dashboard settings and used for follow-up contact
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="business_type">Business Type</Label>
+              <Input
+                id="business_type"
+                type="text"
+                value={businessType}
+                disabled
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="selling_category">What They Sell</Label>
+              <Input
+                id="selling_category"
+                type="text"
+                value={sellingCategory}
+                disabled
+              />
+              <p className="text-sm text-muted-foreground">
+                Used for landlord analytics and niche content personalization.
+              </p>
+            </div>
+
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

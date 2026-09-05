@@ -7,15 +7,18 @@
 import { z } from 'zod';
 
 /**
- * Generate slug from title
- * Keeps full title with hyphens for spaces (same behavior as blog categories)
+ * URL-safe slug: lowercase letters, digits, and hyphens only (no colons, punctuation, etc.).
+ * Safe for Next.js dynamic routes and proxies that treat `:` and other characters specially.
  */
-export function generateSlug(title: string): string {
-  return title
+export function generateSlug(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+  return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')  // Replace spaces with hyphens
-    .replace(/^-+|-+$/g, '');  // Remove leading/trailing hyphens
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 /**
@@ -23,7 +26,15 @@ export function generateSlug(title: string): string {
  */
 export const createPageSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
-  slug: z.string().optional(),
+  slug: z
+    .string()
+    .max(255, 'Slug must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (val == null || val.trim() === '') return undefined;
+      return generateSlug(val);
+    }),
   content: z.string().optional().nullable(),
   banner_image: z.union([
     z.string().url('Banner image must be a valid URL'),
@@ -80,7 +91,15 @@ export const pageQuerySchema = z.object({
  */
 export const createBlogSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255, 'Title must be less than 255 characters'),
-  slug: z.string().optional(),
+  slug: z
+    .string()
+    .max(255, 'Slug must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (val == null || val.trim() === '') return undefined;
+      return generateSlug(val);
+    }),
   content: z.string().optional().nullable(),
   excerpt: z.string().optional().nullable(),
   category_id: z.string().uuid().optional().nullable(),
@@ -136,7 +155,15 @@ export const blogQuerySchema = z.object({
  */
 export const createBlogCategorySchema = z.object({
   name: z.string().min(1, 'Category name is required').max(255, 'Category name must be less than 255 characters'),
-  slug: z.string().optional(),
+  slug: z
+    .string()
+    .max(255)
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (val == null || val.trim() === '') return undefined;
+      return generateSlug(val);
+    }),
 });
 
 /**

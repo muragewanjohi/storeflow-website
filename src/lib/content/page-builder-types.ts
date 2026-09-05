@@ -6,12 +6,13 @@
  * Day 28: Content Management - Simple Page Builder
  */
 
-export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs';
+export type SectionType = 'hero' | 'features' | 'products' | 'testimonials' | 'text' | 'image' | 'categories' | 'banners' | 'sales_tab' | 'split_layout' | 'cta' | 'product_tabs' | 'form' | 'blogs' | 'location';
 
 export interface BaseSection {
   id: string;
   type: SectionType;
   order: number;
+  hidden?: boolean;
 }
 
 export interface HeroSection extends BaseSection {
@@ -19,7 +20,13 @@ export interface HeroSection extends BaseSection {
   title: string;
   subtitle?: string;
   description?: string;
-  image?: string;
+  title_font_size?: string; // CSS value or preset: 'sm' | 'md' | 'lg' | 'xl'
+  subtitle_font_size?: string; // CSS value or preset: 'sm' | 'md' | 'lg' | 'xl'
+  image?: string; // Normal image (displayed as separate element)
+  banner_image?: string; // Banner image (used as background)
+  image_crop?: boolean; // If false, don't crop the normal image. Defaults to true
+  image_position?: 'left' | 'center' | 'right'; // Position of normal image when both banner and normal image are present
+  text_alignment?: 'left' | 'center' | 'right'; // Alignment for title and subtitle
   cta_text?: string;
   cta_link?: string;
   background_color?: string;
@@ -151,11 +158,14 @@ export interface SalesTabSection extends BaseSection {
   // Content
   title?: string;
   subtitle?: string;
+  title_color?: string;
+  subtitle_color?: string;
   limit?: number; // Products per sale
   
   // Features
   show_countdown: boolean;
   show_badge: boolean;
+  show_sale_name?: boolean; // Show sale name on frontend
   badge_text?: string; // Override sale badge_text
   badge_color?: string; // Override sale badge_color
   
@@ -192,7 +202,7 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Left Side Configuration
   left_side: {
-    type: 'banner' | 'image' | 'text';
+    type: 'banner' | 'text' | 'form' | 'products';
     title?: string;
     subtitle?: string;
     content?: string; // For text type or rich HTML
@@ -200,6 +210,14 @@ export interface SplitLayoutSection extends BaseSection {
     alt_text?: string;
     cta_text?: string;
     cta_link?: string;
+    form_id?: string; // For form type
+    
+    // Product Options (if type is 'products')
+    product_selection?: 'category' | 'featured' | 'specific' | 'new' | 'bestsellers';
+    product_ids?: string[];
+    category_id?: string;
+    limit?: number;
+    columns?: 1 | 2 | 3;
     
     // Alignment & Positioning
     text_alignment?: 'left' | 'center' | 'right';
@@ -220,12 +238,15 @@ export interface SplitLayoutSection extends BaseSection {
   
   // Right Side Configuration
   right_side: {
-    type: 'products' | 'features' | 'text' | 'image';
+    type: 'products' | 'features' | 'text' | 'banner' | 'form';
     title?: string;
     subtitle?: string;
     content?: string; // For text type
     image?: string;
     alt_text?: string;
+    cta_text?: string;
+    cta_link?: string;
+    form_id?: string; // For form type
     
     // Product Options
     product_selection?: 'category' | 'featured' | 'specific' | 'new' | 'bestsellers';
@@ -242,12 +263,15 @@ export interface SplitLayoutSection extends BaseSection {
       icon?: string;
     }>;
     
-    // Styling
+    // Styling (banner/image: background_color or transparent)
     background_color?: string;
+    background_gradient?: string;
     title_color?: string;
     subtitle_color?: string;
     text_alignment?: 'left' | 'center' | 'right';
     border_radius?: number;
+    image_position?: 'cover' | 'contain' | 'top' | 'center' | 'bottom';
+    overlay_opacity?: number; // 0-100 for banner overlay
   };
   
   // Section-Level Spacing & Styling
@@ -297,6 +321,57 @@ export interface ProductTabsSection extends BaseSection {
   title_color?: string;
 }
 
+export interface FormSection extends BaseSection {
+  type: 'form';
+  form_id: string; // ID of the form to embed
+  title?: string;
+  subtitle?: string;
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  show_form_title?: boolean; // Whether to show the form's own title
+  max_width?: 'sm' | 'md' | 'lg' | 'xl' | 'full'; // Container width
+}
+
+export interface BlogsSection extends BaseSection {
+  type: 'blogs';
+  title?: string;
+  subtitle?: string;
+  layout?: 'grid' | 'list' | 'carousel';
+  columns?: 2 | 3 | 4;
+  limit?: number; // Number of blog posts to display
+  category_id?: string; // Filter by category (optional)
+  show_excerpt?: boolean; // Show blog excerpt
+  show_date?: boolean; // Show publication date
+  show_author?: boolean; // Show author name
+  show_category?: boolean; // Show category badge
+  show_read_more?: boolean; // Show "Read More" link
+  order_by?: 'created_at' | 'updated_at' | 'title'; // Sort order
+  order_direction?: 'asc' | 'desc';
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  cta_text?: string; // "View All Blogs" button text
+  cta_link?: string; // Link to full blog listing
+}
+
+export interface LocationSection extends BaseSection {
+  type: 'location';
+  title?: string;
+  subtitle?: string;
+  address: string; // Full address for the location
+  latitude?: number; // Optional: precise latitude
+  longitude?: number; // Optional: precise longitude
+  map_type?: 'roadmap' | 'satellite' | 'hybrid' | 'terrain'; // Google Maps map type
+  zoom?: number; // Map zoom level (1-20, default 15)
+  height?: number; // Map height in pixels (default 400)
+  show_info_window?: boolean; // Show address in info window
+  background_color?: string;
+  title_color?: string;
+  subtitle_color?: string;
+  full_width?: boolean; // Full width map
+}
+
 export type PageSection =
   | HeroSection
   | FeaturesSection
@@ -309,7 +384,10 @@ export type PageSection =
   | SalesTabSection
   | SplitLayoutSection
   | CTASection
-  | ProductTabsSection;
+  | ProductTabsSection
+  | FormSection
+  | BlogsSection
+  | LocationSection;
 
 export interface PageBuilderData {
   sections: PageSection[];

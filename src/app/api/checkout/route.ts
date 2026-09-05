@@ -16,6 +16,19 @@ import { canCreateOrder } from '@/lib/subscriptions/limits';
 import { syncProductStockFromVariants } from '@/lib/inventory/sync-product-stock';
 import { requireNotDemoStore } from '@/lib/demo-store/restrictions';
 import { getSessionId } from '@/lib/cart/session';
+import { getStaticOptions } from '@/lib/settings/static-options';
+import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
+import { getCheckoutShippingContext } from '@/lib/checkout/effective-shipping';
+import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
+import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
+import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
+import { normalizeKenyaMsisdnForTumizi } from '@/lib/tumizi/phone';
+import { initiateTumiziCustomerPaymentForOrder } from '@/lib/tumizi/initiate-order-payment';
+import { rollbackCheckoutAfterFailedTumizi } from '@/lib/checkout/rollback-after-failed-tumizi';
+import { computeLineDepositDue, computeOrderDeposit } from '@/lib/orders/deposit';
+import { computeAllItemsNoShipping } from '@/lib/checkout/no-shipping';
+import { createBookingWithCapacityCheck, BookingUnavailableError } from '@/lib/bookings/availability';
 
 /**
  * POST /api/checkout - Create order from cart
@@ -29,6 +42,53 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     const validatedData = checkoutSchema.parse(body);
+
+    const checkoutPaySettings = await getStaticOptions(tenant.id, [
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+    ]);
+    const tumiziCfgCheckout = await getTumiziTenantConfigByTenantId(tenant.id);
+    const tumiziCheckoutLive =
+      tumiziCfgCheckout?.enabled === true && !!tumiziCfgCheckout?.merchantExternalId;
+
+    const cashAllowed =
+      checkoutPaySettings.payment_cash_enabled === 'true' ||
+      checkoutPaySettings.payment_cash_enabled === null;
+    const mpesaAllowed = checkoutPaySettings.payment_mpesa_enabled === 'true';
+
+    if (validatedData.payment_method === 'cash' && !cashAllowed) {
+      return NextResponse.json(
+        { error: 'Cash payments are not enabled for this store.' },
+        { status: 400 },
+      );
+    }
+    if (validatedData.payment_method === 'mpesa' && !mpesaAllowed) {
+      return NextResponse.json(
+        { error: 'M-Pesa is not enabled for this store.' },
+        { status: 400 },
+      );
+    }
+    if (validatedData.payment_method === 'tumizi' && !tumiziCheckoutLive) {
+      return NextResponse.json(
+        {
+          error:
+            'Automatic M-Pesa checkout is not ready for this store yet. Choose another payment method or try again later.',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Block checkout only when storefront is closed (suspended/blocked), not during owner grace period
+    const accessRestriction = getTenantAccessRestriction(tenant);
+    if (!accessRestriction.canAcceptCustomerOrders) {
+      return NextResponse.json(
+        { 
+          error: 'Store temporarily unavailable',
+          message: accessRestriction.reason || 'This store is currently unable to process orders. Please try again later or contact the store owner.',
+        },
+        { status: 403 }
+      );
+    }
 
     // Prevent purchases on demo stores
     await requireNotDemoStore(tenant.id, 'Purchases');
@@ -68,9 +128,27 @@ export async function POST(request: NextRequest) {
       variant_id: string | null;
       quantity: number;
       price: number;
+      unit_cost_at_sale: number;
+      cogs_total: number;
       total: number;
     }> = [];
     let totalAmount = 0;
+    // Basic deposit support (docs/SERVICES_PLAN.md) — the amount actually
+    // due now across the cart. Equals totalAmount unless a line item has a
+    // deposit configured, in which case that line only contributes its
+    // reduced deposit amount here (the rest becomes the order's balance).
+    let depositSubtotal = 0;
+    // Basic services support (docs/SERVICES_PLAN.md) — per-item shipping
+    // requirement, collected here and resolved via computeAllItemsNoShipping()
+    // after the loop. Decided server-side from the real product rows, never
+    // trusted from whatever delivery_method the client happened to send.
+    const shippingRequirements: Array<{ requires_shipping: boolean }> = [];
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — one entry per
+    // bookable cart item, resolved to its matching `bookings[]` request
+    // below. Bookings are created BEFORE the order (real capacity check,
+    // no external calls) so checkout never ends up with a paid order and
+    // no corresponding booking — see the order-creation block below.
+    const bookingRequests: Array<{ productId: string; date: string; startTime: string }> = [];
 
     for (const item of cartItems) {
       const product = await prisma.products.findFirst({
@@ -82,8 +160,15 @@ export async function POST(request: NextRequest) {
           id: true,
           name: true,
           price: true,
+          cost_price: true,
           sale_price: true,
           stock_quantity: true,
+          metadata: true,
+          deposit_type: true,
+          deposit_value: true,
+          requires_shipping: true,
+          is_bookable: true,
+          booking_duration_minutes: true,
         },
       });
 
@@ -94,8 +179,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let variant: { id: string; price: any; stock_quantity: number | null } | null = null;
+      const productMetadata = (product.metadata ?? {}) as Record<string, unknown>;
+      const isDemoProduct =
+        productMetadata.is_demo === true ||
+        productMetadata.is_demo === 'true' ||
+        productMetadata.source === 'starter_pack_ai';
+
+      if (isDemoProduct) {
+        return NextResponse.json(
+          { error: `${product.name} is a demo product and cannot be purchased` },
+          { status: 400 },
+        );
+      }
+
+      let variant: { id: string; price: any; cost_price: any; stock_quantity: number | null } | null = null;
       let finalPrice = Number(product.sale_price || product.price);
+      let unitCostAtSale = Number(product.cost_price || 0);
       let stockQuantity = product.stock_quantity;
 
       if (item.variant_id) {
@@ -108,6 +207,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             price: true,
+            cost_price: true,
             stock_quantity: true,
           },
         });
@@ -120,6 +220,7 @@ export async function POST(request: NextRequest) {
         }
 
         finalPrice = variant.price ? Number(variant.price) : finalPrice;
+        unitCostAtSale = variant.cost_price != null ? Number(variant.cost_price) : unitCostAtSale;
         stockQuantity = variant.stock_quantity;
       }
 
@@ -131,14 +232,41 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — a bookable
+      // item must be exactly quantity 1 (booking the same slot twice in
+      // one order doesn't mean anything) and must carry a matching
+      // bookings[] entry naming the real date/slot the customer picked at
+      // checkout. Never guessed or defaulted, same "never trust a client
+      // delivery_method" discipline as isPickup below.
+      if (product.is_bookable) {
+        if (item.quantity !== 1) {
+          return NextResponse.json(
+            { error: `${product.name} is a booked service — quantity must be 1.` },
+            { status: 400 },
+          );
+        }
+        const bookingRequest = validatedData.bookings.find((b) => b.product_id === product.id);
+        if (!bookingRequest) {
+          return NextResponse.json(
+            { error: `Please select a time slot for ${product.name}.` },
+            { status: 400 },
+          );
+        }
+        bookingRequests.push({ productId: product.id, date: bookingRequest.date, startTime: bookingRequest.start_time });
+      }
+
       const itemTotal = finalPrice * item.quantity;
       totalAmount += itemTotal;
+      depositSubtotal += computeLineDepositDue(itemTotal, product.deposit_type, product.deposit_value);
+      shippingRequirements.push({ requires_shipping: product.requires_shipping !== false });
 
       orderItems.push({
         product_id: product.id,
         variant_id: variant?.id || null,
         quantity: item.quantity,
         price: finalPrice,
+        unit_cost_at_sale: unitCostAtSale,
+        cogs_total: unitCostAtSale * item.quantity,
         total: itemTotal,
       });
     }
@@ -165,25 +293,245 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Determine delivery method and address
+    const deliveryMethod = validatedData.delivery_method || 'delivery';
+    // Basic services support (docs/SERVICES_PLAN.md) — a cart made entirely
+    // of non-shipped items always takes the pickup-equivalent path
+    // (contact info only, no delivery zone/fee), regardless of what
+    // delivery_method the client sent. Reuses the existing pickup
+    // mechanism as-is rather than inventing a new checkout_type — see the
+    // plan doc's "Architecture" section for why.
+    const isPickup = deliveryMethod === 'pickup' || computeAllItemsNoShipping(shippingRequirements);
+
+    const shippingOpts = await getStaticOptions(tenant.id, ['shipping_method_type', 'flat_rate_amount', 'shipping_enabled']);
+    const shippingEnabled = shippingOpts.shipping_enabled !== 'false';
+    if (!isPickup && !shippingEnabled) {
+      return NextResponse.json(
+        { error: 'Delivery is not available for this store. Choose store pickup if offered, or contact the store.' },
+        { status: 400 },
+      );
+    }
+
+    const activeDeliveryZoneCount = await prisma.delivery_zones.count({
+      where: { tenant_id: tenant.id, is_active: true },
+    });
+    const shippingCtx = getCheckoutShippingContext({
+      shippingMethodTypeStored: shippingOpts.shipping_method_type,
+      activeDeliveryZoneCount,
+      flatRateAmountRaw: shippingOpts.flat_rate_amount,
+    });
+
+    let resolvedDeliveryFee: number | null = null;
+    let resolvedDeliveryZoneId: string | null = null;
+    let resolvedDeliveryZoneName: string | null = null;
+    let resolvedDeliveryFeeStatus: 'pending' | 'quoted' | 'approved' | 'rejected' | null = null;
+
+    if (!isPickup) {
+      if (shippingCtx.effectiveMethod === 'flat_rate') {
+        if (shippingCtx.flatRateAmount != null) {
+          resolvedDeliveryFee = shippingCtx.flatRateAmount;
+          resolvedDeliveryFeeStatus = 'approved';
+        } else {
+          resolvedDeliveryFee =
+            validatedData.delivery_fee != null && validatedData.delivery_fee > 0
+              ? validatedData.delivery_fee
+              : null;
+          resolvedDeliveryFeeStatus = 'pending';
+        }
+        resolvedDeliveryZoneId = null;
+        resolvedDeliveryZoneName = null;
+      } else {
+        if (validatedData.delivery_zone_id) {
+          const zone = await prisma.delivery_zones.findFirst({
+            where: {
+              id: validatedData.delivery_zone_id,
+              tenant_id: tenant.id,
+              is_active: true,
+            },
+          });
+          if (!zone) {
+            return NextResponse.json(
+              { error: 'Selected delivery zone is not valid for this store.' },
+              { status: 400 },
+            );
+          }
+          resolvedDeliveryFee = Number(zone.price);
+          resolvedDeliveryZoneId = zone.id;
+          resolvedDeliveryZoneName = zone.name;
+          resolvedDeliveryFeeStatus = 'approved';
+        } else {
+          resolvedDeliveryFee =
+            validatedData.delivery_fee != null && validatedData.delivery_fee > 0
+              ? validatedData.delivery_fee
+              : null;
+          resolvedDeliveryZoneId = null;
+          resolvedDeliveryZoneName = validatedData.delivery_zone_name ?? null;
+          resolvedDeliveryFeeStatus = 'pending';
+        }
+      }
+    }
+    
+    // Get customer info from appropriate address
+    const customerInfo = isPickup && validatedData.pickup_address
+      ? validatedData.pickup_address
+      : validatedData.shipping_address
+        ? validatedData.shipping_address
+        : { name: '', email: '', phone: '' };
+
+    let tumiziPayerPhone: string | null = null;
+    if (validatedData.payment_method === 'tumizi') {
+      tumiziPayerPhone = normalizeKenyaMsisdnForTumizi(customerInfo.phone);
+      if (!tumiziPayerPhone) {
+        return NextResponse.json(
+          {
+            error:
+              'Enter a valid Kenya M-Pesa mobile number in your contact details for payment.',
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Get tax settings
+    const taxSettings = await getStaticOptions(tenant.id, [
+      'tax_enabled',
+      'default_tax_rate',
+      'tax_pricing_type',
+      'tax_included_in_price', // Keep for backward compatibility
+    ]);
+    
+    const taxEnabled = taxSettings.tax_enabled === 'true';
+    const taxRate = taxSettings.default_tax_rate ? parseFloat(taxSettings.default_tax_rate) : null;
+    const taxPricingType = taxSettings.tax_pricing_type || (taxSettings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive');
+    
+    // Calculate subtotal (before tax and delivery)
+    let subtotal = totalAmount - (couponDiscounted || 0);
+    
+    // Calculate tax
+    let taxAmount = 0;
+    if (taxEnabled && taxRate) {
+      const taxRateDecimal = taxRate / 100;
+      if (taxPricingType === 'inclusive') {
+        // Tax is included in price, calculate what portion is tax
+        taxAmount = subtotal - (subtotal / (1 + taxRateDecimal));
+      } else {
+        // Tax is added on top
+        taxAmount = subtotal * taxRateDecimal;
+      }
+    }
+    
+    // Calculate total with tax and delivery fee
+    let finalTotal = subtotal;
+    if (taxEnabled && taxRate && taxPricingType === 'exclusive') {
+      finalTotal += taxAmount; // Add tax if exclusive
+    }
+    // If inclusive, tax is already in subtotal
+    
+    if (!isPickup && resolvedDeliveryFee != null && resolvedDeliveryFee > 0) {
+      finalTotal += resolvedDeliveryFee;
+    }
+
+    // Basic deposit support (docs/SERVICES_PLAN.md) — total_amount keeps
+    // its existing meaning (the full order value) unconditionally; these
+    // two stay null for every normal order.
+    const { depositAmount: resolvedDepositAmount, balanceAmount: resolvedBalanceAmount } = computeOrderDeposit({
+      itemsSubtotal: totalAmount,
+      depositSubtotal,
+      taxAmount,
+      deliveryFee: resolvedDeliveryFee,
+      finalTotal,
+    });
+
+    // Generate invoice number
+    const { generateInvoiceNumber } = await import('@/lib/invoices/generate-invoice-number');
+    const invoiceNumber = await generateInvoiceNumber(tenant.id);
+
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — created BEFORE
+    // the order (real, transactional capacity check, no external calls)
+    // so a slot is never sold twice; linked to the real order/order_product
+    // ids once the order below exists. `status: 'pending'` until the order
+    // actually gets paid — promoted to 'confirmed' from the same real
+    // payment-confirmation paths that already promote payment_status
+    // (Tumizi webhook, manual verify-payment).
+    const createdBookings: Array<{ id: string; productId: string }> = [];
+    for (const req of bookingRequests) {
+      try {
+        const booking = await createBookingWithCapacityCheck({
+          tenantId: tenant.id,
+          productId: req.productId,
+          date: req.date,
+          startTime: req.startTime,
+          customerName: customerInfo.name,
+          customerPhone: customerInfo.phone,
+          customerEmail: customerInfo.email,
+          status: 'pending',
+        });
+        createdBookings.push({ id: booking.id, productId: req.productId });
+      } catch (bookingError: unknown) {
+        // Release any bookings already reserved earlier in this same loop
+        // before failing — never leave a partial set of tentative bookings
+        // behind for a checkout that's about to be rejected.
+        for (const created of createdBookings) {
+          await prisma.service_bookings.update({ where: { id: created.id }, data: { status: 'cancelled' } });
+        }
+        const message =
+          bookingError instanceof BookingUnavailableError
+            ? bookingError.message
+            : 'Could not reserve the selected time slot. Please try again.';
+        return NextResponse.json({ error: message }, { status: 409 });
+      }
+    }
+
     // Create order
     // For guest orders, user_id will be null (order tracked by email + order_number)
     const order = await prisma.orders.create({
       data: {
         tenant_id: tenant.id,
         order_number: orderNumber,
+        invoice_number: invoiceNumber,
         user_id: customerId, // null for guest orders
-        name: validatedData.shipping_address.name,
-        email: validatedData.shipping_address.email,
-        phone: validatedData.shipping_address.phone,
-        total_amount: totalAmount - (couponDiscounted || 0),
+        name: customerInfo.name,
+        email: customerInfo.email,
+        phone: customerInfo.phone,
+        total_amount: finalTotal,
+        deposit_amount: resolvedDepositAmount,
+        balance_amount: resolvedBalanceAmount,
         status: 'pending',
-        payment_status: validatedData.payment_method === 'cash_on_delivery' ? 'pending' : 'pending',
-        payment_gateway: validatedData.payment_method,
-        shipping_address: validatedData.shipping_address as any,
-        billing_address: (validatedData.billing_address || validatedData.shipping_address) as any,
+        // Never trust client-submitted payment verification payloads for paid status.
+        // Payment state is promoted to "paid" only from verified provider callbacks.
+        payment_status: 'pending',
+        payment_gateway:
+          validatedData.payment_method === 'tumizi'
+            ? 'tumizi'
+            : validatedData.payment_method,
+        transaction_id:
+          validatedData.payment_method === 'tumizi'
+            ? null
+            : validatedData.payment_verification?.transaction_id || null,
+        payment_meta:
+          validatedData.payment_method === 'tumizi'
+            ? null
+            : validatedData.payment_verification
+              ? JSON.parse(JSON.stringify({
+                  transaction_id: validatedData.payment_verification.transaction_id,
+                  reference: validatedData.payment_verification.reference,
+                  notes: validatedData.payment_verification.notes,
+                  submitted_at: new Date().toISOString(),
+                  verification_status: 'pending', // pending, verified, rejected
+                }))
+              : null,
+        shipping_address: isPickup 
+          ? (validatedData.pickup_address as any)
+          : (validatedData.shipping_address as any),
+        billing_address: (validatedData.billing_address || validatedData.shipping_address || validatedData.pickup_address) as any,
         coupon: validatedData.coupon_code || null,
         coupon_discounted: couponDiscounted,
         message: validatedData.notes || null,
+        checkout_type: isPickup ? 'pickup' : 'delivery',
+        delivery_zone_id: resolvedDeliveryZoneId,
+        delivery_zone_name: resolvedDeliveryZoneName,
+        delivery_fee: resolvedDeliveryFee,
+        delivery_fee_status: resolvedDeliveryFeeStatus,
         order_products: {
           create: orderItems.map((item: any) => ({
             tenant_id: tenant.id,
@@ -192,6 +540,8 @@ export async function POST(request: NextRequest) {
             user_id: customerId, // null for guest orders
             quantity: item.quantity,
             price: item.price,
+            unit_cost_at_sale: item.unit_cost_at_sale,
+            cogs_total: item.cogs_total,
             total: item.total,
           })),
         },
@@ -211,6 +561,16 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — link each
+    // just-created booking to the now-real order/order_product ids.
+    for (const created of createdBookings) {
+      const matchingOrderProduct = order.order_products.find((op) => op.product_id === created.productId);
+      await prisma.service_bookings.update({
+        where: { id: created.id },
+        data: { order_id: order.id, order_product_id: matchingOrderProduct?.id ?? null },
+      });
+    }
 
     // Update inventory (decrease stock)
     // Track which products have variants so we can sync product-level stock
@@ -248,6 +608,45 @@ export async function POST(request: NextRequest) {
       await syncProductStockFromVariants(productId, tenant.id);
     }
 
+    if (validatedData.payment_method === 'tumizi' && tumiziPayerPhone) {
+      try {
+        await initiateTumiziCustomerPaymentForOrder({
+          tenantId: tenant.id,
+          tenantName: tenant.name,
+          order: {
+            id: order.id,
+            order_number: order.order_number,
+            invoice_number: order.invoice_number,
+            // Basic deposit support (docs/SERVICES_PLAN.md) — charge the
+            // reduced deposit amount when one applies, the full order
+            // total otherwise (unchanged behavior for every normal order).
+            total_amount: order.deposit_amount ?? order.total_amount,
+            name: order.name,
+            email: order.email,
+          },
+          phoneNumber: tumiziPayerPhone,
+          userId: customerId,
+        });
+      } catch (tumiziError: unknown) {
+        console.error('[Checkout] Tumizi initiate failed:', tumiziError);
+        await rollbackCheckoutAfterFailedTumizi({
+          tenantId: tenant.id,
+          orderId: order.id,
+          orderItems: orderItems.map((item) => ({
+            product_id: item.product_id,
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+          })),
+          bookingIds: createdBookings.map((b) => b.id),
+        });
+        const message =
+          tumiziError instanceof Error
+            ? tumiziError.message
+            : 'Could not start M-Pesa payment. Please try again or choose another payment method.';
+        return NextResponse.json({ error: message }, { status: 502 });
+      }
+    }
+
     // Clear cart items from database
     if (customerId) {
       // Authenticated user - clear by user_id
@@ -271,44 +670,136 @@ export async function POST(request: NextRequest) {
     // This will be handled by the client-side event listener
 
     // Send email notifications (async, don't wait)
-    Promise.all([
+    const emailPromises = [
       sendOrderPlacedEmail({
-        order,
+        order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
-        customerEmail: validatedData.shipping_address.email,
-        customerName: validatedData.shipping_address.name,
+        customerEmail: customerInfo.email,
+        customerName: customerInfo.name,
       }),
       sendNewOrderAlertEmail({
-        order,
+        order: order as any, // Type assertion - order includes order_products from Prisma include
         tenant,
       }),
-      // Send immediate notification email for new orders
-      (async () => {
-        const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
-        await sendImmediateNotificationEmail({
-          tenant,
-          notification: {
-            id: `order-${order.id}`,
-            type: 'new_order',
-            title: 'New Order',
-            message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)}`,
-            link: `/dashboard/orders/${order.id}`,
-            created_at: order.created_at || new Date(),
-            read: false,
-            metadata: {
-              order_id: order.id,
-              order_number: order.order_number,
-              amount: Number(order.total_amount),
-            },
-          },
-        }).catch((error) => {
-          console.error('Error sending notification email:', error);
-        });
-      })(),
-    ]).catch((error) => {
+    ];
+
+    // Send invoice email for M-Pesa orders (with payment instructions)
+    if (validatedData.payment_method === 'mpesa') {
+      emailPromises.push(
+        (async () => {
+          const { sendInvoiceEmail } = await import('@/lib/orders/invoice-email');
+          return sendInvoiceEmail({
+            order: order as any,
+            tenant,
+            customerEmail: customerInfo.email,
+            customerName: customerInfo.name,
+          });
+        })()
+      );
+    }
+
+
+    Promise.all(emailPromises).catch((error) => {
       console.error('Error sending order emails:', error);
       // Don't fail the order creation if emails fail
     });
+
+    const { sendNewOrderSmsToMerchant } = await import('@/lib/sms/tenant-notifications');
+    const currencyCode = ((tenant as any).currency || 'KES').toUpperCase();
+    const amount = Number(order.total_amount);
+    const totalLabel = currencyCode === 'KES'
+      ? `KSh ${new Intl.NumberFormat('en-KE', { maximumFractionDigits: 0 }).format(amount)}`
+      : `${currencyCode} ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
+
+    void sendNewOrderSmsToMerchant({
+      tenantId: tenant.id,
+      countryIso2: tenant.country,
+      orderNumber: order.order_number,
+      storeName: tenant.name || tenant.subdomain || 'your store',
+      totalLabel,
+      ordersUrl: getTenantStoreUrl(tenant as any, '/orders'),
+    }).catch((error) => {
+      console.error('[Checkout] Failed to send new-order SMS:', error);
+    });
+
+    // Send immediate notification email separately (different return type)
+    (async () => {
+      try {
+        const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+        const paymentStatusLabel = order.payment_status === 'pending' ? 'Pending payment' : 'Paid';
+        const notification = {
+          id: `order-${order.id}`,
+          type: 'new_order' as const,
+          title: 'New Order',
+          message: `Order ${order.order_number} - $${Number(order.total_amount).toFixed(2)} (${paymentStatusLabel})`,
+          link: `/dashboard/orders/${order.id}`,
+          created_at: order.created_at || new Date(),
+          read: false,
+          metadata: {
+            order_id: order.id,
+            order_number: order.order_number,
+            amount: Number(order.total_amount),
+          },
+        };
+
+        await sendImmediateNotificationEmail({
+          tenant,
+          notification,
+        });
+
+        await dispatchNotificationToTenantDevices({
+          tenantId: tenant.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          link: notification.link,
+        });
+      } catch (error) {
+        console.error('Error sending notification email:', error);
+      }
+    })();
+
+    const checkoutEventId = `order_${order.id}`;
+    const checkoutProperties = {
+      value: Number(order.total_amount),
+      currency: ((tenant as any).currency || 'KES').toUpperCase(),
+      content_type: 'product',
+      contents: orderItems.map((item) => ({
+        content_id: item.product_id,
+        content_type: 'product',
+        content_name:
+          (order as any).order_products?.find((p: any) => p.product_id === item.product_id)?.products?.name ||
+          item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    };
+
+    sendTikTokServerEvent({
+      request,
+      event: 'PlaceAnOrder',
+      eventId: checkoutEventId,
+      email: customerInfo.email || null,
+      phoneNumber: customerInfo.phone || null,
+      externalId: customerId ?? sessionId ?? order.id,
+      properties: checkoutProperties,
+    }).catch((error) => {
+      console.error('Error sending TikTok checkout event:', error);
+    });
+
+    if (order.payment_status === 'paid') {
+      sendTikTokServerEvent({
+        request,
+        event: 'Purchase',
+        eventId: `${checkoutEventId}_purchase`,
+        email: customerInfo.email || null,
+        phoneNumber: customerInfo.phone || null,
+        externalId: customerId ?? sessionId ?? order.id,
+        properties: checkoutProperties,
+      }).catch((error) => {
+        console.error('Error sending TikTok purchase event:', error);
+      });
+    }
 
     return NextResponse.json({
       success: true,

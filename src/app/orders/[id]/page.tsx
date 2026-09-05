@@ -67,6 +67,11 @@ export default async function OrderConfirmationPage({
       billing_address: true,
       order_details: true, // Contains tracking info
       created_at: true,
+      delivery_fee: true,
+      delivery_fee_status: true,
+      delivery_fee_quote: true,
+      delivery_fee_notes: true,
+      delivery_zone_name: true,
       order_products: {
         include: {
           products: {
@@ -123,6 +128,8 @@ export default async function OrderConfirmationPage({
   const orderData = {
     ...order,
     total_amount: Number(order.total_amount),
+    delivery_fee: order.delivery_fee ? Number(order.delivery_fee) : null,
+    delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
     order_details: order.order_details || {},
     order_products: order.order_products.map((op: any) => ({
       ...op,

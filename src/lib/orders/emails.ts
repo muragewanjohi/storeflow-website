@@ -9,7 +9,8 @@ import { prisma } from '@/lib/prisma/client';
 import type { Prisma } from '@prisma/client';
 import type { Tenant } from '@/lib/tenant-context';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/currency-context';
+import { formatCurrencyServer, type CurrencySettings } from '@/lib/currency/format-server';
+import { getTenantStoreUrl } from '@/lib/subscriptions/tenant-url';
 
 // Decimal type from Prisma
 type Decimal = Prisma.Decimal;
@@ -28,7 +29,8 @@ export function getTenantContactEmail(tenant: Tenant): string {
   if (tenant.custom_domain) {
     return `support@${tenant.custom_domain}`;
   }
-  return `support@${tenant.subdomain}.dukanest.com`;
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+  return `support@${tenant.subdomain}.${baseDomain}`;
 }
 
 /**
@@ -109,6 +111,10 @@ interface OrderWithItems {
   email: string | null;
   name: string | null;
   phone: string | null;
+  delivery_fee: Decimal | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: Decimal | null;
+  delivery_fee_notes: string | null;
   order_products: Array<{
     id: string;
     product_id: string | null;
@@ -150,7 +156,7 @@ export async function sendOrderPlacedEmail({
   }));
 
   const totalAmount = Number(order.total_amount);
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
   
@@ -309,7 +315,7 @@ export async function sendNewOrderAlertEmail({
   }));
 
   const totalAmount = Number(order.total_amount);
-  const dashboardUrl = `https://${tenant.subdomain}.dukanest.com/dashboard/orders/${order.id}`;
+  const dashboardUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
   
   // Format currency amounts with proper symbol and spacing
   const formattedTotal = formatCurrencyForEmail(totalAmount, currency);
@@ -330,6 +336,10 @@ export async function sendNewOrderAlertEmail({
         <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
           <p>Hello,</p>
           
+          <p style="font-size: 18px; font-weight: bold; margin: 20px 0;">
+            Order ${order.order_number} - ${formattedTotal}
+          </p>
+          
           <p>A new order has been placed in your store <strong>${tenant.name}</strong>.</p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
@@ -338,7 +348,7 @@ export async function sendNewOrderAlertEmail({
             <p><strong>Customer:</strong> ${order.name || 'N/A'}</p>
             <p><strong>Email:</strong> ${order.email || 'N/A'}</p>
             <p><strong>Phone:</strong> ${order.phone || 'N/A'}</p>
-            <p><strong>Total Amount:</strong> ${formattedTotal}</p>
+            <p><strong>Total Amount:</strong> <strong style="font-size: 18px; color: #059669;">${formattedTotal}</strong></p>
             <p><strong>Payment Status:</strong> ${order.payment_status}</p>
             <p><strong>Order Date:</strong> ${new Date(order.created_at || '').toLocaleDateString()}</p>
           </div>
@@ -417,7 +427,7 @@ Please process this order as soon as possible.
 
   return sendAdminEmail({
     to: adminEmail,
-    subject: `New Order Alert - ${order.order_number}`,
+    subject: `New Order: ${order.order_number} - ${formattedTotal}`,
     html,
     text,
     tenant,
@@ -448,7 +458,7 @@ export async function sendOrderShippedEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -530,7 +540,7 @@ export async function sendOrderDeliveredEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -615,7 +625,7 @@ export async function sendOrderStatusUpdateEmail({
     return { success: true, skipped: true };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -740,13 +750,17 @@ export async function sendPaymentStatusUpdateEmail({
     return { success: true, skipped: true };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
   const paymentStatusLabels: Record<string, string> = {
     pending: 'Pending',
     paid: 'Paid',
+    // Basic deposit support (docs/SERVICES_PLAN.md) — a distinct status
+    // from 'paid' on purpose, so revenue/analytics never treats a
+    // deposit-only order as fully settled. See apply-payment-status.ts.
+    deposit_paid: 'Deposit Paid',
     failed: 'Failed',
     refunded: 'Refunded',
   };
@@ -754,6 +768,7 @@ export async function sendPaymentStatusUpdateEmail({
   const paymentStatusColor: Record<string, string> = {
     pending: '#f59e0b',
     paid: '#10b981',
+    deposit_paid: '#3b82f6',
     failed: '#ef4444',
     refunded: '#6b7280',
   };
@@ -763,9 +778,15 @@ export async function sendPaymentStatusUpdateEmail({
 
   let statusMessage = '';
   let statusIcon = '';
-  
+
   if (newPaymentStatus === 'paid') {
     statusMessage = 'Your payment has been confirmed!';
+    statusIcon = '✅';
+  } else if (newPaymentStatus === 'deposit_paid') {
+    const balance = (order as any).balance_amount != null ? Number((order as any).balance_amount) : null;
+    statusMessage = balance != null && balance > 0
+      ? `Your deposit has been confirmed! A balance of ${balance.toFixed(2)} remains — the store will contact you about settling it.`
+      : 'Your deposit has been confirmed!';
     statusIcon = '✅';
   } else if (newPaymentStatus === 'failed') {
     statusMessage = 'Unfortunately, your payment could not be processed.';
@@ -865,6 +886,137 @@ ${tenant.name}
 }
 
 /**
+ * Send delivery fee quote email to customer
+ * Sent when store owner calculates and sends a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteEmail({
+  order,
+  tenant,
+  deliveryFeeQuote,
+  notes,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  deliveryFeeQuote: number;
+  notes?: string | null;
+}) {
+  const customerEmail = order.email;
+  const customerName = order.name || 'Customer';
+
+  if (!customerEmail) {
+    console.warn('No customer email for order', order.order_number);
+    return { success: false, error: 'No customer email' };
+  }
+
+  const storeUrl = getTenantStoreUrl(tenant);
+  const orderUrl = `${storeUrl}/orders/${order.id}`;
+  const accountActionUrl = `${storeUrl}/account/orders?filter=requiring_action`;
+  const contactEmail = getTenantContactEmail(tenant);
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(deliveryFeeQuote, currency);
+  // When quote is sent, order.total_amount may already include quote; normalize subtotal for accurate email totals.
+  const orderTotal = Number(order.total_amount);
+  const subtotalAmount =
+    order.delivery_fee_status === 'quoted'
+      ? Math.max(0, orderTotal - deliveryFeeQuote)
+      : orderTotal;
+  const formattedSubtotal = formatCurrencyForEmail(subtotalAmount, currency);
+  const formattedTotal = formatCurrencyForEmail(subtotalAmount + deliveryFeeQuote, currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+          <h1 style="color: #92400e; margin-top: 0;">📦 Delivery Fee Quote Required</h1>
+          <p style="margin: 0; color: #78350f;">We've calculated the delivery fee for your order.</p>
+        </div>
+
+        <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+          <h2 style="color: #1f2937; margin-top: 0; font-size: 18px;">Order: ${order.order_number}</h2>
+          
+          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #92400e;">📦 Delivery Fee Quote</p>
+            <p style="margin: 0; font-size: 24px; font-weight: bold; color: #92400e;">${formattedQuote}</p>
+            ${notes ? `<p style="margin: 10px 0 0 0; color: #78350f; font-size: 14px;">${notes}</p>` : ''}
+          </div>
+
+          <div style="margin: 20px 0;">
+            <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Order Subtotal</p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold;">${formattedSubtotal}</p>
+          </div>
+
+          <div style="margin: 20px 0; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+            <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">New Total (including delivery)</p>
+            <p style="margin: 0; font-size: 24px; font-weight: bold; color: #059669;">${formattedTotal}</p>
+          </div>
+
+          <div style="margin: 30px 0; padding: 20px; background-color: #f0f9ff; border-radius: 8px;">
+            <p style="margin: 0 0 15px 0; font-weight: bold; color: #1e40af;">Action Required</p>
+            <p style="margin: 0 0 20px 0; color: #1e3a8a;">
+              Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
+            </p>
+            <a href="${accountActionUrl}" style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-right: 10px;">
+              Review & Approve Quote
+            </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #475569;">
+              Prefer direct order view? <a href="${orderUrl}" style="color: #1d4ed8;">Open order details</a>
+            </p>
+          </div>
+        </div>
+        
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+          If you have any questions about this delivery fee, please contact us at <a href="mailto:${contactEmail}">${contactEmail}</a>
+        </p>
+        
+        <p style="color: #666; font-size: 14px;">
+          Best regards,<br>
+          ${tenant.name}
+        </p>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote - ${order.order_number}
+
+Hello ${customerName},
+
+We've calculated the delivery fee for your order ${order.order_number}.
+
+Delivery Fee Quote: ${formattedQuote}
+${notes ? `Notes: ${notes}` : ''}
+
+Order Subtotal: ${formattedSubtotal}
+New Total (including delivery): ${formattedTotal}
+
+Action Required:
+Please review the delivery fee quote and approve or reject it. If you approve, your order will proceed with the updated total. If you reject, you can cancel the order.
+
+Go to your account dashboard and review: ${accountActionUrl}
+Direct order link: ${orderUrl}
+
+If you have any questions about this delivery fee, please contact us at ${contactEmail}.
+
+Best regards,
+${tenant.name}
+  `;
+
+  return sendCustomerEmail({
+    to: customerEmail,
+    subject: `Delivery Fee Quote for Order ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}
+
+/**
  * Send order cancelled email to customer
  */
 export async function sendOrderCancelledEmail({
@@ -886,7 +1038,7 @@ export async function sendOrderCancelledEmail({
     return { success: false, error: 'No customer email' };
   }
 
-  const storeUrl = `https://${tenant.subdomain}.dukanest.com`;
+  const storeUrl = getTenantStoreUrl(tenant);
   const orderUrl = `${storeUrl}/orders/${order.id}`;
   const contactEmail = getTenantContactEmail(tenant);
 
@@ -950,3 +1102,228 @@ export async function sendOrderCancelledEmail({
   });
 }
 
+/**
+ * Send delivery fee quote approved email to tenant admin
+ * Sent when customer approves a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteApprovedEmail({
+  order,
+  tenant,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+}) {
+  // Get tenant admin email
+  let adminEmail: string;
+  if (tenant.contact_email) {
+    adminEmail = tenant.contact_email;
+  } else if (tenant.user_id) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: user } = await adminClient.auth.admin.getUserById(tenant.user_id);
+      adminEmail = user?.user?.email || `${tenant.subdomain}@dukanest.com`;
+    } catch {
+      adminEmail = `${tenant.subdomain}@dukanest.com`;
+    }
+  } else {
+    adminEmail = `${tenant.subdomain}@dukanest.com`;
+  }
+
+  const customerName = order.name || 'Customer';
+  const customerEmail = order.email || 'N/A';
+  const orderUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
+  const formattedTotal = formatCurrencyForEmail(Number(order.total_amount), currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote Approved - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">✓ Delivery Fee Quote Approved</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello,</p>
+          
+          <p>Great news! The customer has approved the delivery fee quote for order <strong>${order.order_number}</strong>.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+            <h2 style="margin-top: 0; color: #10b981;">Order Details</h2>
+            <p><strong>Order Number:</strong> ${order.order_number}</p>
+            <p><strong>Customer:</strong> ${customerName}</p>
+            <p><strong>Customer Email:</strong> ${customerEmail}</p>
+            <p><strong>Delivery Fee Quote:</strong> ${formattedQuote}</p>
+            <p><strong>Order Total:</strong> ${formattedTotal}</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            You can now proceed with processing and fulfilling this order.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote Approved - ${order.order_number}
+
+Hello,
+
+Great news! The customer has approved the delivery fee quote for order ${order.order_number}.
+
+Order Details:
+- Order Number: ${order.order_number}
+- Customer: ${customerName}
+- Customer Email: ${customerEmail}
+- Delivery Fee Quote: ${formattedQuote}
+- Order Total: ${formattedTotal}
+
+View order in dashboard: ${orderUrl}
+
+You can now proceed with processing and fulfilling this order.
+  `;
+
+  return sendAdminEmail({
+    to: adminEmail,
+    subject: `Delivery Fee Quote Approved - Order ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}
+
+/**
+ * Send delivery fee quote rejected email to tenant admin
+ * Sent when customer rejects a delivery fee quote
+ */
+export async function sendDeliveryFeeQuoteRejectedEmail({
+  order,
+  tenant,
+  reason,
+}: {
+  order: OrderWithItems;
+  tenant: Tenant;
+  reason?: string | null;
+}) {
+  // Get tenant admin email
+  let adminEmail: string;
+  if (tenant.contact_email) {
+    adminEmail = tenant.contact_email;
+  } else if (tenant.user_id) {
+    try {
+      const adminClient = createAdminClient();
+      const { data: user } = await adminClient.auth.admin.getUserById(tenant.user_id);
+      adminEmail = user?.user?.email || `${tenant.subdomain}@dukanest.com`;
+    } catch {
+      adminEmail = `${tenant.subdomain}@dukanest.com`;
+    }
+  } else {
+    adminEmail = `${tenant.subdomain}@dukanest.com`;
+  }
+
+  const customerName = order.name || 'Customer';
+  const customerEmail = order.email || 'N/A';
+  const orderUrl = getTenantStoreUrl(tenant, `/dashboard/orders/${order.id}`);
+  const currency = await getTenantCurrencySettings(tenant.id);
+  const formattedQuote = formatCurrencyForEmail(Number(order.delivery_fee_quote || 0), currency);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Delivery Fee Quote Rejected - ${order.order_number}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0;">⚠ Delivery Fee Quote Rejected</h1>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p>Hello,</p>
+          
+          <p>The customer has rejected the delivery fee quote for order <strong>${order.order_number}</strong>.</p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h2 style="margin-top: 0; color: #f59e0b;">Order Details</h2>
+            <p><strong>Order Number:</strong> ${order.order_number}</p>
+            <p><strong>Customer:</strong> ${customerName}</p>
+            <p><strong>Customer Email:</strong> ${customerEmail}</p>
+            <p><strong>Rejected Delivery Fee Quote:</strong> ${formattedQuote}</p>
+            ${reason ? `
+            <div style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 4px;">
+              <p style="margin: 0 0 5px 0; font-weight: bold; color: #92400e;">Customer's Reason:</p>
+              <p style="margin: 0; color: #78350f;">${reason}</p>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0; color: #92400e; font-weight: bold;">Next Steps:</p>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #78350f;">
+              <li>Review the customer's reason for rejection</li>
+              <li>Consider offering an alternative delivery fee or solution</li>
+              <li>The customer may cancel the order if they choose</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${orderUrl}" style="background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+              View Order Details
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; margin-top: 30px;">
+            Please review the order and take appropriate action.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+Delivery Fee Quote Rejected - ${order.order_number}
+
+Hello,
+
+The customer has rejected the delivery fee quote for order ${order.order_number}.
+
+Order Details:
+- Order Number: ${order.order_number}
+- Customer: ${customerName}
+- Customer Email: ${customerEmail}
+- Rejected Delivery Fee Quote: ${formattedQuote}
+${reason ? `- Customer's Reason: ${reason}` : ''}
+
+Next Steps:
+- Review the customer's reason for rejection
+- Consider offering an alternative delivery fee or solution
+- The customer may cancel the order if they choose
+
+View order in dashboard: ${orderUrl}
+
+Please review the order and take appropriate action.
+  `;
+
+  return sendAdminEmail({
+    to: adminEmail,
+    subject: `Delivery Fee Quote Rejected - Order ${order.order_number}`,
+    html,
+    text,
+    tenant,
+  });
+}

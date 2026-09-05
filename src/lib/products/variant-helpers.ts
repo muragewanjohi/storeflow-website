@@ -74,6 +74,14 @@ export function generateVariantSKU(
  * Format variant attributes for display
  * Returns an array of "Attribute: Value" strings
  */
+/**
+ * Fallback label for variants with no attribute values (base/default variant).
+ * Used on the storefront when a variant has no Speed/Size/Color etc. to display.
+ */
+export function getDefaultVariantLabel(variantId: string): string {
+  return `Default ${variantId.slice(0, 8)}`;
+}
+
 export function formatVariantAttributes(attributes: VariantAttribute[]): string[] {
   if (!attributes || attributes.length === 0) {
     return [];

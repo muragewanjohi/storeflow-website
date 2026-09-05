@@ -1,7 +1,7 @@
 /**
  * Payment Reminders API Route
  * 
- * GET: Send payment reminder emails to tenants with upcoming or overdue payments
+ * GET: Send payment reminder emails (and optional Ujumbe SMS when configured) to tenants
  * 
  * This endpoint should be called by a cron job (daily at 9 AM UTC)
  * Security: Protected by CRON_SECRET_TOKEN
@@ -20,6 +20,10 @@ import { prisma } from '@/lib/prisma/client';
 import { sendPaymentDueReminderEmail } from '@/lib/subscriptions/emails';
 import { sendSubscriptionRenewalReminderEmail } from '@/lib/subscriptions/emails';
 import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
+import {
+  sendPaymentDueReminderSms,
+  sendSubscriptionRenewalReminderSms,
+} from '@/lib/sms/tenant-notifications';
 
 /**
  * GET /api/admin/subscriptions/payment-reminders
@@ -32,49 +36,32 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    // Security: Check for Vercel Cron header OR valid token
-    // Vercel Cron automatically sends 'x-vercel-cron' header (case-insensitive check)
-    // Manual calls require CRON_SECRET_TOKEN via Authorization header or query parameter
-    const allHeaders = Object.fromEntries(
-      Array.from(request.headers.entries()).map(([k, v]) => [k.toLowerCase(), v])
-    );
-    const vercelCronHeader = allHeaders['x-vercel-cron'] || allHeaders['x-vercel-signature'];
-    const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
+    // Security: Use shared auth utility
+    // Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+    // Manual triggers use CRON_SECRET_TOKEN via Authorization header or query parameter
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
     
     // Debug logging (only in production to help diagnose issues)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('[Payment Reminders] Auth check:', {
-        hasVercelCronHeader: !!vercelCronHeader,
-        hasAuthHeader: !!authHeader,
-        hasQueryToken: !!queryToken,
-        hasExpectedToken: !!expectedToken,
-        allHeaderKeys: Object.keys(allHeaders).filter(k => k.includes('vercel') || k.includes('cron') || k.includes('authorization')),
-      });
+    if (process.env.NODE_ENV === 'production' && !authResult.authorized) {
+      console.log('[Payment Reminders] Auth check failed:', authResult.debug);
     }
     
-    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
-    // OR if token is provided and valid
-    // OR if no token is configured (development mode)
-    if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '').trim();
-      const providedToken = queryToken || headerToken;
+    if (!authResult.authorized) {
+      const debugInfo = authResult.debug 
+        ? `hasVercelCronHeader: ${authResult.debug.hasVercelCronHeader}, hasAuthHeader: ${authResult.debug.hasAuthHeader}, hasQueryToken: ${authResult.debug.hasQueryToken}, hasExpectedToken: ${authResult.debug.hasExpectedToken}, hasCronSecret: ${authResult.debug.hasCronSecret}`
+        : 'No debug info available';
       
-      if (!providedToken || providedToken !== expectedToken) {
-        const debugInfo = `hasVercelCronHeader: ${!!vercelCronHeader}, hasAuthHeader: ${!!authHeader}, hasQueryToken: ${!!queryToken}, hasExpectedToken: ${!!expectedToken}`;
-        await completeCronJobLog(logId, 'failed', {
-          error: `Unauthorized - Invalid token. Vercel cron jobs should send x-vercel-cron header or Authorization header with CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
-        });
-        return NextResponse.json(
-          { 
-            message: 'Unauthorized',
-            error: 'Invalid token. Ensure CRON_SECRET_TOKEN is set in Vercel environment variables and cron jobs are configured correctly.',
-          },
-          { status: 401 }
-        );
-      }
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}. Vercel cron jobs automatically send CRON_SECRET in Authorization header. Manual triggers require CRON_SECRET_TOKEN. Debug: ${debugInfo}`,
+      });
+      return NextResponse.json(
+        { 
+          message: 'Unauthorized',
+          error: authResult.reason || 'Invalid token. Ensure CRON_SECRET (for Vercel) or CRON_SECRET_TOKEN (for manual) is set in Vercel environment variables.',
+        },
+        { status: 401 }
+      );
     }
 
     const now = new Date();
@@ -85,6 +72,8 @@ export async function GET(request: NextRequest) {
     // Find tenants with subscriptions expiring in 7 days OR already expired (in grace period)
     const tenantsExpiringSoon = await prisma.tenants.findMany({
       where: {
+        // Never send renewal/payment reminders to self-deleted tenants
+        NOT: { status: 'deleted' },
         OR: [
           // Expiring within 7 days (future)
           {
@@ -118,6 +107,7 @@ export async function GET(request: NextRequest) {
         status: true,
         plan_id: true,
         contact_email: true,
+        country: true,
         data: true,
         price_plans: {
           select: {
@@ -161,11 +151,16 @@ export async function GET(request: NextRequest) {
       checked: tenantsExpiringSoon.length,
       renewal_reminders_sent: 0,
       payment_reminders_sent: 0,
+      renewal_sms_sent: 0,
+      payment_sms_sent: 0,
       errors: [] as string[],
     };
 
     for (const tenant of tenantsExpiringSoon) {
       try {
+        if (tenant.status === 'deleted') {
+          continue;
+        }
         // Type assertion for price_plans relation (Prisma includes it in select but TypeScript may not infer it)
         const tenantWithPlan = tenant as typeof tenant & { 
           price_plans: { 
@@ -204,9 +199,10 @@ export async function GET(request: NextRequest) {
         const shouldSendRenewalReminder = !lastRenewalReminderDateStr || lastRenewalReminderDateStr < todayStr;
         const shouldSendPaymentReminder = !lastPaymentReminderDateStr || lastPaymentReminderDateStr < todayStr;
 
-        // Detect if tenant is from Kenya (check country from data JSON or settings)
-        const tenantCountry = tenantSettings.store_country || '';
-        const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA';
+        // Detect if tenant is from Kenya (check country field, subscription data, or settings)
+        const tenantCountry = tenant.country || subscriptionData.countryCode || tenantSettings.store_country || '';
+        const tenantCurrency = subscriptionData.currency || '';
+        const isKenya = tenantCountry?.toUpperCase() === 'KE' || tenantCountry?.toUpperCase() === 'KENYA' || tenantCurrency === 'KES';
 
         // Send renewal reminder (daily for 7 days before expiry, only if payment is unpaid)
         if (daysUntilExpiry <= 7 && daysUntilExpiry > 0 && shouldSendRenewalReminder && isPaymentUnpaid) {
@@ -223,6 +219,18 @@ export async function GET(request: NextRequest) {
             isKenya,
           });
           results.renewal_reminders_sent++;
+
+          try {
+            const smsOk = await sendSubscriptionRenewalReminderSms({
+              tenantId: tenant.id,
+              countryIso2: tenant.country,
+              storeName: tenant.name,
+              daysLeft: daysUntilExpiry,
+            });
+            if (smsOk) results.renewal_sms_sent++;
+          } catch (smsError) {
+            console.error('[Payment Reminders] Renewal SMS failed:', smsError);
+          }
 
           // Update last renewal reminder date
           const updatedData = {
@@ -256,6 +264,17 @@ export async function GET(request: NextRequest) {
             isKenya,
           });
           results.payment_reminders_sent++;
+
+          try {
+            const smsOk = await sendPaymentDueReminderSms({
+              tenantId: tenant.id,
+              countryIso2: tenant.country,
+              storeName: tenant.name,
+            });
+            if (smsOk) results.payment_sms_sent++;
+          } catch (smsError) {
+            console.error('[Payment Reminders] Payment-due SMS failed:', smsError);
+          }
 
           // Update last payment reminder date in tenant data
           const updatedData = {

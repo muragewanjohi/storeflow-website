@@ -18,6 +18,7 @@ import { usePreview } from '@/lib/themes/preview-context';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingDisplay from '@/components/storefront/rating-display';
 import { toast } from 'sonner';
+import { getProductImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
 
 interface Product {
   id: string;
@@ -38,15 +39,20 @@ interface Product {
 interface DefaultProductCardProps {
   product: Product;
   className?: string;
+  imagePriority?: boolean;
 }
 
-export default function DefaultProductCard({ product, className }: DefaultProductCardProps) {
+export default function DefaultProductCard({ product, className, imagePriority = false }: DefaultProductCardProps) {
   const { isPreview, onProductClick } = usePreview();
   const { formatCurrency, currency } = useCurrency();
   const router = useRouter();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
   
   // Format currency with space between symbol and amount
   const formatCurrencyWithSpace = (amount: number): string => {
@@ -65,6 +71,8 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
   // Determine sale badge text and color
   const saleBadgeText = product.saleBadge || (isOnSale ? 'Sale' : null);
   const saleBadgeColor = product.saleBadgeColor || '#EF4444';
+  const productImage = getProductImageOrFallback(product.name, product.image);
+  const useUnoptimizedImage = shouldUseUnoptimizedImage(productImage);
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -78,6 +86,10 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
     e.stopPropagation();
     
     if (isPreview) return;
+    if (isDemoProduct) {
+      toast.error('This is a demo product and cannot be purchased');
+      return;
+    }
     if (isOutOfStock) {
       toast.error('Product is out of stock');
       return;
@@ -132,7 +144,7 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
   };
 
   return (
-    <Card className={`group overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
+    <Card className={`group overflow-hidden hover:shadow-lg transition-shadow w-full md:max-w-[280px] mx-auto ${className ?? ''}`}>
       <div className="relative">
         {isPreview ? (
           <div
@@ -148,32 +160,31 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
             }}
           >
             <div className="relative aspect-square bg-muted overflow-hidden">
-              {product.image ? (
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                  onError={(e) => {
-                    // Fallback on image error
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      const fallback = document.createElement('div');
-                      fallback.className = 'w-full h-full flex items-center justify-center bg-muted';
-                      fallback.innerHTML = '<span class="text-4xl">📦</span>';
-                      parent.appendChild(fallback);
-                    }
-                  }}
-                  unoptimized={product.image.startsWith('blob:') || product.image.startsWith('data:')}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📦</span>
-                </div>
-              )}
+              <Image
+                src={productImage}
+                alt={product.name}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                priority={imagePriority}
+                onError={(e) => {
+                  // Fallback on image error
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'w-full h-full flex items-center justify-center bg-muted';
+                    fallback.innerHTML = '<span class="text-4xl">📦</span>';
+                    parent.appendChild(fallback);
+                  }
+                }}
+                unoptimized={
+                  productImage.startsWith('blob:') ||
+                  productImage.startsWith('data:') ||
+                  useUnoptimizedImage
+                }
+              />
               {saleBadgeText && (
                 <Badge 
                   className="absolute top-2 left-2 z-10" 
@@ -189,38 +200,42 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                   <Badge variant="secondary">Out of Stock</Badge>
                 </div>
+              )}
+              {isDemoProduct && (
+                <Badge className="absolute top-2 right-2 z-10" variant="secondary">
+                  Demo
+                </Badge>
               )}
             </div>
           </div>
         ) : (
           <Link href={`/products/${product.slug || product.id}`}>
             <div className="relative aspect-square bg-muted overflow-hidden">
-              {product.image ? (
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                  onError={(e) => {
-                    // Fallback on image error
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent && !parent.querySelector('.image-fallback')) {
-                      const fallback = document.createElement('div');
-                      fallback.className = 'image-fallback w-full h-full flex items-center justify-center bg-muted';
-                      fallback.innerHTML = '<span class="text-4xl">📦</span>';
-                      parent.appendChild(fallback);
-                    }
-                  }}
-                  unoptimized={product.image.startsWith('blob:') || product.image.startsWith('data:')}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">📦</span>
-                </div>
-              )}
+              <Image
+                src={productImage}
+                alt={product.name}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                priority={imagePriority}
+                onError={(e) => {
+                  // Fallback on image error
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent && !parent.querySelector('.image-fallback')) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'image-fallback w-full h-full flex items-center justify-center bg-muted';
+                    fallback.innerHTML = '<span class="text-4xl">📦</span>';
+                    parent.appendChild(fallback);
+                  }
+                }}
+                unoptimized={
+                  productImage.startsWith('blob:') ||
+                  productImage.startsWith('data:') ||
+                  useUnoptimizedImage
+                }
+              />
               {saleBadgeText && (
                 <Badge 
                   className="absolute top-2 left-2 z-10" 
@@ -236,6 +251,11 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
                 <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
                   <Badge variant="secondary">Out of Stock</Badge>
                 </div>
+              )}
+              {isDemoProduct && (
+                <Badge className="absolute top-2 right-2 z-10" variant="secondary">
+                  Demo
+                </Badge>
               )}
             </div>
           </Link>
@@ -292,8 +312,9 @@ export default function DefaultProductCard({ product, className }: DefaultProduc
           <Button
             size="sm"
             variant="outline"
-            disabled={isOutOfStock || isAddingToCart}
+            disabled={isOutOfStock || isAddingToCart || isDemoProduct}
             onClick={handleAddToCart}
+            title={isDemoProduct ? 'Demo products cannot be purchased' : 'Add to cart'}
           >
             <ShoppingCartIcon className="h-4 w-4" />
           </Button>

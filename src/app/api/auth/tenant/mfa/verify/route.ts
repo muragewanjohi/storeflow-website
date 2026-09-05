@@ -23,12 +23,50 @@ const verifySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  console.log('[MFA Verify] ========================================');
+  console.log('[MFA Verify] POST /api/auth/tenant/mfa/verify');
+  console.log('[MFA Verify] Request received at:', new Date().toISOString());
+  
   try {
     const tenant = await requireTenant();
+    console.log('[MFA Verify] Tenant:', tenant.subdomain);
+    
     const body = await request.json();
     const validatedData = verifySchema.parse(body);
     const { userId, code, tempSession } = validatedData;
+    
+    console.log('[MFA Verify] userId:', userId);
+    console.log('[MFA Verify] code length:', code?.length);
+    console.log('[MFA Verify] tempSession provided:', !!tempSession);
+    if (tempSession) {
+      console.log('[MFA Verify] tempSession.access_token:', tempSession.access_token ? `${tempSession.access_token.substring(0, 20)}...` : 'MISSING');
+      console.log('[MFA Verify] tempSession.refresh_token:', tempSession.refresh_token ? 'present' : 'MISSING');
+      console.log('[MFA Verify] tempSession.expires_at:', tempSession.expires_at);
+      
+      // Check if token is expired
+      if (tempSession.expires_at) {
+        const expiresAt = new Date(tempSession.expires_at * 1000);
+        const now = new Date();
+        const isExpired = now > expiresAt;
+        console.log('[MFA Verify] Token expires at:', expiresAt.toISOString());
+        console.log('[MFA Verify] Current time:', now.toISOString());
+        console.log('[MFA Verify] Token expired:', isExpired);
+        if (isExpired) {
+          console.error('[MFA Verify] ❌ TOKEN IS EXPIRED!');
+          return NextResponse.json(
+            { 
+              error: 'Session expired',
+              message: 'Your login session has expired. Please log in again.'
+            },
+            { status: 401 }
+          );
+        }
+      }
+    } else {
+      console.warn('[MFA Verify] ⚠️ No tempSession provided!');
+    }
 
+    // Create Supabase client for initial operations
     const supabase = await createClient();
 
     // Verify the OTP code
@@ -120,32 +158,70 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Create response with session data
-      // Cookies are already set by supabase.auth.setSession() above
+      // Return a JSON response with cookies properly set.
+      // Using JSON instead of redirect because opaque redirects (with redirect: 'manual')
+      // don't reliably process Set-Cookie headers in all browsers.
+      const { createServerClient } = await import('@supabase/ssr');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      // Create JSON response first
       const response = NextResponse.json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: role as string,
-          tenant_id: tenant.id,
-          name: user.user_metadata?.name,
-        },
-        session: {
-          access_token: tempSession.access_token,
-          refresh_token: tempSession.refresh_token,
-          expires_at: tempSession.expires_at,
-        },
-        message: 'Code verified successfully',
+        message: 'MFA verification successful',
+        redirectTo: '/dashboard',
       });
 
-      // Verify cookies are in the response
+      // Create Supabase client that sets cookies on the JSON response
+      const responseSupabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            console.log('[MFA Verify] Setting cookies on response:', cookiesToSet.map(c => c.name));
+            cookiesToSet.forEach(({ name, value, options }) => {
+              // Set cookies with proper security options for production
+              response.cookies.set(name, value, {
+                ...options,
+                // Ensure secure in production (required for SameSite=None, recommended always)
+                secure: process.env.NODE_ENV === 'production',
+                // SameSite lax allows navigation from external links while preventing CSRF
+                sameSite: 'lax',
+                // Path should be root for auth cookies
+                path: '/',
+              });
+            });
+          },
+        },
+      });
+
+      const { data: finalSessionData, error: finalSessionError } = await responseSupabase.auth.setSession({
+        access_token: tempSession.access_token,
+        refresh_token: tempSession.refresh_token,
+      });
+
+      if (finalSessionError || !finalSessionData.session) {
+        console.error('[MFA Verify] ❌ Failed to set session with response client:', finalSessionError);
+        return NextResponse.json(
+          { error: 'Session error', message: 'Failed to establish session. Please try logging in again.' },
+          { status: 500 }
+        );
+      }
+
+      const { data: { user: finalUser }, error: finalUserError } = await responseSupabase.auth.getUser();
+      if (finalUserError || !finalUser || finalUser.id !== userId) {
+        console.error('[MFA Verify] ❌ Session validation failed with response client:', finalUserError);
+        return NextResponse.json(
+          { error: 'Session error', message: 'Session validation failed. Please try logging in again.' },
+          { status: 500 }
+        );
+      }
+
+      // Log the cookies that will be sent
       const responseCookies = response.cookies.getAll();
-      console.log('[MFA Verify] Session set server-side, cookies in response:', {
-        count: responseCookies.length,
-        cookieNames: responseCookies.map(c => c.name),
-      });
-
+      console.log('[MFA Verify] ✅ Session set; returning JSON with cookies:', responseCookies.map(c => c.name));
+      
       return response;
     }
 

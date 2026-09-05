@@ -1,7 +1,8 @@
 /**
  * Edit Page Page
- * 
- * Form for editing an existing page
+ *
+ * Loads the tenant's page by ID only (draft or published). Never shows a
+ * generic/default page — always the actual page record for this tenant.
  */
 
 import { notFound } from 'next/navigation';
@@ -26,6 +27,7 @@ export default async function EditPagePage({
 
   const { id } = await params;
 
+  // Load this tenant's page by ID only — never fall back to a default page
   const page = await prisma.pages.findFirst({
     where: {
       id,
@@ -37,7 +39,6 @@ export default async function EditPagePage({
     notFound();
   }
 
-  // Ensure status has a default value if null
   const pageWithDefaults = {
     ...page,
     status: (page.status || 'draft') as 'draft' | 'published' | 'archived',

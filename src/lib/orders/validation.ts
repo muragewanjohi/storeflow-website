@@ -32,31 +32,61 @@ export const updateCartItemSchema = z.object({
  */
 export const checkoutSchema = z.object({
   items: z.array(cartItemSchema).min(1, 'At least one item is required'),
+  delivery_method: z.enum(['delivery', 'pickup']).optional(),
   shipping_address: z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(1, 'Phone is required'),
     address_line_1: z.string().min(1, 'Address line 1 is required'),
     address_line_2: z.string().optional().nullable(),
-    city: z.string().min(1, 'City is required'),
-    state: z.string().min(1, 'State is required'),
-    postal_code: z.string().min(1, 'Postal code is required'),
+    city: z.string().optional().nullable(),
+    state: z.string().optional().nullable(),
+    postal_code: z.string().optional().nullable(),
     country: z.string().min(1, 'Country is required'),
-  }),
+  }).optional().nullable(),
+  pickup_address: z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Invalid email address'),
+    phone: z.string().min(1, 'Phone is required'),
+    address: z.string().min(1, 'Address is required'),
+  }).optional().nullable(),
+  delivery_zone_id: z.string().uuid().optional().nullable(),
+  delivery_zone_name: z.string().optional().nullable(),
+  delivery_fee: z.number().min(0).optional().nullable(),
+  delivery_fee_status: z.enum(['pending', 'quoted', 'approved', 'rejected']).optional().nullable(),
   billing_address: z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(1, 'Phone is required'),
     address_line_1: z.string().min(1, 'Address line 1 is required'),
     address_line_2: z.string().optional().nullable(),
-    city: z.string().min(1, 'City is required'),
-    state: z.string().min(1, 'State is required'),
-    postal_code: z.string().min(1, 'Postal code is required'),
+    city: z.string().optional().nullable(),
+    state: z.string().optional().nullable(),
+    postal_code: z.string().optional().nullable(),
     country: z.string().min(1, 'Country is required'),
   }).optional(),
-  payment_method: z.enum(['pesapal', 'paypal', 'cash_on_delivery']),
+  payment_method: z.enum(['cash', 'mpesa', 'tumizi']),
+  payment_verification: z.object({
+    transaction_id: z.string().min(1, 'Transaction ID is required'),
+    reference: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  }).optional().nullable(),
   coupon_code: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — one entry per
+  // bookable cart item, matched by product_id server-side (never trusted
+  // to line up positionally with `items`). A cart item whose product is
+  // is_bookable but has no matching entry here is rejected at checkout.
+  bookings: z
+    .array(
+      z.object({
+        product_id: z.string().uuid(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+        start_time: z.string().regex(/^\d{2}:\d{2}$/, 'start_time must be HH:mm'),
+      }),
+    )
+    .optional()
+    .default([]),
 });
 
 /**

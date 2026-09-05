@@ -38,6 +38,7 @@ export default function CreateTenantForm() {
     contactEmail: '',
     planId: '',
     isDemo: false,
+    businessType: 'Grocery Store / Supermarket',
   });
 
   // Fetch price plans on mount
@@ -73,6 +74,7 @@ export default function CreateTenantForm() {
           ...formData,
           planId: formData.planId || undefined, // Send undefined instead of empty string
           isDemo: formData.isDemo || false,
+          businessType: formData.isDemo ? formData.businessType : undefined, // Only send if demo store
         }),
       });
 
@@ -141,11 +143,11 @@ export default function CreateTenantForm() {
                 maxLength={63}
               />
               <span className="text-sm text-muted-foreground whitespace-nowrap">
-                .dukanest.com
+                .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Only lowercase letters, numbers, and hyphens. Will be accessible at {formData.subdomain || 'subdomain'}.dukanest.com
+              Only lowercase letters, numbers, and hyphens. Will be accessible at {formData.subdomain || 'subdomain'}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com'}
             </p>
           </div>
 
@@ -280,7 +282,7 @@ export default function CreateTenantForm() {
           <div className="border-t pt-4 mt-4">
             <h3 className="text-lg font-semibold mb-4">Store Type</h3>
             
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-start space-x-3">
                 <input
                   type="checkbox"
@@ -298,16 +300,51 @@ export default function CreateTenantForm() {
                     They are read-only for visitors and can be reset to their original state. Perfect for marketing and demonstrations.
                   </p>
                   {formData.isDemo && (
-                    <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-xs">
-                      <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">Demo Store Features:</p>
-                      <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
-                        <li>Pre-populated with sample products, categories, and content</li>
-                        <li>Read-only for visitors (no real purchases)</li>
-                        <li>Can be reset to original state anytime</li>
-                        <li>Visible on demo showcase page</li>
-                        <li>No expiration date (always active)</li>
-                      </ul>
-                    </div>
+                    <>
+                      <div className="mt-3 space-y-2">
+                        <Label htmlFor="businessType" className="text-sm font-medium">
+                          Business Type *
+                        </Label>
+                        <Select
+                          value={formData.businessType}
+                          onValueChange={(value) => setFormData({ ...formData, businessType: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select business type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Grocery Store / Supermarket">Grocery Store / Supermarket</SelectItem>
+                            <SelectItem value="Pharmacy / Health & Wellness">Pharmacy / Health & Wellness</SelectItem>
+                            <SelectItem value="Fashion / Clothing">Fashion / Clothing</SelectItem>
+                            <SelectItem value="Electronics & Mobile Phones">Electronics & Mobile Phones</SelectItem>
+                            <SelectItem value="Beauty & Personal Care">Beauty & Personal Care</SelectItem>
+                            <SelectItem value="Home & Kitchen">Home & Kitchen</SelectItem>
+                            <SelectItem value="Baby & Kids Products">Baby & Kids Products</SelectItem>
+                            <SelectItem value="Food & Beverages / Restaurant">Food & Beverages / Restaurant</SelectItem>
+                            <SelectItem value="Convenience Store / Duka">Convenience Store / Duka</SelectItem>
+                            <SelectItem value="Furniture & Home Decor">Furniture & Home Decor</SelectItem>
+                            <SelectItem value="Pets">Pets</SelectItem>
+                            <SelectItem value="Hardware">Hardware</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Select the business type to generate relevant demo content (products, categories, etc.)
+                        </p>
+                      </div>
+                      <div className="mt-2 rounded-lg bg-blue-50 dark:bg-blue-950 p-3 text-xs">
+                        <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">Demo Store Features:</p>
+                        <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
+                          <li>Pre-populated with 50 products and 10 categories</li>
+                          <li>5 customers with realistic data</li>
+                          <li>10 sample orders</li>
+                          <li>2 pages, 2 sales promotions, 2 blog posts</li>
+                          <li>Complete homepage with 8 sections</li>
+                          <li>Read-only for visitors (no real purchases)</li>
+                          <li>Can be reset to original state anytime</li>
+                          <li>No expiration date (always active)</li>
+                        </ul>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

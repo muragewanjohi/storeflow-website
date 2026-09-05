@@ -13,6 +13,8 @@ import {
   XCircleIcon,
   ArrowPathIcon,
   ClockIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 interface CronJobLog {
@@ -42,6 +44,16 @@ interface CronJobStats {
     duration_ms: number | null;
     error: string | null;
   }>;
+}
+
+interface Pagination {
+  total: number;
+  limit: number;
+  offset: number;
+  page: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
 
 const CRON_JOBS = [
@@ -81,25 +93,41 @@ const CRON_JOBS = [
     schedule: 'Weekly on Sunday at 3 AM UTC',
     description: 'Hard deletes tenants past retention period (90 days)',
   },
+  {
+    name: 'Pre-Deletion Warnings',
+    path: '/api/admin/cleanup/pre-deletion-warnings',
+    schedule: 'Daily at 10 AM UTC',
+    description: 'Sends warning emails to tenants before hard deletion (30, 7, and 1 day before)',
+  },
+  {
+    name: 'Tumizi Provision Pending Merchants',
+    path: '/api/admin/integrations/tumizi/provision-pending',
+    schedule: 'Every 15 minutes',
+    description:
+      'Processes newly registered stores queued for Tumizi merchant provisioning and retries failed setups',
+  },
 ];
 
 export default function CronJobsClient() {
   const [logs, setLogs] = useState<CronJobLog[]>([]);
   const [stats, setStats] = useState<CronJobStats | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/cron-jobs');
+      const response = await fetch(`/api/admin/cron-jobs?page=${page}&limit=10`);
       const data = await response.json();
       
       if (response.ok) {
         setLogs(data.logs || []);
         setStats(data.stats || null);
+        setPagination(data.pagination || null);
       } else {
         setError(data.message || 'Failed to fetch cron job logs');
       }
@@ -111,11 +139,11 @@ export default function CronJobsClient() {
   };
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(currentPage);
     // Refresh every 30 seconds
-    const interval = setInterval(fetchLogs, 30000);
+    const interval = setInterval(() => fetchLogs(currentPage), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentPage]);
 
   const triggerJob = async (jobPath: string, jobName: string) => {
     try {
@@ -136,7 +164,7 @@ export default function CronJobsClient() {
       if (response.ok) {
         setSuccess(`Job "${jobName}" executed successfully`);
         // Refresh logs after a short delay
-        setTimeout(fetchLogs, 1000);
+        setTimeout(() => fetchLogs(currentPage), 1000);
       } else {
         setError(data.message || `Failed to trigger job "${jobName}"`);
       }
@@ -317,7 +345,9 @@ export default function CronJobsClient() {
         <CardHeader>
           <CardTitle>Recent Execution Logs</CardTitle>
           <CardDescription>
-            Last 50 cron job executions
+            {pagination 
+              ? `Showing ${((pagination.page - 1) * pagination.limit) + 1} to ${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} executions`
+              : 'Cron job execution history'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -326,35 +356,76 @@ export default function CronJobsClient() {
           ) : logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No logs available</p>
           ) : (
-            <div className="space-y-2">
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-center justify-between p-3 border rounded-lg text-sm"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium">{log.job_name}</span>
-                      {getStatusBadge(log.status)}
-                    </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <p>
-                        Started: {new Date(log.started_at).toLocaleString()}
-                      </p>
-                      {log.completed_at && (
+            <>
+              <div className="space-y-2">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{log.job_name}</span>
+                        {getStatusBadge(log.status)}
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
                         <p>
-                          Completed: {new Date(log.completed_at).toLocaleString()} (
-                          {formatDuration(log.duration_ms)})
+                          Started: {new Date(log.started_at).toLocaleString()}
                         </p>
-                      )}
-                      {log.error && (
-                        <p className="text-red-600">Error: {log.error}</p>
-                      )}
+                        {log.completed_at && (
+                          <p>
+                            Completed: {new Date(log.completed_at).toLocaleString()} (
+                            {formatDuration(log.duration_ms)})
+                          </p>
+                        )}
+                        {log.error && (
+                          <p className="text-red-600">Error: {log.error}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 mt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newPage = currentPage - 1;
+                        setCurrentPage(newPage);
+                        fetchLogs(newPage);
+                      }}
+                      disabled={!pagination.hasPrevPage || loading}
+                      className="flex items-center gap-1"
+                    >
+                      <ChevronLeftIcon className="w-4 h-4" />
+                      <span className="hidden sm:inline">Previous</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newPage = currentPage + 1;
+                        setCurrentPage(newPage);
+                        fetchLogs(newPage);
+                      }}
+                      disabled={!pagination.hasNextPage || loading}
+                      className="flex items-center gap-1"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

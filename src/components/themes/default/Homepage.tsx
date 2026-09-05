@@ -19,6 +19,7 @@ import DefaultHero from './Hero';
 import DefaultTestimonials from './Testimonials';
 import DefaultBlogs from './Blogs';
 import { usePreview } from '@/lib/themes/preview-context';
+import { getCollectionPath } from '@/lib/storefront/collection-urls';
 
 interface DefaultHomepageProps {
   products?: DemoProduct[];
@@ -110,7 +111,7 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          onNavigate(`/products?category=${category.slug}`);
+                          onNavigate(getCollectionPath(category.slug));
                         }}
                         className="w-full text-left"
                       >
@@ -141,7 +142,7 @@ function DefaultHomepage({ products = [], categories = [] }: DefaultHomepageProp
                         </Card>
                       </button>
                     ) : (
-                      <a href={`/products?category=${category.slug}`} className="block">
+                      <a href={getCollectionPath(category.slug)} className="block">
                         <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer h-full border-2 hover:border-primary/50">
                           <div className="relative aspect-square overflow-hidden rounded-t-lg">
                             <Image

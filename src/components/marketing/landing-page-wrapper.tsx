@@ -1,14 +1,21 @@
 /**
  * Marketing Landing Page Wrapper
- * 
- * Client component wrapper for the marketing landing page
+ *
+ * Server component: loads Inter font and renders the client landing page.
  */
 
-'use client';
-
+import { Inter } from 'next/font/google';
 import MarketingLandingPage from './landing-page';
 
-export default function MarketingLandingPageWrapper() {
-  return <MarketingLandingPage />;
-}
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+});
 
+export default function MarketingLandingPageWrapper() {
+  return (
+    <div className={inter.className}>
+      <MarketingLandingPage />
+    </div>
+  );
+}

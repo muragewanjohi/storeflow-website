@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
 
     // Use raw SQL for better performance - single query for counts
     const [stats] = await prisma.$queryRaw<Array<{
@@ -47,6 +48,20 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(*) FROM orders WHERE tenant_id = ${tenant.id}::uuid AND status IN ('pending', 'processing')) as pending_orders
     `;
 
+    // Visitors today (from analytics_sessions - may not exist in all environments)
+    let visitorsToday = 0;
+    try {
+      const [visitorsResult] = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(DISTINCT session_id)::bigint as count
+        FROM analytics_sessions
+        WHERE tenant_id = ${tenant.id}::uuid
+          AND started_at >= ${todayStart}
+      `;
+      visitorsToday = Number(visitorsResult?.count ?? 0);
+    } catch {
+      // analytics_sessions table may not exist
+    }
+
     const data = {
       overview: {
         totalOrders: Number(stats.total_orders),
@@ -60,6 +75,7 @@ export async function GET(request: NextRequest) {
         newCustomers: Number(stats.new_customers_this_month),
       },
       pendingOrders: Number(stats.pending_orders),
+      visitorsToday,
     };
 
     // Cache for 30 seconds

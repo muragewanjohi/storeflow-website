@@ -40,6 +40,10 @@ export default function HexFashionProductCard({ product, className }: HexFashion
   const [addingToCart, setAddingToCart] = useState(false);
   const isOnSale = product.compareAtPrice && product.compareAtPrice > product.price;
   const isOutOfStock = (product.stock_quantity ?? 0) <= 0;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreview && onProductClick) {
@@ -53,6 +57,10 @@ export default function HexFashionProductCard({ product, className }: HexFashion
     e.stopPropagation();
     
     if (isPreview) return;
+    if (isDemoProduct) {
+      toast.error('This is a demo product and cannot be purchased');
+      return;
+    }
     if (isOutOfStock) {
       toast.error('Product is out of stock');
       return;
@@ -162,6 +170,11 @@ export default function HexFashionProductCard({ product, className }: HexFashion
                   <span className="text-sm font-medium text-gray-600">Out of Stock</span>
                 </div>
               )}
+              {isDemoProduct && (
+                <div className="absolute top-3 right-3 z-10 rounded-full bg-white/90 px-2 py-1 text-xs font-medium text-gray-700">
+                  Demo
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -176,6 +189,11 @@ export default function HexFashionProductCard({ product, className }: HexFashion
               {isOutOfStock && (
                 <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-10">
                   <span className="text-sm font-medium text-gray-600">Out of Stock</span>
+                </div>
+              )}
+              {isDemoProduct && (
+                <div className="absolute top-3 right-3 z-10 rounded-full bg-white/90 px-2 py-1 text-xs font-medium text-gray-700">
+                  Demo
                 </div>
               )}
             </div>
@@ -255,8 +273,8 @@ export default function HexFashionProductCard({ product, className }: HexFashion
               variant="ghost"
               className="h-8 w-8 rounded-full hover:bg-gray-100"
               onClick={handleAddToCart}
-              disabled={isOutOfStock || addingToCart}
-              title={isOutOfStock ? 'Out of stock' : 'Add to cart'}
+              disabled={isOutOfStock || addingToCart || isDemoProduct}
+              title={isDemoProduct ? 'Demo products cannot be purchased' : isOutOfStock ? 'Out of stock' : 'Add to cart'}
             >
               <ShoppingCartIcon className="h-4 w-4" />
             </Button>

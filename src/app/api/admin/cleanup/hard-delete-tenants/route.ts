@@ -30,28 +30,19 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    // Security: Check for Vercel Cron header OR valid token
-    const vercelCronHeader = request.headers.get('x-vercel-cron');
-    const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
+    // Security: Use shared auth utility
+    // Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
     
-    // Allow if it's a Vercel Cron call (has x-vercel-cron header)
-    // OR if token is provided and valid
-    if (expectedToken && !vercelCronHeader) {
-      const headerToken = authHeader?.replace('Bearer ', '');
-      const providedToken = queryToken || headerToken;
-      
-      if (providedToken !== expectedToken) {
-        await completeCronJobLog(logId, 'failed', {
-          error: 'Unauthorized - Invalid token',
-        });
-        return NextResponse.json(
-          { message: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
+    if (!authResult.authorized) {
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}`,
+      });
+      return NextResponse.json(
+        { message: 'Unauthorized', error: authResult.reason || 'Invalid token' },
+        { status: 401 }
+      );
     }
 
     // Get retention period from environment variable (default: 90 days)

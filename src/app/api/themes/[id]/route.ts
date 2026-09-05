@@ -8,8 +8,24 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import { requireAuth, requireRole } from '@/lib/auth/server';
 
 export const dynamic = 'force-dynamic';
+
+function handleAuthError(error: unknown): NextResponse | null {
+  if (error instanceof Error) {
+    if (error.message === 'Authentication required') {
+      return NextResponse.json({ message: 'Authentication required' }, { status: 401 });
+    }
+    if (error.message.includes('Access denied')) {
+      return NextResponse.json(
+        { message: 'Access denied. Landlord role required.' },
+        { status: 403 }
+      );
+    }
+  }
+  return null;
+}
 
 export async function GET(
   request: NextRequest,
@@ -40,7 +56,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // TODO: Add admin authentication check
+    const user = await requireAuth();
+    requireRole(user, 'landlord');
+
     const { id } = await params;
     const body = await request.json();
 
@@ -54,6 +72,9 @@ export async function PUT(
 
     return NextResponse.json({ theme });
   } catch (error: any) {
+    const authResponse = handleAuthError(error);
+    if (authResponse) return authResponse;
+
     console.error('Error updating theme:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update theme' },
@@ -67,7 +88,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // TODO: Add admin authentication check
+    const user = await requireAuth();
+    requireRole(user, 'landlord');
+
     const { id } = await params;
 
     await prisma.themes.delete({
@@ -76,6 +99,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    const authResponse = handleAuthError(error);
+    if (authResponse) return authResponse;
+
     console.error('Error deleting theme:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to delete theme' },

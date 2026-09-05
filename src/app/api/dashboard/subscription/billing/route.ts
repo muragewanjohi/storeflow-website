@@ -50,23 +50,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // For now, return current subscription info
-    // In production, you'd query a billing_logs or payment_logs table
-    const billingHistory = [
-      {
-        id: 'current',
-        type: 'subscription',
-        description: tenantWithPlan.price_plans
-          ? `Subscription: ${tenantWithPlan.price_plans.name}`
-          : 'No active subscription',
-        amount: tenantWithPlan.price_plans?.price || 0,
-        status: tenantWithPlan.status,
-        date: tenantWithPlan.created_at,
-        expireDate: tenantWithPlan.expire_date,
+    // Fetch real billing history from payment_logs (completed subscription payments)
+    const paymentLogs = await prisma.payment_logs.findMany({
+      where: {
+        tenant_id: tenant.id,
+        status: 'completed',
       },
-    ];
+      orderBy: { created_at: 'desc' },
+      take: 100,
+    });
 
-    // Calculate renewal date (same as expire_date for now, but could be different in future)
+    const planIds = [
+      ...new Set(
+        paymentLogs
+          .map((log) => (log.metadata as Record<string, unknown>)?.plan_id as string)
+          .filter(Boolean)
+      ),
+    ];
+    const plans =
+      planIds.length > 0
+        ? await prisma.price_plans.findMany({
+            where: { id: { in: planIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const planByName = Object.fromEntries(plans.map((p) => [p.id, p.name]));
+
+    const billingHistory = paymentLogs.map((log) => {
+      const meta = (log.metadata ?? {}) as Record<string, unknown>;
+      const planId = meta.plan_id as string | undefined;
+      const planName = planId ? planByName[planId] ?? 'Subscription' : 'Subscription';
+      return {
+        id: log.id,
+        type: 'subscription',
+        description: `Subscription: ${planName}`,
+        amount: Number(log.amount),
+        currency: log.currency ?? 'USD',
+        status: 'active',
+        date: log.created_at,
+      };
+    });
+
     const renewalDate = tenantWithPlan.expire_date;
 
     return NextResponse.json(

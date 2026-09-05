@@ -38,6 +38,10 @@ export default function FurnitureProductCard({ product, onProductClick }: Readon
   const [isLiked, setIsLiked] = useState(false);
 
   const displayPrice = product.sale_price ?? product.price;
+  const isDemoProduct =
+    product.metadata?.is_demo === true ||
+    product.metadata?.is_demo === 'true' ||
+    product.metadata?.source === 'starter_pack_ai';
   const hasDiscount = product.sale_price !== null && product.sale_price !== undefined && product.sale_price < product.price;
   const discountPercent = hasDiscount && product.sale_price !== null && product.sale_price !== undefined
     ? Math.round(((product.price - product.sale_price) / product.price) * 100)
@@ -87,12 +91,18 @@ export default function FurnitureProductCard({ product, onProductClick }: Readon
             </div>
           )}
 
+          {isDemoProduct && (
+            <div className="absolute top-6 left-6 rounded-full bg-white/90 px-3 py-1">
+              <span className="text-xs font-semibold text-[#3a3a3a]">Demo</span>
+            </div>
+          )}
+
           {/* Hover Overlay */}
           {isHovered && (
             <div className="absolute inset-0 bg-[#3a3a3a] bg-opacity-72 flex items-center justify-center">
               <div className="flex flex-col gap-6 items-center">
-                <button className="bg-white text-[#B88E2F] px-[59px] py-3 text-[16px] font-semibold hover:bg-[#B88E2F] hover:text-white transition-colors">
-                  Add to cart
+                <button className="bg-white text-[var(--color-primary)] px-[59px] py-3 text-[16px] font-semibold hover:bg-[var(--color-primary)] hover:text-white transition-colors">
+                  {isDemoProduct ? 'Preview only' : 'Add to cart'}
                 </button>
                 <div className="flex gap-5 items-center">
                   <button className="flex items-center gap-2 text-white text-[16px] font-semibold hover:opacity-70">

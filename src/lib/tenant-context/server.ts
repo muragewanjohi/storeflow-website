@@ -52,55 +52,57 @@ export async function getTenant(): Promise<Tenant | null> {
       } as Tenant;
     }
 
-    // Check for tenant-subdomain cookie BEFORE marketing site check
-    // This is useful for server-side fetch requests where hostname might be different (e.g., www.dukanest.com)
+    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
+    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
+                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
+    
+    // Check if this is a marketing site hostname - don't resolve tenant for these
+    // Use exact root domain matches only - subdomains like shoes.dukanest.com are tenant sites
+    const isMarketingSite = 
+      hostnameWithoutPort === 'www' ||
+      hostnameWithoutPort === 'marketing' ||
+      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
+      hostnameWithoutPort === '127.0.0.1' ||
+      hostnameWithoutPort === 'dukanest.com' ||
+      hostnameWithoutPort === 'www.dukanest.com' ||
+      hostnameWithoutPort === 'storeflow.com' ||
+      hostnameWithoutPort === 'www.storeflow.com' ||
+      hostnameWithoutPort.includes('vercel.app') ||
+      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
+
+    // Primary source of truth: hostname for tenant domains.
+    // This avoids stale tenant cookie causing cross-tenant mismatch redirects.
+    if (!isMarketingSite) {
+      return await getTenantFromRequest(hostname);
+    }
+
+    // Marketing/root domains may carry tenant context via cookie (e.g. OAuth return).
     const cookieStore = await cookies();
     const tenantSubdomainCookie = cookieStore.get('tenant-subdomain')?.value;
-    
     if (tenantSubdomainCookie) {
-      // Try to resolve tenant directly by subdomain from cookie
       try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        
+
         if (supabaseUrl && supabaseKey) {
           const supabase = createClient(supabaseUrl, supabaseKey);
           const { data: tenant, error } = await supabase
             .from('tenants')
             .select('*')
             .eq('subdomain', tenantSubdomainCookie.toLowerCase())
-            .eq('status', 'active')
+            .in('status', ['active', 'expired'])
             .maybeSingle();
-          
+
           if (tenant && !error) {
             return tenant as Tenant;
           }
         }
       } catch (error) {
-        // If cookie-based lookup fails, fall through to hostname-based lookup
         console.error('Error resolving tenant from cookie:', error);
       }
     }
-    
-    // Check if DEFAULT_TENANT_SUBDOMAIN is set (not undefined, null, or empty)
-    const hasDefaultTenant = process.env.DEFAULT_TENANT_SUBDOMAIN && 
-                             process.env.DEFAULT_TENANT_SUBDOMAIN.trim() !== '';
-    
-    // Check if this is a marketing site hostname - don't resolve tenant for these
-    const isMarketingSite = 
-      hostnameWithoutPort === 'www' ||
-      hostnameWithoutPort === 'marketing' ||
-      (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
-      hostnameWithoutPort === '127.0.0.1' ||
-      hostnameWithoutPort.includes('storeflow') ||
-      hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
-    
-    if (isMarketingSite) {
-      return null; // Marketing site - no tenant
-    }
 
-    // Fallback: resolve tenant from hostname (only if not marketing site)
-    return await getTenantFromRequest(hostname);
+    return null; // Marketing site without tenant context
   } catch (error) {
     console.error('Error getting tenant:', error);
     return null;

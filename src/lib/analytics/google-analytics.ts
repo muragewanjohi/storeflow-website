@@ -91,6 +91,29 @@ export function trackEvent(
 }
 
 /**
+ * Track marketing funnel events in both GA and internal analytics DB.
+ * This is used for landlord-facing acquisition reporting.
+ */
+export function trackMarketingFunnelEvent(
+  eventName: string,
+  eventParams?: Record<string, unknown>
+): void {
+  // Always attempt GA tracking first.
+  trackEvent(eventName, eventParams);
+
+  if (typeof window === 'undefined') return;
+
+  // Persist event in analytics_tracking so landlord dashboard can query it.
+  void storeAnalytics({
+    pagePath: `${window.location.pathname}${window.location.search}`,
+    pageTitle: document.title,
+    eventName,
+    eventCategory: 'marketing_funnel',
+    metadata: eventParams,
+  });
+}
+
+/**
  * Store analytics data in database
  */
 async function storeAnalytics(data: {

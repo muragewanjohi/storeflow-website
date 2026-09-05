@@ -72,38 +72,77 @@ export default function CountdownTimer({
 
   if (timeLeft.expired) {
     return (
-      <Badge variant="outline" className={className}>
+      <Badge 
+        variant="secondary" 
+        className={`px-4 py-2 text-sm font-semibold ${className}`}
+      >
         Sale Ended
       </Badge>
     );
   }
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      {showLabels && <span className="text-sm font-medium">Ends in:</span>}
-      <div className="flex items-center gap-1">
+    <div className={`flex items-center gap-3 sm:gap-4 ${className}`}>
+      {showLabels && (
+        <span className="text-sm font-semibold text-primary uppercase tracking-wide">
+          Ends in:
+        </span>
+      )}
+      <div className="flex items-center gap-2 sm:gap-3">
         {timeLeft.days > 0 && (
           <>
-            <div className="flex flex-col items-center bg-muted rounded px-2 py-1 min-w-[3rem]">
-              <span className="text-2xl font-bold">{String(timeLeft.days).padStart(2, '0')}</span>
-              {showLabels && <span className="text-xs text-muted-foreground">Days</span>}
+            <div className="flex flex-col items-center">
+              <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg px-3 sm:px-4 py-2 sm:py-3 min-w-[3.5rem] sm:min-w-[4rem] shadow-lg">
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums block text-center">
+                  {String(timeLeft.days).padStart(2, '0')}
+                </span>
+              </div>
+              {showLabels && (
+                <span className="text-xs font-medium text-muted-foreground mt-1.5 uppercase tracking-wider">
+                  Days
+                </span>
+              )}
             </div>
-            <span className="text-xl font-bold">:</span>
+            <span className="text-xl sm:text-2xl font-bold text-muted-foreground self-start mt-2 sm:mt-3">:</span>
           </>
         )}
-        <div className="flex flex-col items-center bg-muted rounded px-2 py-1 min-w-[3rem]">
-          <span className="text-2xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
-          {showLabels && <span className="text-xs text-muted-foreground">Hours</span>}
+        <div className="flex flex-col items-center">
+          <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg px-3 sm:px-4 py-2 sm:py-3 min-w-[3.5rem] sm:min-w-[4rem] shadow-lg">
+            <span className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums block text-center">
+              {String(timeLeft.hours).padStart(2, '0')}
+            </span>
+          </div>
+          {showLabels && (
+            <span className="text-xs font-medium text-muted-foreground mt-1.5 uppercase tracking-wider">
+              Hours
+            </span>
+          )}
         </div>
-        <span className="text-xl font-bold">:</span>
-        <div className="flex flex-col items-center bg-muted rounded px-2 py-1 min-w-[3rem]">
-          <span className="text-2xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
-          {showLabels && <span className="text-xs text-muted-foreground">Mins</span>}
+        <span className="text-xl sm:text-2xl font-bold text-muted-foreground self-start mt-2 sm:mt-3">:</span>
+        <div className="flex flex-col items-center">
+          <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg px-3 sm:px-4 py-2 sm:py-3 min-w-[3.5rem] sm:min-w-[4rem] shadow-lg">
+            <span className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums block text-center">
+              {String(timeLeft.minutes).padStart(2, '0')}
+            </span>
+          </div>
+          {showLabels && (
+            <span className="text-xs font-medium text-muted-foreground mt-1.5 uppercase tracking-wider">
+              Mins
+            </span>
+          )}
         </div>
-        <span className="text-xl font-bold">:</span>
-        <div className="flex flex-col items-center bg-muted rounded px-2 py-1 min-w-[3rem]">
-          <span className="text-2xl font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
-          {showLabels && <span className="text-xs text-muted-foreground">Secs</span>}
+        <span className="text-xl sm:text-2xl font-bold text-muted-foreground self-start mt-2 sm:mt-3">:</span>
+        <div className="flex flex-col items-center">
+          <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-lg px-3 sm:px-4 py-2 sm:py-3 min-w-[3.5rem] sm:min-w-[4rem] shadow-lg">
+            <span className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums block text-center">
+              {String(timeLeft.seconds).padStart(2, '0')}
+            </span>
+          </div>
+          {showLabels && (
+            <span className="text-xs font-medium text-muted-foreground mt-1.5 uppercase tracking-wider">
+              Secs
+            </span>
+          )}
         </div>
       </div>
     </div>

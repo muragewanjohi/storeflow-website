@@ -7,12 +7,15 @@
 ## When to Use This
 
 Use this bypass **only** when:
-- ✅ Waiting for SendGrid account approval (up to 72 hours)
+- ✅ Waiting for SendGrid account approval (up to 72 hours) - **Recommended!**
 - ✅ Email service is temporarily unavailable
 - ✅ Testing in development environment
 - ✅ Email service configuration is in progress
+- ✅ SendGrid account was rejected and switching to alternative service
 
 **⚠️ NEVER use this in production!**
+
+**💡 Don't Wait for SendGrid!** Use this bypass to continue development while waiting for approval. See [SendGrid Alternatives Guide](./SENDGRID_ALTERNATIVES.md) for what to do if SendGrid rejects your request.
 
 ---
 
@@ -116,26 +119,32 @@ npm run dev
 
 ### Bypass Not Working?
 
-1. **Check environment variable:**
-   ```bash
-   # Verify it's set correctly
-   echo $DISABLE_MFA_TEMPORARILY  # Linux/Mac
-   $env:DISABLE_MFA_TEMPORARILY   # Windows PowerShell
-   ```
+1. **Redeploy after setting environment variables:**
+   - ⚠️ **CRITICAL:** Vercel requires a new deployment for environment variables to take effect
+   - Go to Vercel Dashboard → Deployments
+   - Click "Redeploy" on your latest deployment
+   - OR push a new commit to trigger a deployment
 
-2. **Check NODE_ENV:**
-   ```bash
-   # Must be 'development' or 'test'
-   echo $NODE_ENV
-   ```
+2. **Verify environment variable scope:**
+   - In Vercel, make sure variables are set for **"Preview"** environment (not just "Production")
+   - Check: Vercel Dashboard → Your Project → Settings → Environment Variables
+   - For each variable, verify it shows "Preview" in the scope column
 
-3. **Check server logs:**
-   - Look for: `[Login API] ⚠️ 2FA BYPASS ENABLED`
-   - If you don't see this, the bypass isn't active
+3. **Check variable values:**
+   - `DISABLE_MFA_TEMPORARILY` must be exactly `true` (lowercase, no quotes)
+   - `NODE_ENV` must be exactly `development` (lowercase)
+   - No extra spaces or quotes
 
-4. **Restart server:**
-   - Environment variables are loaded at startup
-   - Changes require server restart
+4. **Check deployment logs:**
+   - Go to Vercel Dashboard → Your Deployment → Logs
+   - Look for: `[Login API] Bypass check:` - this shows the actual values being read
+   - Look for: `[Login API] ⚠️ 2FA BYPASS ENABLED` - confirms bypass is active
+   - If you see the bypass check but it's false, the environment variables aren't being read correctly
+
+5. **Verify you're on the correct branch:**
+   - Make sure you're accessing the `dev` branch deployment
+   - Preview deployments use Preview environment variables
+   - Production deployments use Production environment variables
 
 ### Still Seeing 2FA Prompt?
 
@@ -198,6 +207,155 @@ DISABLE_MFA_TEMPORARILY=false
 - ✅ Temporary solution
 - ✅ Remove once email service is ready
 - ❌ Never use in production
+
+---
+
+## Setting Up Development Environment on Vercel
+
+If you want to deploy a development environment on Vercel (useful for testing without local setup), follow these steps:
+
+### Recommended: Use Preview Deployments
+
+This is the simplest approach - use a development branch with Vercel's automatic preview deployments. No need to create a separate project!
+
+#### Step 1: Create Development Branch
+
+```bash
+# Create and switch to development branch
+git checkout -b dev
+
+# Push to GitHub
+git push -u origin dev
+```
+
+**What happens:** Vercel automatically creates a preview deployment for your `dev` branch.
+
+#### Step 2: Configure Environment Variables for Preview
+
+⚠️ **CRITICAL:** You must set these variables for the **"Preview"** environment specifically!
+
+1. **Go to your existing Vercel project → Settings → Environment Variables**
+2. **Click "Add Environment Variable"**
+3. **For EACH variable, make sure to:**
+   - Select **"Preview"** from the environment dropdown (NOT "Production" or "Development")
+   - Enter the exact variable name
+   - Enter the exact value (case-sensitive)
+   - Click "Save"
+
+4. **Add/Update these variables with "Preview" environment selected:**
+
+```env
+# Set NODE_ENV to development (required for bypass to work)
+NODE_ENV=development
+
+# Enable 2FA bypass
+DISABLE_MFA_TEMPORARILY=true
+
+# Use development Supabase project (or same as production)
+NEXT_PUBLIC_SUPABASE_URL=https://your-dev-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-dev-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-dev-service-role-key
+DATABASE_URL=postgresql://...your-dev-database...
+
+# Development app URL (will be your preview URL)
+NEXT_PUBLIC_APP_URL=https://dukanest-git-dev-yourteam.vercel.app
+
+# SendGrid (optional - can be same as production or different)
+SENDGRID_API_KEY=your-sendgrid-key
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+SENDGRID_FROM_NAME=DukaNest Dev
+```
+
+3. **Important:** Make sure to select **"Preview"** environment when adding variables
+4. **Click "Save"**
+
+#### Step 3: Access Preview Deployment
+
+- Vercel automatically creates preview deployments for all branches
+- Access at: `https://dukanest-git-dev-yourteam.vercel.app`
+- Or check the Vercel dashboard for the preview URL
+- The URL format is: `https://[project-name]-git-[branch-name]-[team].vercel.app`
+
+#### Workflow Summary
+
+| Step | Command / Action | What Happens on Vercel |
+|------|-----------------|------------------------|
+| **Create branch** | `git checkout -b dev` | - |
+| **Push branch** | `git push -u origin dev` | ✅ Auto → Preview Deployment created |
+| **Make changes** | `Edit → commit → git push` | ✅ New preview build & URL (updates automatically) |
+| **Test/QA** | `Open preview URL` | ✅ Safe testing, no effect on production |
+| **Ready for prod?** | `Create PR: dev → main` | ✅ Vercel comments preview link in PR |
+| **Merge PR** | `Merge on GitHub` | ✅ Triggers Production Deployment on main |
+
+### Alternative: Separate Vercel Project
+
+If you prefer a completely separate project:
+
+1. **Create a new Vercel project**
+2. **Import the same repository** but select the `dev` branch
+3. **Configure environment variables** for "Development" environment
+4. **Access at:** `https://dukanest-dev.vercel.app`
+
+This gives you a separate project but requires more management. The preview deployment approach is simpler and recommended.
+
+### Important Notes for Vercel Development Environment
+
+1. **NODE_ENV Requirement:**
+   - The bypass **only works** when `NODE_ENV=development` or `NODE_ENV=test`
+   - Vercel sets `NODE_ENV=production` by default
+   - **You must explicitly set `NODE_ENV=development`** in Vercel environment variables
+
+2. **Environment Variable Scope:**
+   - **Production:** Used for main branch deployments
+   - **Preview:** Used for all branch deployments (except main)
+   - **Development:** Only used if you create a separate project
+
+3. **Database Considerations:**
+   - Use a **separate Supabase project** for development (recommended)
+   - Or use the same database but be careful with test data
+   - Development database can be reset without affecting production
+
+4. **SendGrid Setup:**
+   - You can use the same SendGrid account for both environments
+   - Or wait for approval and use bypass in development only
+
+### Quick Setup Checklist
+
+- [ ] Create `development` branch (or use preview)
+- [ ] Create separate Vercel project (or configure preview env vars)
+- [ ] Set `NODE_ENV=development` in Vercel environment variables
+- [ ] Set `DISABLE_MFA_TEMPORARILY=true` in Vercel environment variables
+- [ ] Configure Supabase credentials (dev project recommended)
+- [ ] Deploy and test login
+- [ ] Verify bypass is working (check console logs)
+
+### Testing the Bypass on Vercel
+
+1. **Deploy your development branch/preview**
+2. **Check deployment logs** for:
+   ```
+   [Login API] ⚠️ 2FA BYPASS ENABLED
+   ```
+3. **Try logging in** - should work without 2FA code
+4. **Check response** - should include warning message about bypass
+
+### Switching Between Environments
+
+**To work on development:**
+```bash
+git checkout development
+# Make changes
+git push origin development
+# Vercel auto-deploys
+```
+
+**To work on production:**
+```bash
+git checkout main  # or master
+# Make changes
+git push origin main
+# Vercel auto-deploys to production
+```
 
 ---
 

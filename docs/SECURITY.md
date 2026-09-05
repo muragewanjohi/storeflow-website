@@ -1,4 +1,4 @@
-# StoreFlow Security Documentation
+# DukaNest Security Documentation
 
 **Row-Level Security (RLS) Implementation Guide**
 
@@ -6,13 +6,13 @@
 
 ## 🔒 Overview
 
-StoreFlow uses **Row-Level Security (RLS)** to ensure automatic tenant data isolation at the database level. This provides a robust security layer that cannot be bypassed, even if application code has bugs.
+DukaNest uses **Row-Level Security (RLS)** to ensure automatic tenant data isolation at the database level. This provides a robust security layer that cannot be bypassed, even if application code has bugs.
 
 ---
 
 ## 🎯 What is Row-Level Security (RLS)?
 
-**Row-Level Security** is a PostgreSQL feature that automatically filters database queries based on policies. In StoreFlow, RLS ensures that:
+**Row-Level Security** is a PostgreSQL feature that automatically filters database queries based on policies. In DukaNest, RLS ensures that:
 
 - ✅ Each tenant can only access their own data
 - ✅ Queries are automatically filtered by `tenant_id`
@@ -21,7 +21,7 @@ StoreFlow uses **Row-Level Security (RLS)** to ensure automatic tenant data isol
 
 ---
 
-## 🏗️ How RLS Works in StoreFlow
+## 🏗️ How RLS Works in DukaNest
 
 ### Architecture
 

@@ -1,11 +1,11 @@
+'use client';
+
 /**
  * Forgot Password Page
  * 
  * Page for requesting password reset
  * Accessible via tenant subdomain
  */
-
-'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

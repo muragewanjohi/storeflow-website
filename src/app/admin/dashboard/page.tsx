@@ -18,13 +18,19 @@ export default async function AdminDashboardPage() {
   const user = await requireAuthOrRedirect('/admin/login');
   await requireRoleOrRedirect(user, 'landlord', '/admin/login');
 
-  // Fetch tenant statistics
-  const [totalTenants, activeTenants] = await Promise.all([
-    prisma.tenants.count(),
-    prisma.tenants.count({
-      where: { status: 'active' },
-    }),
-  ]);
+  // Fetch all tenants and filter out demo stores in JS
+  // (Prisma JSON path filtering on the `data` column is unreliable across DB engines)
+  const allTenants = await prisma.tenants.findMany({
+    select: { status: true, data: true },
+  });
+
+  const regularTenants = allTenants.filter((t) => {
+    const d = t.data as Record<string, unknown> | null;
+    return !(d?.is_demo === true || d?.isDemo === true);
+  });
+
+  const totalTenants = regularTenants.length;
+  const activeTenants = regularTenants.filter((t) => t.status === 'active').length;
 
   return (
     <AdminDashboardClient 

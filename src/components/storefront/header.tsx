@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingCartIcon, Bars3Icon, XMarkIcon, UserIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export default function StorefrontHeader({
   const [cartItemCount, setCartItemCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Removed debug logging
 
@@ -116,11 +118,14 @@ export default function StorefrontHeader({
         
         if (response.ok && isMounted) {
           setIsAuthenticated(true);
+          // Fetch notification count after confirming authentication
+          fetchNotificationCount();
         } else {
           // 401 is expected for unauthenticated users - don't treat as error
           // Only set to false if component is still mounted
           if (isMounted) {
             setIsAuthenticated(false);
+            setNotificationCount(0);
           }
         }
       } catch (error: any) {
@@ -133,6 +138,34 @@ export default function StorefrontHeader({
       }
     }
 
+    // Fetch notification count
+    async function fetchNotificationCount() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      try {
+        const response = await fetch('/api/customers/notifications/count', {
+          signal: controller.signal,
+          cache: 'default',
+          next: { revalidate: 30 }, // Cache for 30 seconds
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok && isMounted) {
+          const data: { count: number } = await response.json();
+          setNotificationCount(data.count || 0);
+        } else if (isMounted) {
+          setNotificationCount(0);
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (isMounted && error.name !== 'AbortError') {
+          setNotificationCount(0);
+        }
+      }
+    }
+
     // Check auth only once on mount
     checkAuth();
 
@@ -140,6 +173,10 @@ export default function StorefrontHeader({
     const timeoutId = setTimeout(() => {
       if (isMounted) {
         fetchCartCount();
+        // Fetch notification count after auth check
+        if (isAuthenticated) {
+          fetchNotificationCount();
+        }
       }
     }, 100);
     
@@ -213,7 +250,7 @@ export default function StorefrontHeader({
         abortController.abort();
       }
     };
-  }, [isPreview]);
+  }, [isPreview, isAuthenticated]);
 
   // Ecommerce storefront navigation
   // Popular e-commerce stores (Amazon, Target, Best Buy, etc.) typically include "Deals" or "Sales" 
@@ -232,43 +269,57 @@ export default function StorefrontHeader({
       <nav className="container mx-auto px-2 sm:px-4 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          {/* Best practice: Very tight spacing (4px) between logo and brand name for unified brand identity */}
-          <div className="flex items-center gap-1" suppressHydrationWarning>
+          {/* Best practice: Logo height should be 60-80% of header height (64px), spacing 12-16px for optimal visual balance */}
+          <div className="flex items-center gap-3 md:gap-4" suppressHydrationWarning>
             {isPreview && onNavigate ? (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   onNavigate('/');
                 }}
-                className="flex items-center gap-1"
+                className="flex items-center gap-3 md:gap-4"
               >
                 {storeLogo && (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-20 flex-shrink-0">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:') || storeLogo.startsWith('/')}
+                      onError={(e) => {
+                        // Hide the image on error, but keep the container for spacing
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
+                <span className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors whitespace-nowrap">
                   {storeName}
                 </span>
               </button>
             ) : (
-              <Link href="/" className="flex items-center gap-1">
+              <Link href="/" className="flex items-center gap-3 md:gap-4">
                 {storeLogo && (
-                  <img 
-                    src={storeLogo} 
-                    alt={storeName}
-                    className="h-10 w-auto sm:h-12 md:h-16 object-contain max-w-[120px] sm:max-w-[180px] md:max-w-[300px]"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-20 flex-shrink-0">
+                    <Image 
+                      src={storeLogo} 
+                      alt={storeName}
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 640px) 48px, (max-width: 768px) 56px, 80px"
+                      unoptimized={storeLogo.startsWith('blob:') || storeLogo.startsWith('data:') || storeLogo.startsWith('/')}
+                      onError={(e) => {
+                        // Hide the image on error, but keep the container for spacing
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 )}
-                <span className="text-lg md:text-xl font-bold text-primary hover:text-accent transition-colors">
+                <span className="text-xl md:text-2xl font-bold text-primary hover:text-accent transition-colors whitespace-nowrap">
                   {storeName}
                 </span>
               </Link>
@@ -343,9 +394,17 @@ export default function StorefrontHeader({
             {/* Account / Login */}
             {isAuthenticated ? (
               <Link href="/account">
-                <Button variant="ghost" size="sm" className="text-primary hover:text-accent transition-colors">
+                <Button variant="ghost" size="sm" className="relative text-primary hover:text-accent transition-colors">
                   <UserIcon className="h-5 w-5 mr-2" />
                   <span className="hidden sm:inline">Account</span>
+                  {notificationCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs"
+                    >
+                      {notificationCount > 9 ? '9+' : notificationCount}
+                    </Badge>
+                  )}
                 </Button>
               </Link>
             ) : (
@@ -496,9 +555,17 @@ export default function StorefrontHeader({
                   <Link
                     href="/account"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
+                    className="flex items-center justify-between px-3 py-2 text-base font-medium text-primary hover:bg-muted hover:text-accent transition-colors"
                   >
-                    My Account
+                    <span>My Account</span>
+                    {notificationCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="h-5 min-w-5 items-center justify-center px-1.5 text-xs"
+                      >
+                        {notificationCount > 9 ? '9+' : notificationCount}
+                      </Badge>
+                    )}
                   </Link>
                 ) : (
                   <Link

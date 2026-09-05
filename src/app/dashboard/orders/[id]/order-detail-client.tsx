@@ -36,8 +36,9 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { formatOrderStatus, formatPaymentStatus } from '@/lib/orders/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CalculatorIcon, MapPinIcon } from 'lucide-react';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { toast } from 'sonner';
 
 interface OrderItem {
   id: string;
@@ -61,13 +62,26 @@ interface Order {
   total_amount: number;
   status: string | null;
   payment_status: string | null;
+  // Basic deposit support (docs/SERVICES_PLAN.md)
+  deposit_amount?: number | null;
+  balance_amount?: number | null;
   payment_gateway: string | null;
   transaction_id: string | null;
+  payment_meta: any | null;
+  tumizi_refund_status: string | null;
+  tumizi_refund_reference: string | null;
+  invoice_number: string | null;
   shipping_address: any;
   billing_address: any;
   coupon: string | null;
   coupon_discounted: number | null;
   message: string | null;
+  delivery_zone_id: string | null;
+  delivery_zone_name: string | null;
+  delivery_fee: number | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: number | null;
+  delivery_fee_notes: string | null;
   items: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -97,10 +111,94 @@ export default function OrderDetailClient({
   const [isCancelling, setIsCancelling] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Delivery quote state
+  const [deliveryFeeQuote, setDeliveryFeeQuote] = useState<string>(
+    order?.delivery_fee_quote?.toString() || ''
+  );
+  const [deliveryFeeNotes, setDeliveryFeeNotes] = useState<string>(
+    order?.delivery_fee_notes || ''
+  );
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+  const [isSyncingTumizi, setIsSyncingTumizi] = useState(false);
+
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.7) — collecting the
+  // remaining balance on a 'deposit_paid' Tumizi order.
+  const [showCollectBalanceDialog, setShowCollectBalanceDialog] = useState(false);
+  const [collectBalancePhone, setCollectBalancePhone] = useState('');
+  const [isCollectingBalance, setIsCollectingBalance] = useState(false);
+  // Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.8) — the real
+  // amount a tenant admin/staff is personally confirming they received for
+  // a manually-verified (M-Pesa till or cash) payment. Only shown/used
+  // when the order has a deposit configured; every normal order keeps the
+  // pre-deposit one-click "Verify Payment" behavior untouched.
+  const [manualVerifiedAmount, setManualVerifiedAmount] = useState<string>(
+    order?.deposit_amount != null ? String(order.deposit_amount) : ''
+  );
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
+  const isTumiziOrder = order?.payment_gateway === 'tumizi';
+
+  const handleTumiziPaymentSync = async () => {
+    if (!order) return;
+    setIsSyncingTumizi(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/tumizi/sync-payment`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setOrder({ ...order, payment_status: data.payment_status });
+        setNewPaymentStatus(data.payment_status || order.payment_status || 'pending');
+        toast.success(
+          data.payment_status === 'paid'
+            ? 'Payment confirmed via Tumizi'
+            : 'Payment status refreshed from Tumizi',
+        );
+        router.refresh();
+      } else {
+        toast.error(data.error || 'Failed to refresh payment from Tumizi');
+      }
+    } catch {
+      toast.error('Failed to refresh payment from Tumizi');
+    } finally {
+      setIsSyncingTumizi(false);
+    }
+  };
+
+  const handleCollectBalance = async () => {
+    if (!order) return;
+    const rawPhone = collectBalancePhone.trim().replace(/\s+/g, '');
+    if (!rawPhone) return;
+    setIsCollectingBalance(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/tumizi/initiate-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: rawPhone,
+          // Real amount override (S-Dep.7) — the STK push must ask for
+          // exactly the outstanding balance, never the full order total.
+          amount: order.balance_amount ?? undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        toast.error(data.error || 'Failed to send STK push');
+        return;
+      }
+      setShowCollectBalanceDialog(false);
+      setCollectBalancePhone('');
+      toast.success('STK push sent for the remaining balance');
+      router.refresh();
+    } catch {
+      toast.error('Failed to send STK push');
+    } finally {
+      setIsCollectingBalance(false);
+    }
+  };
 
   if (error || !order) {
     return (
-      <div>
+      <div className="px-4 pb-24 pt-4 md:px-0 md:pb-0 md:pt-0">
         <div className="mb-6">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/orders">
@@ -145,10 +243,30 @@ export default function OrderDetailClient({
         return 'secondary';
       case 'paid':
         return 'default';
+      // Basic deposit support (docs/SERVICES_PLAN.md) — genuinely paid,
+      // but not fully settled, so distinct from both 'paid' and 'pending'.
+      case 'deposit_paid':
+        return 'default';
       case 'failed':
         return 'destructive';
       case 'refunded':
         return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const getRefundStatusBadgeVariant = (status: string | null) => {
+    if (!status) return 'secondary';
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'success':
+      case 'successful':
+        return 'default';
+      case 'failed':
+      case 'cancelled':
+      case 'declined':
+        return 'destructive';
       default:
         return 'secondary';
     }
@@ -263,7 +381,14 @@ export default function OrderDetailClient({
       }
 
       const data = await response.json();
-      setOrder({ ...order, status: data.order.status, payment_status: data.order.payment_status });
+      const expectedTumiziRefundPending =
+        order.payment_gateway === 'tumizi' && order.payment_status === 'paid';
+      setOrder({
+        ...order,
+        status: data.order.status,
+        payment_status: data.order.payment_status,
+        tumizi_refund_status: expectedTumiziRefundPending ? 'pending' : order.tumizi_refund_status,
+      });
       setShowCancelDialog(false);
       setCancelReason('');
       setSuccessMessage('Order cancelled successfully');
@@ -283,6 +408,58 @@ export default function OrderDetailClient({
     // Placeholder for shipping label printing
     // In production, this would integrate with shipping providers (e.g., ShipStation, EasyPost)
     window.print();
+  };
+
+  const handleSubmitDeliveryQuote = async () => {
+    const fee = parseFloat(deliveryFeeQuote);
+    if (isNaN(fee) || fee < 0) {
+      toast.error('Please enter a valid delivery fee');
+      return;
+    }
+
+    setIsSubmittingQuote(true);
+    setUpdateError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}/delivery-quote`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          delivery_fee_quote: fee,
+          delivery_fee_notes: deliveryFeeNotes || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit delivery quote');
+      }
+
+      if (data.success) {
+        setOrder({ 
+          ...order, 
+          delivery_fee_quote: fee,
+          delivery_fee_notes: deliveryFeeNotes || null,
+          delivery_fee_status: 'quoted'
+        });
+        setSuccessMessage('Delivery quote sent to customer successfully');
+        toast.success('Delivery quote sent to customer');
+        
+        // Refresh page after a short delay
+        setTimeout(() => {
+          router.refresh();
+        }, 1500);
+      }
+    } catch (err: any) {
+      setUpdateError(err.message || 'Failed to submit delivery quote');
+      toast.error(err.message || 'Failed to submit delivery quote');
+    } finally {
+      setIsSubmittingQuote(false);
+    }
   };
 
   // Build order timeline
@@ -318,9 +495,9 @@ export default function OrderDetailClient({
   ];
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#f3f4f6] px-4 pb-24 pt-4 md:min-h-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
+      <div className="mb-5 flex flex-col gap-4 md:mb-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3 md:items-center md:gap-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/orders">
               <ArrowLeftIcon className="mr-2 h-4 w-4" />
@@ -328,30 +505,40 @@ export default function OrderDetailClient({
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Order {order.order_number}</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Order {order.order_number}</h1>
+            <p className="mt-1 text-sm text-muted-foreground md:mt-2 md:text-base">
               Created on {new Date(order.created_at).toLocaleDateString()} at{' '}
               {new Date(order.created_at).toLocaleTimeString()}
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:flex-wrap md:justify-end">
           {order.status !== 'cancelled' && order.status !== 'delivered' && (
             <Button
-              variant="destructive"
+              variant={order.delivery_fee_status === 'rejected' ? 'destructive' : 'outline'}
               size="sm"
               onClick={() => setShowCancelDialog(true)}
+              className={`w-full sm:w-auto ${order.delivery_fee_status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}`}
             >
               <XMarkIcon className="mr-2 h-4 w-4" />
-              Cancel Order
+              {order.delivery_fee_status === 'rejected' ? 'Cancel Order (Required)' : 'Cancel Order'}
             </Button>
           )}
           {order.status === 'processing' && (
-            <Button variant="outline" size="sm" onClick={handlePrintShippingLabel}>
+            <Button variant="outline" size="sm" onClick={handlePrintShippingLabel} className="w-full sm:w-auto">
               <PrinterIcon className="mr-2 h-4 w-4" />
               Print Label
             </Button>
           )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.open(`/api/orders/${order.id}/invoice/download`, '_blank')}
+            className="w-full sm:w-auto"
+          >
+            <PrinterIcon className="mr-2 h-4 w-4" />
+            {order.payment_status === 'paid' ? 'Download Receipt' : 'Download Invoice'}
+          </Button>
         </div>
       </div>
 
@@ -367,9 +554,9 @@ export default function OrderDetailClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-4 md:space-y-6 lg:col-span-2">
           {/* Order Items */}
           <Card>
             <CardHeader>
@@ -379,12 +566,12 @@ export default function OrderDetailClient({
             <CardContent>
               <div className="space-y-4">
                 {order.items.map((item: any) => (
-                  <div key={item.id} className="flex items-start gap-4 border-b pb-4 last:border-0">
+                  <div key={item.id} className="flex flex-col gap-3 border-b pb-4 last:border-0 sm:flex-row sm:items-start sm:gap-4">
                     {item.product_image && (
                       <img
                         src={item.product_image}
                         alt={item.product_name}
-                        className="h-16 w-16 rounded-md object-cover"
+                        className="h-14 w-14 rounded-md object-cover sm:h-16 sm:w-16"
                       />
                     )}
                     <div className="flex-1">
@@ -394,7 +581,7 @@ export default function OrderDetailClient({
                       </p>
                       <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center justify-between sm:block sm:text-right">
                       <p className="font-medium">{formatCurrency(item.total)}</p>
                       <p className="text-sm text-muted-foreground">{formatCurrency(item.price)} each</p>
                     </div>
@@ -402,12 +589,12 @@ export default function OrderDetailClient({
                 ))}
               </div>
               <Separator className="my-4" />
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Total</span>
-                <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-base font-semibold md:text-lg">Total</span>
+                <span className="text-xl font-bold md:text-2xl">{formatCurrency(order.total_amount)}</span>
               </div>
               {order.coupon_discounted && (
-                <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
+                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
                   <span>Coupon Discount ({order.coupon})</span>
                   <span>-{formatCurrency(order.coupon_discounted)}</span>
                 </div>
@@ -504,7 +691,172 @@ export default function OrderDetailClient({
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
+          {/* Delivery Fee Quote Section - Show First */}
+          {order.delivery_fee_status === 'pending' && (
+            <Card className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalculatorIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                  Delivery Fee Quote Required
+                </CardTitle>
+                <CardDescription>
+                  This order is outside standard delivery zones. Calculate and send a delivery fee quote to the customer.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.shipping_address && (
+                  <div>
+                    <Label className="text-sm font-semibold flex items-center gap-2 mb-2">
+                      <MapPinIcon className="h-4 w-4" />
+                      Delivery Address
+                    </Label>
+                    <div className="p-3 bg-background rounded-lg border text-sm">
+                      {order.shipping_address.address_line_1 && <p>{order.shipping_address.address_line_1}</p>}
+                      {order.shipping_address.address_line_2 && <p>{order.shipping_address.address_line_2}</p>}
+                      <p>
+                        {[
+                          order.shipping_address.city,
+                          order.shipping_address.state,
+                          order.shipping_address.postal_code,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                      {order.shipping_address.country && <p>{order.shipping_address.country}</p>}
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <Label htmlFor="delivery_fee_quote">Delivery Fee *</Label>
+                  <Input
+                    id="delivery_fee_quote"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={deliveryFeeQuote}
+                    onChange={(e) => setDeliveryFeeQuote(e.target.value)}
+                    placeholder="0.00"
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the calculated delivery fee for this location
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="delivery_fee_notes">Notes (Optional)</Label>
+                  <Textarea
+                    id="delivery_fee_notes"
+                    value={deliveryFeeNotes}
+                    onChange={(e) => setDeliveryFeeNotes(e.target.value)}
+                    placeholder="Add any notes about the delivery fee calculation"
+                    className="mt-2"
+                    rows={3}
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleSubmitDeliveryQuote}
+                  disabled={!deliveryFeeQuote || isSubmittingQuote}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  {isSubmittingQuote ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <CalculatorIcon className="mr-2 h-4 w-4" />
+                      Send Quote to Customer
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Delivery Zone Info - Show for all orders with delivery zone info */}
+          {(order.delivery_zone_name || order.delivery_fee_status) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPinIcon className="h-5 w-5" />
+                  Delivery Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {order.delivery_zone_name && (
+                  <div>
+                    <Label className="text-sm font-semibold">Zone Name</Label>
+                    <p className="text-sm text-muted-foreground mt-1">{order.delivery_zone_name}</p>
+                  </div>
+                )}
+                {order.delivery_fee && (
+                  <div>
+                    <Label className="text-sm font-semibold">Delivery Fee</Label>
+                    <p className="text-sm font-semibold text-primary mt-1">{formatCurrency(order.delivery_fee)}</p>
+                  </div>
+                )}
+                {order.delivery_fee_status && (
+                  <div>
+                    <Label className="text-sm font-semibold">Fee Status</Label>
+                    <div className="mt-1">
+                      {order.delivery_fee_status === 'approved' && (
+                        <Badge variant="default" className="bg-green-600">
+                          Customer Approved
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'rejected' && (
+                        <Badge variant="destructive">
+                          Customer Rejected
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'quoted' && (
+                        <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                          Quote Sent - Awaiting Customer Approval
+                        </Badge>
+                      )}
+                      {order.delivery_fee_status === 'pending' && (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
+                          Quote Pending
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                  <div>
+                    <Label className="text-sm font-semibold">Quoted Fee</Label>
+                    <p className="text-sm font-semibold mt-1">{formatCurrency(order.delivery_fee_quote)}</p>
+                    {order.delivery_fee_notes && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">{order.delivery_fee_notes}</p>
+                    )}
+                  </div>
+                )}
+                {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      ⚠️ Order status and payment status cannot be updated until the customer approves the delivery fee quote.
+                    </p>
+                  </div>
+                )}
+                {order.delivery_fee_status === 'rejected' && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1">
+                      ❌ Customer Rejected Delivery Fee
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      The customer has rejected the delivery fee quote. Since delivery cannot proceed, you can only cancel this order.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Order Status */}
           <Card>
             <CardHeader>
@@ -523,7 +875,15 @@ export default function OrderDetailClient({
                 <>
                   <div>
                     <Label htmlFor="new_status">Update Status</Label>
-                    <Select value={newStatus} onValueChange={setNewStatus}>
+                    <Select 
+                      value={newStatus} 
+                      onValueChange={setNewStatus}
+                      disabled={
+                        order.delivery_fee_status === 'pending' || 
+                        order.delivery_fee_status === 'quoted' ||
+                        order.delivery_fee_status === 'rejected'
+                      }
+                    >
                       <SelectTrigger id="new_status" className="mt-2">
                         <SelectValue />
                       </SelectTrigger>
@@ -534,6 +894,16 @@ export default function OrderDetailClient({
                         <SelectItem value="delivered">Delivered</SelectItem>
                       </SelectContent>
                     </Select>
+                    {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Status cannot be updated until delivery fee is approved
+                      </p>
+                    )}
+                    {order.delivery_fee_status === 'rejected' && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        Status cannot be updated. Order must be cancelled since delivery was rejected.
+                      </p>
+                    )}
                   </div>
                   {newStatus === 'shipped' && (
                     <>
@@ -545,6 +915,7 @@ export default function OrderDetailClient({
                           onChange={(e) => setTrackingNumber(e.target.value)}
                           placeholder="Enter tracking number"
                           className="mt-2"
+                          disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
                         />
                       </div>
                       <div>
@@ -555,6 +926,7 @@ export default function OrderDetailClient({
                           onChange={(e) => setShippingCarrier(e.target.value)}
                           placeholder="e.g., UPS, FedEx, DHL"
                           className="mt-2"
+                          disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
                         />
                       </div>
                     </>
@@ -568,11 +940,18 @@ export default function OrderDetailClient({
                       placeholder="Add notes about this status update"
                       className="mt-2"
                       rows={3}
+                      disabled={order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted'}
                     />
                   </div>
                   <Button
                     onClick={handleStatusUpdate}
-                    disabled={isUpdating || newStatus === order.status}
+                    disabled={
+                      isUpdating || 
+                      newStatus === order.status ||
+                      order.delivery_fee_status === 'pending' ||
+                      order.delivery_fee_status === 'quoted' ||
+                      order.delivery_fee_status === 'rejected'
+                    }
                     className="w-full"
                   >
                     {isUpdating ? (
@@ -603,6 +982,18 @@ export default function OrderDetailClient({
                   </Badge>
                 </div>
               </div>
+              {order.deposit_amount != null && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Deposit Charged</Label>
+                    <p className="text-sm font-medium mt-1">{formatCurrency(order.deposit_amount)}</p>
+                  </div>
+                  <div>
+                    <Label>Balance Due</Label>
+                    <p className="text-sm font-medium mt-1">{formatCurrency(order.balance_amount ?? 0)}</p>
+                  </div>
+                </div>
+              )}
               {order.payment_gateway && (
                 <div>
                   <Label>Payment Gateway</Label>
@@ -615,11 +1006,244 @@ export default function OrderDetailClient({
                   <p className="text-sm text-muted-foreground mt-1 font-mono">{order.transaction_id}</p>
                 </div>
               )}
+              {order.payment_gateway === 'tumizi' && order.tumizi_refund_status && (
+                <div>
+                  <Label>Tumizi Refund</Label>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant={getRefundStatusBadgeVariant(order.tumizi_refund_status)} className="text-sm">
+                      {order.tumizi_refund_status.toLowerCase() === 'completed'
+                        ? 'Refund Completed'
+                        : order.tumizi_refund_status.toLowerCase() === 'failed'
+                          ? 'Refund Failed'
+                          : 'Refund Pending'}
+                    </Badge>
+                    {order.tumizi_refund_reference && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {order.tumizi_refund_reference}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Payment Verification Details (manual M-Pesa till or cash —
+                  basic deposit support, docs/SERVICES_PLAN.md, S-Dep.8:
+                  cash orders never got this block before, so they had no
+                  way to be verified/rejected at all here) */}
+              {(order.payment_gateway === 'mpesa' || order.payment_gateway === 'cash') && order.payment_meta && (
+                <div className="mt-4 rounded-lg border bg-primary/10 p-4">
+                  <h4 className="font-semibold text-sm mb-3">Payment Verification Details</h4>
+                  <div className="space-y-2 text-sm">
+                    {order.payment_meta.transaction_id && (
+                      <div>
+                        <span className="font-medium">Transaction ID:</span>{' '}
+                        <span className="font-mono">{order.payment_meta.transaction_id}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.reference && (
+                      <div>
+                        <span className="font-medium">Reference:</span>{' '}
+                        <span>{order.payment_meta.reference}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.notes && (
+                      <div>
+                        <span className="font-medium">Customer Notes:</span>{' '}
+                        <span className="text-muted-foreground">{order.payment_meta.notes}</span>
+                      </div>
+                    )}
+                    {order.payment_meta.submitted_at && (
+                      <div>
+                        <span className="font-medium">Submitted:</span>{' '}
+                        <span className="text-muted-foreground">
+                          {new Date(order.payment_meta.submitted_at).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Verification Status:</span>
+                        <Badge 
+                          variant={
+                            order.payment_meta.verification_status === 'verified' ? 'default' :
+                            order.payment_meta.verification_status === 'rejected' ? 'destructive' :
+                            'secondary'
+                          }
+                        >
+                          {order.payment_meta.verification_status === 'verified' ? 'Verified' :
+                           order.payment_meta.verification_status === 'rejected' ? 'Rejected' :
+                           'Pending Verification'}
+                        </Badge>
+                      </div>
+                      {order.payment_meta.verified_at && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Verified: {new Date(order.payment_meta.verified_at).toLocaleString()}
+                          {order.payment_meta.verified_by && ` by ${order.payment_meta.verified_by}`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Admin Verification Actions */}
+                  {order.payment_meta.verification_status === 'pending' && (
+                    <div className="mt-4 flex flex-col gap-2 border-t pt-4">
+                      {/* Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.8) —
+                          only shown when this order actually has a deposit
+                          configured; every normal order never sees this and
+                          keeps the plain one-click flow below unchanged. */}
+                      {order.deposit_amount != null && (
+                        <div>
+                          <Label htmlFor="manual_verified_amount">Amount you actually received</Label>
+                          <Input
+                            id="manual_verified_amount"
+                            type="number"
+                            step="0.01"
+                            value={manualVerifiedAmount}
+                            onChange={(e) => setManualVerifiedAmount(e.target.value)}
+                            className="mt-2"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            This order has a deposit configured (balance {formatCurrency(order.balance_amount ?? 0)}). Enter the
+                            real amount confirmed — a full settlement marks the order Paid, a partial one marks it Deposit Paid.
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        size="sm"
+                        disabled={isVerifyingPayment}
+                        onClick={async () => {
+                          setIsVerifyingPayment(true);
+                          try {
+                            const parsedAmount =
+                              order.deposit_amount != null && manualVerifiedAmount.trim()
+                                ? Number(manualVerifiedAmount)
+                                : undefined;
+                            const response = await fetch(`/api/admin/orders/${order.id}/verify-payment`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                action: 'verify',
+                                ...(parsedAmount != null && Number.isFinite(parsedAmount)
+                                  ? { verifiedAmount: parsedAmount }
+                                  : {}),
+                              }),
+                            });
+                            if (response.ok) {
+                              const data = await response.json();
+                              setOrder({
+                                ...order,
+                                payment_status: data.order.payment_status,
+                                payment_meta: data.order.payment_meta,
+                              });
+                              toast.success(
+                                data.order.payment_status === 'deposit_paid'
+                                  ? 'Partial payment verified — balance still outstanding'
+                                  : 'Payment verified successfully',
+                              );
+                              router.refresh();
+                            } else {
+                              const data = await response.json();
+                              toast.error(data.error || 'Failed to verify payment');
+                            }
+                          } catch (error) {
+                            toast.error('Failed to verify payment');
+                          } finally {
+                            setIsVerifyingPayment(false);
+                          }
+                        }}
+                      >
+                        <CheckCircleIcon className="h-4 w-4 mr-2" />
+                        Verify Payment
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={async () => {
+                          if (!confirm('Are you sure you want to reject this payment? The order payment status will be changed to pending.')) {
+                            return;
+                          }
+                          try {
+                            const response = await fetch(`/api/admin/orders/${order.id}/verify-payment`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'reject' }),
+                            });
+                            if (response.ok) {
+                              const data = await response.json();
+                              setOrder({ ...order, payment_status: data.order.payment_status, payment_meta: data.order.payment_meta });
+                              toast.success('Payment rejected');
+                              router.refresh();
+                            } else {
+                              const data = await response.json();
+                              toast.error(data.error || 'Failed to reject payment');
+                            }
+                          } catch (error) {
+                            toast.error('Failed to reject payment');
+                          }
+                        }}
+                      >
+                        <XMarkIcon className="h-4 w-4 mr-2" />
+                        Reject Payment
+                      </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {order.payment_status !== 'refunded' && (
+                isTumiziOrder ? (
+                  <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Tumizi verifies M-Pesa payments automatically. The order updates when the customer
+                      pays or when Tumizi sends a webhook.
+                    </p>
+                    {(order.payment_status === 'pending' || order.payment_status === 'failed') && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        disabled={isSyncingTumizi}
+                        onClick={handleTumiziPaymentSync}
+                      >
+                        {isSyncingTumizi ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Checking Tumizi...
+                          </>
+                        ) : (
+                          'Refresh from Tumizi'
+                        )}
+                      </Button>
+                    )}
+                    {/* Basic deposit support (docs/SERVICES_PLAN.md, S-Dep.7) */}
+                    {order.payment_status === 'deposit_paid' && order.balance_amount != null && order.balance_amount > 0 && (
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={() => {
+                          setCollectBalancePhone(order.phone || '');
+                          setShowCollectBalanceDialog(true);
+                        }}
+                      >
+                        Collect Balance ({formatCurrency(order.balance_amount)})
+                      </Button>
+                    )}
+                  </div>
+                ) : (
                 <>
                   <div>
                     <Label htmlFor="new_payment_status">Update Payment Status</Label>
-                    <Select value={newPaymentStatus} onValueChange={setNewPaymentStatus}>
+                    <Select 
+                      value={newPaymentStatus} 
+                      onValueChange={setNewPaymentStatus}
+                      disabled={
+                        order.delivery_fee_status === 'pending' || 
+                        order.delivery_fee_status === 'quoted' ||
+                        order.delivery_fee_status === 'rejected'
+                      }
+                    >
                       <SelectTrigger id="new_payment_status" className="mt-2">
                         <SelectValue />
                       </SelectTrigger>
@@ -630,10 +1254,26 @@ export default function OrderDetailClient({
                         <SelectItem value="refunded">Refunded</SelectItem>
                       </SelectContent>
                     </Select>
+                    {(order.delivery_fee_status === 'pending' || order.delivery_fee_status === 'quoted') && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Payment status cannot be updated until delivery fee is approved
+                      </p>
+                    )}
+                    {order.delivery_fee_status === 'rejected' && (
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                        Payment status cannot be updated. Order must be cancelled since delivery was rejected.
+                      </p>
+                    )}
                   </div>
                   <Button
                     onClick={handlePaymentStatusUpdate}
-                    disabled={isUpdating || newPaymentStatus === order.payment_status}
+                    disabled={
+                      isUpdating || 
+                      newPaymentStatus === order.payment_status ||
+                      order.delivery_fee_status === 'pending' ||
+                      order.delivery_fee_status === 'quoted' ||
+                      order.delivery_fee_status === 'rejected'
+                    }
                     variant="outline"
                     className="w-full"
                   >
@@ -647,9 +1287,11 @@ export default function OrderDetailClient({
                     )}
                   </Button>
                 </>
+                )
               )}
             </CardContent>
           </Card>
+
 
           {/* Customer Information */}
           <Card>
@@ -692,10 +1334,21 @@ export default function OrderDetailClient({
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Order</AlertDialogTitle>
+            <AlertDialogTitle>
+              {order.delivery_fee_status === 'rejected' ? 'Cancel Order (Required)' : 'Cancel Order'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this order? This action cannot be undone. A refund will be processed
-              automatically.
+              {order.delivery_fee_status === 'rejected' ? (
+                <>
+                  The customer has rejected the delivery fee quote. Since delivery cannot proceed, this order must be cancelled.
+                  {order.payment_status === 'paid' && ' A refund will be processed automatically.'}
+                </>
+              ) : (
+                <>
+                  Are you sure you want to cancel this order? This action cannot be undone. A refund will be processed
+                  automatically.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
@@ -725,6 +1378,51 @@ export default function OrderDetailClient({
                 </>
               ) : (
                 'Cancel Order'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Collect Balance Dialog (docs/SERVICES_PLAN.md, S-Dep.7) */}
+      <AlertDialog open={showCollectBalanceDialog} onOpenChange={setShowCollectBalanceDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Collect remaining balance</AlertDialogTitle>
+            <AlertDialogDescription>
+              Send an M-Pesa STK push for {order.balance_amount != null ? formatCurrency(order.balance_amount) : 'the remaining balance'} to
+              the phone number below.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="collect_balance_phone">Phone number</Label>
+              <Input
+                id="collect_balance_phone"
+                value={collectBalancePhone}
+                onChange={(e) => setCollectBalancePhone(e.target.value)}
+                placeholder="e.g. 2547XXXXXXXX"
+                className="mt-2"
+                disabled={isCollectingBalance}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCollectingBalance}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCollectBalance();
+              }}
+              disabled={isCollectingBalance || !collectBalancePhone.trim()}
+            >
+              {isCollectingBalance ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send STK Push'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -15,6 +15,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,11 +43,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { Tenant } from '@/lib/tenant-context';
+import { isKenyaCountry, resolvePlanMonthlyPrice, formatPrice } from '@/lib/pricing/location';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { toast } from 'sonner';
 
 interface PricePlan {
   id: string;
   name: string;
   price: number;
+  price_kes?: number | null;
   duration_months: number;
   trial_days?: number | null;
   features: any;
@@ -73,6 +79,7 @@ interface BillingHistoryItem {
   type: string;
   description: string;
   amount: number;
+  currency?: string;
   status: string;
   date: Date | string;
   expireDate?: Date | string | null;
@@ -158,16 +165,103 @@ export default function TenantSubscriptionClient({
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [selectedPlanName, setSelectedPlanName] = useState<string | null>(null);
+  
+  // Payment state
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'pesapal'>('mpesa');
+  const [mpesaPhone, setMpesaPhone] = useState('');
+  const [pesapalLoading, setPesapalLoading] = useState(false);
+  const [mpesaLoading, setMpesaLoading] = useState(false);
+  const paymentBusy = pesapalLoading || mpesaLoading;
 
-  // Handle tab navigation from URL query params
+  // PesaPal config (yearly discount %)
+  const { data: pesapalConfig } = useQuery({
+    queryKey: ['pesapal-subscription-config'],
+    queryFn: async () => {
+      const res = await fetch('/api/pesapal/subscription/config');
+      if (!res.ok) return { yearlyDiscountPercent: 17 };
+      const data = await res.json();
+      return { yearlyDiscountPercent: data.yearlyDiscountPercent ?? 17 };
+    },
+  });
+  const yearlyDiscountPercent = pesapalConfig?.yearlyDiscountPercent ?? 17;
+
+  const isKenya = isKenyaCountry(tenant?.country);
+  const currencySymbol = isKenya ? 'Ksh' : '$';
+  const getDisplayPrice = (plan: Pick<PricePlan, 'price' | 'price_kes'>) =>
+    resolvePlanMonthlyPrice({ price: plan.price, price_kes: plan.price_kes }, isKenya);
+  const formatPlanPrice = (plan: Pick<PricePlan, 'price' | 'price_kes'>) =>
+    formatPrice(getDisplayPrice(plan), currencySymbol);
+
+  const renewalDate = tenant.expire_date ?? null;
+  const daysUntilRenewal = getDaysUntil(renewalDate);
+  const isExpired = daysUntilRenewal <= 0;
+  const isExpiringSoon = daysUntilRenewal > 0 && daysUntilRenewal <= 7;
+  const canPayForCurrentPlan = Boolean(
+    currentPlan && Number(getDisplayPrice(currentPlan)) > 0
+  );
+
+  const openPaymentForCurrentPlan = () => {
+    if (!currentPlan || !canPayForCurrentPlan) return;
+    setSelectedPlanId(currentPlan.id);
+    setSelectedPlanName(currentPlan.name);
+    setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+    setBillingInterval('monthly');
+    setMpesaPhone('');
+    setShowPaymentDialog(true);
+  };
+
+  useEffect(() => {
+    if (billingInterval === 'yearly' && paymentMethod === 'mpesa') {
+      setPaymentMethod('pesapal');
+    }
+  }, [billingInterval, paymentMethod]);
+
+  // Handle tab navigation and PesaPal callback params from URL
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam && ['overview', 'usage', 'plans', 'billing'].includes(tabParam)) {
       setActiveTab(tabParam);
-      // Clean up URL after setting tab
       router.replace('/dashboard/subscription', { scroll: false });
     }
-  }, [searchParams, router]);
+    const success = searchParams.get('success');
+    const errorParam = searchParams.get('error');
+    const subscriptionType = searchParams.get('subscription_type') || 'activation';
+    if (success === '1') {
+      trackMetaPixelEvent('Subscribe', {
+        content_name: 'Subscription payment',
+        content_category: subscriptionType === 'renewal' ? 'subscription_renewal' : 'subscription',
+        subscription_type: subscriptionType,
+        status: 'completed',
+      });
+      setUpgradeSuccess('Payment successful! Your subscription has been activated.');
+      setActiveTab('plans');
+      router.replace('/dashboard/subscription?tab=plans', { scroll: false });
+    } else if (errorParam) {
+      const messages: Record<string, string> = {
+        missing_params: 'Invalid return from payment. Please try again.',
+        payment_failed: 'Payment was not completed. Please try again.',
+        payment_not_found: 'Payment record not found. Please contact support.',
+        plan_not_found: 'Plan not found. Please contact support.',
+        callback_failed: 'We couldn’t confirm your payment. Please contact support if you were charged.',
+      };
+      setUpgradeError(messages[errorParam] ?? `Payment error: ${errorParam}`);
+      setActiveTab('plans');
+      router.replace('/dashboard/subscription?tab=plans', { scroll: false });
+    }
+
+    const renewParam = searchParams.get('renew');
+    if (renewParam === '1' && currentPlan && canPayForCurrentPlan) {
+      setSelectedPlanId(currentPlan.id);
+      setSelectedPlanName(currentPlan.name);
+      setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+      setBillingInterval('monthly');
+      setMpesaPhone('');
+      setShowPaymentDialog(true);
+      router.replace('/dashboard/subscription', { scroll: false });
+    }
+  }, [searchParams, router, currentPlan, canPayForCurrentPlan]);
 
   // Fetch billing history
   const { data: billingData, isLoading: isLoadingBilling } = useQuery({
@@ -179,12 +273,6 @@ export default function TenantSubscriptionClient({
     },
   });
 
-  // Calculate renewal date (same as expire_date for now)
-  const renewalDate = tenant.expire_date ?? null;
-  const daysUntilRenewal = getDaysUntil(renewalDate);
-  const isExpiringSoon = daysUntilRenewal > 0 && daysUntilRenewal <= 7;
-
-  // Calculate next billing date (renewal date)
   const nextBillingDate = renewalDate;
 
   const handleUpgrade = async (planId: string, isDowngrade: boolean = false) => {
@@ -219,7 +307,7 @@ export default function TenantSubscriptionClient({
         );
       } else if (data.changeType === 'upgrade') {
         const proratedMsg = data.proratedAmount && data.proratedAmount > 0
-          ? ` You've been charged a prorated amount of $${data.proratedAmount.toFixed(2)} for the remaining days in your billing cycle.`
+          ? ` You've been charged a prorated amount of ${formatPrice(Number(data.proratedAmount), currencySymbol)} for the remaining days in your billing cycle.`
           : '';
         setUpgradeSuccess(
           `Upgrade successful! Your plan has been upgraded to ${data.plan?.name || 'the new plan'} and is now active.${proratedMsg}`
@@ -242,8 +330,124 @@ export default function TenantSubscriptionClient({
     }
   };
 
+  // PesaPal payment handler: initiate then load PesaPal in our page (embedded iframe)
+  const handlePesapalPayment = async (planId: string) => {
+    setPesapalLoading(true);
+    setUpgradeError(null);
+    try {
+      const response = await fetch('/api/pesapal/subscription/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_id: planId,
+          billing_interval: billingInterval,
+          enable_recurring: false,
+          embed: true,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate payment');
+      }
+      const data = await response.json();
+      if (data.redirect_url) {
+        const checkoutUrl = `/dashboard/subscription/pesapal-checkout?redirect_url=${encodeURIComponent(data.redirect_url)}`;
+        window.location.href = checkoutUrl;
+        return;
+      }
+      throw new Error('No redirect URL received');
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'Payment initiation failed');
+      setPesapalLoading(false);
+    }
+  };
+
+  const pollMpesaSubscriptionStatus = async (externalReference: string): Promise<boolean> => {
+    const maxAttempts = 36;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const response = await fetch(
+        `/api/tumizi/subscription/status?external_reference=${encodeURIComponent(externalReference)}`,
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      const status = String(data.status ?? '').toLowerCase();
+      if (status === 'completed') return true;
+      if (status === 'failed' || status === 'cancelled' || status === 'timeout') {
+        throw new Error('M-Pesa payment was not completed. Please try again.');
+      }
+    }
+    throw new Error('Payment is still pending. Refresh this page shortly to confirm activation.');
+  };
+
+  const handleMpesaPayment = async (planId: string) => {
+    const phone = mpesaPhone.trim().replace(/\s+/g, '');
+    if (!phone) {
+      setUpgradeError('Enter your M-Pesa phone number.');
+      return;
+    }
+
+    setMpesaLoading(true);
+    setUpgradeError(null);
+    try {
+      const response = await fetch('/api/tumizi/subscription/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_id: planId,
+          phone_number: phone,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initiate M-Pesa payment');
+      }
+
+      const externalReference =
+        data.external_reference || data.checkout_request_id || data.checkoutRequestId;
+      if (!externalReference) {
+        throw new Error('Unexpected response from payment service');
+      }
+
+      toast.message(data.message || 'Check your phone to approve the M-Pesa prompt.');
+      const completed = await pollMpesaSubscriptionStatus(externalReference);
+      if (completed) {
+        setShowPaymentDialog(false);
+        setUpgradeSuccess('Payment successful! Your subscription has been activated.');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'M-Pesa payment failed');
+    } finally {
+      setMpesaLoading(false);
+    }
+  };
+
+  // Yearly price from monthly with discount (client-side display)
+  const getYearlyPriceDisplay = (monthlyPrice: number) => {
+    const discount = yearlyDiscountPercent / 100;
+    return Math.round(monthlyPrice * 12 * (1 - discount) * 100) / 100;
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-6 max-w-7xl">
+      {paymentBusy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="rounded-xl border bg-card p-6 text-center shadow-lg">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+            <p className="mt-4 text-sm font-medium">
+              {mpesaLoading ? 'Waiting for M-Pesa confirmation…' : 'Preparing secure checkout...'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {mpesaLoading
+                ? 'Approve the STK prompt on your phone. This may take a moment.'
+                : 'Please wait while we connect you to PesaPal.'}
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Subscription & Billing</h1>
@@ -264,7 +468,7 @@ export default function TenantSubscriptionClient({
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Monthly Price</p>
                 <p className="text-xl font-bold">
-                  ${Number(currentPlan.price).toFixed(2)}
+                  {formatPlanPrice(currentPlan)}
                   <span className="text-sm font-normal text-muted-foreground">
                     {' '}/ {currentPlan.duration_months === 1 ? 'month' : `${currentPlan.duration_months} months`}
                   </span>
@@ -325,6 +529,35 @@ export default function TenantSubscriptionClient({
         </Card>
       )}
 
+      {/* Expired subscription renewal */}
+      {isExpired && currentPlan && canPayForCurrentPlan && (
+        <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <ClockIcon className="h-5 w-5 mt-0.5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+                <div>
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-100">
+                    Subscription Expired
+                  </p>
+                  <p className="text-sm mt-1 text-yellow-800 dark:text-yellow-200">
+                    Your subscription expired on <strong>{formatDate(renewalDate)}</strong>.
+                    Pay now to restore full access and continue using your store.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={openPaymentForCurrentPlan}
+                disabled={pesapalLoading}
+                className="sm:flex-shrink-0 bg-yellow-600 hover:bg-yellow-700"
+              >
+                {pesapalLoading ? 'Processing...' : 'Renew now'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trial/Expiry Warning */}
       {isExpiringSoon && currentPlan && (
         <Card className={`${
@@ -333,35 +566,46 @@ export default function TenantSubscriptionClient({
             : 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20'
         }`}>
           <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <ClockIcon className={`h-5 w-5 mt-0.5 ${
-                currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-yellow-600 dark:text-yellow-400'
-              }`} />
-              <div>
-                <p className={`font-semibold ${
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <ClockIcon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
                   currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'text-blue-900 dark:text-blue-100'
-                    : 'text-yellow-900 dark:text-yellow-100'
-                }`}>
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'Trial Period Ending Soon'
-                    : 'Renewal Reminder'}
-                </p>
-                <p className={`text-sm mt-1 ${
-                  currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? 'text-blue-800 dark:text-blue-200'
-                    : 'text-yellow-800 dark:text-yellow-200'
-                }`}>
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? `Your ${currentPlan.trial_days}-day free trial expires on ` : 'Your subscription will renew on '}
-                  <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}).
-                  {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
-                    ? ' Subscribe now to continue using the service.'
-                    : daysUntilRenewal <= 3 && ' Please ensure your payment method is up to date.'}
-                </p>
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-yellow-600 dark:text-yellow-400'
+                }`} />
+                <div>
+                  <p className={`font-semibold ${
+                    currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'text-blue-900 dark:text-blue-100'
+                      : 'text-yellow-900 dark:text-yellow-100'
+                  }`}>
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'Trial Period Ending Soon'
+                      : 'Renewal Reminder'}
+                  </p>
+                  <p className={`text-sm mt-1 ${
+                    currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? 'text-blue-800 dark:text-blue-200'
+                      : 'text-yellow-800 dark:text-yellow-200'
+                  }`}>
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? `Your ${currentPlan.trial_days}-day free trial expires on ` : 'Your subscription will renew on '}
+                    <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}).
+                    {currentPlan.trial_days && currentPlan.trial_days > 0 && daysUntilRenewal > 0 && daysUntilRenewal <= currentPlan.trial_days
+                      ? ' Subscribe now to continue using the service.'
+                      : ' Pay now to avoid interruption.'}
+                  </p>
+                </div>
               </div>
+              {canPayForCurrentPlan && (
+                <Button
+                  onClick={openPaymentForCurrentPlan}
+                  disabled={pesapalLoading}
+                  className="sm:flex-shrink-0"
+                >
+                  {pesapalLoading ? 'Processing...' : 'Pay now'}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -369,17 +613,31 @@ export default function TenantSubscriptionClient({
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="usage">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="overview"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="usage"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Usage & Limits
             <ChartBarIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="plans">
+          <TabsTrigger 
+            value="plans"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Plans & Pricing
             <CreditCardIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="billing">
+          <TabsTrigger 
+            value="billing"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Billing History
             <DocumentTextIcon className="ml-2 h-4 w-4" />
           </TabsTrigger>
@@ -595,8 +853,10 @@ export default function TenantSubscriptionClient({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {availablePlans.map((plan: any) => {
                   const isCurrentPlan = plan.id === currentPlan?.id;
-                  const isUpgrade = currentPlan && Number(plan.price) > Number(currentPlan.price);
-                  const isDowngrade = currentPlan && Number(plan.price) < Number(currentPlan.price);
+                  const currentDisplayPrice = currentPlan ? getDisplayPrice(currentPlan) : 0;
+                  const planDisplayPrice = getDisplayPrice(plan);
+                  const isUpgrade = currentPlan && planDisplayPrice > currentDisplayPrice;
+                  const isDowngrade = currentPlan && planDisplayPrice < currentDisplayPrice;
                   const features = (plan.features as any) || {};
 
                   return (
@@ -612,7 +872,7 @@ export default function TenantSubscriptionClient({
                       <CardHeader>
                         <CardTitle className="text-2xl">{plan.name}</CardTitle>
                         <div className="mt-4">
-                          <span className="text-4xl font-bold">${Number(plan.price).toFixed(2)}</span>
+                          <span className="text-4xl font-bold">{formatPlanPrice(plan)}</span>
                           <span className="text-muted-foreground ml-2">
                             / {plan.duration_months === 1 ? 'month' : `${plan.duration_months} months`}
                           </span>
@@ -682,14 +942,25 @@ export default function TenantSubscriptionClient({
                                   setSelectedPlanName(plan.name);
                                   setShowDowngradeDialog(true);
                                 } else {
-                                  handleUpgrade(plan.id, false);
+                                  // For upgrades/new subscriptions, show payment option
+                                  if (getDisplayPrice(plan) > 0) {
+                                    setSelectedPlanId(plan.id);
+                                    setSelectedPlanName(plan.name);
+                                    setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+                                    setBillingInterval('monthly');
+                                    setMpesaPhone('');
+                                    setShowPaymentDialog(true);
+                                  } else {
+                                    // Free plan, activate directly
+                                    handleUpgrade(plan.id, false);
+                                  }
                                 }
                               }}
-                              disabled={isUpgrading}
+                              disabled={isUpgrading || paymentBusy}
                               className="w-full"
                               variant={isUpgrade ? 'default' : 'outline'}
                             >
-                              {isUpgrading ? (
+                              {isUpgrading || paymentBusy ? (
                                 'Processing...'
                               ) : isUpgrade ? (
                                 <>
@@ -748,6 +1019,39 @@ export default function TenantSubscriptionClient({
 
         {/* Billing History Tab */}
         <TabsContent value="billing" className="space-y-6">
+          {/* Pay now card: show when due within 7 days (best practice: renewal CTA in billing) */}
+          {(isExpired || isExpiringSoon) && currentPlan && canPayForCurrentPlan && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <p className="font-semibold">
+                      {isExpired ? 'Subscription expired' : 'Renewal due soon'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {isExpired ? (
+                        <>
+                          Your subscription expired on <strong>{formatDate(renewalDate)}</strong>.
+                          Pay now to restore full access.
+                        </>
+                      ) : (
+                        <>
+                          Your subscription renews on <strong>{formatDate(renewalDate)}</strong> ({daysUntilRenewal} day{daysUntilRenewal !== 1 ? 's' : ''}). Pay now to avoid interruption.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={openPaymentForCurrentPlan}
+                    disabled={pesapalLoading}
+                  >
+                    {pesapalLoading ? 'Processing...' : isExpired ? 'Renew now' : 'Pay now'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Billing History</CardTitle>
@@ -772,7 +1076,11 @@ export default function TenantSubscriptionClient({
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">${Number(item.amount).toFixed(2)}</p>
+                        <p className="font-semibold">
+                          {item.currency === 'KES' || (isKenya && item.currency !== 'USD')
+                            ? formatPrice(Number(item.amount), 'Ksh')
+                            : formatPrice(Number(item.amount), currencySymbol)}
+                        </p>
                         <Badge
                           variant={
                             item.status === 'active'
@@ -829,6 +1137,177 @@ export default function TenantSubscriptionClient({
               }}
             >
               Confirm Downgrade
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Payment dialog: M-Pesa or PesaPal */}
+      <AlertDialog
+        open={showPaymentDialog}
+        onOpenChange={(open) => {
+          setShowPaymentDialog(open);
+          if (!open) {
+            setBillingInterval('monthly');
+            setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+            setMpesaPhone('');
+          }
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-semibold tracking-tight">
+              Subscribe to {selectedPlanName}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-5 pt-1">
+                <p className="text-muted-foreground text-sm">
+                  Continue to secure checkout for <strong className="text-foreground">{selectedPlanName}</strong>.
+                </p>
+                {/* PesaPal: billing interval + amount */}
+                {selectedPlanId && availablePlans.find((p: any) => p.id === selectedPlanId) && (() => {
+                  const sel = availablePlans.find((p: any) => p.id === selectedPlanId);
+                  if (!sel) return null;
+                  const monthlyDisplay = getDisplayPrice(sel);
+                  const yearlyDisplay = getYearlyPriceDisplay(monthlyDisplay);
+                  return (
+                  <>
+                    {isKenya && (
+                      <div className="space-y-3">
+                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Payment method
+                        </Label>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('mpesa')}
+                            disabled={billingInterval === 'yearly'}
+                            className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                              paymentMethod === 'mpesa'
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                            } ${billingInterval === 'yearly' ? 'cursor-not-allowed opacity-50' : ''}`}
+                          >
+                            M-Pesa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('pesapal')}
+                            className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                              paymentMethod === 'pesapal'
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                            }`}
+                          >
+                            PesaPal
+                          </button>
+                        </div>
+                        {billingInterval === 'yearly' && (
+                          <p className="text-xs text-muted-foreground">
+                            Yearly billing is available via PesaPal only.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Billing
+                      </Label>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setBillingInterval('monthly')}
+                          className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                            billingInterval === 'monthly'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                          }`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBillingInterval('yearly')}
+                          className={`flex-1 rounded-lg border-2 py-2.5 text-sm font-medium transition-all ${
+                            billingInterval === 'yearly'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border bg-muted/20 text-muted-foreground hover:border-muted-foreground/40'
+                          }`}
+                        >
+                          Yearly (save {yearlyDiscountPercent}%)
+                        </button>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-4">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Amount to Pay</p>
+                      <p className="text-2xl font-bold tracking-tight text-foreground">
+                        {paymentMethod === 'mpesa' || billingInterval === 'monthly'
+                          ? `${formatPrice(monthlyDisplay, currencySymbol)} / month`
+                          : `${formatPrice(yearlyDisplay, currencySymbol)} / year`}
+                      </p>
+                      {billingInterval === 'yearly' && paymentMethod === 'pesapal' && (
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          2 months free when billed annually
+                        </p>
+                      )}
+                    </div>
+                    {paymentMethod === 'mpesa' && isKenya ? (
+                      <div className="space-y-3">
+                        <Label htmlFor="subscription-mpesa-phone">M-Pesa phone number</Label>
+                        <Input
+                          id="subscription-mpesa-phone"
+                          type="tel"
+                          placeholder="2547XXXXXXXX or 07XXXXXXXX"
+                          value={mpesaPhone}
+                          onChange={(e) => setMpesaPhone(e.target.value)}
+                          disabled={paymentBusy}
+                        />
+                        <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                          <InformationCircleIcon className="h-4 w-4 shrink-0" />
+                          You&apos;ll receive an STK prompt on your phone to approve payment.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        <CreditCardIcon className="h-4 w-4 shrink-0" />
+                        You&apos;ll complete payment on PesaPal (card, mobile money, or other methods). You can stay on our site.
+                      </p>
+                    )}
+                  </>
+                  );
+                })()}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel
+              disabled={paymentBusy}
+              onClick={() => {
+                setBillingInterval('monthly');
+                setPaymentMethod(isKenya ? 'mpesa' : 'pesapal');
+                setMpesaPhone('');
+              }}
+              className="mt-2"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!selectedPlanId) return;
+                if (paymentMethod === 'mpesa' && isKenya) {
+                  void handleMpesaPayment(selectedPlanId);
+                  return;
+                }
+                void handlePesapalPayment(selectedPlanId);
+              }}
+              disabled={paymentBusy}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {paymentBusy
+                ? 'Please wait...'
+                : paymentMethod === 'mpesa' && isKenya
+                  ? 'Pay now'
+                  : 'Continue to PesaPal'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

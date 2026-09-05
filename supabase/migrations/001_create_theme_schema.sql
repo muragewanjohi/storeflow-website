@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS themes (
   title VARCHAR(255) NOT NULL,  -- Note: Using 'title' to match actual schema
   slug VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
-  author VARCHAR(255) DEFAULT 'StoreFlow',
+  author VARCHAR(255) DEFAULT 'DukaNest',
   version VARCHAR(50) DEFAULT '1.0.0',
   status BOOLEAN DEFAULT true,
   is_premium BOOLEAN DEFAULT false,
@@ -200,7 +200,7 @@ SELECT * FROM (VALUES
       "compareProducts": true
     }
   }'::jsonb,
-  'StoreFlow',
+  'DukaNest',
   '1.0.0'
 ),
 (
@@ -233,7 +233,7 @@ SELECT * FROM (VALUES
       "compareProducts": false
     }
   }'::jsonb,
-  'StoreFlow',
+  'DukaNest',
   '1.0.0'
 ),
 (
@@ -266,7 +266,7 @@ SELECT * FROM (VALUES
       "compareProducts": false
     }
   }'::jsonb,
-  'StoreFlow',
+  'DukaNest',
   '1.0.0'
 )) AS v(title, slug, description, status, colors, typography, config, author, version)
 WHERE NOT EXISTS (SELECT 1 FROM themes WHERE themes.slug = v.slug);

@@ -8,13 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
-import { z } from 'zod';
-
-const updateAttributeSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  slug: z.string().max(255).optional().nullable(),
-  type: z.enum(['color', 'size', 'text', 'number']).optional().nullable(),
-});
+import { updateAttributeSchema } from '@/lib/attributes/validation';
 
 interface RouteParams {
   params: Promise<{ id: string }>;

@@ -16,6 +16,7 @@ import {
   CubeIcon,
   FolderIcon,
   ShoppingCartIcon,
+  CalculatorIcon,
   UsersIcon,
   UserGroupIcon,
   Cog6ToothIcon,
@@ -34,6 +35,10 @@ import {
   ArrowTrendingUpIcon,
   PaintBrushIcon,
   FireIcon,
+  BookOpenIcon,
+  ArrowTopRightOnSquareIcon,
+  GiftIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -51,47 +56,56 @@ interface NavigationItem {
   adminOnly?: boolean;
   group?: string;
   submenu?: boolean; // Indicates this is a submenu item (indented under parent)
+  external?: boolean; // Opens in a new tab (for links outside the dashboard)
 }
 
 const navigation: NavigationItem[] = [
   // 1. Dashboard (Most important - always first)
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   
-  // 2. Orders (Second most important - revenue center)
-  { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
+  // 2. Themes (Design and customization - important for branding)
+  { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, adminOnly: true },
   
-  // 3. Products group (Catalog management)
+  // 3. Orders (Second most important - revenue center)
+  { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCartIcon },
+  { name: 'Bookings', href: '/dashboard/bookings', icon: CalendarDaysIcon },
+  { name: 'Point of Sale', href: '/dashboard/pos', icon: CalculatorIcon },
+  
+  // 4. Products group (Catalog management)
   { name: 'Products', href: '/dashboard/products', icon: CubeIcon, group: 'Products' },
   { name: 'Categories', href: '/dashboard/categories', icon: FolderIcon, group: 'Products' },
   { name: 'Attributes', href: '/dashboard/settings/attributes', icon: TagIcon, group: 'Products' },
   { name: 'Inventory', href: '/dashboard/inventory', icon: ClipboardDocumentListIcon, group: 'Products' },
   { name: 'Inventory Settings', href: '/dashboard/inventory/settings', icon: AdjustmentsHorizontalIcon, group: 'Products', adminOnly: true },
   
-  // 4. Customers (Standalone - important)
+  // 5. Customers (Standalone - important)
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
   
-  // 5. Marketing group (Sales, Promotions, Analytics)
+  // 6. Marketing group (Sales, Promotions, Analytics)
   { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Marketing' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon, group: 'Marketing' },
   
-  // 6. Content group (Website content)
+  // 7. Content group (Website content)
   { name: 'Pages', href: '/dashboard/pages', icon: DocumentTextIcon, group: 'Content' },
   { name: 'Blogs', href: '/dashboard/blogs', icon: NewspaperIcon, group: 'Content' },
   { name: 'Blog Categories', href: '/dashboard/blogs/categories', icon: TagIcon, group: 'Content', submenu: true },
   { name: 'Forms', href: '/dashboard/forms', icon: ClipboardDocumentListIcon, group: 'Content' },
   { name: 'Media Library', href: '/dashboard/media', icon: PhotoIcon, group: 'Content' },
-  { name: 'Themes', href: '/dashboard/themes', icon: PaintBrushIcon, group: 'Content', adminOnly: true },
   
-  // 7. Settings (Standalone)
+  // 8. Settings (Standalone)
   { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
   
-  // 8. Support group
+  // 9. Support group
   { name: 'Support Tickets', href: '/dashboard/support/tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
   { name: 'Platform Support', href: '/dashboard/support/landlord-tickets', icon: ChatBubbleLeftRightIcon, group: 'Support' },
+  { name: 'User Guide', href: '/help', icon: BookOpenIcon, group: 'Support', external: true },
   
-  // 9. Admin-only items
+  // 10. Subscription group (admin-only)
+  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, group: 'Subscription', adminOnly: true },
+  { name: 'Referral Rewards', href: '/dashboard/subscription/referrals', icon: GiftIcon, group: 'Subscription', adminOnly: true, submenu: true },
+
+  // 11. Admin-only items
   { name: 'Users', href: '/dashboard/users', icon: UsersIcon, adminOnly: true },
-  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCardIcon, adminOnly: true },
 ];
 
 // Catalog icon
@@ -105,6 +119,7 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const [marketingExpanded, setMarketingExpanded] = useState(false);
   const [contentExpanded, setContentExpanded] = useState(false);
   const [supportExpanded, setSupportExpanded] = useState(false);
+  const [subscriptionExpanded, setSubscriptionExpanded] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
@@ -123,16 +138,18 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
 
   // Group navigation items following e-commerce best practices:
   // 1. Dashboard (standalone)
-  // 2. Orders (standalone - most important after dashboard)
-  // 3. Products group
-  // 4. Customers (standalone)
-  // 5. Marketing group
-  // 6. Content group
-  // 7. Settings (standalone)
-  // 8. Support group
-  // 9. Admin items (standalone)
+  // 2. Themes (standalone - design and customization)
+  // 3. Orders (standalone - most important after dashboard)
+  // 4. Products group
+  // 5. Customers (standalone)
+  // 6. Marketing group
+  // 7. Content group
+  // 8. Settings (standalone)
+  // 9. Support group
+  // 10. Admin items (standalone)
   
   const dashboardItem = filteredNavigation.find((item) => item.name === 'Dashboard');
+  const themesItem = filteredNavigation.find((item) => item.name === 'Themes');
   const ordersItem = filteredNavigation.find((item) => item.name === 'Orders');
   const customersItem = filteredNavigation.find((item) => item.name === 'Customers');
   const settingsItem = filteredNavigation.find((item) => item.name === 'Settings');
@@ -140,7 +157,9 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   const marketingItems = filteredNavigation.filter((item: any) => item.group === 'Marketing');
   const contentItems = filteredNavigation.filter((item: any) => item.group === 'Content');
   const supportItems = filteredNavigation.filter((item: any) => item.group === 'Support');
-  const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group);
+  const subscriptionItems = filteredNavigation.filter((item: any) => item.group === 'Subscription');
+  // Exclude Themes from adminItems since it's already added separately above
+  const adminItems = filteredNavigation.filter((item: any) => item.adminOnly && !item.group && item.name !== 'Themes');
   
   // Build grouped navigation in the correct order using an array to maintain sequence
   const orderedGroupedNavigation: Array<{ groupName: string; items: NavigationItem[] }> = [];
@@ -150,12 +169,17 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     orderedGroupedNavigation.push({ groupName: 'Main', items: [dashboardItem] });
   }
   
-  // 2. Orders (standalone - most important)
+  // 2. Themes (standalone - design and customization)
+  if (themesItem) {
+    orderedGroupedNavigation.push({ groupName: 'Main', items: [themesItem] });
+  }
+  
+  // 3. Orders (standalone - most important)
   if (ordersItem) {
     orderedGroupedNavigation.push({ groupName: 'Main', items: [ordersItem] });
   }
   
-  // 3. Products group
+  // 4. Products group
   if (productsItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Products', items: productsItems });
   }
@@ -184,8 +208,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
   if (supportItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Support', items: supportItems });
   }
+
+  // 9. Subscription group
+  if (subscriptionItems.length > 0) {
+    orderedGroupedNavigation.push({ groupName: 'Subscription', items: subscriptionItems });
+  }
   
-  // 9. Admin items (standalone)
+  // 10. Admin items (standalone)
   if (adminItems.length > 0) {
     orderedGroupedNavigation.push({ groupName: 'Main', items: adminItems });
   }
@@ -210,6 +239,13 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
     (item) => item.group === 'Support' && (pathname === item.href || pathname.startsWith(item.href + '/'))
   );
 
+  // Check if any subscription item is active
+  const isSubscriptionActive = filteredNavigation.some(
+    (item) =>
+      item.group === 'Subscription' &&
+      (pathname === item.href || pathname.startsWith(item.href + '/')),
+  );
+
   // Auto-expand active group on mount and when pathname changes
   useEffect(() => {
     if (isProductsActive) {
@@ -217,25 +253,35 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isMarketingActive) {
       setProductsExpanded(false);
       setMarketingExpanded(true);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isContentActive) {
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(true);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
     } else if (isSupportActive) {
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(true);
+      setSubscriptionExpanded(false);
+    } else if (isSubscriptionActive) {
+      setProductsExpanded(false);
+      setMarketingExpanded(false);
+      setContentExpanded(false);
+      setSupportExpanded(false);
+      setSubscriptionExpanded(true);
     }
     // Only run when pathname or active states change, not when expanded states change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isProductsActive, isMarketingActive, isContentActive, isSupportActive]);
+  }, [pathname, isProductsActive, isMarketingActive, isContentActive, isSupportActive, isSubscriptionActive]);
 
   // Accordion handler - opens one group and closes others
   const handleGroupToggle = (groupName: string) => {
@@ -243,7 +289,8 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       (groupName === 'Products' && productsExpanded) ||
       (groupName === 'Marketing' && marketingExpanded) ||
       (groupName === 'Content' && contentExpanded) ||
-      (groupName === 'Support' && supportExpanded);
+      (groupName === 'Support' && supportExpanded) ||
+      (groupName === 'Subscription' && subscriptionExpanded);
 
     // If clicking an already expanded group, close it
     // Otherwise, close all and open the clicked one
@@ -253,18 +300,21 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
       if (groupName === 'Marketing') setMarketingExpanded(false);
       if (groupName === 'Content') setContentExpanded(false);
       if (groupName === 'Support') setSupportExpanded(false);
+      if (groupName === 'Subscription') setSubscriptionExpanded(false);
     } else {
       // Close all groups first, then open the clicked one
       setProductsExpanded(false);
       setMarketingExpanded(false);
       setContentExpanded(false);
       setSupportExpanded(false);
+      setSubscriptionExpanded(false);
       
       // Open the clicked group
       if (groupName === 'Products') setProductsExpanded(true);
       if (groupName === 'Marketing') setMarketingExpanded(true);
       if (groupName === 'Content') setContentExpanded(true);
       if (groupName === 'Support') setSupportExpanded(true);
+      if (groupName === 'Subscription') setSubscriptionExpanded(true);
     }
   };
 
@@ -321,22 +371,39 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                 <p className="px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Store Dashboard</p>
               </div>
               <ul role="list" className="space-y-6">
-                {orderedGroupedNavigation.map(({ groupName, items }) => {
+                {orderedGroupedNavigation.map(({ groupName, items }, index) => {
                   const isProductsGroup = groupName === 'Products';
                   const isMarketingGroup = groupName === 'Marketing';
                   const isContentGroup = groupName === 'Content';
                   const isSupportGroup = groupName === 'Support';
-                  const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
+                  const isSubscriptionGroup = groupName === 'Subscription';
+                  const isExpanded = isProductsGroup
+                    ? productsExpanded
+                    : isMarketingGroup
+                      ? marketingExpanded
+                      : isContentGroup
+                        ? contentExpanded
+                        : isSupportGroup
+                          ? supportExpanded
+                          : isSubscriptionGroup
+                            ? subscriptionExpanded
+                            : true;
                   const isMainGroup = groupName === 'Main';
                   
                   return (
-                    <li key={groupName}>
+                    <li key={`${groupName}-${index}`}>
                       {!isMainGroup && (
                         <button
                           type="button"
                           onClick={() => handleGroupToggle(groupName)}
                           className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                            (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                            (isProductsGroup && isProductsActive) ||
+                            (isMarketingGroup && isMarketingActive) ||
+                            (isContentGroup && isContentActive) ||
+                            (isSupportGroup && isSupportActive) ||
+                            (isSubscriptionGroup && isSubscriptionActive)
+                              ? 'text-foreground'
+                              : ''
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -352,9 +419,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                             {isSupportGroup && (
                               <ChatBubbleLeftRightIcon className="h-4 w-4" />
                             )}
+                            {isSubscriptionGroup && (
+                              <CreditCardIcon className="h-4 w-4" />
+                            )}
                             <span>{groupName}</span>
                           </div>
-                          {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
+                          {(isProductsGroup ||
+                            isMarketingGroup ||
+                            isContentGroup ||
+                            isSupportGroup ||
+                            isSubscriptionGroup) && (
                             <ChevronDownIcon
                               className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                             />
@@ -369,6 +443,33 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
                             const isItemPending = pendingHref === item.href;
+
+                            // External links open in a new tab
+                            if (item.external) {
+                              return (
+                                <li key={item.href}>
+                                  <a
+                                    href={item.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                      item.submenu ? 'px-6' : 'px-3'
+                                    } text-muted-foreground hover:bg-accent hover:text-accent-foreground`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <item.icon
+                                      className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-accent-foreground"
+                                      aria-hidden="true"
+                                    />
+                                    <span className="flex items-center gap-2">
+                                      {item.name}
+                                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-50" />
+                                    </span>
+                                  </a>
+                                </li>
+                              );
+                            }
+
                             return (
                               <li key={item.href}>
                                 <Link
@@ -432,22 +533,39 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
               </div>
             )}
             <ul role="list" className="flex flex-1 flex-col gap-y-4">
-              {orderedGroupedNavigation.map(({ groupName, items }) => {
+              {orderedGroupedNavigation.map(({ groupName, items }, index) => {
                 const isProductsGroup = groupName === 'Products';
                 const isMarketingGroup = groupName === 'Marketing';
                 const isContentGroup = groupName === 'Content';
                 const isSupportGroup = groupName === 'Support';
-                const isExpanded = isProductsGroup ? productsExpanded : (isMarketingGroup ? marketingExpanded : (isContentGroup ? contentExpanded : (isSupportGroup ? supportExpanded : true)));
+                const isSubscriptionGroup = groupName === 'Subscription';
+                const isExpanded = isProductsGroup
+                  ? productsExpanded
+                  : isMarketingGroup
+                    ? marketingExpanded
+                    : isContentGroup
+                      ? contentExpanded
+                      : isSupportGroup
+                        ? supportExpanded
+                        : isSubscriptionGroup
+                          ? subscriptionExpanded
+                          : true;
                 const isMainGroup = groupName === 'Main';
                 
                 return (
-                  <li key={groupName}>
+                  <li key={`${groupName}-${index}`}>
                     {!collapsed && !isMainGroup && (
                       <button
                         type="button"
                         onClick={() => handleGroupToggle(groupName)}
                         className={`w-full flex items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors ${
-                          (isProductsGroup && isProductsActive) || (isMarketingGroup && isMarketingActive) || (isContentGroup && isContentActive) || (isSupportGroup && isSupportActive) ? 'text-foreground' : ''
+                          (isProductsGroup && isProductsActive) ||
+                          (isMarketingGroup && isMarketingActive) ||
+                          (isContentGroup && isContentActive) ||
+                          (isSupportGroup && isSupportActive) ||
+                          (isSubscriptionGroup && isSubscriptionActive)
+                            ? 'text-foreground'
+                            : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -463,9 +581,16 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                           {isSupportGroup && (
                             <ChatBubbleLeftRightIcon className="h-4 w-4" />
                           )}
+                          {isSubscriptionGroup && (
+                            <CreditCardIcon className="h-4 w-4" />
+                          )}
                           <span>{groupName}</span>
                         </div>
-                        {(isProductsGroup || isMarketingGroup || isContentGroup || isSupportGroup) && (
+                        {(isProductsGroup ||
+                          isMarketingGroup ||
+                          isContentGroup ||
+                          isSupportGroup ||
+                          isSubscriptionGroup) && (
                           <ChevronDownIcon
                             className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
                           />
@@ -480,6 +605,37 @@ export default function DashboardSidebar({ user, tenant, mobileMenuOpen: externa
                               ? pathname === item.href
                               : pathname === item.href || pathname.startsWith(item.href + '/');
                           const isItemPending = pendingHref === item.href;
+
+                          // External links open in a new tab
+                          if (item.external) {
+                            return (
+                              <li key={item.href}>
+                                <a
+                                  href={item.href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`group flex gap-x-3 rounded-lg py-2.5 text-sm font-medium transition-colors ${
+                                    item.submenu ? 'px-6' : 'px-3'
+                                  } ${
+                                    collapsed ? 'justify-center' : ''
+                                  } text-muted-foreground hover:bg-accent hover:text-accent-foreground`}
+                                  title={collapsed ? item.name : undefined}
+                                >
+                                  <item.icon
+                                    className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-accent-foreground"
+                                    aria-hidden="true"
+                                  />
+                                  {!collapsed && (
+                                    <span className="flex items-center gap-2">
+                                      {item.name}
+                                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-50" />
+                                    </span>
+                                  )}
+                                </a>
+                              </li>
+                            );
+                          }
+
                           return (
                             <li key={item.href}>
                               <Link

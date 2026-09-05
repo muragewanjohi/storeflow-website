@@ -80,10 +80,14 @@ export const customerAddressSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().min(1, 'Phone is required'),
   address: z.string().min(1, 'Address is required'),
-  city: z.string().min(1, 'City is required'),
+  city: z.string().optional().nullable(),
   state_id: z.string().uuid().optional().nullable(),
   country_id: z.string().uuid().optional().nullable(),
+  // Allow state and country as strings for backward compatibility and when IDs are not available
+  state: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
   postal_code: z.string().optional().nullable(),
+  address_label: z.string().max(50).optional().nullable(),
   is_default: z.boolean().default(false),
 });
 

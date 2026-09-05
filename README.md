@@ -1,13 +1,13 @@
-# StoreFlow - Multi-Tenant Ecommerce Platform
+# DukaNest - Multi-Tenant Ecommerce Platform
 ## Next.js + Supabase + Vercel
 
 **Slogan:** "Start Your Store. Grow Your Business. It's That Simple."
 
 ---
 
-## 📖 What is StoreFlow?
+## 📖 What is DukaNest?
 
-StoreFlow is a platform that lets you create and manage multiple online stores from one place. Think of it as a system where:
+DukaNest is a platform that lets you create and manage multiple online stores from one place. Think of it as a system where:
 
 - **Platform Owners (Landlords)** can create and manage many different online stores
 - **Store Owners (Tenants)** get their own complete online store with a unique web address (like `mystore.dukanest.com`)
@@ -15,35 +15,44 @@ StoreFlow is a platform that lets you create and manage multiple online stores f
 
 ### How It Works
 
-1. **A platform owner creates a new store** - They set up a store for a business owner, choose a name and web address
-2. **The store owner gets their own dashboard** - They can add products, manage orders, see customers, and customize their store's appearance
-3. **Customers visit the store** - They see a fully functional online store where they can browse products, add items to cart, and make purchases
-4. **Everything is separate and secure** - Each store's data is completely isolated, so store owners can only see and manage their own products, orders, and customers
+1. **A business owner starts a free trial in minutes** - They register their store (now optimized for Google-first signup), choose a subdomain, and get instant dashboard access.
+2. **DukaNest provisions the store automatically** - The tenant storefront, default Multipurpose theme, core pages, settings, and onboarding content are set up for them.
+3. **The owner runs operations from one dashboard** - They manage products, inventory, orders, customers, promotions, content, and support from a single place.
+4. **Customers shop on a branded storefront** - Each tenant has a fully functional online shop with catalog, cart, checkout, and payment flows.
+5. **Data stays isolated and secure per tenant** - Auth, role checks, and tenant scoping ensure each store only accesses its own data.
+6. **Analytics and notifications keep owners informed** - Real-time insights and alerting help owners make faster decisions and respond quickly.
 
 ### What Store Owners Can Do
 
-- **Manage Products** - Add, edit, and organize products with images, descriptions, and prices
-- **Handle Orders** - Process orders, update shipping status, and manage inventory
-- **Track Customers** - See customer information, order history, and manage customer accounts
-- **Customize Their Store** - Choose from different themes, customize colors and fonts, and create custom pages
-- **Manage Content** - Create blog posts, custom pages, and forms for their store
-- **View Analytics** - See sales reports, revenue trends, and customer insights
+- **Manage Catalog & Inventory** - Add/edit products, categories, attributes, variants, and stock with media uploads.
+- **Run Order Operations** - Process orders, update statuses, handle delivery flows, and monitor payment states.
+- **Built-In Sales & Promotions** - Run campaigns, promotions, and growth offers directly from the dashboard to increase conversions.
+- **Understand Customers** - View customer profiles, order history, addresses, and engagement patterns.
+- **Customize Storefront Experience** - Apply themes, tune branding, and configure storefront settings.
+- **Publish Content & Campaigns** - Manage blogs, pages, forms, and sales/promotional campaigns.
+- **Track Performance in Detail** - Monitor revenue, traffic, conversion, product performance, and real-time analytics.
+- **Setup Delivery Zones** - Configure delivery areas, pricing logic, and fulfillment coverage for your store.
+- **Manage Support & Operations** - Handle support tickets, settings, domains, and platform-facing workflows.
 
-### What Makes StoreFlow Special
+### What Makes DukaNest Special
 
-- **No Coding Required** - Store owners can set up and manage their entire store through an easy-to-use dashboard
-- **Multiple Themes** - Choose from pre-designed themes that work for different types of businesses (fashion, electronics, groceries, etc.)
-- **Complete Ecommerce Features** - Everything needed to run an online store: products, shopping cart, checkout, payments, and order management
-- **Secure & Isolated** - Each store's data is completely separate and secure, so there's no risk of one store seeing another's information
-- **Scalable** - The platform can handle thousands of stores, each with their own products, customers, and orders
+- **Mobile-First Direction** - Built for the way your users already work (mostly on phones), with Flutter apps and offline-first sync on the roadmap.
+- **Fast Onboarding** - Google-first registration with reduced friction gets new stores live quickly.
+- **No Coding Required** - Owners can launch and run a full store from an intuitive dashboard.
+- **Complete Commerce Stack** - Catalog, orders, customers, content, analytics, and payments in one platform.
 
-In simple terms, StoreFlow is like a shopping mall where each store is completely independent, but they all share the same infrastructure and management system behind the scenes.
+- **Kenya-Ready Payments** - Native M-Pesa and Pesapal workflows for local market needs.
+- **Secure Multi-Tenancy** - Strong tenant isolation, role-based access control, and robust auth/MFA patterns.
+- **Scalable Platform Architecture** - Designed to support many independent stores on shared infrastructure.
+- **Operational Visibility** - Rich analytics, notifications, and reporting for data-driven decisions.
+
+In simple terms, DukaNest is like a shopping mall where each store is completely independent, but they all share the same infrastructure and management system behind the scenes.
 
 ---
 
 ## 🚀 Project Overview
 
-StoreFlow is a modern, multi-tenant ecommerce platform built with:
+DukaNest is a modern, multi-tenant ecommerce platform built with:
 - **Next.js 14+** (App Router, Server Components, TypeScript)
 - **Supabase** (PostgreSQL database, Authentication, Storage, RLS)
 - **Vercel** (Hosting, Multi-Tenant Platform, Edge Functions)
@@ -112,7 +121,7 @@ storeflow/
 - **Zod** - Schema validation
 - **React Hook Form** - Form handling
 - **TanStack Query** - Data fetching
-- **Pesapal** - Payment processing (Kenya)
+- **M-Pesa + Pesapal** - Payment processing (Kenya)
 
 ---
 
@@ -125,6 +134,7 @@ storeflow/
 - **[SECURITY.md](./docs/SECURITY.md)** - Row-Level Security (RLS) implementation guide
 - **[PRISMA_EXPLANATION.md](./docs/PRISMA_EXPLANATION.md)** - Prisma ORM guide
 - **[POSTMAN_COLLECTION_GUIDE.md](./docs/POSTMAN_COLLECTION_GUIDE.md)** - API testing with Postman
+- **[GOOGLE_MAPS_SETUP.md](./docs/GOOGLE_MAPS_SETUP.md)** - Google Maps API setup for address autocomplete
 
 **External Documentation:**
 All migration and planning docs are in the [`../docs/`](../docs/) folder.
@@ -188,48 +198,102 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed setup instructions.
 
 ## 📋 Development Roadmap
 
-See [`../docs/NODEJS_MIGRATION_UPDATED.md`](../docs/NODEJS_MIGRATION_UPDATED.md) for the complete 49-day roadmap.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`docs/mobile-first-flutter-roadmap.md`](docs/mobile-first-flutter-roadmap.md) for full planning detail.
 
-### Current Status: Day 7 Complete ✅
+### ✅ Implemented Features (Current Codebase)
 
-**Completed:**
-- ✅ Project initialization (Day 6)
-- ✅ Development tools setup (Day 7)
-- ✅ Documentation created (Day 7)
+#### Multi-tenant Platform Core
+- Tenant-per-subdomain architecture (`tenant.dukanest.com`) with tenant context resolution
+- Tenant data isolation with Supabase/Postgres + Prisma + RLS patterns
+- Landlord/admin capabilities for tenant and plan management
+- Dynamic tenant routing for storefront and dashboard experiences
 
-**Next Steps:**
-- Day 8: Database schema design
-- Day 9: Row-Level Security setup
-- Day 10: Tenant resolution system
+#### Authentication & Access Control
+- Tenant and landlord auth flows
+- Role-based access (`tenant_admin`, `tenant_staff`, `landlord`)
+- MFA support for tenant and landlord login flows
+- Trusted devices and password reset/account recovery flows
+- Google-first registration UX with email/password fallback
 
-### Quick Overview:
+#### Storefront (Customer-Facing)
+- Tenant storefront pages and shared layout system
+- Product catalog, categories, product detail, cart, checkout, and order tracking
+- Blog/pages/forms rendering for tenant-managed content
+- Theme-driven storefront customization
 
-**Week 1: Preparation** ✅
-- Architecture study
-- Database schema design
-- Project initialization
-- Development tools
+#### Dashboard (Store Owner)
+- Product, category, attribute, inventory, and media management
+- Order and customer management
+- Sales/promotions and analytics pages
+- Theme customization and preview flows
+- Domain/settings/support/subscription management
 
-**Week 2-3: Foundation** (Upcoming)
-- Multi-tenancy core
-- Authentication
-- Tenant management
+#### Content & Marketing
+- Blog and blog category management
+- Page builder/content pages and form builder + submissions
+- Social sharing + Open Graph/Twitter metadata integration
 
-**Week 4-6: Features** (Planned)
-- Products, Orders, Customers
-- Payment integration
-- Content management
+#### Analytics
+- Tracking endpoints (sessions, page views, events)
+- Dashboard analytics modules (overview, sales, revenue, traffic, customers, conversion, product performance, geographic, realtime)
+- Export/report-related analytics capabilities
 
-**Week 7: Launch** (Planned)
-- Testing
-- Documentation
-- Deployment
+#### Payments & Billing
+- M-Pesa subscription flows (initiate, callback, status)
+- Pesapal subscription/callback/IPN flows
+- Subscription lifecycle and scheduled downgrade/expiry processing
+
+#### Notifications & Support
+- In-app notification APIs and unread counts
+- Customer/store support ticket flows and message threads
+- Admin support ticket management tools
+
+#### Platform Operations & Quality
+- Type-check, lint, unit testing, Playwright e2e support
+- Deployment verification/smoke test scripts
+- Vercel-oriented multi-tenant deployment helpers
+
+### 🚧 In Progress / Next Up
+
+#### Immediate (Mobile-First Phase 1)
+- Mobile-first registration optimization (Google-first, fewer fields, default Multipurpose theme)
+- Mobile-first dashboard UX improvements (navigation + high-usage page optimization)
+- Mobile API foundation (`/api/v1/mobile/*`) with standardized response envelope
+
+#### Near-Term (Mobile App Foundation)
+- Token-based mobile auth hardening and endpoint parity
+- Push notification infrastructure (FCM device registration + dispatch)
+- Sync API foundation for offline-capable clients
+
+### 🧭 Planned Features (Mobile & Growth)
+
+#### Flutter Apps
+- Flutter Shop Owner app (Android + iOS) for core operations from phone
+- Flutter Customer storefront app with checkout and order tracking
+
+#### Offline-First Capability
+- Local-first data caching on mobile
+- Action queue and reconnect sync engine
+- Conflict handling and retry/idempotency controls
+
+#### PWA & Mobile Web
+- Service worker, install prompt, and offline-safe web enhancements
+- Improved mobile media/camera workflows for product creation
+
+#### Business Growth Enhancements
+- Deeper social commerce and channel integrations
+- Additional automation/marketing tooling
+- Ongoing analytics and operational reliability improvements
+
+For priorities, sequencing, and implementation details, see:
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/mobile-first-flutter-roadmap.md`](docs/mobile-first-flutter-roadmap.md)
 
 ---
 
 ## 🎨 Theme System
 
-StoreFlow uses a **component-based theme architecture**.
+DukaNest uses a **component-based theme architecture**.
 
 - Each theme is a React component library
 - Themes stored in `src/themes/`

@@ -1,69 +1,97 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { ImageWithFallback } from './image-with-fallback';
+import { ArrowRight, Play, CheckCircle2 } from 'lucide-react';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { HeroMockups } from './hero-mockups';
+
+const bullets = [
+  'Own Domain',
+  'M-Pesa Payments',
+  'Expense & COGS Tracking',
+  'Mobile App Included',
+];
 
 export function Hero() {
   return (
-    <section id="home" className="relative overflow-hidden py-16 lg:py-24 bg-gradient-to-br from-white to-[#f6faff]">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#0025cc]/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#0025cc]/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1000ms' }}></div>
+    <section
+      id="home"
+      className="relative overflow-hidden pt-20"
+      style={{ background: 'linear-gradient(160deg, #ffffff 0%, #f6faff 50%, #eef4ff 100%)' }}
+    >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-32 top-1/4 h-[500px] w-[500px] rounded-full bg-[#0B33B7]/8 blur-[100px]" />
+        <div className="absolute -right-32 bottom-1/4 h-[400px] w-[400px] rounded-full bg-[#082a94]/10 blur-[80px]" />
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center min-h-[600px] lg:min-h-[700px]">
-          {/* Left Content */}
-          <div className="space-y-8 lg:ml-5">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 text-[#0c0528]">
-              <span className="text-base">{`Our Platform, Your Success Icon `}</span>
-              <span className="text-xl">🎯</span>
-            </div>
-
-            {/* Main Heading */}
-            <h1 className="text-5xl lg:text-6xl font-bold text-[#0c0528] leading-tight">
-              Build your Online Shop site within{' '}
-              <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-                minutes
+      <div className="container relative z-10 mx-auto px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        <div className="grid w-full items-start gap-12 lg:grid-cols-2 lg:gap-16">
+          <div className="space-y-8 lg:sticky lg:top-24 lg:py-4">
+            <h1 className="text-[clamp(2.25rem,5.5vw,3.75rem)] font-bold leading-[1.08] tracking-tight text-[#0c0528]">
+              <span className="block">Own Your Online Store.</span>
+              <span className="block bg-gradient-to-r from-[#0B33B7] to-[#082a94] bg-clip-text text-transparent">
+                Grow Your Business.
               </span>
             </h1>
 
-            {/* Description */}
-            <p className="text-lg text-[#8d8d8d] leading-relaxed">
-              Create your own online store with a unique web address and dedicated dashboard. Manage products, payments, and sales effortlessly. Everything you need to grow your business is just a click away. Start today and simplify your e-commerce journey.
+            <p className="max-w-xl text-lg leading-relaxed text-[#555]">
+              Sell products, accept payments, track profits, and manage everything from one place.
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start">
-              <Link 
-                href="/pricing" 
-                className="group bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white px-8 py-4 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all flex items-center gap-2"
+            <ul className="space-y-3">
+              {bullets.map((item) => (
+                <li key={item} className="flex items-center gap-2.5 text-[#0c0528]">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[#0B33B7]" />
+                  <span className="font-medium">{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex flex-col gap-4">
+              <Link
+                href="/register"
+                onClick={() =>
+                  trackMetaPixelEvent('Lead', {
+                    content_name: 'Create your own store - Free for 30 days',
+                    content_category: 'hero',
+                  })
+                }
+                className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0B33B7] to-[#082a94] px-8 py-4 text-lg font-semibold text-white shadow-[0_20px_40px_-12px_rgba(11,51,183,0.45)] sm:w-fit"
               >
-                Get Started Now
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                Create your own store &mdash; Free for 30 days
+                <ArrowRight className="h-5 w-5" />
               </Link>
-              <Link 
-                href="/pricing" 
-                className="bg-white text-[#0025cc] px-8 py-4 rounded-full border-2 border-[#0025cc] hover:bg-[#0025cc] hover:text-white transition-all flex items-center justify-center gap-2"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </Link>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <Link
+                  href="/register"
+                  onClick={() =>
+                    trackMetaPixelEvent('Lead', {
+                      content_name: 'Start Free Trial',
+                      content_category: 'hero',
+                    })
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#0B33B7]/25 bg-white px-8 py-3.5 font-semibold text-[#0B33B7]"
+                >
+                  Start Free Trial
+                </Link>
+                <Link
+                  href="/demo-stores"
+                  onClick={() =>
+                    trackMetaPixelEvent('Lead', {
+                      content_name: 'Watch Demo',
+                      content_category: 'hero',
+                    })
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-[#0B33B7]/20 bg-white px-8 py-3.5 font-semibold text-[#0B33B7]"
+                >
+                  <Play className="h-5 w-5" />
+                  Watch Demo
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* Right Content - Hero Image */}
-          <div className="relative flex items-end justify-end self-stretch">
-            <div className="relative w-full lg:w-[130%] xl:w-[150%] -mr-0 lg:-mr-[28px] xl:-mr-[60px] h-full">
-              <ImageWithFallback
-                alt="Build your online shop"
-                src="/hero_image.png"
-                className="w-full h-full object-contain object-bottom"
-              />
-            </div>
-          </div>
+          <HeroMockups />
         </div>
       </div>
     </section>

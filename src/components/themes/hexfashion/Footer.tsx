@@ -15,9 +15,9 @@ export default function HexFashionFooter() {
   const footerLinks = {
     shop: [
       { name: 'New Arrivals', href: '/products?sort=newest' },
-      { name: 'Tops', href: '/products?category=tops' },
-      { name: 'Bottoms', href: '/products?category=bottoms' },
-      { name: 'Accessories', href: '/products?category=accessories' },
+      { name: 'Tops', href: '/collections/tops' },
+      { name: 'Bottoms', href: '/collections/bottoms' },
+      { name: 'Accessories', href: '/collections/accessories' },
     ],
     customer: [
       { name: 'Size Guide', href: '/size-guide' },

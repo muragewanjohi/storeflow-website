@@ -149,9 +149,34 @@ export default async function ProductsPage({
       products = searchProductIds
         .map(id => productMap.get(id))
         .filter((p): p is NonNullable<typeof p> => p !== undefined)
-        .slice(skip, skip + limit);
+        .slice(skip, skip + limit)
+        .map((product: any) => {
+          const image = typeof product.image === 'string' ? product.image.trim() : product.image;
+          const safeImage = image;
+          return {
+            ...product,
+            image: safeImage,
+            price: typeof product.price?.toNumber === 'function' ? product.price.toNumber() : Number(product.price),
+            created_at:
+              product.created_at instanceof Date
+                ? product.created_at.toISOString()
+                : product.created_at,
+          };
+        });
     } else {
-      products = productsData;
+      products = productsData.map((product: any) => {
+        const image = typeof product.image === 'string' ? product.image.trim() : product.image;
+        const safeImage = image;
+        return {
+          ...product,
+          image: safeImage,
+          price: typeof product.price?.toNumber === 'function' ? product.price.toNumber() : Number(product.price),
+          created_at:
+            product.created_at instanceof Date
+              ? product.created_at.toISOString()
+              : product.created_at,
+        };
+      });
     }
 
     // Calculate pagination metadata

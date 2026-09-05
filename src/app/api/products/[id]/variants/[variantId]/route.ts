@@ -31,6 +31,7 @@ const updateVariantSchema = z.object({
   // New: Multiple attributes array
   attributes: z.array(variantAttributeSchema).optional(),
   price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
+  cost_price: z.number().min(0).optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
   stock_quantity: z.number().int().min(0).optional(),
   sku: z.string().max(100).optional().nullable(),
   image: z.string().url().optional().nullable(),
@@ -77,6 +78,7 @@ export async function PUT(
       if (validatedData.attribute_id !== undefined) updateData.attribute_id = validatedData.attribute_id;
       if (validatedData.attribute_value_id !== undefined) updateData.attribute_value_id = validatedData.attribute_value_id;
       if (validatedData.price !== undefined) updateData.price = validatedData.price;
+      if (validatedData.cost_price !== undefined) updateData.cost_price = validatedData.cost_price;
       if (validatedData.stock_quantity !== undefined) updateData.stock_quantity = validatedData.stock_quantity;
       if (validatedData.sku !== undefined) updateData.sku = validatedData.sku;
       if (validatedData.image !== undefined) updateData.image = validatedData.image;

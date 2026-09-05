@@ -8,14 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
-import { z } from 'zod';
-
-const createAttributeValueSchema = z.object({
-  value: z.string().min(1).max(255),
-  color_code: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
-  // Note: Images are stored at variant level, not attribute value level
-  // This keeps attributes reusable across products
-});
+import { createAttributeValueSchema } from '@/lib/attributes/validation';
 
 interface RouteParams {
   params: Promise<{ id: string }>;

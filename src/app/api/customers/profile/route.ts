@@ -10,6 +10,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerUpdateSchema } from '@/lib/customers/validation';
 import { getCurrentCustomer } from '@/lib/customers/get-current-customer';
+import { serializeStoredAddress } from '@/lib/customers/address-storage';
 
 /**
  * GET /api/customers/profile - Get current customer profile
@@ -108,6 +109,37 @@ export async function PUT(request: NextRequest) {
         email_verified: true,
       },
     });
+
+    // Seed the delivery-address book from profile once, so checkout can reuse it.
+    if (validatedData.address?.trim()) {
+      const existingAddress = await prisma.user_delivery_addresses.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          user_id: customer.id,
+        },
+        select: { id: true },
+      });
+
+      if (!existingAddress) {
+        await prisma.user_delivery_addresses.create({
+          data: {
+            tenant_id: tenant.id,
+            user_id: customer.id,
+            name: validatedData.name,
+            email: updatedCustomer.email,
+            phone: validatedData.mobile || null,
+            address: serializeStoredAddress(validatedData.address, {
+              state: validatedData.state,
+              country: validatedData.country,
+              addressLabel: 'Default',
+            }),
+            city: validatedData.city || null,
+            postal_code: validatedData.postal_code || null,
+            is_default: true,
+          },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

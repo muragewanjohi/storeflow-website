@@ -1,515 +1,757 @@
 /**
  * User Guide Content Component
  * 
- * Displays user guide with images and interactive sections
+ * Modern help center inspired by Medusa's user guide structure
+ * Features: Sticky left sidebar navigation, sticky right sidebar table of contents,
+ *           scrollable center content, next/prev navigation, internal article linking
+ * 
+ * Internal Article Linking:
+ *   In the rich text editor (admin), you can link to other articles using:
+ *     href="/help?article=ARTICLE_SLUG"
+ *   Example: <a href="/help?article=managing-orders">Managing Orders</a>
+ *   The public help page will intercept these links and navigate to the article.
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  ChevronDownIcon, 
-  ChevronUpIcon,
   ShoppingCartIcon,
   UserIcon,
+  UserGroupIcon,
+  UsersIcon,
   QuestionMarkCircleIcon,
   MagnifyingGlassIcon,
   CreditCardIcon,
   TruckIcon,
   HeartIcon,
   EnvelopeIcon,
+  XMarkIcon,
+  BookOpenIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  Bars3Icon,
+  HomeIcon,
+  PaintBrushIcon,
+  CubeIcon,
+  FireIcon,
+  DocumentTextIcon,
+  Cog6ToothIcon,
+  ChatBubbleLeftRightIcon,
+  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
+
+// Icon mapping
+const iconMap: Record<string, typeof UserIcon> = {
+  'UserIcon': UserIcon,
+  'UserGroupIcon': UserGroupIcon,
+  'UsersIcon': UsersIcon,
+  'ShoppingCartIcon': ShoppingCartIcon,
+  'QuestionMarkCircleIcon': QuestionMarkCircleIcon,
+  'CreditCardIcon': CreditCardIcon,
+  'TruckIcon': TruckIcon,
+  'HeartIcon': HeartIcon,
+  'EnvelopeIcon': EnvelopeIcon,
+  'BookOpenIcon': BookOpenIcon,
+  'HomeIcon': HomeIcon,
+  'PaintBrushIcon': PaintBrushIcon,
+  'CubeIcon': CubeIcon,
+  'FireIcon': FireIcon,
+  'DocumentTextIcon': DocumentTextIcon,
+  'Cog6ToothIcon': Cog6ToothIcon,
+  'ChatBubbleLeftRightIcon': ChatBubbleLeftRightIcon,
+  'RocketLaunchIcon': RocketLaunchIcon,
+};
+
+interface Article {
+  id: string;
+  title: string;
+  slug: string | null;
+  content: string;
+  image: string | null;
+  image_alt: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  is_popular: boolean | null;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string | null;
+  icon: string | null;
+  color: string | null;
+  bg_color: string | null;
+  sort_order: number | null;
+  is_active: boolean | null;
+  articles: Article[];
+}
 
 interface UserGuideContentProps {
   tenantName?: string | null;
+  categories: Category[];
 }
 
-export default function UserGuideContent({ tenantName }: UserGuideContentProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['getting-started']));
+export default function UserGuideContent({ tenantName, categories: dbCategories }: Readonly<UserGuideContentProps>) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const toggleSection = (sectionId: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId);
-    } else {
-      newExpanded.add(sectionId);
+  // Map database categories to component format
+  const categories = useMemo(() => {
+    return dbCategories.map(cat => ({
+      ...cat,
+      icon: cat.icon ? (iconMap[cat.icon] || BookOpenIcon) : BookOpenIcon,
+    }));
+  }, [dbCategories]);
+
+  // Flatten all articles into a sequential list for prev/next navigation
+  const allArticles = useMemo(() => {
+    const articles: { article: Article; categoryId: string; categoryName: string }[] = [];
+    for (const category of categories) {
+      for (const article of category.articles) {
+        articles.push({ article, categoryId: category.id, categoryName: category.name });
+      }
     }
-    setExpandedSections(newExpanded);
+    return articles;
+  }, [categories]);
+
+  // Find current article index in the flat list
+  const currentArticleIndex = useMemo(() => {
+    return allArticles.findIndex(a => a.article.id === selectedArticle);
+  }, [allArticles, selectedArticle]);
+
+  // Previous and next articles
+  const prevArticle = currentArticleIndex > 0 ? allArticles[currentArticleIndex - 1] : null;
+  const nextArticle = currentArticleIndex < allArticles.length - 1 ? allArticles[currentArticleIndex + 1] : null;
+
+  // Navigate to an article by slug
+  const navigateToArticleBySlug = useCallback((slug: string) => {
+    for (const category of categories) {
+      const article = category.articles.find(a => a.slug === slug);
+      if (article) {
+        setSelectedArticle(article.id);
+        setSelectedCategory(category.id);
+        const newExpanded = new Set(expandedCategories);
+        newExpanded.add(category.id);
+        setExpandedCategories(newExpanded);
+        // Scroll content to top
+        if (contentScrollRef.current) {
+          contentScrollRef.current.scrollTop = 0;
+        }
+        return true;
+      }
+    }
+    return false;
+  }, [categories, expandedCategories]);
+
+  // Navigate to an article
+  const navigateToArticle = useCallback((articleId: string, categoryId: string) => {
+    setSelectedArticle(articleId);
+    setSelectedCategory(categoryId);
+    const newExpanded = new Set(expandedCategories);
+    newExpanded.add(categoryId);
+    setExpandedCategories(newExpanded);
+    // Scroll content to top
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTop = 0;
+    }
+  }, [expandedCategories]);
+
+  // Handle URL query params for direct article linking
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const articleSlug = params.get('article');
+    if (articleSlug) {
+      navigateToArticleBySlug(articleSlug);
+    }
+  }, [navigateToArticleBySlug]);
+
+  // Set default selected category and article on mount
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      const firstCategory = categories[0];
+      setSelectedCategory(firstCategory.id);
+      setExpandedCategories(new Set([firstCategory.id]));
+      if (firstCategory.articles.length > 0) {
+        setSelectedArticle(firstCategory.articles[0].id);
+      }
+    }
+  }, [categories, selectedCategory]);
+
+  const toggleCategory = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
   };
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          User Guide
-        </h1>
-        <p className="text-xl text-gray-600">
-          Everything you need to know about shopping at {tenantName || 'our store'}
-        </p>
-      </div>
+  // Get current article
+  const currentArticle = useMemo(() => {
+    if (!selectedArticle) return null;
+    for (const category of categories) {
+      const article = category.articles.find(a => a.id === selectedArticle);
+      if (article) return article;
+    }
+    return null;
+  }, [selectedArticle, categories]);
 
-      {/* Quick Navigation */}
-      <div className="bg-gray-50 rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Quick Navigation</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <a href="#getting-started" className="flex flex-col items-center p-3 bg-white rounded-lg hover:shadow-md transition">
-            <UserIcon className="w-8 h-8 text-blue-600 mb-2" />
-            <span className="text-sm font-medium">Getting Started</span>
-          </a>
-          <a href="#shopping" className="flex flex-col items-center p-3 bg-white rounded-lg hover:shadow-md transition">
-            <ShoppingCartIcon className="w-8 h-8 text-green-600 mb-2" />
-            <span className="text-sm font-medium">Shopping</span>
-          </a>
-          <a href="#account" className="flex flex-col items-center p-3 bg-white rounded-lg hover:shadow-md transition">
-            <UserIcon className="w-8 h-8 text-purple-600 mb-2" />
-            <span className="text-sm font-medium">My Account</span>
-          </a>
-          <a href="#faq" className="flex flex-col items-center p-3 bg-white rounded-lg hover:shadow-md transition">
-            <QuestionMarkCircleIcon className="w-8 h-8 text-orange-600 mb-2" />
-            <span className="text-sm font-medium">FAQ</span>
-          </a>
-        </div>
-      </div>
+  // Detect if content is HTML
+  const isHtmlContent = (content: string) => {
+    return /<[a-z][\s\S]*>/i.test(content);
+  };
 
-      {/* Getting Started Section */}
-      <section id="getting-started" className="mb-12">
-        <div 
-          className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer"
-          onClick={() => toggleSection('getting-started')}
-        >
-          <div className="p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <UserIcon className="w-6 h-6 text-blue-600" />
-              Getting Started
-            </h2>
-            {expandedSections.has('getting-started') ? (
-              <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-            ) : (
-              <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
-          {expandedSections.has('getting-started') && (
-            <div className="px-6 pb-6 space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Creating an Account</h3>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700 mb-4">
-                      Creating an account allows you to track orders, save addresses, and enjoy faster checkout.
-                    </p>
-                    <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                      <li>Click &quot;Sign Up&quot; or &quot;Create Account&quot; in the header</li>
-                      <li>Fill in your information (name, email, password)</li>
-                      <li>Verify your email address</li>
-                      <li>Start shopping!</li>
-                    </ol>
-                  </div>
-                  {/* Screenshot */}
-                  <div className="rounded-lg overflow-hidden border border-gray-200">
-                    <Image
-                      src="/images/user-guide/signup-page.png"
-                      alt="Customer registration form"
-                      width={1200}
-                      height={800}
-                      className="w-full h-auto"
-                      unoptimized
-                    />
-                  </div>
-                </div>
-              </div>
+  // Extract headings from content for table of contents (supports both HTML and Markdown)
+  const tableOfContents = useMemo(() => {
+    if (!currentArticle) return [];
+    
+    const headings: { id: string; text: string; level: number }[] = [];
+    const content = currentArticle.content;
+
+    if (isHtmlContent(content)) {
+      const h2Regex = /<h2[^>]*>(.*?)<\/h2>/gi;
+      const h3Regex = /<h3[^>]*>(.*?)<\/h3>/gi;
+      const allMatches: { text: string; level: number; index: number }[] = [];
+      
+      let match;
+      while ((match = h2Regex.exec(content)) !== null) {
+        const text = match[1].replace(/<[^>]*>/g, '').trim();
+        if (text) {
+          allMatches.push({ text, level: 2, index: match.index });
+        }
+      }
+      while ((match = h3Regex.exec(content)) !== null) {
+        const text = match[1].replace(/<[^>]*>/g, '').trim();
+        if (text) {
+          allMatches.push({ text, level: 3, index: match.index });
+        }
+      }
+      
+      allMatches.sort((a, b) => a.index - b.index);
+      
+      for (const m of allMatches) {
+        const id = m.text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        headings.push({ id, text: m.text, level: m.level });
+      }
+    } else {
+      const lines = content.split('\n');
+      lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('## ')) {
+          const text = trimmed.replace('## ', '').replace(/!\[.*?\]\(.*?\)/, '').trim();
+          if (text) {
+            const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            headings.push({ id, text, level: 2 });
+          }
+        } else if (trimmed.startsWith('### ')) {
+          const text = trimmed.replace('### ', '').trim();
+          if (text) {
+            const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            headings.push({ id, text, level: 3 });
+          }
+        }
+      });
+    }
+    
+    return headings;
+  }, [currentArticle]);
+
+  // Filter articles based on search
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return categories;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return categories
+      .map(category => {
+        const matchingArticles = category.articles.filter(article =>
+          article.title.toLowerCase().includes(query) ||
+          article.content.toLowerCase().includes(query)
+        );
+
+        if (category.name.toLowerCase().includes(query) || matchingArticles.length > 0) {
+          return {
+            ...category,
+            articles: matchingArticles.length > 0 ? matchingArticles : category.articles,
+          };
+        }
+        return null;
+      })
+      .filter((category) => category !== null);
+  }, [searchQuery, categories]);
+
+  // Add IDs to HTML headings for table of contents navigation
+  const addHeadingIds = (html: string) => {
+    return html.replace(/<(h[23])([^>]*)>(.*?)<\/h[23]>/gi, (match, tag, attrs, text) => {
+      const plainText = text.replace(/<[^>]*>/g, '').trim();
+      const id = plainText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      if (/id\s*=/.test(attrs)) return match;
+      return `<${tag}${attrs} id="${id}">${text}</${tag}>`;
+    });
+  };
+
+  // Render HTML content with proper styling
+  const renderHtmlContent = (content: string) => {
+    const styledContent = addHeadingIds(content);
+    return (
+      <div 
+        className="user-guide-html-content"
+        dangerouslySetInnerHTML={{ __html: styledContent }}
+      />
+    );
+  };
+
+  // Render markdown content with proper formatting (legacy support)
+  const renderMarkdownContent = (content: string) => {
+    const lines = content.split('\n');
+    const elements: React.ReactElement[] = [];
+    let key = 0;
+    let currentList: { type: 'ul' | 'ol'; items: string[] } | null = null;
+
+    const flushList = () => {
+      if (currentList) {
+        const ListTag = currentList.type === 'ul' ? 'ul' : 'ol';
+        const className = currentList.type === 'ul' 
+          ? 'list-disc list-inside space-y-2 text-gray-700 ml-4 my-4'
+          : 'list-decimal list-inside space-y-2 text-gray-700 ml-4 my-4';
+        
+        elements.push(
+          <ListTag key={key++} className={className}>
+            {currentList.items.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
+          </ListTag>
+        );
+        currentList = null;
+      }
+    };
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('## ')) {
+        flushList();
+        const text = trimmed.replace('## ', '').replace(/!\[.*?\]\(.*?\)/, '').trim();
+        const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        elements.push(
+          <h2 key={key++} id={id} className="text-2xl font-bold text-[#0c0528] mt-8 mb-4 pb-2 border-b border-gray-200">
+            {text}
+          </h2>
+        );
+      } else if (trimmed.startsWith('### ')) {
+        flushList();
+        const text = trimmed.replace('### ', '').trim();
+        const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        elements.push(
+          <h3 key={key++} id={id} className="text-xl font-semibold text-[#0c0528] mt-6 mb-3">
+            {text}
+          </h3>
+        );
+      } else if (trimmed.startsWith('#### ')) {
+        flushList();
+        const text = trimmed.replace('#### ', '').trim();
+        elements.push(
+          <h4 key={key++} className="text-lg font-semibold text-[#0c0528] mt-4 mb-2">
+            {text}
+          </h4>
+        );
+      }
+      else if (trimmed.match(/^!\[.*?\]\(.*?\)$/)) {
+        flushList();
+        const match = trimmed.match(/!\[(.*?)\]\((.*?)\)/);
+        if (match) {
+          const [, alt, src] = match;
+          elements.push(
+            <div key={key++} className="my-6 rounded-lg overflow-hidden border border-gray-200">
+              <Image
+                src={src}
+                alt={alt}
+                width={1200}
+                height={800}
+                className="w-full h-auto"
+                unoptimized
+              />
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* Shopping Section */}
-      <section id="shopping" className="mb-12">
-        <div 
-          className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer"
-          onClick={() => toggleSection('shopping')}
-        >
-          <div className="p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <ShoppingCartIcon className="w-6 h-6 text-green-600" />
-              Shopping Guide
-            </h2>
-            {expandedSections.has('shopping') ? (
-              <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-            ) : (
-              <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
-          {expandedSections.has('shopping') && (
-            <div className="px-6 pb-6 space-y-8">
-              {/* Browsing Products */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <MagnifyingGlassIcon className="w-5 h-5 text-blue-600" />
-                  Browsing Products
-                </h3>
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="font-semibold mb-2">Search Products</h4>
-                      <p className="text-sm text-gray-600">
-                        Use the search bar in the header to find products by name, SKU, or keywords.
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h4 className="font-semibold mb-2">Browse Categories</h4>
-                      <p className="text-sm text-gray-600">
-                        Click on category names in the navigation to filter products.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-2">📸 Screenshot: Product Listing Page</p>
-                    <p className="text-sm text-gray-400">Add screenshot of product grid with search and filters</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Product Details */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Viewing Product Details</h3>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700 mb-4">
-                      Click on any product to view detailed information including images, description, price, and variants.
-                    </p>
-                    <ul className="list-disc list-inside space-y-2 text-gray-700">
-                      <li>View product images (click to zoom)</li>
-                      <li>Read product description</li>
-                      <li>Select variants (size, color, etc.)</li>
-                      <li>Check stock availability</li>
-                      <li>Add to cart</li>
-                    </ul>
-                  </div>
-                  <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-2">📸 Screenshot: Product Detail Page</p>
-                    <p className="text-sm text-gray-400">Add screenshot of product page with images and add to cart button</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shopping Cart */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <ShoppingCartIcon className="w-5 h-5 text-green-600" />
-                  Shopping Cart
-                </h3>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700 mb-4">
-                      Manage your cart items, update quantities, and proceed to checkout.
-                    </p>
-                    <ul className="list-disc list-inside space-y-2 text-gray-700">
-                      <li>View all items in your cart</li>
-                      <li>Update quantities using +/- buttons</li>
-                      <li>Remove items you no longer want</li>
-                      <li>Continue shopping or proceed to checkout</li>
-                    </ul>
-                  </div>
-                  <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-2">📸 Screenshot: Shopping Cart Page</p>
-                    <p className="text-sm text-gray-400">Add screenshot of cart with items and checkout button</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Checkout Process */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <CreditCardIcon className="w-5 h-5 text-purple-600" />
-                  Checkout Process
-                </h3>
-                <div className="space-y-4">
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <h4 className="font-semibold text-blue-900 mb-2">Step-by-Step Checkout</h4>
-                    <ol className="list-decimal list-inside space-y-2 text-blue-800">
-                      <li>Enter shipping address (or select saved address)</li>
-                      <li>Enter billing address</li>
-                      <li>Review your order items and totals</li>
-                      <li>Select payment method</li>
-                      <li>Complete payment</li>
-                      <li>Receive order confirmation</li>
-                    </ol>
-                  </div>
-                  <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
-                    <p className="text-gray-500 mb-2">📸 Screenshot: Checkout Page</p>
-                    <p className="text-sm text-gray-400">Add screenshot of checkout form with address and payment fields</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Account Management Section */}
-      <section id="account" className="mb-12">
-        <div 
-          className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer"
-          onClick={() => toggleSection('account')}
-        >
-          <div className="p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <UserIcon className="w-6 h-6 text-purple-600" />
-              Managing Your Account
-            </h2>
-            {expandedSections.has('account') ? (
-              <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-            ) : (
-              <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
-          {expandedSections.has('account') && (
-            <div className="px-6 pb-6 space-y-6">
-              {/* Profile Management */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Profile & Settings</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">Update Profile</h4>
-                    <p className="text-sm text-gray-600">
-                      Go to &quot;My Account&quot; → &quot;Profile&quot; to update your name, email, and phone number.
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold mb-2">Change Password</h4>
-                    <p className="text-sm text-gray-600">
-                      Use &quot;Forgot Password?&quot; on the login page or update it in account settings.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Addresses */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Manage Addresses</h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 mb-4">
-                    Save multiple addresses for faster checkout. Set a default address for automatic selection.
-                  </p>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    <li>Add new shipping or billing addresses</li>
-                    <li>Edit existing addresses</li>
-                    <li>Set default address</li>
-                    <li>Delete unused addresses</li>
-                  </ul>
-                </div>
-                <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300 mt-4">
-                  <p className="text-gray-500 mb-2">📸 Screenshot: Address Management Page</p>
-                  <p className="text-sm text-gray-400">Add screenshot of saved addresses list</p>
-                </div>
-              </div>
-
-              {/* Order History */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <TruckIcon className="w-5 h-5 text-blue-600" />
-                  Order History & Tracking
-                </h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 mb-4">
-                    View all your past orders, track shipments, and manage returns.
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <h4 className="font-semibold mb-2">View Orders</h4>
-                      <p className="text-sm text-gray-600">
-                        Go to &quot;My Account&quot; → &quot;Orders&quot; to see all your orders with status and tracking information.
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2">Track Shipments</h4>
-                      <p className="text-sm text-gray-600">
-                        Click &quot;Track Order&quot; on any shipped order to view real-time tracking updates.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300 mt-4">
-                  <p className="text-gray-500 mb-2">📸 Screenshot: Order History Page</p>
-                  <p className="text-sm text-gray-400">Add screenshot of orders list with tracking info</p>
-                </div>
-              </div>
-
-              {/* Wishlist */}
-              <div>
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <HeartIcon className="w-5 h-5 text-red-600" />
-                  Wishlist
-                </h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 mb-4">
-                    Save products you love for later. Add items to your wishlist and purchase them when ready.
-                  </p>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    <li>Click heart icon on product page to add to wishlist</li>
-                    <li>View all saved items in &quot;My Account&quot; → &quot;Wishlist&quot;</li>
-                    <li>Add items directly to cart from wishlist</li>
-                    <li>Remove items you no longer want</li>
-                  </ul>
-                </div>
-                <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300 mt-4">
-                  <p className="text-gray-500 mb-2">📸 Screenshot: Wishlist Page</p>
-                  <p className="text-sm text-gray-400">Add screenshot of wishlist with saved products</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Support Section */}
-      <section id="support" className="mb-12">
-        <div 
-          className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer"
-          onClick={() => toggleSection('support')}
-        >
-          <div className="p-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <EnvelopeIcon className="w-6 h-6 text-orange-600" />
-              Support & Help
-            </h2>
-            {expandedSections.has('support') ? (
-              <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-            ) : (
-              <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
-          {expandedSections.has('support') && (
-            <div className="px-6 pb-6 space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Creating Support Tickets</h3>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 mb-4">
-                    Need help? Create a support ticket and our team will assist you.
-                  </p>
-                  <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                    <li>Go to &quot;Support&quot; page</li>
-                    <li>Click &quot;Create Ticket&quot;</li>
-                    <li>Fill in subject, department, priority, and description</li>
-                    <li>Attach files if needed</li>
-                    <li>Submit and wait for response</li>
-                  </ol>
-                </div>
-                <div className="bg-gray-100 rounded-lg p-8 text-center border-2 border-dashed border-gray-300 mt-4">
-                  <p className="text-gray-500 mb-2">📸 Screenshot: Support Ticket Form</p>
-                  <p className="text-sm text-gray-400">Add screenshot of ticket creation form</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="mb-12">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3 mb-6">
-              <QuestionMarkCircleIcon className="w-6 h-6 text-orange-600" />
-              Frequently Asked Questions
-            </h2>
-            <div className="space-y-4">
-              <div className="border-b border-gray-200 pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">How do I reset my password?</h3>
-                <p className="text-gray-600">
-                  Click &quot;Forgot Password?&quot; on the login page, enter your email, and follow the instructions in the email.
-                </p>
-              </div>
-              <div className="border-b border-gray-200 pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Do I need an account to shop?</h3>
-                <p className="text-gray-600">
-                  No, you can shop as a guest. However, creating an account allows you to track orders and save addresses.
-                </p>
-              </div>
-              <div className="border-b border-gray-200 pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">How do I track my order?</h3>
-                <p className="text-gray-600">
-                  Go to &quot;My Account&quot; → &quot;Orders&quot;, click on your order, and view the tracking information.
-                </p>
-              </div>
-              <div className="border-b border-gray-200 pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">What payment methods are accepted?</h3>
-                <p className="text-gray-600">
-                  Payment methods vary by store. Common methods include credit cards, PayPal, and mobile money (M-Pesa).
-                </p>
-              </div>
-              <div className="border-b border-gray-200 pb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Can I cancel my order?</h3>
-                <p className="text-gray-600">
-                  Yes, if the order hasn&apos;t been shipped yet. Go to your order details and click &quot;Cancel Order&quot;.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">How do I contact support?</h3>
-                <p className="text-gray-600">
-                  Use the &quot;Support&quot; page to create a ticket, or contact the store owner directly via email.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tips Section */}
-      <section className="mb-12">
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">💡 Tips & Best Practices</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-semibold mb-2">Shopping Tips</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                <li>Create an account for faster checkout</li>
-                <li>Save addresses to speed up future purchases</li>
-                <li>Use wishlist to save products for later</li>
-                <li>Check product reviews before purchasing</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Account Security</h3>
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                <li>Use a strong password (8+ characters)</li>
-                <li>Don&apos;t share your password</li>
-                <li>Log out on shared computers</li>
-                <li>Keep your email updated</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section className="text-center">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Still Need Help?</h2>
-          <p className="text-gray-600 mb-6">
-            Can&apos;t find what you&apos;re looking for? We&apos;re here to help!
+          );
+        }
+      }
+      else if (trimmed.match(/^\d+\.\s/)) {
+        const text = trimmed.replace(/^\d+\.\s/, '');
+        if (!currentList || currentList.type !== 'ol') {
+          flushList();
+          currentList = { type: 'ol', items: [text] };
+        } else {
+          currentList.items.push(text);
+        }
+      }
+      else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const text = trimmed.replace(/^[-*]\s/, '');
+        if (!currentList || currentList.type !== 'ul') {
+          flushList();
+          currentList = { type: 'ul', items: [text] };
+        } else {
+          currentList.items.push(text);
+        }
+      }
+      else if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.split('**').length === 3) {
+        flushList();
+        const text = trimmed.replace(/\*\*/g, '');
+        elements.push(
+          <p key={key++} className="text-gray-700 mb-4 leading-relaxed">
+            <strong className="text-[#0c0528] font-semibold">{text}</strong>
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/support"
-              className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition"
-            >
-              <EnvelopeIcon className="w-5 h-5 mr-2" />
-              Contact Support
-            </Link>
-            <Link
-              href="/support"
-              className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition"
-            >
-              Create Support Ticket
-            </Link>
+        );
+      }
+      else if (trimmed && !trimmed.startsWith('#')) {
+        flushList();
+        const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+        if (parts.length > 1) {
+          elements.push(
+            <p key={key++} className="text-gray-700 mb-4 leading-relaxed">
+              {parts.map((part, idx) => 
+                part.startsWith('**') && part.endsWith('**') ? (
+                  <strong key={idx} className="text-[#0c0528] font-semibold">
+                    {part.replace(/\*\*/g, '')}
+                  </strong>
+                ) : (
+                  part
+                )
+              )}
+            </p>
+          );
+        } else {
+          elements.push(
+            <p key={key++} className="text-gray-700 mb-4 leading-relaxed">
+              {trimmed}
+            </p>
+          );
+        }
+      } else if (trimmed === '') {
+        flushList();
+      }
+    });
+
+    flushList();
+    return elements;
+  };
+
+  // Render content - auto-detect HTML vs Markdown
+  const renderContent = (content: string) => {
+    if (isHtmlContent(content)) {
+      return renderHtmlContent(content);
+    }
+    return renderMarkdownContent(content);
+  };
+
+  // Handle internal article links: intercept clicks on /help?article=SLUG links
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href) return;
+
+      // Handle /help?article=slug links
+      if (href.startsWith('/help?article=') || href.startsWith('/help/?article=')) {
+        e.preventDefault();
+        const url = new URL(href, window.location.origin);
+        const articleSlug = url.searchParams.get('article');
+        if (articleSlug) {
+          navigateToArticleBySlug(articleSlug);
+          // Update browser URL without reload
+          window.history.pushState({}, '', `/help?article=${articleSlug}`);
+        }
+      }
+    };
+
+    const container = contentRef.current;
+    if (container) {
+      container.addEventListener('click', handleClick);
+      return () => container.removeEventListener('click', handleClick);
+    }
+  }, [navigateToArticleBySlug]);
+
+  // Handle scroll for table of contents highlighting
+  useEffect(() => {
+    const scrollContainer = contentScrollRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const headings = scrollContainer.querySelectorAll('h2[id], h3[id]');
+      if (!headings || headings.length === 0) return;
+
+      let current = '';
+      headings.forEach((heading) => {
+        const rect = heading.getBoundingClientRect();
+        // Account for the sticky header offset (~80px)
+        if (rect.top <= 120) {
+          current = heading.id;
+        }
+      });
+
+      setActiveHeading(current);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [currentArticle]);
+
+  return (
+    <div className="bg-white flex h-full relative">
+      {/* Mobile sidebar overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Left Sidebar Navigation */}
+      {/* Desktop: always visible as a flex column */}
+      {/* Mobile: fixed overlay sliding in from left */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-gray-50 border-r border-gray-200 flex flex-col
+          transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:static lg:translate-x-0 lg:w-64 lg:flex-shrink-0 lg:z-auto
+        `}
+      >
+        {/* Sidebar header with close button (mobile only) */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#0025cc] focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+              >
+                <XMarkIcon className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-3 p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+          >
+            <XMarkIcon className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Navigation - scrollable */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+          {filteredCategories.map((category) => {
+            const Icon = category.icon;
+            const isExpanded = expandedCategories.has(category.id);
+            const isSelected = selectedCategory === category.id;
+
+            return (
+              <div key={category.id}>
+                <button
+                  onClick={() => {
+                    if (category.articles.length > 0) {
+                      toggleCategory(category.id);
+                      setSelectedCategory(category.id);
+                      if (category.articles.length > 0) {
+                        setSelectedArticle(category.articles[0].id);
+                      }
+                      // Close mobile sidebar after selection
+                      setSidebarOpen(false);
+                      // Scroll content to top
+                      if (contentScrollRef.current) {
+                        contentScrollRef.current.scrollTop = 0;
+                      }
+                    }
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isSelected
+                      ? 'bg-[#0025cc] text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="flex-1 text-left">{category.name}</span>
+                </button>
+
+                {/* Articles in category */}
+                {isExpanded && category.articles.length > 0 && (
+                  <div className="ml-7 mt-1 space-y-1">
+                    {category.articles.map((article) => {
+                      const isArticleSelected = selectedArticle === article.id;
+                      return (
+                        <button
+                          key={article.id}
+                          onClick={() => {
+                            navigateToArticle(article.id, category.id);
+                            // Close mobile sidebar after selection
+                            setSidebarOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                            isArticleSelected
+                              ? 'bg-[#0025cc]/10 text-[#0025cc] font-medium'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {article.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+      </aside>
+
+      {/* Main Content Area - scrollable center */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header - sticky */}
+        <div className="bg-white border-b border-gray-200 flex-shrink-0 z-10">
+          <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 mb-1">
+                  <span>Documentation</span>
+                  <ChevronRightIcon className="w-4 h-4" />
+                  <span>User Guide</span>
+                </div>
+                <h1 className="text-lg sm:text-2xl font-bold text-[#0c0528] truncate">
+                  {currentArticle?.title || 'User Guide'}
+                </h1>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
+                aria-label="Toggle navigation"
+              >
+                <Bars3Icon className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
           </div>
         </div>
-      </section>
+
+        {/* Content - this is the only scrollable area */}
+        <div ref={contentScrollRef} className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            {currentArticle ? (
+              <article ref={contentRef} className="prose prose-sm sm:prose-lg max-w-none">
+                <div className="text-gray-700 leading-relaxed">
+                  {renderContent(currentArticle.content)}
+                </div>
+              </article>
+            ) : (
+              <div className="text-center py-12">
+                <BookOpenIcon className="w-12 sm:w-16 h-12 sm:h-16 text-gray-300 mx-auto mb-4" />
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Select an article</h2>
+                <p className="text-sm sm:text-base text-gray-600">Choose a topic from the sidebar to get started</p>
+              </div>
+            )}
+
+            {/* Previous / Next Navigation */}
+            {currentArticle && (
+              <nav className="mt-10 sm:mt-16 mb-6 sm:mb-8 border-t border-gray-200 pt-6 sm:pt-8">
+                <div className="flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-3 sm:gap-4">
+                  {/* Previous Article */}
+                  {prevArticle ? (
+                    <button
+                      onClick={() => navigateToArticle(prevArticle.article.id, prevArticle.categoryId)}
+                      className="flex-1 group text-left p-3 sm:p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
+                        <ChevronLeftIcon className="w-3.5 h-3.5" />
+                        <span>Previous</span>
+                      </div>
+                      <div className="font-medium text-sm sm:text-base text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                        {prevArticle.article.title}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{prevArticle.categoryName}</div>
+                    </button>
+                  ) : (
+                    <div className="hidden sm:block flex-1" />
+                  )}
+
+                  {/* Next Article */}
+                  {nextArticle ? (
+                    <button
+                      onClick={() => navigateToArticle(nextArticle.article.id, nextArticle.categoryId)}
+                      className="flex-1 group text-left sm:text-right p-3 sm:p-4 rounded-lg border border-gray-200 hover:border-[#0025cc] hover:bg-[#0025cc]/5 transition-colors"
+                    >
+                      <div className="flex items-center sm:justify-end gap-1.5 text-sm text-gray-500 group-hover:text-[#0025cc] mb-1">
+                        <span>Next</span>
+                        <ChevronRightIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="font-medium text-sm sm:text-base text-gray-900 group-hover:text-[#0025cc] transition-colors">
+                        {nextArticle.article.title}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{nextArticle.categoryName}</div>
+                    </button>
+                  ) : (
+                    <div className="hidden sm:block flex-1" />
+                  )}
+                </div>
+              </nav>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Right Sidebar - Table of Contents - desktop only */}
+      {currentArticle && tableOfContents.length > 0 && (
+        <aside className="hidden xl:flex w-64 flex-shrink-0 border-l border-gray-200 bg-gray-50 flex-col">
+          <div className="flex-1 overflow-y-auto p-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">On this page</h3>
+            <nav className="space-y-2">
+              {tableOfContents.map((heading) => (
+                <a
+                  key={heading.id}
+                  href={`#${heading.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const scrollContainer = contentScrollRef.current;
+                    const element = scrollContainer?.querySelector(`#${CSS.escape(heading.id)}`);
+                    if (element && scrollContainer) {
+                      const elementTop = element.getBoundingClientRect().top;
+                      const containerTop = scrollContainer.getBoundingClientRect().top;
+                      scrollContainer.scrollTo({
+                        top: scrollContainer.scrollTop + (elementTop - containerTop) - 20,
+                        behavior: 'smooth',
+                      });
+                    }
+                  }}
+                  className={`block text-sm transition-colors ${
+                    heading.level === 2
+                      ? `pl-0 ${activeHeading === heading.id ? 'text-[#0025cc] font-medium' : 'text-gray-700 hover:text-[#0025cc]'}`
+                      : `pl-4 ${activeHeading === heading.id ? 'text-[#0025cc] font-medium' : 'text-gray-600 hover:text-[#0025cc]'}`
+                  }`}
+                >
+                  {heading.text}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
-

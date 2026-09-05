@@ -458,10 +458,10 @@ test.describe('Tenant Creation', () => {
     }
     
     // Step 3: Wait for registration form to load
-    await page.waitForSelector('h1:has-text("Create Your Store"), h1', { timeout: 10000, state: 'visible' });
+    await page.waitForSelector('h1:has-text("Create your store"), h1', { timeout: 10000, state: 'visible' });
     
-    // Wait for all required form fields
-    const requiredFields = ['#name', '#subdomain', '#adminName', '#adminEmail', '#adminPassword', '#contactEmail'];
+    // Wait for all required form fields (contactEmail removed from public registration)
+    const requiredFields = ['#name', '#subdomain', '#adminName', '#adminEmail', '#adminPassword'];
     for (const field of requiredFields) {
       await page.waitForSelector(field, { timeout: 15000, state: 'visible' });
     }
@@ -475,7 +475,6 @@ test.describe('Tenant Creation', () => {
     await page.fill('#adminName', 'First Admin');
     await page.fill('#adminEmail', `first-${Date.now()}@test.com`);
     await page.fill('#adminPassword', 'TestPassword123!');
-    await page.fill('#contactEmail', `first-contact-${Date.now()}@test.com`);
     
     // Submit first tenant
     const [firstResponse] = await Promise.all([
@@ -530,7 +529,7 @@ test.describe('Tenant Creation', () => {
     }
     
     // Wait for registration form heading
-    await page.waitForSelector('h1:has-text("Create Your Store"), h1', { timeout: 10000, state: 'visible' });
+    await page.waitForSelector('h1:has-text("Create your store"), h1', { timeout: 10000, state: 'visible' });
     
     // Wait for all required form fields to be visible and enabled
     for (const field of requiredFields) {
@@ -549,7 +548,6 @@ test.describe('Tenant Creation', () => {
     await page.fill('#adminName', 'Second Admin');
     await page.fill('#adminEmail', `second-${Date.now()}@test.com`);
     await page.fill('#adminPassword', 'TestPassword123!');
-    await page.fill('#contactEmail', `second-contact-${Date.now()}@test.com`);
     
     // Submit and wait for API response
     const [duplicateResponse] = await Promise.all([

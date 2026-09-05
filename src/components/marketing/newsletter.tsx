@@ -1,36 +1,50 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { Mail, Phone } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export function Newsletter() {
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary/10 via-primary/5 to-background">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[#0025cc] to-[#001a99] text-white">
       <div className="container mx-auto max-w-4xl text-center">
-        <h2 className="text-4xl md:text-5xl font-bold mb-4">
-          Get Updates as soon as they happen.
+        <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          Still Selling Products Online Without Your Own Website?
         </h2>
-        <p className="text-xl text-muted-foreground mb-8">
-          Signup now for our newsletter and app launch.
+        <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
+          Your customers are ready to buy. Give them a professional store where they can see products, prices, and delivery fees &mdash; and place orders without messaging you first, whether they find you on WhatsApp, Instagram, Facebook, Jiji, or Jumia.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            className="flex-1 px-4 py-3 rounded-lg border bg-background"
-          />
-          <Button size="lg">Subscribe</Button>
+
+        {/* Trust Signals */}
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/80 mb-10">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-300" />
+            Free for 14 days
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-300" />
+            No credit card required
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-300" />
+            Set up in 5 minutes
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-green-300" />
+            From Ksh 1,000/mo
+          </span>
         </div>
-        {/* <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            <span>example@dukanest.com</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4" />
-            <span>+1 (555) 123-4567</span>
-          </div>
-        </div> */}
+
+        {/* Primary CTA */}
+        <Link 
+          href="/register" 
+          className="group bg-white text-[#0025cc] px-10 py-5 rounded-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all inline-flex items-center gap-2 text-lg font-bold"
+        >
+          Create Your Store Now
+          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        </Link>
+        <p className="text-sm text-white/60 mt-4">
+          Join sellers across Kenya who moved from WhatsApp to their own online store
+        </p>
       </div>
     </section>
   );

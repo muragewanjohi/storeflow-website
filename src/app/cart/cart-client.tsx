@@ -47,6 +47,11 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
   const [couponCode, setCouponCode] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [discount, setDiscount] = useState(0);
+  const [taxSettings, setTaxSettings] = useState<{
+    tax_enabled: boolean;
+    default_tax_rate: number | null;
+    tax_pricing_type: 'inclusive' | 'exclusive';
+  } | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -65,10 +70,30 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
     }
   }, [isAuthenticated, router]);
 
-  // Fetch cart on mount
+  // Fetch tax settings
+  const fetchTaxSettings = useCallback(async () => {
+    try {
+      const response = await fetch('/api/checkout/settings');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.settings) {
+          setTaxSettings({
+            tax_enabled: data.settings.tax_enabled || false,
+            default_tax_rate: data.settings.default_tax_rate || null,
+            tax_pricing_type: data.settings.tax_pricing_type || 'exclusive',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tax settings:', error);
+    }
+  }, []);
+
+  // Fetch cart and tax settings on mount
   useEffect(() => {
     fetchCart();
-  }, [fetchCart]);
+    fetchTaxSettings();
+  }, [fetchCart, fetchTaxSettings]);
 
   const updateQuantity = async (productId: string, variantId: string | null, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -230,7 +255,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto max-w-full overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="h-8 bg-muted rounded animate-pulse w-1/4 mb-6" />
           {Array.from({ length: 3 }).map((_: any, i: any) => (
@@ -251,7 +276,7 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto max-w-full overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8">
         <div className="text-center py-12">
           <ShoppingCartIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <h1 className="text-2xl font-bold mb-2">Your cart is empty</h1>
@@ -267,10 +292,24 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
   }
 
   const subtotal = cart.total || cart.items.reduce((sum: any, item: any) => sum + item.price * item.quantity, 0);
-  const total = subtotal - discount;
+  
+  // Calculate tax
+  let taxAmount = 0;
+  if (taxSettings?.tax_enabled && taxSettings.default_tax_rate) {
+    const taxRate = taxSettings.default_tax_rate / 100;
+    if (taxSettings.tax_pricing_type === 'inclusive') {
+      // Tax is included in price, calculate what portion is tax
+      taxAmount = subtotal - (subtotal / (1 + taxRate));
+    } else {
+      // Tax is added on top
+      taxAmount = subtotal * taxRate;
+    }
+  }
+  
+  const total = subtotal - discount + (taxSettings?.tax_pricing_type === 'exclusive' ? taxAmount : 0);
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto max-w-full overflow-x-hidden px-3 py-6 sm:px-4 sm:py-8">
       <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -319,21 +358,21 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 border rounded-md">
+                        <div className="flex items-center gap-1 rounded-md border">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-11 w-11"
                             onClick={() => updateQuantity(item.product_id, item.variant_id, item.quantity - 1)}
                             disabled={isUpdating}
                           >
                             <MinusIcon className="h-4 w-4" />
                           </Button>
-                          <span className="w-12 text-center">{item.quantity}</span>
+                          <span className="w-10 text-center text-sm sm:w-12">{item.quantity}</span>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="h-11 w-11"
                             onClick={() => updateQuantity(item.product_id, item.variant_id, item.quantity + 1)}
                             disabled={isUpdating}
                           >
@@ -344,9 +383,9 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-11 w-11 text-destructive hover:text-destructive"
                           onClick={() => removeItem(item.product_id, item.variant_id)}
                           disabled={isUpdating}
-                          className="text-destructive hover:text-destructive"
                         >
                           <TrashIcon className="h-5 w-5" />
                         </Button>
@@ -405,6 +444,20 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                   <span>Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
+                
+                {/* Tax Display */}
+                {taxSettings?.tax_enabled && taxSettings.default_tax_rate && (
+                  <div className="flex justify-between text-sm">
+                    <span>
+                      Tax ({taxSettings.default_tax_rate}%)
+                      {taxSettings.tax_pricing_type === 'inclusive' && (
+                        <span className="text-xs text-muted-foreground ml-1">(included)</span>
+                      )}
+                    </span>
+                    <span>{formatCurrency(taxAmount)}</span>
+                  </div>
+                )}
+                
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Discount</span>
@@ -426,14 +479,14 @@ export default function CartClient({ isAuthenticated = false }: Readonly<CartCli
                     router.push('/checkout');
                   }
                 }}
-                className="w-full"
+                className="min-h-11 w-full"
                 size="lg"
               >
                 {isAuthenticated ? 'Proceed to Checkout' : 'Login to Checkout'}
               </Button>
 
               <Link href="/products">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="min-h-11 w-full">
                   Continue Shopping
                 </Button>
               </Link>

@@ -13,21 +13,49 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getTenantFromRequest } from './lib/tenant-context';
 import { createServerClient } from '@supabase/ssr';
+import {
+  applyMobileApiCors,
+  isMobileOrPublicRegistrationApiPath,
+  mobileApiCorsPreflight,
+} from './lib/api/mobile-cors';
+import { getSharedAuthCookieDomain } from './lib/supabase/auth-cookie-domain';
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
+  const code = request.nextUrl.searchParams.get('code');
 
-  // Skip middleware for:
-  // - API routes (they handle tenant resolution themselves)
-  // - Static files
-  // - Next.js internal routes
+  if (code && (pathname === '/' || pathname === '/index' || pathname === '/reset-password')) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = '/auth/callback';
+    callbackUrl.search = '';
+    callbackUrl.searchParams.set('code', code);
+    const nextOnRoot = request.nextUrl.searchParams.get('next');
+    if (nextOnRoot) {
+      callbackUrl.searchParams.set('next', nextOnRoot);
+    } else if (pathname === '/reset-password') {
+      callbackUrl.searchParams.set('next', '/reset-password');
+    }
+    return NextResponse.redirect(callbackUrl);
+  }
+
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/static/') ||
-    pathname.startsWith('/favicon.ico')
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/auth/callback')
   ) {
+    if (pathname.startsWith('/api/')) {
+      if (isMobileOrPublicRegistrationApiPath(pathname) && request.method === 'OPTIONS') {
+        return mobileApiCorsPreflight(request);
+      }
+      const res = NextResponse.next();
+      if (isMobileOrPublicRegistrationApiPath(pathname)) {
+        return applyMobileApiCors(request, res);
+      }
+      return res;
+    }
     return NextResponse.next();
   }
 
@@ -42,13 +70,14 @@ export async function middleware(request: NextRequest) {
   const isLocalhost = hostnameWithoutPort === 'localhost' || hostnameWithoutPort === '127.0.0.1';
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   
-  // Marketing site hostnames
+  // Marketing site hostnames (exact root domain matches only - subdomains are tenant sites)
   const isMarketingSite = 
     hostnameWithoutPort === 'www' ||
     hostnameWithoutPort === 'marketing' ||
     hostnameWithoutPort === 'www.dukanest.com' ||
     hostnameWithoutPort === 'dukanest.com' ||
-    hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort === 'www.storeflow.com' ||
+    hostnameWithoutPort === 'storeflow.com' ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
   
@@ -84,7 +113,9 @@ export async function middleware(request: NextRequest) {
 
   // Prevent redirect loops - if we're already on a 404 or error page, don't redirect again
   if (pathname === '/404' || pathname === '/tenant-suspended' || pathname === '/tenant-expired') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-pathname', pathname);
+    return response;
   }
 
   try {
@@ -112,16 +143,27 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Redirect suspended tenants (past grace period)
+    // Redirect suspended tenants (past grace period) - block storefront access
     if (accessRestriction.level === 'restricted' && tenant.status === 'suspended') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/tenant-suspended';
-      return NextResponse.redirect(url);
+      // Check if this is a storefront route (not dashboard)
+      const isStorefrontRoute = !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin');
+      
+      if (isStorefrontRoute) {
+        // Redirect storefront to suspension page
+        const url = request.nextUrl.clone();
+        url.pathname = '/tenant-suspended';
+        return NextResponse.redirect(url);
+      } else {
+        // For dashboard routes, allow access to renewal page
+        const url = request.nextUrl.clone();
+        url.pathname = '/tenant-suspended';
+        return NextResponse.redirect(url);
+      }
     }
 
-    // For expired tenants in grace period, allow access but mark as read-only
-    // Don't redirect - let them access dashboard in read-only mode
-    // The dashboard layout will enforce read-only restrictions
+    // For expired tenants in grace period:
+    // - Dashboard: read-only for the store owner (renewal banner)
+    // - Storefront: continues normally for customers (no owner-only notices)
 
     // Clone the request headers and add tenant info
     const requestHeaders = new Headers(request.headers);
@@ -150,6 +192,8 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
+    const authCookieDomain = getSharedAuthCookieDomain(hostname);
+
     const supabase = createServerClient(
       supabaseUrl,
       supabaseAnonKey,
@@ -160,18 +204,31 @@ export async function middleware(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
+              // Ensure cookies are set with proper security options
+              response.cookies.set(name, value, {
+                ...options,
+                // Ensure secure in production
+                secure: process.env.NODE_ENV === 'production',
+                // SameSite lax allows navigation from external links
+                sameSite: 'lax',
+                // Path should be root for auth cookies
+                path: '/',
+                ...(authCookieDomain ? { domain: authCookieDomain } : {}),
+              });
             });
           },
         },
       }
     );
 
+    // IMPORTANT: Refresh session FIRST to ensure valid tokens before any checks
+    // This updates cookies if the session was refreshed
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
     // CRITICAL SECURITY: Block landlords from accessing tenant subdomains
     // Landlords should only access the platform admin at /admin routes on marketing domain
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const userRole = session.user.user_metadata?.role;
+    if (user && !userError) {
+      const userRole = user.user_metadata?.role;
       if (userRole === 'landlord') {
         // Landlord trying to access tenant subdomain - BLOCK and redirect
         // Build redirect URL to marketing domain
@@ -185,9 +242,6 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
       }
     }
-
-    // Refresh session (this updates cookies if needed)
-    await supabase.auth.getSession();
 
     // Also set response headers (for client-side access)
     response.headers.set('x-tenant-id', tenant.id);
@@ -211,8 +265,14 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - images/ (public static images, e.g. the onboarding placeholder SVG
+     *   — these must never go through tenant resolution, otherwise the
+     *   next/image optimizer's internal fetch gets redirected to /404
+     *   and returns `received null`)
+     * - fonts/ (public static fonts)
+     * - static assets with common extensions served from /public
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|robots.txt|sitemap.xml|manifest.json).*)',
   ],
 };
 

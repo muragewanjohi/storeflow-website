@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, TruckIcon, StarIcon, ArrowLeftIcon, ExclamationTriangleIcon, XCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useCurrency } from '@/lib/currency/currency-context';
 import RatingInput from '@/components/storefront/rating-input';
@@ -23,7 +23,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 interface OrderProduct {
@@ -52,6 +64,11 @@ interface Order {
   billing_address: any;
   order_details: any; // Contains tracking_number and shipping_carrier
   created_at: Date | null;
+  delivery_fee: number | null;
+  delivery_fee_status: string | null;
+  delivery_fee_quote: number | null;
+  delivery_fee_notes: string | null;
+  delivery_zone_name: string | null;
   order_products: OrderProduct[];
 }
 
@@ -80,6 +97,12 @@ export default function OrderConfirmationClient({
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<OrderProduct | null>(null);
   const [isLoadingReviews, setIsLoadingReviews] = useState(true);
+  const [isProcessingQuote, setIsProcessingQuote] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState(order.payment_status);
 
   // Using formatCurrency from useCurrency hook
   const formatPrice = (price: number) => formatCurrency(price);
@@ -88,7 +111,141 @@ export default function OrderConfirmationClient({
   const trackingNumber = order.order_details?.tracking_number || null;
   const shippingCarrier = order.order_details?.shipping_carrier || null;
   const isShipped = order.status?.toLowerCase() === 'shipped';
-  const isPaid = order.payment_status?.toLowerCase() === 'paid';
+  const isPaid = paymentStatus?.toLowerCase() === 'paid';
+  const isTumiziOrder = order.payment_gateway === 'tumizi';
+  const isTumiziPaymentPending = isTumiziOrder && paymentStatus === 'pending';
+
+  // Handle approve delivery quote
+  const handleApproveQuote = async () => {
+    setIsProcessingQuote(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/delivery-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to approve quote');
+      }
+
+      toast.success('Delivery fee approved! Your order will proceed.');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve delivery fee');
+    } finally {
+      setIsProcessingQuote(false);
+    }
+  };
+
+  // Handle reject delivery quote
+  const handleRejectQuote = async () => {
+    setIsProcessingQuote(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/delivery-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reject',
+          reason: rejectReason || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to reject quote');
+      }
+
+      toast.success('Delivery fee rejected. You can cancel the order if needed.');
+      setRejectReason('');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject delivery fee');
+    } finally {
+      setIsProcessingQuote(false);
+      setShowRejectDialog(false);
+    }
+  };
+
+  // Handle cancel order
+  const handleCancelOrder = async () => {
+    setIsProcessingQuote(true);
+    try {
+      // First reject the quote if not already rejected
+      if (order.delivery_fee_status === 'quoted') {
+        await fetch(`/api/orders/${order.id}/delivery-fee`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            action: 'reject',
+            reason: cancelReason || 'Customer cancelled due to delivery fee',
+          }),
+        });
+      }
+
+      // Then cancel the order
+      const response = await fetch(`/api/customers/orders/${order.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reason: cancelReason || 'Order cancelled by customer due to delivery fee rejection',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to cancel order');
+      }
+
+      toast.success('Order cancelled successfully.');
+      setCancelReason('');
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to cancel order');
+    } finally {
+      setIsProcessingQuote(false);
+      setShowCancelDialog(false);
+    }
+  };
+
+  // Poll Tumizi for payment confirmation (STK push) after checkout
+  useEffect(() => {
+    if (!isTumiziOrder || paymentStatus === 'paid' || paymentStatus === 'failed') {
+      return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 24;
+
+    const syncTumiziPayment = async () => {
+      const query = window.location.search.replace(/^\?/, '');
+      const url = `/api/orders/${order.id}/tumizi/sync-payment${query ? `?${query}` : ''}`;
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (response.ok && data.success && data.payment_status) {
+          setPaymentStatus(data.payment_status);
+          if (data.payment_status === 'paid') {
+            toast.success('Payment received. Thank you!');
+          }
+        }
+      } catch (error) {
+        console.error('[Order confirmation] Tumizi sync failed:', error);
+      }
+    };
+
+    void syncTumiziPayment();
+    const interval = setInterval(() => {
+      attempts += 1;
+      void syncTumiziPayment();
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [order.id, isTumiziOrder, paymentStatus]);
 
   // Check review status for all products in order
   useEffect(() => {
@@ -200,10 +357,23 @@ export default function OrderConfirmationClient({
                 <div>
                   <h1 className="text-2xl font-bold text-green-900">Order Confirmed!</h1>
                   <p className="text-green-700">
-                    Thank you for your order. We&apos;ve received your order and will begin processing it right away.
+                    {isTumiziPaymentPending
+                      ? 'Complete the M-Pesa prompt on your phone. We will confirm payment automatically.'
+                      : 'Thank you for your order. We&apos;ve received your order and will begin processing it right away.'}
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {isTumiziPaymentPending && (
+          <Card className="mb-6 border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <p className="text-sm text-amber-900">
+                Waiting for M-Pesa payment via Tumizi. This page updates automatically when payment is
+                confirmed—no need to enter a transaction code.
+              </p>
             </CardContent>
           </Card>
         )}
@@ -238,9 +408,9 @@ export default function OrderConfirmationClient({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Order Details */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Order Information */}
             <Card>
               <CardHeader>
@@ -270,7 +440,7 @@ export default function OrderConfirmationClient({
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Payment Status</p>
-                    <p className="font-semibold capitalize">{order.payment_status}</p>
+                    <p className="font-semibold capitalize">{paymentStatus}</p>
                   </div>
                 </div>
               </CardContent>
@@ -417,8 +587,8 @@ export default function OrderConfirmationClient({
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
+          <div className="lg:col-span-2">
+            <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
@@ -430,14 +600,97 @@ export default function OrderConfirmationClient({
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span className="text-muted-foreground">Included</span>
+                    <span className={order.delivery_fee_status === 'pending' ? 'text-yellow-600 font-medium' : 'text-muted-foreground'}>
+                      {order.delivery_fee_status === 'pending' 
+                        ? 'Excluded' 
+                        : order.delivery_fee && order.delivery_fee > 0
+                        ? formatPrice(order.delivery_fee)
+                        : order.delivery_fee_quote && order.delivery_fee_quote > 0
+                        ? formatPrice(order.delivery_fee_quote)
+                        : 'Included'}
+                    </span>
                   </div>
+                  {order.delivery_fee_status === 'pending' && (
+                    <div className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded">
+                      Delivery fee will be calculated and sent to you separately.
+                    </div>
+                  )}
+                  {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                    <div className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/20 p-2 rounded">
+                      Delivery fee quote sent. Please check your email or order details to approve.
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>{formatPrice(order.total_amount)}</span>
+                    <span>
+                      {order.delivery_fee_status === 'pending'
+                        ? formatPrice(order.total_amount)
+                        : order.delivery_fee && order.delivery_fee > 0
+                        ? formatPrice(order.total_amount + order.delivery_fee)
+                        : order.delivery_fee_quote && order.delivery_fee_quote > 0
+                        ? formatPrice(order.total_amount + order.delivery_fee_quote)
+                        : formatPrice(order.total_amount)}
+                    </span>
                   </div>
                 </div>
+
+                <Separator />
+
+                {/* Delivery Fee Quote Action - Show when quote is sent */}
+                {order.delivery_fee_status === 'quoted' && order.delivery_fee_quote && (
+                  <div className="space-y-3 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg overflow-hidden">
+                    <div className="flex items-start gap-3">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2 text-sm">
+                          Delivery Fee Quote Received
+                        </h3>
+                        <div className="mb-3 space-y-2">
+                          <p className="text-xs text-yellow-800 dark:text-yellow-200 break-words">
+                            A delivery fee quote has been sent for your order. Please review and take action.
+                          </p>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded border border-yellow-200 dark:border-yellow-800">
+                            <p className="text-xs text-muted-foreground mb-1">Delivery Fee Quote</p>
+                            <p className="text-lg font-bold text-yellow-900 dark:text-yellow-100">
+                              {formatPrice(order.delivery_fee_quote)}
+                            </p>
+                            {order.delivery_fee_notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic break-words">
+                                &quot;{order.delivery_fee_notes}&quot;
+                              </p>
+                            )}
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded border border-yellow-200 dark:border-yellow-800">
+                            <p className="text-xs text-muted-foreground mb-1">New Total (including delivery)</p>
+                            <p className="text-base font-bold">
+                              {formatPrice(order.total_amount + order.delivery_fee_quote)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            onClick={handleApproveQuote}
+                            disabled={isProcessingQuote}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2"
+                            size="sm"
+                          >
+                            {isProcessingQuote ? 'Processing...' : '✓ Approve Quote'}
+                          </Button>
+                          <Button
+                            onClick={() => setShowRejectDialog(true)}
+                            disabled={isProcessingQuote}
+                            variant="outline"
+                            className="w-full border-red-300 text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-sm py-2"
+                            size="sm"
+                          >
+                            ✗ Reject Quote
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <Separator />
 
@@ -523,6 +776,87 @@ export default function OrderConfirmationClient({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Reject Quote Dialog */}
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Delivery Fee Quote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              If you reject this delivery fee quote, you can choose to cancel the order. 
+              Would you like to provide a reason for rejecting the quote?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="reject-reason">Reason (optional)</Label>
+              <Textarea
+                id="reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g., Delivery fee is too high, location is too far..."
+                rows={3}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRejectReason('')}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowRejectDialog(false);
+                setShowCancelDialog(true);
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              Reject & Cancel Order
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleRejectQuote}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Reject Only
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Order Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel order {order.order_number}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="cancel-reason">Reason for cancellation (optional)</Label>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g., Delivery fee too high..."
+                rows={3}
+                className="mt-2"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setCancelReason('');
+              setRejectReason('');
+            }}>Keep Order</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelOrder}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Yes, Cancel Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -14,6 +14,8 @@ import { prisma } from '@/lib/prisma/client';
 import { addToCartSchema, updateCartItemSchema } from '@/lib/orders/validation';
 import { getOrCreateCustomer } from '@/lib/customers/get-customer';
 import { getOrCreateSessionId, getSessionId } from '@/lib/cart/session';
+import { trackAddToCart } from '@/lib/analytics/server-tracking';
+import { sendTikTokServerEvent } from '@/lib/analytics/tiktok-events-api';
 
 /**
  * GET /api/cart - Get cart items
@@ -58,6 +60,21 @@ export async function GET(request: NextRequest) {
             image: true,
             sku: true,
             slug: true,
+            estimated_delivery_days: true,
+            // Basic deposit support (docs/SERVICES_PLAN.md) — raw config,
+            // not a pre-computed amount, so checkout-client.tsx can preview
+            // the deposit/balance split live via the same
+            // computeLineDepositDue()/computeOrderDeposit() checkout uses.
+            deposit_type: true,
+            deposit_value: true,
+            // Basic services support (docs/SERVICES_PLAN.md) — lets the
+            // checkout client know when the whole cart is non-shipped
+            // items, so it can skip the delivery-method UI accordingly.
+            requires_shipping: true,
+            // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — lets
+            // checkout-client.tsx show the time-slot picker for this item.
+            is_bookable: true,
+            booking_duration_minutes: true,
           },
         },
       },
@@ -113,6 +130,15 @@ export async function GET(request: NextRequest) {
         image: product.image,
         sku: product.sku,
         slug: product.slug,
+        estimated_delivery_days: product.estimated_delivery_days,
+        // Basic deposit support (docs/SERVICES_PLAN.md)
+        deposit_type: product.deposit_type,
+        deposit_value: product.deposit_value != null ? Number(product.deposit_value) : null,
+        // Basic services support (docs/SERVICES_PLAN.md)
+        requires_shipping: product.requires_shipping !== false,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        is_bookable: product.is_bookable === true,
+        booking_duration_minutes: product.booking_duration_minutes,
       };
     }).filter(Boolean) as any[];
 
@@ -181,11 +207,25 @@ export async function POST(request: NextRequest) {
         image: true,
         sku: true,
         slug: true,
+        metadata: true,
       },
     });
 
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+
+    const productMetadata = (product.metadata ?? {}) as Record<string, unknown>;
+    const isDemoProduct =
+      productMetadata.is_demo === true ||
+      productMetadata.is_demo === 'true' ||
+      productMetadata.source === 'starter_pack_ai';
+
+    if (isDemoProduct) {
+      return NextResponse.json(
+        { error: 'This is a demo product and cannot be purchased' },
+        { status: 400 },
+      );
     }
 
     // If variant is specified, fetch variant details
@@ -269,6 +309,39 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    // Track add to cart event (fire and forget)
+    if (sessionId) {
+      trackAddToCart(tenant.id, sessionId, product_id, quantity).catch((error) => {
+        console.error('Error tracking add to cart:', error);
+      });
+    }
+
+    const addToCartEventId = `cart_${product_id}_${Date.now()}`;
+    sendTikTokServerEvent({
+      request,
+      event: 'AddToCart',
+      eventId: addToCartEventId,
+      email: user?.email ?? null,
+      externalId: customerId ?? sessionId,
+      properties: {
+        content_type: 'product',
+        quantity,
+        value: finalPrice * quantity,
+        currency: ((tenant as any).currency || 'KES').toUpperCase(),
+        contents: [
+          {
+            content_id: product_id,
+            content_type: 'product',
+            content_name: product.name,
+            quantity,
+            price: finalPrice,
+          },
+        ],
+      },
+    }).catch((error) => {
+      console.error('Error sending TikTok AddToCart event:', error);
+    });
 
     // Fetch updated cart
     const cartItems = await prisma.cart_items.findMany({

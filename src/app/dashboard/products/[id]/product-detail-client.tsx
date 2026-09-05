@@ -6,9 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useCurrency } from '@/lib/currency/currency-context';
+import AdminShareButtons from '@/components/dashboard/admin-share-buttons';
 
 interface Product {
   id: string;
@@ -32,6 +31,7 @@ interface Product {
   description?: string | null;
   short_description?: string | null;
   price: number;
+  cost_price?: number | null;
   sale_price?: number | null;
   stock_quantity: number;
   status: 'active' | 'inactive' | 'draft' | 'archived';
@@ -63,6 +63,7 @@ interface Variant {
   product_id: string;
   sku: string;
   price?: number | null;
+  cost_price?: number | null;
   stock_quantity: number;
   image?: string | null;
   variant_attributes?: VariantAttribute[];
@@ -79,7 +80,6 @@ export default function ProductDetailClient({
   product,
   variants,
 }: Readonly<ProductDetailClientProps>) {
-  const router = useRouter();
   const { formatCurrency } = useCurrency();
 
   // Using formatCurrency from useCurrency hook
@@ -115,12 +115,22 @@ export default function ProductDetailClient({
             <p className="text-muted-foreground mt-2">Product Details</p>
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/dashboard/products/${product.id}/edit`}>
-            <PencilIcon className="mr-2 h-4 w-4" />
-            Edit Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <AdminShareButtons
+            title={product.name}
+            url={`/products/${product.slug}`}
+            image={product.image}
+            description={product.short_description || product.description}
+            price={product.sale_price || product.price}
+            type="product"
+          />
+          <Button asChild>
+            <Link href={`/dashboard/products/${product.id}/edit`}>
+              <PencilIcon className="mr-2 h-4 w-4" />
+              Edit Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -175,6 +185,7 @@ export default function ProductDetailClient({
                       <TableHead>Variant</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Price</TableHead>
+                      <TableHead>Cost Price</TableHead>
                       <TableHead>Stock</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -227,6 +238,13 @@ export default function ProductDetailClient({
                             {variant.price
                               ? formatPrice(variant.price)
                               : formatPrice(product.price)}
+                          </TableCell>
+                          <TableCell>
+                            {variant.cost_price != null
+                              ? formatPrice(variant.cost_price)
+                              : product.cost_price != null
+                                ? formatPrice(product.cost_price)
+                                : '—'}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -285,6 +303,12 @@ export default function ProductDetailClient({
                     {product.stock_quantity} units
                   </Badge>
                 </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Cost Price</p>
+                <p className="mt-1 text-sm">
+                  {product.cost_price != null ? formatPrice(product.cost_price) : 'Not set'}
+                </p>
               </div>
               {product.short_description && (
                 <div>

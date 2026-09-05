@@ -137,7 +137,9 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/admin/support/tickets - Create new landlord support ticket
  * 
- * Can be called by tenant admins to create tickets for the landlord
+ * Can be called by:
+ * - Tenant admins to create tickets for the landlord
+ * - Landlord/admin to create tickets directed at a specific tenant
  */
 export async function POST(request: NextRequest) {
   try {
@@ -146,32 +148,41 @@ export async function POST(request: NextRequest) {
 
     const validatedData = createLandlordTicketSchema.parse(body);
 
-    // Get tenant context (tenant creating the ticket)
-    const tenant = await prisma.tenants.findFirst({
-      where: {
-        id: user.tenant_id || '',
-      },
-    });
+    let tenantId: string;
+    let tenant: any;
 
-    if (!tenant && user.role !== 'landlord') {
-      return NextResponse.json(
-        { error: 'Tenant not found' },
-        { status: 404 }
-      );
-    }
+    if (user.role === 'landlord' && validatedData.tenant_id) {
+      // Landlord creating a ticket for a specific tenant
+      tenant = await prisma.tenants.findFirst({
+        where: { id: validatedData.tenant_id },
+      });
 
-    // For tenant admins, tenant must exist
-    if (!tenant) {
-      return NextResponse.json(
-        { error: 'Tenant not found. Tenant admins must belong to a tenant.' },
-        { status: 404 }
-      );
+      if (!tenant) {
+        return NextResponse.json(
+          { error: 'Selected tenant not found' },
+          { status: 404 }
+        );
+      }
+      tenantId = tenant.id;
+    } else {
+      // Tenant admin creating a ticket for the landlord
+      tenant = await prisma.tenants.findFirst({
+        where: { id: user.tenant_id || '' },
+      });
+
+      if (!tenant) {
+        return NextResponse.json(
+          { error: 'Tenant not found. Tenant admins must belong to a tenant.' },
+          { status: 404 }
+        );
+      }
+      tenantId = tenant.id;
     }
 
     const ticket = await prisma.landlord_support_tickets.create({
       data: {
-        tenant_id: tenant.id,
-        user_id: user.id, // Tenant admin user (from Supabase auth)
+        tenant_id: tenantId,
+        user_id: user.id,
         subject: validatedData.subject,
         description: validatedData.description,
         priority: validatedData.priority,
@@ -190,13 +201,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Send email notification to landlord admin
-    sendNewLandlordTicketEmail({
-      ticket,
-      tenant: tenant as any,
-    }).catch((error) => {
-      console.error('Error sending new landlord ticket email:', error);
-    });
+    // If landlord created the ticket, also add the description as an initial message
+    if (user.role === 'landlord' && validatedData.tenant_id) {
+      await prisma.landlord_support_ticket_messages.create({
+        data: {
+          ticket_id: ticket.id,
+          user_id: user.id,
+          message: validatedData.description,
+          attachments: [],
+        },
+      });
+    }
+
+    // Send email notification to landlord admin (for tenant-created tickets)
+    if (user.role !== 'landlord') {
+      sendNewLandlordTicketEmail({
+        ticket,
+        tenant: tenant as any,
+      }).catch((error) => {
+        console.error('Error sending new landlord ticket email:', error);
+      });
+    }
 
     return NextResponse.json(
       { success: true, ticket },

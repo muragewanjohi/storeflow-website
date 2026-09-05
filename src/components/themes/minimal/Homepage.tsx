@@ -37,7 +37,7 @@ export default function MinimalHomepage({ products = [], categories = [] }: Mini
               <h2 className="text-4xl font-light tracking-widest uppercase mb-4" style={{ fontFamily: 'var(--font-heading, inherit)' }}>
                 Featured Products
               </h2>
-              <div className="w-24 h-px bg-border mx-auto"></div>
+              <div className="w-24 h-px bg-[var(--color-primary)] mx-auto"></div>
             </div>
             <MinimalProductGrid
               products={featuredProducts.map((p: any) => ({

@@ -163,17 +163,29 @@ export default function BlogsListClient({ blogs }: Readonly<BlogsListClientProps
 
       {/* Status Tabs */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList>
-          <TabsTrigger value="all">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="all"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             All ({statusCounts.all})
           </TabsTrigger>
-          <TabsTrigger value="published">
+          <TabsTrigger 
+            value="published"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Published ({statusCounts.published})
           </TabsTrigger>
-          <TabsTrigger value="draft">
+          <TabsTrigger 
+            value="draft"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Draft ({statusCounts.draft})
           </TabsTrigger>
-          <TabsTrigger value="archived">
+          <TabsTrigger 
+            value="archived"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
             Archived ({statusCounts.archived})
           </TabsTrigger>
         </TabsList>

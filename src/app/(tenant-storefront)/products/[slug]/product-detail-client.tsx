@@ -6,17 +6,22 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon, PlusIcon, MinusIcon, ChevronRightIcon, HomeIcon, TruckIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import { useCurrency } from '@/lib/currency/currency-context';
 import ProductReviewsSection from '@/components/storefront/product-reviews-section';
 import { RatingDisplay } from '@/components/storefront/rating-display';
+import ProductShareButtons from '@/components/storefront/product-share-buttons';
+import { trackMetaPixelEvent } from '@/lib/analytics/meta-pixel';
+import { sanitizeHtmlForDisplay } from '@/lib/security/sanitize-html';
+import { getDefaultVariantLabel } from '@/lib/products/variant-helpers';
+import { getCollectionPath } from '@/lib/storefront/collection-urls';
 
 interface ProductVariant {
   id: string;
@@ -57,6 +62,7 @@ interface Product {
   product_variants: ProductVariant[];
   averageRating?: number;
   totalReviews?: number;
+  estimated_delivery_days?: number | null;
 }
 
 interface RelatedProduct {
@@ -69,20 +75,32 @@ interface RelatedProduct {
   stock_quantity: number | null;
 }
 
+interface ProductCategoryBreadcrumb {
+  name: string;
+  slug: string;
+}
+
 interface ProductDetailClientProps {
   product: Product;
   relatedProducts: RelatedProduct[];
+  defaultEstimatedDeliveryDays?: number | null;
+  category?: ProductCategoryBreadcrumb | null;
 }
 
 export default function ProductDetailClient({
   product,
   relatedProducts,
+  defaultEstimatedDeliveryDays,
+  category = null,
 }: Readonly<ProductDetailClientProps>) {
   const { formatCurrency, currency } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState(product.image);
   const [hasInteractedWithQuantity, setHasInteractedWithQuantity] = useState(false);
+  
+  // Get estimated delivery days (product-specific overrides tenant default)
+  const estimatedDeliveryDays = product.estimated_delivery_days ?? defaultEstimatedDeliveryDays;
 
   // Format currency with space between symbol and amount
   const formatCurrencyWithSpace = (amount: number): string => {
@@ -110,8 +128,27 @@ export default function ProductDetailClient({
   const displayPrice = product.sale_price || basePrice;
   const hasDiscount = product.sale_price !== null && !selectedVariantData?.price;
 
+  // Get current stock quantity (variant stock if selected, otherwise product stock)
+  const currentStockQuantity = selectedVariantData 
+    ? selectedVariantData.stock_quantity 
+    : product.stock_quantity;
+
   const router = useRouter();
   const [addingToCart, setAddingToCart] = useState(false);
+
+  useEffect(() => {
+    trackMetaPixelEvent('ViewContent', {
+      contents: [
+        {
+          content_id: product.id,
+          content_type: 'product',
+          content_name: product.name,
+        },
+      ],
+      value: displayPrice,
+      currency: currency.code,
+    });
+  }, [product.id, product.name, displayPrice, currency.code]);
 
   const handleAddToCart = async () => {
     setAddingToCart(true);
@@ -127,6 +164,17 @@ export default function ProductDetailClient({
       });
 
       if (response.ok) {
+        trackMetaPixelEvent('AddToCart', {
+          contents: [
+            {
+              content_id: product.id,
+              content_type: 'product',
+              content_name: product.name,
+            },
+          ],
+          value: displayPrice * quantity,
+          currency: currency.code,
+        });
         // Notify header to update cart count
         window.dispatchEvent(new Event('cartUpdated'));
         
@@ -155,10 +203,7 @@ export default function ProductDetailClient({
   };
 
   const incrementQuantity = () => {
-    const maxQuantity = selectedVariant
-      ? product.product_variants.find((v) => v.id === selectedVariant)?.stock_quantity || product.stock_quantity
-      : product.stock_quantity;
-    if (maxQuantity !== null && quantity < maxQuantity) {
+    if (currentStockQuantity !== null && quantity < currentStockQuantity) {
       setQuantity(quantity + 1);
       setHasInteractedWithQuantity(true);
     }
@@ -171,7 +216,8 @@ export default function ProductDetailClient({
     }
   };
 
-  const isOutOfStock = product.stock_quantity !== null && product.stock_quantity === 0;
+  // Check if the current selection (variant or product) is out of stock
+  const isOutOfStock = currentStockQuantity !== null && currentStockQuantity <= 0;
 
   // Get gallery images
   const galleryImages = Array.isArray(product.gallery) ? product.gallery : [];
@@ -179,6 +225,9 @@ export default function ProductDetailClient({
     product.image,
     ...galleryImages.filter((img: string) => img && img !== product.image),
   ].filter(Boolean) as string[];
+  const safeProductDescription = product.description
+    ? sanitizeHtmlForDisplay(product.description)
+    : null;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -192,6 +241,17 @@ export default function ProductDetailClient({
         <Link href="/products" className="hover:text-foreground transition-colors">
           Products
         </Link>
+        {category && (
+          <>
+            <ChevronRightIcon className="h-4 w-4" />
+            <Link
+              href={getCollectionPath(category.slug)}
+              className="hover:text-foreground transition-colors"
+            >
+              {category.name}
+            </Link>
+          </>
+        )}
         <ChevronRightIcon className="h-4 w-4" />
         <span className="text-foreground font-medium">{product.name}</span>
       </nav>
@@ -208,6 +268,9 @@ export default function ProductDetailClient({
                 fill
                 className="object-cover"
                 priority
+                quality={90}
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                unoptimized={selectedImage.startsWith('data:') || selectedImage.startsWith('blob:')}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -234,6 +297,9 @@ export default function ProductDetailClient({
                     alt={`${product.name} - Image ${index + 1}`}
                     fill
                     className="object-cover"
+                    quality={90}
+                    sizes="120px"
+                    unoptimized={img.startsWith('data:') || img.startsWith('blob:')}
                   />
                 </button>
               ))}
@@ -241,10 +307,10 @@ export default function ProductDetailClient({
           )}
         </div>
 
-        {/* Product Info */}
+        {/* Product Info - typography scaled to align with header/nav (design best practice) */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+            <h1 className="text-xl font-bold mb-1.5 md:text-2xl">{product.name}</h1>
             {product.sku && (
               <p className="text-sm text-muted-foreground mb-2">SKU: {product.sku}</p>
             )}
@@ -261,15 +327,15 @@ export default function ProductDetailClient({
             )}
           </div>
 
-          {/* Price */}
-          <div className="flex items-center gap-3">
-            <span className="text-3xl font-bold">{formatPrice(displayPrice)}</span>
+          {/* Price - prominent but proportional to page hierarchy */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xl font-bold md:text-2xl">{formatPrice(displayPrice)}</span>
             {hasDiscount && (
               <>
-                <span className="text-xl text-muted-foreground line-through">
+                <span className="text-base text-muted-foreground line-through">
                   {formatPrice(product.price)}
                 </span>
-                <span className="bg-destructive text-destructive-foreground px-2 py-1 rounded text-sm font-medium">
+                <span className="bg-destructive text-destructive-foreground px-2 py-0.5 rounded text-xs font-medium">
                   {Math.round(((product.price - product.sale_price!) / product.price) * 100)}% OFF
                 </span>
               </>
@@ -284,17 +350,43 @@ export default function ProductDetailClient({
           {/* Stock Status */}
           {isOutOfStock ? (
             <div className="text-destructive font-medium">Out of Stock</div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {product.stock_quantity} in stock
+          ) : currentStockQuantity !== null ? (
+            <div className="text-sm text-green-600">
+              {currentStockQuantity} in stock
+            </div>
+          ) : null}
+
+          {/* Estimated Delivery Time */}
+          {estimatedDeliveryDays && estimatedDeliveryDays > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+              <TruckIcon className="h-5 w-5 text-primary" />
+              <span>
+                Estimated delivery: <span className="font-medium text-foreground">
+                  {estimatedDeliveryDays === 1 
+                    ? '1 day' 
+                    : `${estimatedDeliveryDays} days`}
+                </span>
+              </span>
             </div>
           )}
+
+          {/* Social Share Buttons */}
+          <div className="pt-2">
+            <ProductShareButtons
+              productName={product.name}
+              productUrl={`/products/${product.slug || product.id}`}
+              productImage={selectedImage || product.image}
+              productDescription={product.short_description || product.description || undefined}
+              productPrice={displayPrice}
+              currency={currency.code}
+            />
+          </div>
 
           {/* Description */}
           {product.short_description && (
             <div>
-              <h2 className="font-semibold mb-2">Description</h2>
-              <p className="text-muted-foreground whitespace-pre-line">
+              <h2 className="text-base font-semibold mb-2">Description</h2>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">
                 {product.short_description}
               </p>
             </div>
@@ -303,7 +395,7 @@ export default function ProductDetailClient({
           {/* Variants */}
           {product.product_variants.length > 0 && (
             <div>
-              <h2 className="font-semibold mb-4">Variants</h2>
+              <h2 className="text-base font-semibold mb-4">Variants</h2>
               <div className="space-y-3">
                 {product.product_variants.map((variant: any) => {
                   const variantImage = variant.image || 
@@ -313,6 +405,7 @@ export default function ProductDetailClient({
                   const variantDetails = variant.variant_attributes
                     .map((va: any) => `${va.attributes.name}: ${va.attribute_values.value}`)
                     .join(', ');
+                  const defaultVariantLabel = getDefaultVariantLabel(variant.id);
 
                   return (
                     <button
@@ -321,6 +414,13 @@ export default function ProductDetailClient({
                         setSelectedVariant(variant.id);
                         if (variantImage) {
                           setSelectedImage(variantImage);
+                        }
+                        // Reset quantity to 1 when switching variants, or to max available if out of stock
+                        const variantStock = variant.stock_quantity ?? 0;
+                        if (variantStock > 0 && quantity > variantStock) {
+                          setQuantity(variantStock);
+                        } else if (variantStock <= 0) {
+                          setQuantity(1); // Reset to 1, button will be disabled anyway
                         }
                       }}
                       className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
@@ -335,9 +435,12 @@ export default function ProductDetailClient({
                           <div className="relative w-20 h-20 bg-muted rounded-md overflow-hidden flex-shrink-0">
                             <Image
                               src={variantImage}
-                              alt={variantDetails || `Variant ${variant.id.slice(0, 8)}`}
+                              alt={variantDetails || defaultVariantLabel}
                               fill
                               className="object-cover"
+                              quality={90}
+                              sizes="80px"
+                              unoptimized={variantImage.startsWith('data:') || variantImage.startsWith('blob:')}
                             />
                           </div>
                         )}
@@ -372,14 +475,14 @@ export default function ProductDetailClient({
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-sm font-medium">Variant {variant.id.slice(0, 8)}</span>
+                                <span className="text-sm font-medium">{defaultVariantLabel}</span>
                               )}
                               {variant.sku && (
                                 <p className="text-xs text-muted-foreground mt-1">SKU: {variant.sku}</p>
                               )}
                             </div>
                             {variant.price && (
-                              <span className="font-bold text-lg ml-2">
+                              <span className="font-semibold text-base ml-2">
                                 {formatPrice(variant.price)}
                               </span>
                             )}
@@ -405,7 +508,7 @@ export default function ProductDetailClient({
           {/* Quantity Selector */}
           <div className="space-y-3">
             <div className="flex items-center gap-4">
-              <label className="font-semibold">Quantity:</label>
+              <label className="text-sm font-semibold">Quantity:</label>
               <div className="flex items-center gap-2 border rounded-md">
                 <Button
                   variant="ghost"
@@ -420,7 +523,7 @@ export default function ProductDetailClient({
                   variant="ghost"
                   size="icon"
                   onClick={incrementQuantity}
-                  disabled={isOutOfStock || (product.stock_quantity !== null && quantity >= product.stock_quantity)}
+                  disabled={isOutOfStock || (currentStockQuantity !== null && quantity >= currentStockQuantity)}
                 >
                   <PlusIcon className="h-4 w-4" />
                 </Button>
@@ -450,12 +553,12 @@ export default function ProductDetailClient({
           </Button>
 
           {/* Full Description */}
-          {product.description && (
+          {safeProductDescription && (
             <div className="pt-6 border-t">
-              <h2 className="font-semibold mb-2">Full Description</h2>
+              <h2 className="text-base font-semibold mb-2">Full Description</h2>
               <div
-                className="text-muted-foreground prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: product.description }}
+                className="text-muted-foreground prose prose-sm max-w-none text-sm"
+                dangerouslySetInnerHTML={{ __html: safeProductDescription }}
               />
             </div>
           )}
@@ -470,7 +573,7 @@ export default function ProductDetailClient({
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6">Related Products</h2>
+          <h2 className="text-lg font-bold mb-4 md:text-xl">Related Products</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((relatedProduct) => (
               <Link key={relatedProduct.id} href={`/products/${relatedProduct.slug}`}>
@@ -483,6 +586,9 @@ export default function ProductDetailClient({
                           alt={relatedProduct.name}
                           fill
                           className="object-cover"
+                          quality={90}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          unoptimized={relatedProduct.image.startsWith('data:') || relatedProduct.image.startsWith('blob:')}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -491,9 +597,9 @@ export default function ProductDetailClient({
                       )}
                     </div>
                     <div className="p-4">
-                      <h3 className="font-semibold mb-2 line-clamp-2">{relatedProduct.name}</h3>
+                      <h3 className="text-sm font-semibold mb-2 line-clamp-2">{relatedProduct.name}</h3>
                       <div className="flex items-center gap-2">
-                        <p className="text-lg font-bold">
+                        <p className="text-base font-semibold">
                           {formatPrice(relatedProduct.sale_price || relatedProduct.price)}
                         </p>
                         {relatedProduct.sale_price && (

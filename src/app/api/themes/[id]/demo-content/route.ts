@@ -21,6 +21,8 @@ export async function GET(
   
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const industryOverride = searchParams.get('industry');
 
     // Always query database first to get the correct theme by ID
     let theme: { id: string; slug: string; title: string } | null = null;
@@ -87,15 +89,17 @@ export async function GET(
     }
 
     // Get demo content based on industry (synchronous, fast)
-    const demoProducts = getDemoProducts(themeTemplate.industry, themeTemplate.demoContent.products);
-    const demoCategories = getDemoCategories(themeTemplate.industry);
+    // Allow industry override for preview (e.g. ?industry=fashion for multipurpose theme showing clothes)
+    const industry = industryOverride || themeTemplate.industry;
+    const demoProducts = getDemoProducts(industry, themeTemplate.demoContent.products);
+    const demoCategories = getDemoCategories(industry);
 
     return NextResponse.json({
       theme: {
         id: theme.id,
         slug: theme.slug,
         title: theme.title,
-        industry: themeTemplate.industry,
+        industry,
       },
       products: demoProducts,
       categories: demoCategories,

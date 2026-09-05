@@ -62,14 +62,15 @@ export function ImageWithFallback({
   // Use Next.js Image for optimized images
   if (fill) {
     return (
-      <div className={`relative ${className}`} style={style} {...rest}>
+      <div className={`relative w-full h-full ${className}`} style={style} {...rest}>
         <Image
           src={src}
           alt={alt}
           fill
           sizes={sizes || '100vw'}
+          className="object-cover"
           onError={handleError}
-          unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
+          unoptimized={src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('/')}
         />
       </div>
     );
@@ -85,7 +86,7 @@ export function ImageWithFallback({
       style={style}
       sizes={sizes}
       onError={handleError}
-      unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
+      unoptimized={src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('/')}
       {...rest}
     />
   );

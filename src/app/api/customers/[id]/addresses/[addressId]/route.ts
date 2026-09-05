@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerAddressSchema } from '@/lib/customers/validation';
+import { parseStoredAddress, serializeStoredAddress } from '@/lib/customers/address-storage';
 
 /**
  * PUT /api/customers/[id]/addresses/[addressId] - Update customer address
@@ -56,6 +57,12 @@ export async function PUT(
       });
     }
 
+    const addressField = serializeStoredAddress(validatedData.address, {
+      state: validatedData.state,
+      country: validatedData.country,
+      addressLabel: validatedData.address_label,
+    });
+
     // Update address
     const updatedAddress = await prisma.user_delivery_addresses.update({
       where: { id: addressId },
@@ -63,8 +70,8 @@ export async function PUT(
         name: validatedData.name,
         email: validatedData.email,
         phone: validatedData.phone,
-        address: validatedData.address,
-        city: validatedData.city,
+        address: addressField,
+        city: validatedData.city || null,
         state_id: validatedData.state_id,
         country_id: validatedData.country_id,
         postal_code: validatedData.postal_code,
@@ -74,19 +81,25 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      address: {
-        id: updatedAddress.id,
-        name: updatedAddress.name,
-        email: updatedAddress.email,
-        phone: updatedAddress.phone,
-        address: updatedAddress.address,
-        city: updatedAddress.city,
-        state_id: updatedAddress.state_id,
-        country_id: updatedAddress.country_id,
-        postal_code: updatedAddress.postal_code,
-        is_default: updatedAddress.is_default,
-        updated_at: updatedAddress.updated_at,
-      },
+      address: (() => {
+        const parsedAddress = parseStoredAddress(updatedAddress.address);
+        return {
+          address: parsedAddress.address,
+          state: parsedAddress.state || '',
+          country: parsedAddress.country || '',
+          address_label: parsedAddress.addressLabel,
+          id: updatedAddress.id,
+          name: updatedAddress.name,
+          email: updatedAddress.email,
+          phone: updatedAddress.phone,
+          city: updatedAddress.city || '',
+          state_id: updatedAddress.state_id,
+          country_id: updatedAddress.country_id,
+          postal_code: updatedAddress.postal_code || '',
+          is_default: updatedAddress.is_default,
+          updated_at: updatedAddress.updated_at,
+        };
+      })(),
     });
   } catch (error: any) {
     console.error('Error updating customer address:', error);

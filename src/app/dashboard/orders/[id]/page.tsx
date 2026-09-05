@@ -58,6 +58,15 @@ export default async function OrderDetailPage({
     if (!orderData) {
       error = 'Order not found';
     } else {
+      const tumiziRefundLog = await prisma.payment_logs.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          gateway: 'tumizi_refund',
+          payment_id: `refund-order-${orderData.id}`,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
       // Fetch product variants separately if needed
       const variantIds = orderData.order_products
         .filter((item: any) => item.variant_id)
@@ -89,11 +98,21 @@ export default async function OrderDetailPage({
         payment_status: orderData.payment_status,
         payment_gateway: orderData.payment_gateway,
         transaction_id: orderData.transaction_id,
+        payment_meta: orderData.payment_meta,
+        tumizi_refund_status: tumiziRefundLog?.status || null,
+        tumizi_refund_reference: tumiziRefundLog?.transaction_id || null,
+        invoice_number: orderData.invoice_number,
         shipping_address: orderData.shipping_address,
         billing_address: orderData.billing_address,
         coupon: orderData.coupon,
         coupon_discounted: orderData.coupon_discounted ? Number(orderData.coupon_discounted) : null,
         message: orderData.message,
+        delivery_zone_id: orderData.delivery_zone_id,
+        delivery_zone_name: orderData.delivery_zone_name,
+        delivery_fee: orderData.delivery_fee ? Number(orderData.delivery_fee) : null,
+        delivery_fee_status: orderData.delivery_fee_status,
+        delivery_fee_quote: orderData.delivery_fee_quote ? Number(orderData.delivery_fee_quote) : null,
+        delivery_fee_notes: orderData.delivery_fee_notes,
         items: orderData.order_products.map((item: any) => ({
           id: item.id,
           product_id: item.product_id,

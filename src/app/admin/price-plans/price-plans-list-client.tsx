@@ -26,8 +26,11 @@ interface PricePlan {
   id: string;
   name: string;
   price: number;
+  price_kes?: number | null;
   duration_months: number;
   trial_days: number | null;
+  onboarding_reward_window_days: number | null;
+  onboarding_reward_bonus_days: number | null;
   features: any;
   status: string | null;
   created_at: Date | null;
@@ -81,12 +84,9 @@ export default function PricePlansListClient({ pricePlans }: Readonly<PricePlans
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(Number(price));
-  };
+  const formatUsd = (price: number) => `$${Number(price).toFixed(2)}`;
+  const formatKes = (price: number | null | undefined) =>
+    price != null ? `Ksh ${Number(price).toLocaleString('en-KE')}` : '—';
 
   return (
     <Card>
@@ -122,9 +122,11 @@ export default function PricePlansListClient({ pricePlans }: Readonly<PricePlans
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>USD / month</TableHead>
+                <TableHead>KES / month</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Trial Period</TableHead>
+                <TableHead>Setup Reward</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Tenants</TableHead>
                 <TableHead>Created</TableHead>
@@ -135,7 +137,8 @@ export default function PricePlansListClient({ pricePlans }: Readonly<PricePlans
               {pricePlans.map((plan: any) => (
                 <TableRow key={plan.id}>
                   <TableCell className="font-medium">{plan.name}</TableCell>
-                  <TableCell>{formatPrice(plan.price)}</TableCell>
+                  <TableCell>{formatUsd(plan.price)}</TableCell>
+                  <TableCell>{formatKes(plan.price_kes)}</TableCell>
                   <TableCell>
                     {plan.duration_months === 1
                       ? '1 month'
@@ -148,6 +151,18 @@ export default function PricePlansListClient({ pricePlans }: Readonly<PricePlans
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">No trial</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {plan.onboarding_reward_window_days &&
+                    plan.onboarding_reward_window_days > 0 &&
+                    plan.onboarding_reward_bonus_days &&
+                    plan.onboarding_reward_bonus_days > 0 ? (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100">
+                        {plan.onboarding_reward_bonus_days} days in {plan.onboarding_reward_window_days}d
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Disabled</span>
                     )}
                   </TableCell>
                   <TableCell>{getStatusBadge(plan.status)}</TableCell>

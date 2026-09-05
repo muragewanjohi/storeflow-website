@@ -5,6 +5,8 @@
  * New tenant admin logins should use /dashboard/login
  */
 
+export const dynamic = 'force-dynamic';
+
 import { redirect } from 'next/navigation';
 
 export default function TenantLoginPage() {

@@ -128,7 +128,11 @@ export default function BlogPostClient({ blog, relatedBlogs }: Readonly<BlogPost
               {relatedBlogs.map((relatedPost) => (
                 <Link
                   key={relatedPost.id}
-                  href={relatedPost.slug ? `/blog/${relatedPost.slug}` : `/blog/${relatedPost.id}`}
+                  href={
+                    relatedPost.slug
+                      ? `/blog/${encodeURIComponent(relatedPost.slug)}`
+                      : `/blog/${relatedPost.id}`
+                  }
                   className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden"
                 >
                   {relatedPost.image && (

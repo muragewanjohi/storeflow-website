@@ -6,17 +6,15 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-// Lazy load rich text editor for better performance
 import RichTextEditor from '@/components/content/rich-text-editor-lazy';
 import ImageUploadField from '@/components/content/image-upload-field';
 import PageBuilder from '@/components/content/page-builder/page-builder';
@@ -25,6 +23,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import ContextualHelp from '@/components/dashboard/contextual-help';
+import ContextualHelpPanel from '@/components/dashboard/contextual-help-panel';
+import FeatureDiscoveryTooltip from '@/components/dashboard/feature-discovery-tooltip';
+import LegalPageDraftButton from './legal-page-draft-button';
 
 interface Page {
   id: string;
@@ -93,12 +96,86 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     use_banner: detectUseBanner(page?.content || '', page?.banner_image || ''),
   });
 
+  // SEO sections collapsible state (initially closed)
+  const [seoSettingsOpen, setSeoSettingsOpen] = useState(false);
+  const [seoPreviewOpen, setSeoPreviewOpen] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const initialFormRef = useRef(JSON.stringify({
+    title: page?.title || '',
+    slug: page?.slug || '',
+    content: page?.content || '',
+    banner_image: page?.banner_image || '',
+    meta_title: page?.meta_title || '',
+    meta_description: page?.meta_description || '',
+    meta_tags: page?.meta_tags || '',
+  }));
+
+  // Track dirty state
+  useEffect(() => {
+    const current = JSON.stringify({
+      title: formData.title,
+      slug: formData.slug,
+      content: formData.content,
+      banner_image: formData.banner_image,
+      meta_title: formData.meta_title,
+      meta_description: formData.meta_description,
+      meta_tags: formData.meta_tags,
+    });
+    setIsDirty(current !== initialFormRef.current);
+  }, [formData]);
+
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) { e.preventDefault(); }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  /** Preview open state; persisted in sessionStorage so it survives remounts/refreshes until user closes */
+  const [pageBuilderPreviewOpen, setPageBuilderPreviewOpen] = useState(false);
+
+  const previewStorageKey = `page-builder-preview-open-${page?.id ?? 'new'}`;
+
+  // Restore preview open state after mount (e.g. after router.refresh() or RSC refetch)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem(previewStorageKey) === '1') {
+        setPageBuilderPreviewOpen(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [previewStorageKey]);
+
+  const handlePreviewOpenChange = (open: boolean) => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (open) sessionStorage.setItem(previewStorageKey, '1');
+        else sessionStorage.removeItem(previewStorageKey);
+      }
+    } catch {
+      // ignore
+    }
+    setPageBuilderPreviewOpen(open);
+  };
   
   const [contentMode, setContentMode] = useState<'rich-text' | 'page-builder'>(() =>
     detectContentMode(page?.content)
   );
+
+  const generateSlugFromTitle = useCallback(() => {
+    if (!formData.title.trim()) return;
+    const slug = formData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    setFormData((prev) => ({ ...prev, slug }));
+  }, [formData.title]);
   
   // Update use_banner when content changes
   const handleContentChange = (newContent: string) => {
@@ -108,8 +185,9 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Extracted save logic so it can be called from PageBuilder save button too.
+  // saveAsDraft: if true, saves with status 'draft'; if false, saves with status 'published'.
+  const performSave = async (saveAsDraft: boolean) => {
     setIsSubmitting(true);
     setError(null);
 
@@ -123,6 +201,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
       const url = isEditing ? `/api/pages/${page.id}` : '/api/pages';
       const method = isEditing ? 'PUT' : 'POST';
+      const statusToSave = saveAsDraft ? 'draft' : 'published';
 
       // Helper function to check if URL is a blob URL
       const isBlobUrl = (url: string | null | undefined): boolean => {
@@ -189,7 +268,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
       // Prepare data, ensuring all fields are properly formatted
       const submitData: any = {
         title: formData.title.trim(),
-        status: formData.status,
+        status: statusToSave,
       };
 
       // Only include optional fields if they have values
@@ -229,10 +308,40 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
         throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} page`);
       }
 
-      // Force a hard refresh by redirecting with cache busting and refreshing router
+      // Reset dirty state after successful save
+      setIsDirty(false);
+      initialFormRef.current = JSON.stringify({
+        title: formData.title,
+        slug: formData.slug,
+        content: formData.content,
+        banner_image: formData.banner_image,
+        meta_title: formData.meta_title,
+        meta_description: formData.meta_description,
+        meta_tags: formData.meta_tags,
+      });
+
+      // Save as draft: stay on edit page so user can click Preview (or go to new page's edit when creating)
+      if (saveAsDraft) {
+        setIsSubmitting(false);
+        if (isEditing) {
+          router.refresh();
+        } else {
+          const data = await response.json();
+          const newId = data.page?.id;
+          if (newId) {
+            router.push(`/dashboard/pages/${newId}`);
+            setTimeout(() => router.refresh(), 100);
+          } else {
+            router.push(`/dashboard/pages?refresh=${Date.now()}`);
+            setTimeout(() => router.refresh(), 100);
+          }
+        }
+        return;
+      }
+
+      // Publish: redirect to pages list
       const refreshUrl = `/dashboard/pages?refresh=${Date.now()}`;
       router.push(refreshUrl);
-      // Use setTimeout to ensure router.push completes before refresh
       setTimeout(() => {
         router.refresh();
       }, 100);
@@ -240,6 +349,21 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
       setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} page`);
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmitDraft = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave(true);
+  };
+
+  const handleSubmitPublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSave(false);
+  };
+
+  // Handler for PageBuilder save button (saves as draft by default so edits don't go live accidentally)
+  const handlePageBuilderSave = () => {
+    performSave(true);
   };
 
   return (
@@ -286,7 +410,7 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
+      <form className={isSubmitting ? 'pointer-events-none opacity-50' : ''}>
         <div className="space-y-6">
           {/* Basic Information */}
           <Card>
@@ -298,7 +422,14 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="title">Title *</Label>
+                  <ContextualHelp
+                    title="Page Title"
+                    description="Use a clear, specific title. This helps customers and search engines understand the page."
+                    learnMoreHref="/help?article=creating-pages"
+                  />
+                </div>
                 <Input
                   id="title"
                   value={formData.title || ''}
@@ -309,13 +440,38 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug || ''}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="page-slug (auto-generated if empty)"
-                />
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="slug">Slug</Label>
+                  <ContextualHelp
+                    title="Slug"
+                    description="The slug is the page URL path. Keep it short, lowercase, and descriptive. Leave empty to auto-generate from title."
+                    learnMoreHref="/help?article=creating-pages"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="slug"
+                    value={formData.slug || ''}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder="page-slug (auto-generated if empty)"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Regenerate from title"
+                    onClick={generateSlugFromTitle}
+                    disabled={!formData.title.trim()}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+                {(formData.slug || page?.slug) && (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {baseUrl || 'https://example.com'}/page/{formData.slug || page?.slug}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
                   URL-friendly version of the title. Leave empty to auto-generate.
                 </p>
@@ -323,14 +479,20 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Header Image Type</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label>Header Style</Label>
+                    <ContextualHelp
+                      title="Header Style"
+                      description="Use Banner image for simple pages. Use Hero section when building richer pages with title, subtitle, and call-to-action content."
+                      learnMoreHref="/help?article=creating-pages"
+                    />
+                  </div>
                   <RadioGroup
                     value={formData.use_banner ? 'banner' : 'hero'}
                     onValueChange={(value) => {
                       setFormData((prev) => ({ 
                         ...prev, 
                         use_banner: value === 'banner',
-                        // Clear banner_image if switching to hero, or clear hero section if switching to banner
                         banner_image: value === 'banner' ? prev.banner_image : '',
                       }));
                     }}
@@ -339,18 +501,18 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="banner" id="banner" />
                       <Label htmlFor="banner" className="font-normal cursor-pointer">
-                        Use Banner Image
+                        Banner image
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="hero" id="hero" />
                       <Label htmlFor="hero" className="font-normal cursor-pointer">
-                        Use Hero Section (in Page Builder)
+                        Hero section
                       </Label>
                     </div>
                   </RadioGroup>
                   <p className="text-xs text-muted-foreground">
-                    Choose whether to use a simple banner image or a Hero Section from the Page Builder
+                    Banner image for simple pages, or a Hero section for richer headers
                   </p>
                 </div>
 
@@ -361,7 +523,9 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
                       value={formData.banner_image || null}
                       onChange={(url) => setFormData((prev) => ({ ...prev, banner_image: url || '' }))}
                       aspectRatio={16 / 9}
-                      helpText="Upload a banner image for this page (max 5MB)"
+                      allowSkipCrop={true}
+                      recommendedDimensions="1920×1080 or larger (16:9). Images under 1920px wide: use “Use full image (no crop)” to avoid width cropping."
+                      helpText="Upload a banner image for this page (max 5MB). Crop uses 16:9."
                     />
                     
                     {/* Guidance on when to use Banner Image */}
@@ -393,56 +557,88 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="content">Content</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="content">Content</Label>
+                  <ContextualHelp
+                    title="Content Mode"
+                    description="Simple Editor is best for basic text pages. Page Builder is best for structured pages made of reusable sections."
+                    learnMoreHref="/help?article=page-builder-overview"
+                  />
+                  <FeatureDiscoveryTooltip
+                    featureKey="page-content-mode-tabs"
+                    title="Page Builder is available"
+                    description="You can now build pages using reusable sections with drag-and-drop ordering and live preview."
+                  />
+                  <ContextualHelpPanel
+                    title="Page Content Help"
+                    description="Choose the content mode based on your page goal. Use Simple Editor for straightforward pages and Page Builder for modular, conversion-focused pages."
+                    tips={[
+                      'Use Hero as your first section for landing pages.',
+                      'Add a CTA section when the page has a conversion goal.',
+                      'Keep sections focused and avoid overly long pages.',
+                    ]}
+                    learnMoreHref="/help?article=page-builder-overview"
+                    triggerLabel="Open guide"
+                  />
+                </div>
                 <Tabs value={contentMode} onValueChange={(value) => setContentMode(value as 'rich-text' | 'page-builder')}>
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="rich-text">Rich Text Editor</TabsTrigger>
-                    <TabsTrigger value="page-builder">Page Builder</TabsTrigger>
+                  <TabsList className="mb-4 bg-muted/50 border border-border">
+                    <TabsTrigger 
+                      value="rich-text"
+                      className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                    >
+                      Simple Editor
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="page-builder"
+                      className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+                    >
+                      Page Builder
+                    </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="rich-text" className="mt-0">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Write freely with formatting tools -- best for simple text pages.
+                    </p>
+                    <LegalPageDraftButton
+                      onDrafted={(draft) =>
+                        setFormData((prev) => ({ ...prev, title: prev.title || draft.title, content: draft.contentHtml }))
+                      }
+                    />
                     <RichTextEditor
                       content={contentMode === 'rich-text' ? (formData.content || '') : ''}
                       onChange={(content) => setFormData((prev) => ({ ...prev, content }))}
                       placeholder="Start writing your page content..."
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Use the toolbar to format text, add images, links, and more
-                    </p>
                   </TabsContent>
                   
                   <TabsContent value="page-builder" className="mt-0">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Build rich pages from reusable sections -- best for landing pages and homepages.
+                    </p>
                     <PageBuilder
                       value={contentMode === 'page-builder' ? (formData.content || '') : ''}
                       onChange={handleContentChange}
                       pageSlug={(formData.slug || page?.slug) || undefined}
                       pageId={page?.id}
                       pageStatus={formData.status}
+                      onSave={handlePageBuilderSave}
+                      isSaving={isSubmitting}
+                      previewOpen={pageBuilderPreviewOpen}
+                      onPreviewOpenChange={handlePreviewOpenChange}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Build your page using pre-designed sections. Content is stored as JSON.
-                    </p>
                   </TabsContent>
                 </Tabs>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: 'draft' | 'published' | 'archived') =>
-                    setFormData({ ...formData, status: value })
-                  }
-                >
-                  <SelectTrigger id="status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+                <strong className="text-foreground">Status:</strong>{' '}
+                {formData.status === 'published'
+                  ? 'Published — visible on your storefront'
+                  : formData.status === 'archived'
+                    ? 'Archived — hidden from storefront'
+                    : 'Draft — not visible to customers. Use Preview to see how it will look.'}
               </div>
             </CardContent>
           </Card>
@@ -450,58 +646,147 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
           {/* SEO Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>SEO Settings</CardTitle>
-              <CardDescription>
-                Meta tags for search engine optimization
-              </CardDescription>
+              <button
+                type="button"
+                onClick={() => setSeoSettingsOpen(!seoSettingsOpen)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div>
+                  <CardTitle>SEO Settings</CardTitle>
+                  <CardDescription>
+                    Meta tags for search engine optimization
+                  </CardDescription>
+                </div>
+                {seoSettingsOpen ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="meta_title">Meta Title</Label>
-                <Input
-                  id="meta_title"
-                  value={formData.meta_title || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
-                  placeholder="SEO title (max 60 characters)"
-                  maxLength={60}
-                />
-              </div>
+            {seoSettingsOpen && (
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_title">Meta Title</Label>
+                    <ContextualHelp
+                      title="Meta Title"
+                      description="The SEO title shown in search results. Aim for under 60 characters and include the main keyword."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
+                  <Input
+                    id="meta_title"
+                    value={formData.meta_title || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_title: e.target.value })}
+                    placeholder="SEO title (max 60 characters)"
+                    maxLength={60}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meta_description">Meta Description</Label>
-                <Textarea
-                  id="meta_description"
-                  value={formData.meta_description || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
-                  rows={3}
-                  placeholder="SEO description (max 160 characters)"
-                  maxLength={160}
-                />
-              </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_description">Meta Description</Label>
+                    <ContextualHelp
+                      title="Meta Description"
+                      description="A short summary for search results. Keep it under 160 characters and include a clear value proposition."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
+                  <Textarea
+                    id="meta_description"
+                    value={formData.meta_description || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_description: e.target.value })}
+                    rows={3}
+                    placeholder="SEO description (max 160 characters)"
+                    maxLength={160}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="meta_tags">Meta Tags</Label>
-                <Input
-                  id="meta_tags"
-                  value={formData.meta_tags || ''}
-                  onChange={(e) => setFormData({ ...formData, meta_tags: e.target.value })}
-                  placeholder="Comma-separated tags"
-                />
-              </div>
-            </CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="meta_tags">Meta Tags</Label>
+                    <ContextualHelp
+                      title="Meta Tags"
+                      description="Optional comma-separated keywords. Focus on a few relevant terms instead of long keyword lists."
+                      learnMoreHref="/help?article=seo-basics"
+                    />
+                  </div>
+                  <Input
+                    id="meta_tags"
+                    value={formData.meta_tags || ''}
+                    onChange={(e) => setFormData({ ...formData, meta_tags: e.target.value })}
+                    placeholder="Comma-separated tags"
+                  />
+                </div>
+              </CardContent>
+            )}
           </Card>
 
           {/* SEO Preview */}
-          <SEOPreview
-            title={formData.meta_title || formData.title}
-            description={formData.meta_description}
-            slug={formData.slug}
-            baseUrl={baseUrl || 'https://example.com'}
-          />
-
-          {/* Form Actions */}
           <Card>
-            <CardFooter className="flex justify-end gap-2">
+            <CardHeader>
+              <button
+                type="button"
+                onClick={() => setSeoPreviewOpen(!seoPreviewOpen)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <div>
+                  <CardTitle>SEO Preview</CardTitle>
+                  <CardDescription>
+                    How your page will appear in search engine results
+                  </CardDescription>
+                </div>
+                {seoPreviewOpen ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            </CardHeader>
+            {seoPreviewOpen && (
+              <CardContent>
+                <SEOPreview
+                  title={formData.meta_title || formData.title}
+                  description={formData.meta_description}
+                  slug={formData.slug}
+                  baseUrl={baseUrl || 'https://example.com'}
+                />
+              </CardContent>
+            )}
+          </Card>
+
+        </div>
+      </form>
+
+      {/* Sticky Action Bar */}
+      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 mt-6">
+        <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  asChild
+                >
+                  <a
+                    href={`/dashboard/pages/${page.id}/preview`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Preview
+                  </a>
+                </Button>
+              )}
+              {isDirty && (
+                <span className="text-xs text-amber-600 font-medium">
+                  Unsaved changes
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -510,14 +795,25 @@ export default function PageFormClient({ page, baseUrl }: Readonly<PageFormClien
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isEditing ? 'Update Page' : 'Create Page'}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={handleSubmitDraft}
+              >
+                {isSubmitting ? 'Saving...' : isEditing ? 'Save as draft' : 'Save draft'}
               </Button>
-            </CardFooter>
-          </Card>
+              <Button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSubmitPublish}
+              >
+                {isSubmitting ? 'Saving...' : isEditing ? 'Publish' : 'Create & Publish'}
+              </Button>
+            </div>
+          </div>
         </div>
-      </form>
-
+      </div>
     </div>
   );
 }

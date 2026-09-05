@@ -11,6 +11,10 @@ import { requireAuthOrRedirect, requireRoleOrRedirect } from '@/lib/auth/server'
 import { prisma } from '@/lib/prisma/client';
 import TenantSettingsClient from './tenant-settings-client';
 import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
+import {
+  buildGettingStartedProgress,
+  GETTING_STARTED_OPTION_NAMES,
+} from '@/lib/onboarding/getting-started-progress';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -41,6 +45,50 @@ export default async function TenantSettingsPage({ params }: PageProps) {
     redirect('/admin/tenants');
   }
 
+  const [productCount, categoryCount, deliveryZoneCount, onboardingSettingsRaw] = await Promise.all([
+    prisma.products.count({
+      where: {
+        tenant_id: tenant.id,
+        status: 'active',
+        created_by: { not: null },
+      },
+    }),
+    prisma.categories.count({
+      where: { tenant_id: tenant.id },
+    }),
+    prisma.delivery_zones.count({
+      where: {
+        tenant_id: tenant.id,
+        is_active: true,
+      },
+    }),
+    prisma.static_options.findMany({
+      where: {
+        tenant_id: tenant.id,
+        option_name: { in: [...GETTING_STARTED_OPTION_NAMES] },
+      },
+      select: {
+        option_name: true,
+        option_value: true,
+      },
+    }),
+  ]);
+
+  const onboardingSettings = onboardingSettingsRaw.reduce<Record<string, string | null>>(
+    (acc, item) => {
+      acc[item.option_name] = item.option_value ?? null;
+      return acc;
+    },
+    {},
+  );
+
+  const onboardingJourney = buildGettingStartedProgress({
+    productCount,
+    categoryCount,
+    deliveryZoneCount,
+    settings: onboardingSettings,
+  });
+
   // Include data field for reminder tracking
   const tenantData = {
     ...tenant,
@@ -51,6 +99,27 @@ export default async function TenantSettingsPage({ params }: PageProps) {
         }
       : null,
   };
+
+  // Fetch countries for tenant country dropdown (global countries with ISO codes)
+  let countries: Array<{ id: string; name: string; code: string | null }> = [];
+  try {
+    countries = await prisma.countries.findMany({
+      where: {
+        tenant_id: null,
+        code: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching countries:', error);
+  }
 
   // Fetch all available price plans for plan selection
   const pricePlansData = await prisma.price_plans.findMany({
@@ -96,7 +165,13 @@ export default async function TenantSettingsPage({ params }: PageProps) {
           Manage settings for {tenant.name}
         </p>
       </div>
-      <TenantSettingsClient tenant={tenantData as any} pricePlans={pricePlans} />
+      <TenantSettingsClient
+        tenant={tenantData as any}
+        pricePlans={pricePlans}
+        countries={countries}
+        contactPhone={onboardingSettings.store_phone || ''}
+        onboardingJourney={onboardingJourney}
+      />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   sendOrderStatusUpdateEmail,
   sendPaymentStatusUpdateEmail 
 } from '@/lib/orders/emails';
+import { dispatchNotificationToTenantDevices } from '@/lib/notifications/mobile-push';
 
 /**
  * GET /api/orders/[id] - Get order details
@@ -85,6 +86,10 @@ export async function GET(
         email: order.email,
         phone: order.phone,
         total_amount: Number(order.total_amount),
+        // Basic deposit support (docs/SERVICES_PLAN.md) — null for every
+        // normal order, real values only when a deposit was configured.
+        deposit_amount: order.deposit_amount != null ? Number(order.deposit_amount) : null,
+        balance_amount: order.balance_amount != null ? Number(order.balance_amount) : null,
         status: order.status,
         payment_status: order.payment_status,
         payment_gateway: order.payment_gateway,
@@ -146,6 +151,22 @@ export async function PUT(
 
     // Update order status if provided
     if (body.status) {
+      // Prevent status updates for out-of-zone orders until delivery fee is approved
+      if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
+        return NextResponse.json(
+          { error: 'Order status cannot be updated until the customer approves the delivery fee quote' },
+          { status: 400 }
+        );
+      }
+
+      // If delivery fee is rejected, only allow cancellation
+      if (existingOrder.delivery_fee_status === 'rejected' && body.status !== 'cancelled') {
+        return NextResponse.json(
+          { error: 'Order status cannot be updated. Since the customer rejected the delivery fee, the order must be cancelled.' },
+          { status: 400 }
+        );
+      }
+
       const { status, notes } = orderStatusUpdateSchema.parse({ status: body.status, notes: body.notes });
 
       // Validate status transition
@@ -234,6 +255,32 @@ export async function PUT(
 
     // Update payment status if provided
     if (body.payment_status) {
+      if (existingOrder.payment_gateway === 'tumizi') {
+        return NextResponse.json(
+          {
+            error:
+              'Tumizi payment status is updated automatically when the customer pays. Use "Refresh from Tumizi" on the order page.',
+          },
+          { status: 400 },
+        );
+      }
+
+      // Prevent payment status updates for out-of-zone orders until delivery fee is approved
+      if (existingOrder.delivery_fee_status === 'pending' || existingOrder.delivery_fee_status === 'quoted') {
+        return NextResponse.json(
+          { error: 'Payment status cannot be updated until the customer approves the delivery fee quote' },
+          { status: 400 }
+        );
+      }
+
+      // If delivery fee is rejected, prevent payment status updates (order must be cancelled)
+      if (existingOrder.delivery_fee_status === 'rejected') {
+        return NextResponse.json(
+          { error: 'Payment status cannot be updated. Since the customer rejected the delivery fee, the order must be cancelled.' },
+          { status: 400 }
+        );
+      }
+
       const { payment_status, transaction_id, payment_gateway, notes } = orderPaymentStatusUpdateSchema.parse({
         payment_status: body.payment_status,
         transaction_id: body.transaction_id,
@@ -279,25 +326,39 @@ export async function PUT(
       if (payment_status === 'failed' || (payment_status === 'pending' && existingOrder.payment_status !== 'pending')) {
         (async () => {
           const { sendImmediateNotificationEmail } = await import('@/lib/notifications/email');
+          const notification = {
+            id: `payment-${payment_status}-${order.id}`,
+            type: (payment_status === 'failed' ? 'failed_payment' : 'pending_payment') as
+              | 'failed_payment'
+              | 'pending_payment',
+            title: payment_status === 'failed' ? 'Failed Payment' : 'Pending Payment',
+            message: payment_status === 'failed'
+              ? `Payment failed for order ${order.order_number}`
+              : `Order ${order.order_number} is awaiting payment`,
+            link: `/dashboard/orders/${order.id}`,
+            created_at: new Date(),
+            read: false,
+            metadata: {
+              order_id: order.id,
+              order_number: order.order_number,
+            },
+          };
+
           await sendImmediateNotificationEmail({
             tenant,
-            notification: {
-              id: `payment-${payment_status}-${order.id}`,
-              type: payment_status === 'failed' ? 'failed_payment' : 'pending_payment',
-              title: payment_status === 'failed' ? 'Failed Payment' : 'Pending Payment',
-              message: payment_status === 'failed'
-                ? `Payment failed for order ${order.order_number}`
-                : `Order ${order.order_number} is awaiting payment`,
-              link: `/dashboard/orders/${order.id}`,
-              created_at: new Date(),
-              read: false,
-              metadata: {
-                order_id: order.id,
-                order_number: order.order_number,
-              },
-            },
+            notification,
           }).catch((error) => {
             console.error('Error sending payment notification email:', error);
+          });
+
+          await dispatchNotificationToTenantDevices({
+            tenantId: tenant.id,
+            type: notification.type,
+            title: notification.title,
+            message: notification.message,
+            link: notification.link,
+          }).catch((error) => {
+            console.error('Error sending payment notification push:', error);
           });
         })();
       }

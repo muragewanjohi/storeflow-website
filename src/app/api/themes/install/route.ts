@@ -13,16 +13,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import {
-  getHomepageTemplateData,
   getHomepageLayout,
   convertLegacyLayoutToPageBuilder,
   createDefaultHomepageTemplate,
 } from '@/lib/themes/homepage-templates';
-import { getThemeDefaults } from '@/lib/themes/theme-defaults';
+import { getThemeDefaults, getBusinessTypeColorScheme } from '@/lib/themes/theme-defaults';
 import { getAdditionalPageTemplates } from '@/lib/themes/additional-pages';
 import { createDemoContent } from '@/lib/themes/demo-content';
 import { trackThemeInstallation } from '@/lib/themes/theme-installation-analytics';
 import { generateSlug } from '@/lib/content/validation';
+import { canInstallTheme } from '@/lib/themes/theme-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     const body = await request.json();
-    const { theme_id, include_demo_content, include_demo_attributes } = body;
+    const { theme_id, include_demo_content, include_demo_attributes, business_type } = body;
     
     console.log('[Theme Install] Installation request:', {
       theme_id,
@@ -112,6 +112,25 @@ export async function POST(request: NextRequest) {
 
     if (!theme) {
       return NextResponse.json({ error: 'Theme not found' }, { status: 404 });
+    }
+
+    // Theme Track A4 — real Basic/Pro gating. Every theme ships with
+    // is_premium: false today (DA.30), so this is a no-op until a theme is
+    // actually flipped to premium, but it's the real enforcement point once
+    // one is.
+    if (theme.is_premium) {
+      const plan = tenant.plan_id
+        ? await prisma.price_plans.findUnique({ where: { id: tenant.plan_id }, select: { name: true } })
+        : null;
+      if (!canInstallTheme(plan?.name, theme)) {
+        return NextResponse.json(
+          {
+            error: `"${theme.title}" is a Pro theme. Upgrade your plan to install it.`,
+            code: 'THEME_REQUIRES_UPGRADE',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Deactivate all other themes for this tenant
@@ -138,14 +157,26 @@ export async function POST(request: NextRequest) {
 
     if (existingTenantTheme) {
       // Update existing theme to active
+      // Also update colors if business type is provided (allows color refresh)
+      const updateData: any = {
+        is_active: true,
+        updated_at: new Date(),
+      };
+      
+      // If business type is provided, update colors with latest scheme
+      if (business_type) {
+        const themeDefaults = getThemeDefaults(theme.slug);
+        const businessColors = getBusinessTypeColorScheme(business_type);
+        if (businessColors) {
+          updateData.custom_colors = { ...(themeDefaults?.colors || {}), ...businessColors };
+        }
+      }
+      
       tenantTheme = await prisma.tenant_themes.update({
         where: {
           id: existingTenantTheme.id,
         },
-        data: {
-          is_active: true,
-          updated_at: new Date(),
-        },
+        data: updateData,
       });
     } else {
       // Create new tenant theme
@@ -154,13 +185,23 @@ export async function POST(request: NextRequest) {
       // Get theme defaults for this theme
       const themeDefaults = getThemeDefaults(theme.slug);
       
-      // Create tenant theme with defaults
+      // Get business type color scheme if provided
+      let finalColors = themeDefaults?.colors || {};
+      if (business_type) {
+        const businessColors = getBusinessTypeColorScheme(business_type);
+        if (businessColors) {
+          // Merge business type colors with theme defaults (business type takes precedence)
+          finalColors = { ...finalColors, ...businessColors };
+        }
+      }
+      
+      // Create tenant theme with defaults and business type colors
       tenantTheme = await prisma.tenant_themes.create({
         data: {
           tenant_id: tenant.id,
           theme_id: theme_id,
           is_active: true,
-          custom_colors: themeDefaults?.colors || {},
+          custom_colors: finalColors,
           custom_fonts: themeDefaults?.fonts || {},
         },
       });
@@ -185,10 +226,9 @@ export async function POST(request: NextRequest) {
     // Always try to create pages if they don't exist (for both new installs and switches)
     // Create homepage
     try {
-      // Determine page title and slug
-      const templateData = getHomepageTemplateData(theme.slug);
-      const pageTitle = templateData?.title || `Home - ${theme.title}`;
-      const pageSlug = generateSlug('home'); // Use same slug generation as API route
+      // Homepage always uses slug 'home' and title 'Home' for display in dashboard/navigation
+      const pageTitle = 'Home';
+      const pageSlug = generateSlug('home'); // 'home'
 
       // Check if homepage already exists for this tenant (matching API route check)
       const existingHomepage = await prisma.pages.findFirst({
@@ -201,13 +241,12 @@ export async function POST(request: NextRequest) {
       // Get homepage template data for this theme
       const layoutData = getHomepageLayout(theme.slug);
 
-      // Convert layout to page builder format
+      // Convert layout to page builder format (pass business_type for split banner, colors, etc.)
       let pageBuilderData;
       if (layoutData && layoutData.length > 0) {
         pageBuilderData = convertLegacyLayoutToPageBuilder(layoutData);
       } else {
-        // Use default template if theme-specific one doesn't exist
-        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name);
+        pageBuilderData = createDefaultHomepageTemplate(theme.slug, tenant.name, business_type);
       }
 
       // Clean any blob URLs from page builder content
@@ -291,6 +330,75 @@ export async function POST(request: NextRequest) {
       
       const additionalPageTemplates = getAdditionalPageTemplates(tenantName);
       
+      // Get or create contact form for contact page
+      let contactFormId: string | undefined;
+      if (additionalPageTemplates?.some(t => t.slug === 'contact')) {
+        try {
+          const existingContactForm = await prisma.form_builders.findFirst({
+            where: {
+              tenant_id: tenant.id,
+              slug: 'contact-form',
+            },
+          });
+
+          if (!existingContactForm) {
+            const contactForm = await prisma.form_builders.create({
+              data: {
+                tenant_id: tenant.id,
+                title: 'Contact Form',
+                slug: 'contact-form',
+                description: 'Get in touch with us using this form',
+                email: tenant.contact_email || null,
+                button_text: 'Send Message',
+                fields: [
+                  {
+                    id: `field-${Date.now()}-1`,
+                    type: 'text',
+                    label: 'Name',
+                    name: 'name',
+                    required: true,
+                    placeholder: 'Your full name',
+                  },
+                  {
+                    id: `field-${Date.now()}-2`,
+                    type: 'email',
+                    label: 'Email',
+                    name: 'email',
+                    required: true,
+                    placeholder: 'your.email@example.com',
+                  },
+                  {
+                    id: `field-${Date.now()}-3`,
+                    type: 'text',
+                    label: 'Subject',
+                    name: 'subject',
+                    required: true,
+                    placeholder: 'What is this regarding?',
+                  },
+                  {
+                    id: `field-${Date.now()}-4`,
+                    type: 'textarea',
+                    label: 'Message',
+                    name: 'message',
+                    required: true,
+                    placeholder: 'Tell us how we can help you...',
+                  },
+                ],
+                success_message: 'Thank you for your message! We will get back to you soon.',
+                status: 'active',
+              },
+            });
+            contactFormId = contactForm.id;
+            console.log('[Theme Install] ✅ Created contact form (ID: ' + contactFormId + ')');
+          } else {
+            contactFormId = existingContactForm.id;
+            console.log('[Theme Install] ℹ️ Contact form already exists (ID: ' + contactFormId + ')');
+          }
+        } catch (formError: any) {
+          console.error('[Theme Install] ❌ Failed to create contact form:', formError);
+        }
+      }
+      
       console.log('[Theme Install] getAdditionalPageTemplates returned:', {
         templateCount: additionalPageTemplates?.length || 0,
         templates: additionalPageTemplates?.map(t => ({ slug: t.slug, title: t.title })) || [],
@@ -327,8 +435,14 @@ export async function POST(request: NextRequest) {
             });
 
             // Generate page builder content (use tenantName variable)
+            // For contact page, pass the contact form ID and contact email
             console.log('[Theme Install] Generating page builder content...');
-            let pageBuilderData = pageConfig.templateGenerator(tenantName);
+            let pageBuilderData;
+            if (pageConfig.slug === 'contact') {
+              pageBuilderData = pageConfig.templateGenerator(tenantName, contactFormId, tenant.contact_email || undefined);
+            } else {
+              pageBuilderData = pageConfig.templateGenerator(tenantName);
+            }
           
             // Clean any blob URLs from page builder content
             pageBuilderData = cleanBlobUrlsFromPageBuilder(pageBuilderData);
@@ -454,25 +568,41 @@ export async function POST(request: NextRequest) {
     console.log('[Theme Install] =================================');
     
     // Create demo content if requested (only for new installs to avoid duplicates)
+    let demoPagesCreated = 0;
+    let demoSalesCreated = 0;
+    let demoBlogsCreated = 0;
+    let demoBlogCategoriesCreated = 0;
+    let demoFormsCreated = 0;
+
     if (isNewInstall && include_demo_content === true) {
       try {
-        console.log('[Theme Install] Creating demo content for theme:', theme.slug, {
+        console.log('[Theme Install] Creating demo content for business type:', business_type, {
           includeAttributes: include_demo_attributes === true,
         });
         const demoResult = await createDemoContent(
           prisma, 
           tenant.id, 
-          theme.slug,
+          business_type || '',
           include_demo_attributes === true
         );
         demoContentCreated = true;
         demoCategoriesCreated = demoResult.categoriesCreated;
         demoProductsCreated = demoResult.productsCreated;
         demoAttributesCreated = demoResult.attributesCreated;
+        demoPagesCreated = demoResult.pagesCreated;
+        demoSalesCreated = demoResult.salesCreated;
+        demoBlogsCreated = demoResult.blogsCreated;
+        demoBlogCategoriesCreated = demoResult.blogCategoriesCreated;
+        demoFormsCreated = demoResult.formsCreated;
         console.log('[Theme Install] Demo content created:', {
           categories: demoCategoriesCreated,
           products: demoProductsCreated,
           attributes: demoAttributesCreated,
+          pages: demoPagesCreated,
+          sales: demoSalesCreated,
+          blogs: demoBlogsCreated,
+          blogCategories: demoBlogCategoriesCreated,
+          forms: demoFormsCreated,
         });
       } catch (demoError: any) {
         // Log detailed error but don't fail theme installation
@@ -519,6 +649,11 @@ export async function POST(request: NextRequest) {
       demo_categories_created: demoCategoriesCreated,
       demo_products_created: demoProductsCreated,
       demo_attributes_created: demoAttributesCreated,
+      demo_pages_created: demoPagesCreated,
+      demo_sales_created: demoSalesCreated,
+      demo_blogs_created: demoBlogsCreated,
+      demo_blog_categories_created: demoBlogCategoriesCreated,
+      demo_forms_created: demoFormsCreated,
     };
     
     console.log('[Theme Install] ===== FINAL RESPONSE DATA =====');

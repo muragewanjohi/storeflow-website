@@ -6,6 +6,8 @@
  * Phase 3: Dashboard UI - Sales Implementation
  */
 
+export const dynamic = 'force-dynamic';
+
 import { redirect } from 'next/navigation';
 import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';

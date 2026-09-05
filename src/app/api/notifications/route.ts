@@ -11,6 +11,7 @@ import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { cache } from '@/lib/cache/simple-cache';
 import type { Notification } from '@/lib/notifications/types';
+import { getAiQuotaWarnings, formatAiQuotaWarning } from '@/lib/subscriptions/ai-quota-warnings';
 
 /**
  * GET /api/notifications - Get all notifications (cached for 30 seconds)
@@ -40,8 +41,14 @@ export async function GET(request: NextRequest) {
     const [
       pendingOrders,
       lowStockProducts,
+      lowStockVariants,
       newSupportTickets,
       landlordTickets,
+      landlordTicketMessages,
+      landlordUserIds,
+      approvedDeliveryFees,
+      rejectedDeliveryFees,
+      aiQuotaWarnings,
     ] = await Promise.all([
       // 1. Pending/processing orders (limit 10)
       prisma.orders.findMany({
@@ -60,7 +67,7 @@ export async function GET(request: NextRequest) {
         take: 10,
       }),
 
-      // 2. Low stock products (simple products only, limit 5)
+      // 2. Low stock products
       prisma.products.findMany({
         where: {
           tenant_id: tenant.id,
@@ -70,10 +77,27 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           name: true,
+          sku: true,
           stock_quantity: true,
         },
         orderBy: { stock_quantity: 'asc' },
-        take: 5,
+        take: 10,
+      }),
+
+      // 2b. Low stock variants
+      prisma.product_variants.findMany({
+        where: {
+          tenant_id: tenant.id,
+          stock_quantity: { lte: 10, gt: 0 },
+        },
+        select: {
+          id: true,
+          sku: true,
+          stock_quantity: true,
+          product_id: true,
+        },
+        orderBy: { stock_quantity: 'asc' },
+        take: 10,
       }),
 
       // 3. New support tickets (open, last 7 days)
@@ -105,10 +129,83 @@ export async function GET(request: NextRequest) {
           subject: true,
           status: true,
           updated_at: true,
+          user_id: true,
         },
         orderBy: { updated_at: 'desc' },
         take: 5,
       }),
+
+      // 4b. Recent landlord ticket messages (replies from landlord in last 7 days)
+      prisma.landlord_support_ticket_messages.findMany({
+        where: {
+          created_at: { gte: sevenDaysAgo },
+          landlord_support_tickets: {
+            tenant_id: tenant.id,
+            status: { not: 'closed' },
+          },
+        },
+        select: {
+          id: true,
+          ticket_id: true,
+          user_id: true,
+          message: true,
+          created_at: true,
+          landlord_support_tickets: {
+            select: {
+              id: true,
+              subject: true,
+              user_id: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      }),
+
+      // 4c. Landlord user IDs (to distinguish landlord replies from tenant replies)
+      prisma.landlord_users.findMany({
+        select: { id: true },
+      }),
+
+      // 5. Recently approved delivery fee quotes (last 24 hours)
+      prisma.orders.findMany({
+        where: {
+          tenant_id: tenant.id,
+          delivery_fee_status: 'approved',
+          updated_at: { gte: twentyFourHoursAgo },
+        },
+        select: {
+          id: true,
+          order_number: true,
+          total_amount: true,
+          delivery_fee_quote: true,
+          updated_at: true,
+        },
+        orderBy: { updated_at: 'desc' },
+        take: 10,
+      }),
+
+      // 6. Recently rejected delivery fee quotes (last 24 hours)
+      prisma.orders.findMany({
+        where: {
+          tenant_id: tenant.id,
+          delivery_fee_status: 'rejected',
+          updated_at: { gte: twentyFourHoursAgo },
+        },
+        select: {
+          id: true,
+          order_number: true,
+          total_amount: true,
+          delivery_fee_quote: true,
+          delivery_fee_notes: true,
+          updated_at: true,
+        },
+        orderBy: { updated_at: 'desc' },
+        take: 10,
+      }),
+
+      // 7. AI Phase 8.2 — real usage vs real plan quota, only entries at/above 80%
+      getAiQuotaWarnings(tenant),
     ]);
 
     // Process pending orders
@@ -129,19 +226,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Process low stock
+    // Process low stock products
     for (const product of lowStockProducts) {
       notifications.push({
-        id: `low-stock-${product.id}`,
+        id: `low-stock-product-${product.id}`,
         type: 'low_stock',
         title: 'Low Stock Alert',
-        message: `${product.name} - ${product.stock_quantity} units remaining`,
-        link: `/dashboard/products/${product.id}`,
+        message: `${product.name}${product.sku ? ` (${product.sku})` : ''} - ${product.stock_quantity} units remaining`,
+        link: `/dashboard/inventory`,
         created_at: new Date(),
         read: false,
         metadata: {
           product_id: product.id,
           stock_quantity: product.stock_quantity,
+          item_type: 'product',
+        },
+      });
+    }
+
+    // Get product names for low stock variants
+    const variantProductIds = lowStockVariants.map((v: any) => v.product_id).filter(Boolean);
+    let variantProducts: Map<string, string> = new Map();
+    if (variantProductIds.length > 0) {
+      const products = await prisma.products.findMany({
+        where: { id: { in: variantProductIds } },
+        select: { id: true, name: true },
+      });
+      variantProducts = new Map(products.map((p: any) => [p.id, p.name]));
+    }
+
+    // Process low stock variants
+    for (const variant of lowStockVariants) {
+      const variantName = variant.sku || 'Variant';
+      const productName = variantProducts.get(variant.product_id) || 'Unknown Product';
+      notifications.push({
+        id: `low-stock-variant-${variant.id}`,
+        type: 'low_stock',
+        title: 'Low Stock Alert (Variant)',
+        message: `${productName} - ${variantName} - ${variant.stock_quantity} units remaining`,
+        link: `/dashboard/inventory`,
+        created_at: new Date(),
+        read: false,
+        metadata: {
+          variant_id: variant.id,
+          product_id: variant.product_id,
+          stock_quantity: variant.stock_quantity,
+          item_type: 'variant',
         },
       });
     }
@@ -176,6 +306,94 @@ export async function GET(request: NextRequest) {
         metadata: {
           ticket_id: ticket.id,
           status: ticket.status,
+        },
+      });
+    }
+
+    // Process landlord ticket reply messages (only from landlord, not tenant's own messages)
+    const landlordUserIdSet = new Set(landlordUserIds.map((u: { id: string }) => u.id));
+    for (const msg of landlordTicketMessages) {
+      if (!msg.user_id || !landlordUserIdSet.has(msg.user_id)) continue;
+
+      const existingNotification = notifications.find(
+        (n) => n.id === `landlord-reply-${msg.ticket_id}`
+      );
+      if (!existingNotification) {
+        notifications.push({
+          id: `landlord-reply-${msg.ticket_id}`,
+          type: 'support_ticket_reply',
+          title: 'New Reply from Platform',
+          message: `${msg.landlord_support_tickets.subject} - New reply received`,
+          link: `/dashboard/support/landlord-tickets/${msg.ticket_id}`,
+          created_at: msg.created_at || new Date(),
+          read: false,
+          metadata: {
+            ticket_id: msg.ticket_id,
+            message_id: msg.id,
+          },
+        });
+      }
+    }
+
+    // Process approved delivery fee quotes
+    for (const order of approvedDeliveryFees) {
+      notifications.push({
+        id: `delivery-approved-${order.id}`,
+        type: 'delivery_fee_approved',
+        title: 'Delivery Fee Quote Approved',
+        message: `Order ${order.order_number} - Customer approved delivery fee`,
+        link: `/dashboard/orders/${order.id}`,
+        created_at: order.updated_at || new Date(),
+        read: false,
+        metadata: {
+          order_id: order.id,
+          order_number: order.order_number,
+          delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
+        },
+      });
+    }
+
+    // Process rejected delivery fee quotes
+    for (const order of rejectedDeliveryFees) {
+      notifications.push({
+        id: `delivery-rejected-${order.id}`,
+        type: 'delivery_fee_rejected',
+        title: 'Delivery Fee Quote Rejected',
+        message: `Order ${order.order_number} - Customer rejected delivery fee`,
+        link: `/dashboard/orders/${order.id}`,
+        created_at: order.updated_at || new Date(),
+        read: false,
+        metadata: {
+          order_id: order.id,
+          order_number: order.order_number,
+          delivery_fee_quote: order.delivery_fee_quote ? Number(order.delivery_fee_quote) : null,
+          rejection_reason: order.delivery_fee_notes || null,
+        },
+      });
+    }
+
+    // Process AI quota warnings (AI Phase 8.2) — real usage vs real plan
+    // quota, deterministic/templated, no AI call. Deliberately backdated to
+    // the start of the month (not "now") — these are computed fresh on
+    // every read with no real occurred-at time, and a low-urgency "you're
+    // close to a quota" nudge should never outrank a same-day pending
+    // payment or new order in the sort below just because it was computed
+    // this instant.
+    for (const warning of aiQuotaWarnings) {
+      const { title, message } = formatAiQuotaWarning(warning);
+      notifications.push({
+        id: warning.id,
+        type: warning.severity === 'reached' ? 'ai_quota_reached' : 'ai_quota_warning',
+        title,
+        message,
+        link: '/dashboard/subscription',
+        created_at: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        read: false,
+        metadata: {
+          limit_key: warning.limitKey,
+          current: warning.current,
+          limit: warning.limit,
+          severity: warning.severity,
         },
       });
     }

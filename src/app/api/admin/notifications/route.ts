@@ -97,11 +97,10 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
-    // Filter to only show replies from tenants (not landlord replies)
-    // We check if the message user_id matches the ticket user_id (tenant admin)
+    // Filter to only show replies from tenants (not the landlord's own replies)
     for (const message of recentLandlordTicketMessages) {
-      const isTenantReply = message.user_id === message.landlord_support_tickets.user_id;
-      if (isTenantReply && message.landlord_support_tickets.status !== 'closed') {
+      const isFromLandlord = message.user_id === user.id;
+      if (!isFromLandlord && message.landlord_support_tickets.status !== 'closed') {
         // Check if we already have a notification for this ticket
         const existingNotification = notifications.find(
           (n) => n.id === `landlord-ticket-reply-${message.ticket_id}`

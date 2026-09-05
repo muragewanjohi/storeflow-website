@@ -23,9 +23,18 @@ import { requireAuth } from '@/lib/auth/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAnyRoleOrRedirect } from '@/lib/auth/server';
 import { getStaticOptions, setStaticOptions } from '@/lib/settings/static-options';
+import { getTumiziTenantConfigByTenantId } from '@/lib/tumizi/config';
 import { prisma } from '@/lib/prisma/client';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { cache } from '@/lib/cache/simple-cache';
+import { isValidE164DigitsString } from '@/lib/phone/parse';
+
+function storePhoneDigitsOrNull(v: string | null | undefined): string | null {
+  if (v == null || v === '') return null;
+  const d = v.replace(/\D/g, '');
+  return d || null;
+}
 
 const settingsUpdateSchema = z.object({
   // Store Details (store_name and custom_domain are stored in tenants table, not here)
@@ -36,7 +45,12 @@ const settingsUpdateSchema = z.object({
   store_country: z.string().optional().nullable(),
   store_postal_code: z.string().optional().nullable(),
   store_phone: z.string().optional().nullable(),
+  /** Pro (non-Basic) plans only; cleared server-side for Basic tenants */
+  store_phone_2: z.string().optional().nullable(),
+  store_phone_3: z.string().optional().nullable(),
   store_logo: z.string().optional().nullable(),
+  business_type: z.string().optional().nullable(),
+  selling: z.string().optional().nullable(),
   
   // Currency Settings
   currency_code: z.string().max(10).optional(),
@@ -48,22 +62,35 @@ const settingsUpdateSchema = z.object({
   
   // Shipping Methods
   shipping_enabled: z.boolean().optional(),
-  shipping_method_type: z.enum(['flat_rate', 'dynamic_rate']).optional(),
+  shipping_method_type: z.enum(['flat_rate', 'delivery_zones']).optional(),
   flat_rate_amount: z.number().min(0).optional().nullable(),
-  dynamic_rate_per_km: z.number().min(0).optional().nullable(),
   free_shipping_enabled: z.boolean().optional(),
   free_shipping_threshold: z.number().optional().nullable(),
   
+  // Pickup Options
+  pickup_enabled: z.boolean().optional(),
+  pickup_location_name: z.string().optional().nullable(),
+  pickup_instructions: z.string().optional().nullable(),
+  pickup_hours: z.string().optional().nullable(), // JSON string of weekly hours
+  
   // Payment Methods
-  payment_pesapal_enabled: z.boolean().optional(),
-  payment_paypal_enabled: z.boolean().optional(),
-  payment_cash_on_delivery_enabled: z.boolean().optional(),
-  default_payment_method: z.string().optional().nullable(),
+  payment_cash_enabled: z.boolean().optional(),
+  payment_mpesa_enabled: z.boolean().optional(),
+  payment_mpesa_option: z.enum(['send_money', 'buy_goods', 'paybill', 'pochi']).optional(),
+  payment_mpesa_send_money_number: z.string().optional().nullable(),
+  payment_mpesa_buy_goods_till: z.string().optional().nullable(),
+  payment_mpesa_paybill_number: z.string().optional().nullable(),
+  payment_mpesa_paybill_account: z.string().optional().nullable(),
+  payment_mpesa_pochi_phone: z.string().optional().nullable(),
+  payment_method: z.enum(['cash', 'mpesa', 'tumizi']).optional(),
+  default_payment_method: z.enum(['cash', 'mpesa', 'tumizi']).optional(), // Keep for backward compatibility
+  payment_timing: z.enum(['before_delivery', 'after_delivery', 'user_choice']).optional(),
   
   // Tax Settings
   tax_enabled: z.boolean().optional(),
   default_tax_rate: z.number().min(0).max(100).optional().nullable(),
-  tax_included_in_price: z.boolean().optional(),
+  tax_pricing_type: z.enum(['inclusive', 'exclusive']).optional(),
+  tax_included_in_price: z.boolean().optional(), // Keep for backward compatibility
   tax_calculation_based_on: z.enum(['billing_address', 'shipping_address', 'store_address']).optional(),
 });
 
@@ -88,6 +115,8 @@ export async function GET(request: NextRequest) {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'store_phone_2',
+      'store_phone_3',
       
       // Currency Settings
       'currency_code',
@@ -103,11 +132,27 @@ export async function GET(request: NextRequest) {
       'free_shipping_enabled',
       'free_shipping_threshold',
       
+      // Pickup Options
+      'pickup_enabled',
+      'pickup_location_name',
+      'pickup_instructions',
+      'pickup_hours',
+      'pickup_location_name',
+      'pickup_instructions',
+      'pickup_hours',
+      
       // Payment Methods
-      'payment_pesapal_enabled',
-      'payment_paypal_enabled',
-      'payment_cash_on_delivery_enabled',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_mpesa_option',
+      'payment_mpesa_send_money_number',
+      'payment_mpesa_buy_goods_till',
+      'payment_mpesa_paybill_number',
+      'payment_mpesa_paybill_account',
+      'payment_mpesa_pochi_phone',
+      'payment_method',
       'default_payment_method',
+      'payment_tumizi_enabled',
       
       // Tax Settings
       'tax_enabled',
@@ -126,8 +171,9 @@ export async function GET(request: NextRequest) {
       currency_decimal_places: '2',
       shipping_enabled: 'true',
       shipping_method_type: 'flat_rate',
-      payment_pesapal_enabled: 'true',
-      payment_cash_on_delivery_enabled: 'true',
+      payment_cash_enabled: 'true',
+      default_payment_method: 'cash',
+      payment_timing: 'before_delivery',
       tax_enabled: 'false',
       tax_included_in_price: 'false',
       tax_calculation_based_on: 'billing_address',
@@ -149,7 +195,11 @@ export async function GET(request: NextRequest) {
     // Convert string booleans to actual booleans
     const booleanFields = [
       'shipping_enabled',
+      'pickup_enabled',
       'free_shipping_enabled',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_tumizi_enabled',
       'payment_pesapal_enabled',
       'payment_paypal_enabled',
       'payment_cash_on_delivery_enabled',
@@ -175,9 +225,6 @@ export async function GET(request: NextRequest) {
     }
     if (result.flat_rate_amount !== undefined && result.flat_rate_amount !== null) {
       result.flat_rate_amount = parseFloat(result.flat_rate_amount);
-    }
-    if (result.dynamic_rate_per_km !== undefined && result.dynamic_rate_per_km !== null) {
-      result.dynamic_rate_per_km = parseFloat(result.dynamic_rate_per_km);
     }
 
     // Add store name and domain from tenants table
@@ -228,6 +275,14 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const validatedData = settingsUpdateSchema.parse(body);
 
+    const currentPlan = tenant.plan_id
+      ? await prisma.price_plans.findUnique({
+          where: { id: tenant.plan_id },
+          select: { name: true },
+        })
+      : null;
+    const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+
     // Convert to string format for static_options
     const optionsToSave: Record<string, string | null> = {};
 
@@ -251,10 +306,69 @@ export async function PUT(request: NextRequest) {
       optionsToSave.store_postal_code = validatedData.store_postal_code || null;
     }
     if (validatedData.store_phone !== undefined) {
-      optionsToSave.store_phone = validatedData.store_phone || null;
+      const d = storePhoneDigitsOrNull(validatedData.store_phone);
+      if (d && !isValidE164DigitsString(d)) {
+        return NextResponse.json({ error: 'Invalid store phone number' }, { status: 400 });
+      }
+      optionsToSave.store_phone = d;
+    }
+    if (isBasicPlan) {
+      optionsToSave.store_phone_2 = null;
+      optionsToSave.store_phone_3 = null;
+    } else {
+      if (validatedData.store_phone_2 !== undefined) {
+        const d = storePhoneDigitsOrNull(validatedData.store_phone_2);
+        if (d && !isValidE164DigitsString(d)) {
+          return NextResponse.json({ error: 'Invalid additional store phone (2)' }, { status: 400 });
+        }
+        optionsToSave.store_phone_2 = d;
+      }
+      if (validatedData.store_phone_3 !== undefined) {
+        const d = storePhoneDigitsOrNull(validatedData.store_phone_3);
+        if (d && !isValidE164DigitsString(d)) {
+          return NextResponse.json({ error: 'Invalid additional store phone (3)' }, { status: 400 });
+        }
+        optionsToSave.store_phone_3 = d;
+      }
     }
     if (validatedData.store_logo !== undefined) {
       optionsToSave.store_logo = validatedData.store_logo || null;
+    }
+
+    // Tenant profile data stored in tenants.data JSON
+    if (validatedData.business_type !== undefined || validatedData.selling !== undefined) {
+      const existingTenant = await prisma.tenants.findUnique({
+        where: { id: tenant.id },
+        select: { data: true },
+      });
+      const existingData =
+        existingTenant?.data && typeof existingTenant.data === 'object' && !Array.isArray(existingTenant.data)
+          ? (existingTenant.data as Record<string, unknown>)
+          : {};
+      const nextData: Record<string, unknown> = { ...existingData };
+
+      if (validatedData.business_type !== undefined) {
+        const businessType = validatedData.business_type?.trim();
+        if (businessType) {
+          nextData.business_type = businessType;
+        } else {
+          delete nextData.business_type;
+        }
+      }
+
+      if (validatedData.selling !== undefined) {
+        const selling = validatedData.selling?.trim();
+        if (selling) {
+          nextData.selling = selling;
+        } else {
+          delete nextData.selling;
+        }
+      }
+
+      await prisma.tenants.update({
+        where: { id: tenant.id },
+        data: { data: nextData as Prisma.InputJsonValue },
+      });
     }
 
     // Currency Settings
@@ -287,28 +401,139 @@ export async function PUT(request: NextRequest) {
     if (validatedData.flat_rate_amount !== undefined) {
       optionsToSave.flat_rate_amount = validatedData.flat_rate_amount?.toString() || null;
     }
-    if (validatedData.dynamic_rate_per_km !== undefined) {
-      optionsToSave.dynamic_rate_per_km = validatedData.dynamic_rate_per_km?.toString() || null;
-    }
     if (validatedData.free_shipping_enabled !== undefined) {
       optionsToSave.free_shipping_enabled = validatedData.free_shipping_enabled.toString();
     }
     if (validatedData.free_shipping_threshold !== undefined) {
       optionsToSave.free_shipping_threshold = validatedData.free_shipping_threshold?.toString() || null;
     }
+    
+    // Pickup Options
+    if (validatedData.pickup_enabled !== undefined) {
+      // Get current settings to check if address exists
+      const currentSettings = await getStaticOptions(tenant.id, [
+        'store_address',
+        'store_city',
+        'store_country',
+      ]);
+      
+      // Validate that pickup can only be enabled if store has physical address
+      const hasPhysicalAddress = !!(
+        validatedData.store_address ||
+        (currentSettings.store_address && currentSettings.store_city && currentSettings.store_country)
+      );
+      
+      if (validatedData.pickup_enabled && !hasPhysicalAddress) {
+        return NextResponse.json(
+          { error: 'Store pickup requires a physical address. Please add store address first.' },
+          { status: 400 }
+        );
+      }
+      
+      optionsToSave.pickup_enabled = validatedData.pickup_enabled.toString();
+    }
+    if (validatedData.pickup_location_name !== undefined) {
+      optionsToSave.pickup_location_name = validatedData.pickup_location_name || null;
+    }
+    if (validatedData.pickup_instructions !== undefined) {
+      optionsToSave.pickup_instructions = validatedData.pickup_instructions || null;
+    }
+    if (validatedData.pickup_hours !== undefined) {
+      optionsToSave.pickup_hours = validatedData.pickup_hours || null;
+    }
 
     // Payment Methods
-    if (validatedData.payment_pesapal_enabled !== undefined) {
-      optionsToSave.payment_pesapal_enabled = validatedData.payment_pesapal_enabled.toString();
+    if (validatedData.payment_cash_enabled !== undefined) {
+      optionsToSave.payment_cash_enabled = validatedData.payment_cash_enabled.toString();
     }
-    if (validatedData.payment_paypal_enabled !== undefined) {
-      optionsToSave.payment_paypal_enabled = validatedData.payment_paypal_enabled.toString();
+    if (validatedData.payment_mpesa_enabled !== undefined) {
+      optionsToSave.payment_mpesa_enabled = validatedData.payment_mpesa_enabled.toString();
     }
-    if (validatedData.payment_cash_on_delivery_enabled !== undefined) {
-      optionsToSave.payment_cash_on_delivery_enabled = validatedData.payment_cash_on_delivery_enabled.toString();
+    if (validatedData.payment_mpesa_option !== undefined) {
+      optionsToSave.payment_mpesa_option = validatedData.payment_mpesa_option;
     }
-    if (validatedData.default_payment_method !== undefined) {
-      optionsToSave.default_payment_method = validatedData.default_payment_method || null;
+    if (validatedData.payment_mpesa_send_money_number !== undefined) {
+      optionsToSave.payment_mpesa_send_money_number = validatedData.payment_mpesa_send_money_number || null;
+    }
+    if (validatedData.payment_mpesa_buy_goods_till !== undefined) {
+      optionsToSave.payment_mpesa_buy_goods_till = validatedData.payment_mpesa_buy_goods_till || null;
+    }
+    if (validatedData.payment_mpesa_paybill_number !== undefined) {
+      optionsToSave.payment_mpesa_paybill_number = validatedData.payment_mpesa_paybill_number || null;
+    }
+    if (validatedData.payment_mpesa_paybill_account !== undefined) {
+      optionsToSave.payment_mpesa_paybill_account = validatedData.payment_mpesa_paybill_account || null;
+    }
+    if (validatedData.payment_mpesa_pochi_phone !== undefined) {
+      optionsToSave.payment_mpesa_pochi_phone = validatedData.payment_mpesa_pochi_phone || null;
+    }
+    if (validatedData.payment_method !== undefined) {
+      optionsToSave.payment_method = validatedData.payment_method;
+      // Also update default_payment_method for backward compatibility
+      optionsToSave.default_payment_method = validatedData.payment_method;
+    } else if (validatedData.default_payment_method !== undefined) {
+      // Fallback for backward compatibility
+      optionsToSave.default_payment_method = validatedData.default_payment_method;
+      optionsToSave.payment_method = validatedData.default_payment_method;
+    }
+    if (validatedData.payment_timing !== undefined) {
+      optionsToSave.payment_timing = validatedData.payment_timing;
+    }
+    
+    // Validation: Ensure at least one payment method is enabled
+    // Get current settings to check existing values
+    const currentPaymentSettings = await getStaticOptions(tenant.id, [
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_tumizi_enabled',
+      'payment_method',
+      'default_payment_method',
+    ]);
+
+    const tumiziIntegration = await getTumiziTenantConfigByTenantId(tenant.id);
+    const tumiziLive =
+      tumiziIntegration?.enabled === true && !!tumiziIntegration?.merchantExternalId;
+
+    const cashEnabled = validatedData.payment_cash_enabled !== undefined 
+      ? validatedData.payment_cash_enabled 
+      : (currentPaymentSettings.payment_cash_enabled === 'true' || currentPaymentSettings.payment_cash_enabled === null);
+    const mpesaEnabled = validatedData.payment_mpesa_enabled !== undefined 
+      ? validatedData.payment_mpesa_enabled 
+      : (currentPaymentSettings.payment_mpesa_enabled === 'true');
+    const tumiziOffered =
+      currentPaymentSettings.payment_tumizi_enabled === 'true' || tumiziLive;
+
+    if (!cashEnabled && !mpesaEnabled && !tumiziOffered) {
+      return NextResponse.json(
+        { error: 'At least one payment method must be enabled' },
+        { status: 400 }
+      );
+    }
+
+    const effectivePaymentMethod =
+      validatedData.payment_method ??
+      validatedData.default_payment_method ??
+      currentPaymentSettings.payment_method ??
+      currentPaymentSettings.default_payment_method ??
+      'cash';
+
+    if (effectivePaymentMethod === 'cash' && !cashEnabled) {
+      return NextResponse.json(
+        { error: 'Cash payments are disabled. Pick another default payment method.' },
+        { status: 400 },
+      );
+    }
+    if (effectivePaymentMethod === 'mpesa' && !mpesaEnabled) {
+      return NextResponse.json(
+        { error: 'M-Pesa is disabled. Pick another default payment method.' },
+        { status: 400 },
+      );
+    }
+    if (effectivePaymentMethod === 'tumizi' && !tumiziOffered) {
+      return NextResponse.json(
+        { error: 'Tumizi checkout is not available for this store.' },
+        { status: 400 },
+      );
     }
 
     // Tax Settings
@@ -318,8 +543,14 @@ export async function PUT(request: NextRequest) {
     if (validatedData.default_tax_rate !== undefined) {
       optionsToSave.default_tax_rate = validatedData.default_tax_rate?.toString() || null;
     }
-    if (validatedData.tax_included_in_price !== undefined) {
+    if (validatedData.tax_pricing_type !== undefined) {
+      optionsToSave.tax_pricing_type = validatedData.tax_pricing_type;
+      // Also update tax_included_in_price for backward compatibility
+      optionsToSave.tax_included_in_price = (validatedData.tax_pricing_type === 'inclusive').toString();
+    } else if (validatedData.tax_included_in_price !== undefined) {
+      // Fallback for backward compatibility
       optionsToSave.tax_included_in_price = validatedData.tax_included_in_price.toString();
+      optionsToSave.tax_pricing_type = validatedData.tax_included_in_price ? 'inclusive' : 'exclusive';
     }
     if (validatedData.tax_calculation_based_on !== undefined) {
       optionsToSave.tax_calculation_based_on = validatedData.tax_calculation_based_on;

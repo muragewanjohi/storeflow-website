@@ -36,7 +36,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
   const categoryImages = [
     'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800&h=800&fit=crop',
     'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
-    'https://images.unsplash.com/photo-1631889993954-22e7ef0e7d73?w=800&h=800&fit=crop',
+    'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
   ];
 
   const inspirations = [
@@ -44,7 +44,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
       number: '01',
       category: 'Bed Room',
       title: 'Inner Peace',
-      image: 'https://images.unsplash.com/photo-1631889993954-22e7ef0e7d73?w=800&h=800&fit=crop',
+      image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=800&fit=crop',
     },
   ];
 
@@ -66,14 +66,14 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
             <p className="text-[16px] font-semibold text-[#333] mb-4 tracking-[3px] uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
               New Arrival
             </p>
-            <h1 className="text-[52px] font-bold text-[#B88E2F] mb-6 leading-[65px]" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            <h1 className="text-[52px] font-bold text-[var(--color-primary)] mb-6 leading-[65px]" style={{ fontFamily: 'Poppins, sans-serif' }}>
               Discover Our<br />New Collection
             </h1>
             <p className="text-[18px] font-medium text-[#333] mb-8 leading-[24px]" style={{ fontFamily: 'Poppins, sans-serif' }}>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut elit tellus, luctus nec ullamcorper mattis.
             </p>
             <Button
-              className="bg-[#B88E2F] text-white px-[72px] py-[25px] text-[16px] font-bold uppercase hover:bg-[#a67d1e] transition-colors"
+              className="bg-[var(--color-primary)] text-white px-[72px] py-[25px] text-[16px] font-bold uppercase hover:brightness-90 transition"
               style={{ fontFamily: 'Poppins, sans-serif' }}
             >
               Buy Now
@@ -98,7 +98,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
             {['Dining', 'Living', 'Bedroom'].map((category, index) => (
               <Link
                 key={category}
-                href={`/products?category=${category.toLowerCase()}`}
+                href={`/collections/${encodeURIComponent(category.toLowerCase())}`}
                 className="group"
               >
                 <div className="relative h-[550px] md:h-[600px] rounded-lg overflow-hidden mb-4">
@@ -145,7 +145,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
           <div className="text-center mt-12">
             <Button
               variant="outline"
-              className="border border-[#B88E2F] text-[#B88E2F] px-[72px] py-3 text-[16px] font-semibold hover:bg-[#B88E2F] hover:text-white transition-colors"
+              className="border border-[var(--color-primary)] text-[var(--color-primary)] px-[72px] py-3 text-[16px] font-semibold hover:bg-[var(--color-primary)] hover:text-white transition-colors"
               style={{ fontFamily: 'Poppins, sans-serif' }}
             >
               Show More
@@ -166,7 +166,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
                 Our designer already made a lot of beautiful prototipe of rooms that inspire you
               </p>
               <Button
-                className="bg-[#B88E2F] text-white px-[72px] py-3 text-[16px] font-semibold hover:bg-[#a67d1e] transition-colors"
+                className="bg-[var(--color-primary)] text-white px-[72px] py-3 text-[16px] font-semibold hover:brightness-90 transition"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
                 Explore More
@@ -195,7 +195,7 @@ export default function FurnitureHomepage({ products = [], categories = [] }: Re
                   </h3>
                 </div>
               </div>
-              <div className="absolute bottom-6 right-6 w-12 h-12 bg-[#B88E2F] rounded-full flex items-center justify-center cursor-pointer hover:bg-[#a67d1e] transition-colors">
+              <div className="absolute bottom-6 right-6 w-12 h-12 bg-[var(--color-primary)] rounded-full flex items-center justify-center cursor-pointer hover:brightness-90 transition">
                 <ArrowRightIcon className="w-6 h-6 text-white" />
               </div>
             </div>

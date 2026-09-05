@@ -12,9 +12,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import CountdownTimer from '@/components/storefront/countdown-timer';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { getSaleImageOrFallback, shouldUseUnoptimizedImage } from '@/lib/images/fallbacks';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
 
 interface Sale {
   id: string;
@@ -64,23 +66,18 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
             className="group overflow-hidden hover:shadow-xl transition-all duration-300 h-full flex flex-col border-2 hover:border-primary/20"
           >
             {/* Image Section with Overlay */}
-            <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-muted to-muted/50">
-              {sale.banner_image ? (
-                <Image
-                  src={sale.banner_image}
-                  alt={sale.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  priority={sale.is_featured}
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                  <span className="text-6xl opacity-50">🏷️</span>
-                </div>
-              )}
+            <div className="relative aspect-[4/3] overflow-hidden bg-transparent">
+              <Image
+                src={getSaleImageOrFallback(sale.name, sale.banner_image)}
+                alt={sale.name}
+                fill
+                className="object-contain group-hover:scale-105 transition-transform duration-500"
+                priority={sale.is_featured}
+                unoptimized={shouldUseUnoptimizedImage(getSaleImageOrFallback(sale.name, sale.banner_image))}
+              />
               
-              {/* Gradient Overlay for better text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              {/* Gradient Overlay - pointer-events-none so it never blocks clicks on card/content below */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" aria-hidden="true" />
               
               {/* Badges */}
               <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
@@ -112,9 +109,9 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
 
             {/* Content Section */}
             <div className="p-6 flex flex-col flex-1">
-              {/* Title - Clickable */}
-              <Link 
-                href={`/sales/${sale.slug}`}
+              {/* Title - links to sale page */}
+              <Link
+                href={storefrontSalePath(sale.slug)}
                 className="block mb-3 group/title"
               >
                 <h2 className="text-xl md:text-2xl font-bold mb-2 group-hover/title:text-primary transition-colors line-clamp-2">
@@ -132,41 +129,38 @@ export default function AllSalesClient({ sales }: Readonly<AllSalesClientProps>)
               {/* Countdown Timer */}
               {sale.end_date && (
                 <div className="mb-4 pb-4 border-b">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Ends in:
-                    </span>
-                  </div>
                   <CountdownTimer 
                     endDate={sale.end_date} 
-                    className="text-sm"
+                    showLabels={true}
                   />
                 </div>
               )}
 
-              {/* CTA Button */}
+              {/* Shop Now - native anchor so navigation always goes to individual sale page */}
               {sale.slug ? (
-                <Button 
-                  asChild
-                  className="w-full group/button mt-auto"
-                  size="lg"
-                >
-                  <Link href={`/sales/${sale.slug}`}>
-                    Shop Now
-                    <ArrowRightIcon className="ml-2 h-4 w-4 group-hover/button:translate-x-1 transition-transform" />
-                  </Link>
-                </Button>
-              ) : (
                 <div className="mt-auto">
-                  <Button 
-                    className="w-full"
-                    size="lg"
-                    disabled
-                    variant="outline"
+                  <a
+                    href={storefrontSalePath(sale.slug)}
+                    className={cn(
+                      'inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors',
+                      'hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                      'group/btn'
+                    )}
                   >
                     Shop Now
-                    <ArrowRightIcon className="ml-2 h-4 w-4" />
-                  </Button>
+                    <ArrowRightIcon className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </a>
+                </div>
+              ) : (
+                <div className="mt-auto">
+                  <span
+                    className={cn(
+                      'inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md border border-input bg-muted px-8 text-sm font-medium text-muted-foreground'
+                    )}
+                  >
+                    Shop Now
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </span>
                   <p className="text-xs text-muted-foreground mt-1 text-center">
                     Sale slug missing
                   </p>

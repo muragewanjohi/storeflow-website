@@ -6,15 +6,18 @@
  * Phase 4: Storefront - Sales Implementation
  */
 
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import { storefrontSalePath } from '@/lib/sales/slug-url';
+import { getCurrencyForTenant } from '@/lib/currency/get-currency-server';
 import SalePageClient from './sale-page-client';
+import SalePageCurrencyWrapper from './sale-page-currency-wrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +26,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) return { title: 'Sale' };
   const { slug } = await params;
 
   const sale = await prisma.sales.findFirst({
@@ -46,7 +50,7 @@ export async function generateMetadata({
     tenant,
     title: sale.name,
     description: sale.description || `Shop ${sale.name} at ${tenant.name || tenant.subdomain}`,
-    url: `/sales/${slug}`,
+    url: storefrontSalePath(slug),
   });
 }
 
@@ -97,6 +101,20 @@ export default async function SalePage({
   });
 
   if (!sale) {
+    // Common typo: URL has slug ending in "s" (e.g. /sales/summer-sales) but DB slug is summer-sale
+    if (slug.endsWith('s') && slug.length > 1) {
+      const slugWithoutTrailingS = slug.slice(0, -1);
+      const saleByAltSlug = await prisma.sales.findFirst({
+        where: {
+          slug: slugWithoutTrailingS,
+          tenant_id: tenant.id,
+          status: 'active',
+        },
+      });
+      if (saleByAltSlug) {
+        redirect(storefrontSalePath(saleByAltSlug.slug));
+      }
+    }
     notFound();
   }
 
@@ -121,6 +139,9 @@ export default async function SalePage({
   const total = productSales.length;
   const skip = (page - 1) * limit;
   const paginatedProductSales = productSales.slice(skip, skip + limit);
+
+  // Fetch tenant currency so sale page shows selected currency on first paint
+  const currency = await getCurrencyForTenant(tenant.id);
 
   // Map products with sale pricing
   const products = paginatedProductSales.map((productSale) => {
@@ -157,7 +178,8 @@ export default async function SalePage({
       <div className="min-h-screen bg-background flex flex-col">
         <StorefrontHeader />
         <main className="flex-1">
-          <SalePageClient
+          <SalePageCurrencyWrapper initialCurrency={currency}>
+            <SalePageClient
             sale={{
               id: sale.id,
               name: sale.name,
@@ -176,6 +198,7 @@ export default async function SalePage({
             limit={limit}
             themeSlug={tenant.theme_slug || 'default'}
           />
+          </SalePageCurrencyWrapper>
         </main>
         <StorefrontFooter />
       </div>

@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "storeflow-api-collection",
-		"name": "StoreFlow API Collection",
-		"description": "Complete API collection for StoreFlow multi-tenant ecommerce platform. Updated after each development day.",
+		"name": "DukaNest API Collection",
+		"description": "Complete API collection for DukaNest multi-tenant ecommerce platform. Includes Phase 0 mobile routes (auth, dashboard, media, M-Pesa, notifications) and onboarding starter-pack endpoints.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "storeflow"
 	},
@@ -1331,6 +1331,62 @@
 							]
 						},
 						"description": "Send payment reminder emails to tenants with upcoming or overdue payments.\n\n**Day 25-26:** Subscription Management\n\n**Security:**\n- Requires CRON_SECRET_TOKEN in Authorization header\n- Should be called by cron jobs (daily or weekly), not manually\n\n**Actions:**\n- Finds tenants with subscriptions expiring in 7 days\n- Sends renewal reminder emails (7 days before expiry)\n- Sends payment due reminder emails\n\n**Response:**\n- Results object with checked, renewal_reminders_sent, payment_reminders_sent, errors"
+					},
+					"response": []
+				},
+				{
+					"name": "Tumizi Provision Pending Merchants",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Tumizi provisioning result returned\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    pm.expect(jsonData).to.have.property('processed');",
+									"    pm.expect(jsonData).to.have.property('succeeded');",
+									"    pm.expect(jsonData).to.have.property('failed');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cron_secret_token}}",
+								"description": "CRON_SECRET_TOKEN for authentication"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/integrations/tumizi/provision-pending?limit=20",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"integrations",
+								"tumizi",
+								"provision-pending"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Max queued tenants to process in one run (1-100)"
+								}
+							]
+						},
+						"description": "Process pending Tumizi merchant provisioning tasks created during tenant registration.\n\n**Security:**\n- Requires CRON_SECRET/CRON_SECRET_TOKEN in Authorization header\n- Intended for scheduled cron execution and manual landlord-triggered retries\n\n**Response:**\n- processed: number of queued tenants evaluated\n- succeeded: successful merchant provisions\n- failed: failed provisions (inspect errors array)\n- errors: list of tenant-level provisioning errors"
 					},
 					"response": []
 				}
@@ -3828,6 +3884,2034 @@
 				}
 			],
 			"description": "Landlord support ticket management endpoints (Day 21.5-22). Tickets from tenants to the landlord/platform admin."
+		},
+		{
+			"name": "Mobile API (Phase 0)",
+			"description": "Phase 0 mobile API endpoints for Flutter integration.",
+			"item": [
+				{
+					"name": "Mobile Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Mobile login succeeds\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data) {",
+									"    var requiresMfa = jsonData.data.requiresMfa === true;",
+									"    pm.environment.set('mobile_requires_mfa', requiresMfa ? 'true' : 'false');",
+									"    if (jsonData.data.user && jsonData.data.user.id) {",
+									"        pm.environment.set('mobile_user_id', jsonData.data.user.id);",
+									"    }",
+									"    if (jsonData.data.user && jsonData.data.user.email) {",
+									"        pm.environment.set('mobile_user_email', jsonData.data.user.email);",
+									"    }",
+									"    if (jsonData.data.user && jsonData.data.user.tenantId) {",
+									"        pm.environment.set('tenant_id', jsonData.data.user.tenantId);",
+									"    }",
+									"    if (requiresMfa && jsonData.data.tempSession) {",
+									"        pm.environment.set('mobile_temp_access_token', jsonData.data.tempSession.accessToken || '');",
+									"        pm.environment.set('mobile_temp_refresh_token', jsonData.data.tempSession.refreshToken || '');",
+									"        pm.environment.unset('mobile_access_token');",
+									"        pm.environment.unset('mobile_refresh_token');",
+									"        pm.environment.unset('auth_token');",
+									"    } else {",
+									"        pm.environment.set('mobile_access_token', jsonData.data.accessToken);",
+									"        pm.environment.set('mobile_refresh_token', jsonData.data.refreshToken);",
+									"        pm.environment.set('auth_token', jsonData.data.accessToken);",
+									"        pm.environment.unset('mobile_temp_access_token');",
+									"        pm.environment.unset('mobile_temp_refresh_token');",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{mobile_email}}\",\n  \"password\": \"{{mobile_password}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Login for mobile API and store bearer tokens in Postman environment."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Google Sign-In",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"{{google_id_token}}\",\n  \"accessToken\": \"{{google_access_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/google",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"google"
+							]
+						},
+						"description": "Exchange Google OIDC id_token for Supabase session. Set google_id_token (and google_access_token if required by token) from your device or OAuth playground. Response matches Mobile Login (MFA + tempSession for tenant roles)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Register (create store)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200 or 201\", function () {",
+									"    pm.expect([200, 201]).to.include(pm.response.code);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Register returns success envelope\", function () {",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"});",
+									"",
+									"pm.test(\"Tumizi queue flag shape is valid when present\", function () {",
+									"    if (jsonData && jsonData.data && Object.prototype.hasOwnProperty.call(jsonData.data, 'tumiziProvisioningQueued')) {",
+									"        pm.expect(jsonData.data.tumiziProvisioningQueued).to.be.a('boolean');",
+									"    } else {",
+									"        pm.expect(true).to.eql(true);",
+									"    }",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data) {",
+									"    if (jsonData.data.tenant && jsonData.data.tenant.id) {",
+									"        pm.environment.set('tenant_id', jsonData.data.tenant.id);",
+									"    }",
+									"    if (jsonData.data.tenant && jsonData.data.tenant.subdomain) {",
+									"        pm.environment.set('tenant_subdomain', jsonData.data.tenant.subdomain);",
+									"    }",
+									"    if (Object.prototype.hasOwnProperty.call(jsonData.data, 'tumiziProvisioningQueued')) {",
+									"        pm.environment.set('tumizi_provisioning_queued', String(jsonData.data.tumiziProvisioningQueued));",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Test Mobile Store\",\n  \"subdomain\": \"{{tenant_subdomain}}\",\n  \"adminEmail\": \"{{mobile_email}}\",\n  \"adminPassword\": \"{{mobile_password}}\",\n  \"adminPhone\": \"+254712345678\",\n  \"adminPhoneCountry\": \"KE\",\n  \"authProvider\": \"email\",\n  \"referrerSubdomain\": \"\",\n  \"billingCountry\": \"KE\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Create tenant with mobile response envelope. Same JSON as POST /api/tenants/register. Optional referrerSubdomain (friend's shop subdomain) for referral attribution. Optional billingCountry (ISO 2-letter, e.g. KE or US) for subscription pricing. Use a fresh subdomain; then Mobile Login with same email/password."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Refresh returns new tokens\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('accessToken');",
+									"    pm.expect(jsonData.data).to.have.property('refreshToken');",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data) {",
+									"    pm.environment.set('mobile_access_token', jsonData.data.accessToken);",
+									"    pm.environment.set('mobile_refresh_token', jsonData.data.refreshToken);",
+									"    pm.environment.set('auth_token', jsonData.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{mobile_refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Refresh mobile access token using refresh token."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Forgot Password",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Forgot-password anti-enumeration response\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('sent');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{mobile_email}}\",\n  \"redirectTo\": \"{{base_url}}/reset-password\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/forgot-password",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"forgot-password"
+							]
+						},
+						"description": "Request Supabase password reset email. Always returns success payload (anti-enumeration). Optional redirectTo must be a valid URL."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile MFA Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"MFA status response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('mfaRequired');",
+									"    pm.expect(jsonData.data).to.have.property('mfaEnabled');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{mobile_user_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/mfa/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"mfa",
+								"status"
+							]
+						},
+						"description": "Check MFA requirement/enabled status for mobile user."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile MFA Send Code",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"MFA code sent response\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data.sent).to.eql(true);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{mobile_user_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/mfa/send-code",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"mfa",
+								"send-code"
+							]
+						},
+						"description": "Send MFA OTP code to mobile user email."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile MFA Verify",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"MFA verify response\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data.verified).to.eql(true);",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.accessToken) {",
+									"    pm.environment.set('mobile_access_token', jsonData.data.accessToken);",
+									"    pm.environment.set('mobile_refresh_token', jsonData.data.refreshToken || '');",
+									"    pm.environment.set('auth_token', jsonData.data.accessToken);",
+									"    pm.environment.set('mobile_requires_mfa', 'false');",
+									"    pm.environment.unset('mobile_temp_access_token');",
+									"    pm.environment.unset('mobile_temp_refresh_token');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{mobile_user_id}}\",\n  \"code\": \"{{mobile_mfa_code}}\",\n  \"tempSession\": {\n    \"accessToken\": \"{{mobile_temp_access_token}}\",\n    \"refreshToken\": \"{{mobile_temp_refresh_token}}\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/mfa/verify",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"mfa",
+								"verify"
+							]
+						},
+						"description": "Verify MFA OTP code for mobile user."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Overview",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Overview response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('metrics');",
+									"    pm.expect(jsonData.data).to.have.property('recentOrders');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/overview",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"overview"
+							]
+						},
+						"description": "Get mobile dashboard overview metrics and recent orders."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Products",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Products response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/products?page=1&limit=20&search=&status=active",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"products"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "status",
+									"value": "active"
+								}
+							]
+						},
+						"description": "Get tenant products for mobile dashboard with pagination and filters."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Products (Remove Demo)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Remove demo products response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('removedCount');",
+									"    pm.expect(jsonData.data).to.have.property('deletedCount');",
+									"    pm.expect(jsonData.data).to.have.property('archivedCount');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/products/demo",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"products",
+								"demo"
+							]
+						},
+						"description": "Remove active demo products for the tenant. Demo products referenced by orders are archived instead of deleted."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Orders",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Orders response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/orders?page=1&limit=20&status=pending",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"orders"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "pending"
+								}
+							]
+						},
+						"description": "Get tenant orders for mobile dashboard with pagination and filters."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Customers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Customers response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/customers?page=1&limit=20&search=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"customers"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "search",
+									"value": ""
+								}
+							]
+						},
+						"description": "Get tenant customers for mobile dashboard with pagination and filters."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Inventory",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Inventory response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"    pm.expect(jsonData.data).to.have.property('stats');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/inventory?page=1&limit=20&threshold=10&low_stock_only=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"inventory"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "threshold",
+									"value": "10"
+								},
+								{
+									"key": "low_stock_only",
+									"value": "false"
+								}
+							]
+						},
+						"description": "Get inventory list + low-stock stats for mobile dashboard."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Settings",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Settings response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('store');",
+									"    pm.expect(jsonData.data).to.have.property('currency');",
+									"    pm.expect(jsonData.data).to.have.property('payment');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"settings"
+							]
+						},
+						"description": "Get core tenant settings for mobile dashboard."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Delete Account",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200, 400, or 403\", function () {",
+									"    pm.expect([200, 400, 403]).to.include(pm.response.code);",
+									"});",
+									"var jsonData = pm.response.json();",
+									"if (pm.response.code === 200 && jsonData.success) {",
+									"    pm.test(\"Delete account success envelope\", function () {",
+									"        pm.expect(jsonData.data).to.have.property('retentionDays');",
+									"        pm.expect(jsonData.data).to.have.property('redirectTo');",
+									"    });",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"confirmation\": \"DELETE {{tenant_subdomain}}\",\n  \"reason\": \"\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/settings/delete-account",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"settings",
+								"delete-account"
+							]
+						},
+						"description": "Soft-delete the authenticated tenant (tenant_admin only, Bearer token). Confirmation must be exactly `DELETE {subdomain}` (set `tenant_subdomain` in environment). On success, clear local tokens — response `data.clearLocalSession` is true. Same email/SMS as web."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Sales",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Sales response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"    pm.expect(jsonData).to.have.property('pagination');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/sales?page=1&limit=20&search=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"sales"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": ""
+								}
+							]
+						},
+						"description": "List sales/promotions for the tenant (pagination + optional status/search)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Analytics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Analytics response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('period');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/analytics?days=30",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"analytics"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "30",
+									"description": "1-365"
+								}
+							]
+						},
+						"description": "Aggregated analytics for the tenant (default window: 30 days)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard P&L",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"P&L response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('grossRevenue');",
+									"    pm.expect(jsonData.data).to.have.property('netProfit');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/analytics/pnl?start_date=2026-01-01&end_date=2026-01-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"analytics",
+								"pnl"
+							],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2026-01-31"
+								}
+							]
+						},
+						"description": "Profit and Loss summary for the selected period."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expense Categories (List)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expense-categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expense-categories"
+							]
+						},
+						"description": "List tenant expense categories. The response includes default categories and any custom categories created by the store."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expense Categories (Create)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Fuel\",\n  \"slug\": \"fuel\",\n  \"description\": \"Fuel and transport costs\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expense-categories",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expense-categories"
+							]
+						},
+						"description": "Create a tenant-specific expense category. Use the returned category.id as expense_category_id when creating or updating expenses."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expense Categories (Update)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Fuel & Transport\",\n  \"description\": \"Fuel, taxi, and delivery transport costs\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expense-categories/{{expense_category_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expense-categories",
+								"{{expense_category_id}}"
+							]
+						},
+						"description": "Update an expense category. If the slug changes, linked expenses are updated to keep their category value in sync."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expense Categories (Delete)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expense-categories/{{expense_category_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expense-categories",
+								"{{expense_category_id}}"
+							]
+						},
+						"description": "Delete an expense category. Categories currently used by expenses cannot be deleted."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (List)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-01-31&category=fuel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "start_date",
+									"value": "2026-01-01",
+									"description": "Optional. Include expenses on or after this date."
+								},
+								{
+									"key": "end_date",
+									"value": "2026-01-31",
+									"description": "Optional. Include expenses on or before this date."
+								},
+								{
+									"key": "category",
+									"value": "fuel",
+									"description": "Optional. Category slug, including custom slugs."
+								},
+								{
+									"key": "category_id",
+									"value": "",
+									"description": "Optional. Filter by expense category ID."
+								}
+							]
+						},
+						"description": "List expense ledger records for the tenant. Optional filters: start_date, end_date, category, category_id."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (Create)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"expense_date\": \"2026-01-18\",\n  \"category_id\": \"{{expense_category_id}}\",\n  \"amount\": 1250,\n  \"tax_amount\": 0,\n  \"payment_method\": \"mpesa\",\n  \"reference\": \"META-ADS-001\",\n  \"notes\": \"January boosted posts\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses"
+							]
+						},
+						"description": "Create a tenant expense record for P&L. Pass category_id for tenant-specific categories, or pass category as an existing category slug."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (Update)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"category_id\": \"{{expense_category_id}}\",\n  \"amount\": 1320,\n  \"notes\": \"Updated spend\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses/{{expense_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses",
+								"{{expense_id}}"
+							]
+						},
+						"description": "Update an existing expense record. Send only the fields that need correction, for example category_id, amount, or notes."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Dashboard Expenses (Delete)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/dashboard/expenses/{{expense_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"dashboard",
+								"expenses",
+								"{{expense_id}}"
+							]
+						},
+						"description": "Delete an existing expense record for the current tenant."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Media Upload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Upload response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('url');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"description": "JPEG, PNG, WebP, or GIF; max 5MB",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/media/upload",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"media",
+								"upload"
+							]
+						},
+						"description": "Multipart upload to tenant storage. Select an image file for the `file` field."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile M-Pesa Initiate",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"STK push response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('checkoutRequestId');",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.checkoutRequestId) {",
+									"    pm.environment.set('mobile_mpesa_checkout_request_id', jsonData.data.checkoutRequestId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"254712345678\",\n  \"amount\": 10,\n  \"reference\": \"POSTMAN-TEST\",\n  \"description\": \"DukaNest mobile payment test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/mpesa/initiate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"mpesa",
+								"initiate"
+							]
+						},
+						"description": "Initiate STK Push (sandbox/production per server env). Saves checkoutRequestId to {{mobile_mpesa_checkout_request_id}}."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile M-Pesa Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"M-Pesa status response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('status');",
+									"    pm.expect(jsonData.data).to.have.property('checkoutRequestId');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/mpesa/status?checkoutRequestId={{mobile_mpesa_checkout_request_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"mpesa",
+								"status"
+							],
+							"query": [
+								{
+									"key": "checkoutRequestId",
+									"value": "{{mobile_mpesa_checkout_request_id}}",
+									"description": "From initiate response (also accepts checkout_request_id)"
+								}
+							]
+						},
+						"description": "Poll STK status for a checkout request belonging to the tenant."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Notifications List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Notifications list shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('items');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/notifications/list",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"notifications",
+								"list"
+							]
+						},
+						"description": "Derived notifications (orders, low stock, tickets, delivery fee) for the tenant user."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Register Device",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Register device response\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('deviceId');",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.deviceId) {",
+									"    pm.environment.set('mobile_device_id', jsonData.data.deviceId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"deviceId\": \"{{mobile_device_id}}\",\n  \"token\": \"{{mobile_push_token}}\",\n  \"platform\": \"android\",\n  \"appVersion\": \"1.0.0\",\n  \"deviceName\": \"Postman\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/notifications/register-device",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"notifications",
+								"register-device"
+							]
+						},
+						"description": "Upsert FCM/APNs token for push. Set mobile_device_id (or let test save it from response)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Notification Preferences (GET)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Preferences GET shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('preferences');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/notifications/preferences?deviceId={{mobile_device_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"notifications",
+								"preferences"
+							],
+							"query": [
+								{
+									"key": "deviceId",
+									"value": "{{mobile_device_id}}"
+								}
+							]
+						},
+						"description": "Read per-device notification toggles (requires prior register-device for same deviceId)."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Notification Preferences (PUT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Preferences PUT shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('preferences');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"newOrder\": true,\n  \"pendingPayment\": true,\n  \"lowStock\": true,\n  \"supportTicket\": true,\n  \"deliveryUpdates\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/notifications/preferences?deviceId={{mobile_device_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"notifications",
+								"preferences"
+							],
+							"query": [
+								{
+									"key": "deviceId",
+									"value": "{{mobile_device_id}}"
+								}
+							]
+						},
+						"description": "Patch notification preferences for a registered device (boolean fields optional)."
+					},
+					"response": []
+				},
+				{
+					"name": "Onboarding Selling Exists",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Selling exists response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('exists');",
+									"    pm.expect(jsonData.data).to.have.property('matches');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"selling\": \"{{onboarding_selling}}\",\n  \"businessType\": \"{{onboarding_business_type}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/onboarding/selling-exists",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"onboarding",
+								"selling-exists"
+							]
+						},
+						"description": "Check whether a selling niche already exists before triggering Gemini/Nano Banana generation."
+					},
+					"response": []
+				},
+				{
+					"name": "Onboarding Starter Pack (Sync)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Starter pack response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('sellingPrecheck');",
+									"    pm.expect(jsonData.data).to.have.property('themeConfig');",
+									"    pm.expect(jsonData.data).to.have.property('gemini');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"businessType\": \"{{onboarding_business_type}}\",\n  \"selling\": \"{{onboarding_selling}}\",\n  \"themeSlug\": \"{{onboarding_theme_slug}}\",\n  \"locale\": \"en-KE\",\n  \"currency\": \"KES\",\n  \"productsCount\": 8,\n  \"categoriesCount\": 5,\n  \"blogPostsCount\": 2,\n  \"includeGeminiCall\": false,\n  \"checkSellingExists\": true,\n  \"forceExternalGeneration\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/onboarding/starter-pack",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"onboarding",
+								"starter-pack"
+							]
+						},
+						"description": "Build starter-pack contract payload and selling-precheck result. Set includeGeminiCall=true to execute Gemini directly."
+					},
+					"response": []
+				},
+				{
+					"name": "Onboarding Starter Pack Create Job",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 202\", function () {",
+									"    pm.response.to.have.status(202);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Job created\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('jobId');",
+									"});",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.jobId) {",
+									"    pm.environment.set('starter_pack_job_id', jsonData.data.jobId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"businessType\": \"{{onboarding_business_type}}\",\n  \"selling\": \"{{onboarding_selling}}\",\n  \"themeSlug\": \"{{onboarding_theme_slug}}\",\n  \"locale\": \"en-KE\",\n  \"currency\": \"KES\",\n  \"productsCount\": 8,\n  \"categoriesCount\": 5,\n  \"blogPostsCount\": 2,\n  \"includeGeminiCall\": true,\n  \"checkSellingExists\": true,\n  \"forceExternalGeneration\": false,\n  \"geminiModel\": \"gemini-2.0-flash\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/onboarding/starter-pack-jobs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"onboarding",
+								"starter-pack-jobs"
+							]
+						},
+						"description": "Create async starter-pack generation job (recommended for Flutter). Stores jobId in {{starter_pack_job_id}}."
+					},
+					"response": []
+				},
+				{
+					"name": "Onboarding Starter Pack Job Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Job status response shape\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('status');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"onboarding",
+								"starter-pack-jobs",
+								"{{starter_pack_job_id}}"
+							]
+						},
+						"description": "Poll async starter-pack job status until running -> success|failed."
+					},
+					"response": []
+				},
+				{
+					"name": "Onboarding Starter Pack Save Assets",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Assets saved response\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('assetsSaved');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"assets\": [\n    {\n      \"productName\": \"Fancy Red Cap Oranda\",\n      \"sourcePrompt\": \"4k studio product photo of ornamental fish\",\n      \"imageUrl\": \"{{starter_pack_image_url}}\",\n      \"storagePath\": \"onboarding/starter-pack/red-cap-oranda.png\",\n      \"width\": 2048,\n      \"height\": 2048,\n      \"mimeType\": \"image/png\",\n      \"provider\": \"nano-banana\"\n    }\n  ],\n  \"persistMode\": \"tenant-profile\",\n  \"tenantId\": \"{{tenant_id}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}/save-assets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"onboarding",
+								"starter-pack-jobs",
+								"{{starter_pack_job_id}}",
+								"save-assets"
+							]
+						},
+						"description": "Persist Nano Banana image outputs for a completed starter-pack job."
+					},
+					"response": []
+				},
+				{
+					"name": "Mobile Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var jsonData = pm.response.json();",
+									"pm.test(\"Logout success\", function () {",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"});",
+									"",
+									"pm.environment.unset('mobile_access_token');",
+									"pm.environment.unset('mobile_refresh_token');",
+									"pm.environment.unset('auth_token');"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{mobile_refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/mobile/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"mobile",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Logout mobile user and clear saved tokens from Postman environment."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"event": [
@@ -3845,10 +5929,11 @@
 					"}",
 					"",
 					"// Auto-set auth token if available (for protected routes)",
-					"if (pm.environment.get('auth_token')) {",
+					"var activeToken = pm.environment.get('mobile_access_token') || pm.environment.get('auth_token');",
+					"if (activeToken) {",
 					"    pm.request.headers.add({",
 					"        key: 'Authorization',",
-					"        value: 'Bearer ' + pm.environment.get('auth_token')",
+					"        value: 'Bearer ' + activeToken",
 					"    });",
 					"}"
 				]

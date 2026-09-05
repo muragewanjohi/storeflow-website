@@ -16,15 +16,59 @@ export const createProductSchema = z.object({
   description: z.string().nullable().optional().or(z.literal('').transform(() => null)),
   short_description: z.string().max(500, 'Short description must be less than 500 characters').optional().nullable(),
   price: z.number().positive('Price must be positive').or(z.string().transform((val) => parseFloat(val))),
+  cost_price: z.number().min(0, 'Cost price cannot be negative').optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sale_price: z.number().positive().optional().nullable().or(z.string().transform((val) => parseFloat(val)).optional().nullable()),
+  // Basic deposit support (docs/SERVICES_PLAN.md) — 'fixed' is a KES
+  // amount (capped at the item's own total at checkout time, so it can
+  // never exceed what the line owes), 'percentage' is 0-100. No
+  // schema-level cross-check between the two here (would break
+  // updateProductSchema's .partial() chain below); the dashboard/mobile
+  // forms constrain the input, and checkout's computeLineDepositDue()
+  // already caps a runaway fixed value defensively either way.
+  deposit_type: z.enum(['none', 'fixed', 'percentage']).default('none').optional(),
+  deposit_value: z.number().min(0).optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseFloat(val))).optional().nullable()),
   sku: z.string().max(100, 'SKU must be less than 100 characters').optional().nullable(),
-  stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').default(0).optional(),
+  // Nullable so a non-shipped item (requires_shipping: false) can be
+  // explicitly unlimited — checkout's stock check already treats NULL as
+  // "not tracked" (@/lib/checkout/no-shipping.ts's sibling logic in
+  // checkout/route.ts); previously unreachable from this schema since it
+  // had no way to actually send null, only ever a real number defaulting
+  // to 0 — see docs/SERVICES_PLAN.md.
+  stock_quantity: z.number().int().min(0, 'Stock quantity cannot be negative').nullable().default(0).optional(),
   status: z.enum(['active', 'inactive', 'draft', 'archived']).default('active').optional(),
   image: z.string().url().optional().nullable(),
   gallery: z.array(z.string().url()).default([]).optional().or(z.literal(undefined).transform(() => [])),
-  category_id: z.string().uuid().optional().nullable(),
+  // Required at create time — a product must always belong to a category
+  // (user-requested change). updateProductSchema below (.partial()) makes
+  // this optional again for edits, so tweaking price/stock on an existing
+  // product never forces re-picking a category.
+  category_id: z.string().uuid('Please select a category for this product'),
   brand_id: z.string().uuid().optional().nullable(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
+  // Estimated delivery time in days (null means use tenant default)
+  estimated_delivery_days: z.number().int().min(1).max(365).optional().nullable()
+    .or(z.string().transform((val) => val ? parseInt(val, 10) : null).optional().nullable()),
+  // Basic services support (docs/SERVICES_PLAN.md) — false means a
+  // service/digital item: checkout skips delivery-zone/shipping-fee
+  // collection entirely for a cart made only of these. Defaults true
+  // (ships normally), matching the DB column's own default.
+  requires_shipping: z.boolean().default(true).optional(),
+  // Real scheduling/booking (S2, docs/SERVICES_PLAN.md) — capacity, not
+  // named staff (user-confirmed scope): booking_capacity is "how many
+  // concurrent bookings this service supports" (e.g. 3 chairs), never a
+  // specific staff member. booking_duration_minutes is required in
+  // practice once is_bookable is true (enforced in the dashboard/mobile
+  // forms and the AI intake conversation, not here — mirrors how
+  // requires_shipping's own stock-quantity coupling is enforced at the UI
+  // layer, not the schema layer, since updateProductSchema's .partial()
+  // must stay valid for a same-toggle-unchanged edit).
+  is_bookable: z.boolean().default(false).optional(),
+  booking_duration_minutes: z.number().int().positive().optional().nullable()
+    .or(z.string().transform((val) => (val === '' ? null : parseInt(val, 10))).optional().nullable()),
+  booking_capacity: z.number().int().positive().default(1).optional()
+    .or(z.string().transform((val) => (val === '' ? 1 : parseInt(val, 10))).optional()),
 }).strip(); // Strip unknown fields to prevent Prisma errors
 
 /**

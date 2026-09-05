@@ -1,119 +1,95 @@
-import Image from 'next/image';
-import { Star, Quote } from 'lucide-react';
+'use client';
 
-const testimonials = [
+import Image from 'next/image';
+import Link from 'next/link';
+import { Star, ArrowRight } from 'lucide-react';
+
+const stories = [
   {
-    name: 'Wanjiku Kamau',
-    role: 'Boutique Owner',
-    company: 'Nairobi Fashion Hub',
-    image: 'https://images.unsplash.com/photo-1668752741330-8adc5cef7485?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxBZnJpY2FuJTIwd29tYW4lMjBwcm9mZXNzaW9uYWx8ZW58MXx8fHwxNzY1OTA5ODAzfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    rating: 5,
-    text: 'DukaNest transformed my business! Setting up my online store was incredibly easy, and I was selling within hours. The templates are beautiful and the dashboard makes managing orders a breeze.'
-  },
-  {
+    company: 'Smart Hub Electronics',
+    before: 'WhatsApp orders only',
+    after: ['12,458 visitors', '250 orders', 'Ksh 250,000 revenue'],
+    image: 'https://images.unsplash.com/photo-1616804827035-f4aa814c14ac?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200',
     name: 'Kofi Mwangi',
-    role: 'Electronics Retailer',
-    company: 'Tech Hub Kenya',
-    image: 'https://images.unsplash.com/photo-1616804827035-f4aa814c14ac?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxBZnJpY2FuJTIwbWFuJTIwcHJvZmVzc2lvbmFsfGVufDF8fHx8MTc2NTk2NjA2MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    rating: 5,
-    text: 'The scalability of DukaNest is impressive. Started with the Basic plan and upgraded to Premium as my business grew. The unlimited products feature is exactly what I needed for my expanding inventory.'
   },
   {
+    company: 'Wedding Gowns',
+    before: 'Instagram only',
+    after: ['Professional website', 'Repeat customers', 'Inventory tracking'],
+    image: 'https://images.unsplash.com/photo-1668752741330-8adc5cef7485?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200',
+    name: 'Wanjiku Kamau',
+  },
+  {
+    company: 'Fashion Hub',
+    before: 'Facebook Marketplace',
+    after: ['More sales', 'Easier management', 'Better branding'],
+    image: 'https://images.unsplash.com/photo-1563132337-f159f484226c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200',
     name: 'Amani Otieno',
-    role: 'Grocery Store Manager',
-    company: 'Fresh Market Mombasa',
-    image: 'https://images.unsplash.com/photo-1563132337-f159f484226c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxBZnJpY2FuJTIwYnVzaW5lc3N3b21hbnxlbnwxfHx8fDE3NjU5NjYwNjF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    rating: 5,
-    text: 'Customer support is outstanding! Available 24/7 and always helpful. The secure payment processing gives my customers confidence, and the multi-currency support helped me reach international buyers.'
-  }
+  },
 ];
 
 export function Testimonials() {
   return (
-    <section className="py-20 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <p className="text-[#0025cc] font-medium mb-2">Testimonials</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-[#0c0528] mb-4">
-            What Our{' '}
-            <span className="bg-gradient-to-r from-[#0025cc] to-[#001a99] bg-clip-text text-transparent">
-              Customers
-            </span>{' '}
-            Are Saying
+    <section className="bg-white py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto mb-16 max-w-3xl text-center">
+          <h2 className="text-4xl font-bold tracking-tight text-[#0c0528] md:text-5xl">
+            Store Owners Who Made The Switch
           </h2>
-          <p className="text-[#8d8d8d] mt-4">
-            Join thousands of successful store owners who trust DukaNest to power their e-commerce business
-          </p>
         </div>
 
-        {/* Testimonials Grid - Single Row */}
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
-            <div
-              key={index}
-              className="group bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+        <div className="grid gap-8 md:grid-cols-3">
+          {stories.map((story) => (
+            <article
+              key={story.company}
+              className="testimonial-card group rounded-3xl border border-[#eaeaea] bg-[#f8f9fb] p-8 transition-all hover:-translate-y-1 hover:shadow-xl"
             >
-              {/* Quote Icon */}
-              <div className="absolute top-4 right-4 text-blue-100">
-                <Quote className="w-12 h-12" />
+              <div className="mb-5 flex items-center gap-4">
+                <div className="relative h-14 w-14 overflow-hidden rounded-full ring-2 ring-[#0B33B7]/20">
+                  <Image src={story.image} alt={story.name} fill className="object-cover" sizes="56px" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#0c0528]">{story.company}</h3>
+                  <p className="text-sm text-[#8d8d8d]">{story.name}</p>
+                </div>
               </div>
 
-              {/* Rating */}
-              <div className="flex gap-1 mb-4">
-                {[...Array(testimonial.rating)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+              <div className="mb-1 flex gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
                 ))}
               </div>
 
-              {/* Testimonial Text */}
-              <p className="text-[#8d8d8d] leading-relaxed mb-6 relative z-10">
-                &ldquo;{testimonial.text}&rdquo;
-              </p>
-
-              {/* Customer Info */}
-              <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-blue-100">
-                  <Image
-                    src={testimonial.image}
-                    alt={testimonial.name}
-                    fill
-                    className="object-cover"
-                    sizes="48px"
-                  />
+              <div className="mt-5 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#8d8d8d]">Before</p>
+                  <p className="mt-1 text-[#555]">{story.before}</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-[#0c0528]">{testimonial.name}</h4>
-                  <p className="text-sm text-[#8d8d8d]">{testimonial.role}</p>
-                  <p className="text-xs text-[#0025cc]">{testimonial.company}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#0B33B7]">After</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {story.after.map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm font-medium text-[#0c0528]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
-
-              {/* Hover effect gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[#0025cc] to-[#001a99] opacity-0 group-hover:opacity-5 transition-opacity"></div>
-            </div>
+            </article>
           ))}
         </div>
 
-        {/* Stats Section */}
-        {/* <div className="grid md:grid-cols-4 gap-8 mt-16 pt-16 border-t border-gray-200">
-          <div className="text-center">
-            <div className="text-4xl font-bold text-[#0025cc] mb-2">10,000+</div>
-            <div className="text-[#8d8d8d]">Active Stores</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-[#0025cc] mb-2">98%</div>
-            <div className="text-[#8d8d8d]">Customer Satisfaction</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-[#0025cc] mb-2">$50M+</div>
-            <div className="text-[#8d8d8d]">Sales Processed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-[#0025cc] mb-2">24/7</div>
-            <div className="text-[#8d8d8d]">Support Available</div>
-          </div>
-        </div> */}
+        <div className="mt-12 text-center">
+          <Link
+            href="/register"
+            className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#0B33B7] to-[#082a94] px-8 py-4 font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5"
+          >
+            Join These Store Owners
+            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+          </Link>
+        </div>
       </div>
     </section>
   );

@@ -11,6 +11,7 @@ import { requireAuthOrRedirect, requireAnyRoleOrRedirect } from '@/lib/auth/serv
 import { requireTenant } from '@/lib/tenant-context/server';
 import { getTenantAccessRestriction } from '@/lib/tenant-context/access-control';
 import DashboardLayoutClient from '@/components/dashboard/layout-client';
+import { prisma } from '@/lib/prisma/client';
 
 export default async function DashboardLayout({
   children,
@@ -60,15 +61,47 @@ export default async function DashboardLayout({
   }
 
   // Get tenant context
-  const tenant = await requireTenant();
+  let tenant = await requireTenant();
 
   // Verify user belongs to tenant (unless landlord)
   if (user.role !== 'landlord' && user.tenant_id !== tenant.id) {
-    redirect('/dashboard/login');
+    if (!user.tenant_id) {
+      redirect('/dashboard/login');
+    }
+
+    const userTenant = await prisma.tenants.findUnique({
+      where: { id: user.tenant_id },
+    });
+
+    if (!userTenant) {
+      redirect('/dashboard/login');
+    }
+
+    console.warn('[Dashboard Layout] Tenant mismatch recovered', {
+      resolvedTenantId: tenant.id,
+      userTenantId: user.tenant_id,
+      userId: user.id,
+    });
+
+    tenant = {
+      ...userTenant,
+      status: userTenant.status ?? 'active',
+      created_at: userTenant.created_at ?? new Date(),
+      updated_at: userTenant.updated_at ?? new Date(),
+      data: (userTenant.data as Record<string, unknown> | null) ?? null,
+    } as typeof tenant;
   }
 
   // Check tenant access restrictions
   const accessRestriction = getTenantAccessRestriction(tenant);
+  const userMetadata = (user.metadata ?? {}) as Record<string, unknown>;
+  const metadataName =
+    typeof userMetadata.name === 'string'
+      ? userMetadata.name
+      : typeof userMetadata.full_name === 'string'
+        ? userMetadata.full_name
+        : '';
+  const shouldShowProfilePrompt = userMetadata.profile_completed === false || metadataName.trim().length === 0;
 
   // Block access if completely restricted (suspended or deleted)
   // Allow read-only access during grace period
@@ -85,6 +118,8 @@ export default async function DashboardLayout({
       user={user} 
       tenant={tenant}
       accessRestriction={accessRestriction}
+      shouldShowProfilePrompt={shouldShowProfilePrompt}
+      profileName={metadataName}
     >
       {children}
     </DashboardLayoutClient>

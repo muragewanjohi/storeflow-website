@@ -16,6 +16,7 @@ import { z } from 'zod';
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
   role: z.enum(['tenant_admin', 'tenant_staff']).optional(),
+  customPermissions: z.array(z.string()).optional(),
 });
 
 /**
@@ -59,6 +60,7 @@ export async function GET(
         email: targetUser.user.email,
         name: targetUser.user.user_metadata?.name,
         role: targetUser.user.user_metadata?.role,
+        customPermissions: targetUser.user.user_metadata?.permissions || undefined,
         created_at: targetUser.user.created_at,
         last_sign_in_at: targetUser.user.last_sign_in_at,
       },
@@ -115,6 +117,10 @@ export async function PUT(
       ...targetUser.user.user_metadata,
       ...(validatedData.name && { name: validatedData.name }),
       ...(validatedData.role && { role: validatedData.role }),
+      // Handle custom permissions: if provided, set them; if explicitly set to empty array, remove them
+      ...(validatedData.customPermissions !== undefined && {
+        permissions: validatedData.customPermissions.length > 0 ? validatedData.customPermissions : undefined,
+      }),
     };
 
     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
@@ -164,8 +170,6 @@ export async function DELETE(
     const user = await requireAuth();
     requireAnyRole(user, ['tenant_admin', 'landlord']);
 
-    const tenant = await requireTenant();
-    const supabase = await createClient();
     const adminClient = createAdminClient();
 
     const { id } = await params;
@@ -180,12 +184,17 @@ export async function DELETE(
       );
     }
 
-    // Verify user belongs to tenant
-    if (targetUser.user.user_metadata?.tenant_id !== tenant.id) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+    // If not landlord, verify user belongs to tenant
+    if (user.role !== 'landlord') {
+      const tenant = await requireTenant();
+      
+      // Verify user belongs to tenant
+      if (targetUser.user.user_metadata?.tenant_id !== tenant.id) {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
     // Prevent deleting yourself
@@ -193,6 +202,14 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Cannot delete your own account' },
         { status: 400 }
+      );
+    }
+
+    // Prevent deleting other landlords (only landlords can delete landlords)
+    if (targetUser.user.user_metadata?.role === 'landlord' && user.role !== 'landlord') {
+      return NextResponse.json(
+        { error: 'Access denied. Only landlords can delete landlord accounts.' },
+        { status: 403 }
       );
     }
 

@@ -6,7 +6,7 @@
 
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { 
@@ -21,6 +21,12 @@ interface AccessRestrictionBannerProps {
 }
 
 export function AccessRestrictionBanner({ restriction }: Readonly<AccessRestrictionBannerProps>) {
+  const router = useRouter();
+
+  const handleRenew = () => {
+    router.push('/dashboard/subscription?renew=1');
+  };
+
   // Don't show banner for full access
   if (restriction.level === 'full') {
     return null;
@@ -45,10 +51,12 @@ export function AccessRestrictionBanner({ restriction }: Readonly<AccessRestrict
               </p>
             )}
             <div className="flex items-center gap-4 pt-2">
-              <Button asChild size="sm" className="bg-yellow-600 hover:bg-yellow-700">
-                <Link href="/dashboard/subscription">
-                  Renew Subscription Now
-                </Link>
+              <Button
+                size="sm"
+                className="bg-yellow-600 hover:bg-yellow-700"
+                onClick={handleRenew}
+              >
+                Renew Subscription Now
               </Button>
               <p className="text-sm">
                 You have read-only access. Editing and order processing are disabled.
@@ -72,10 +80,12 @@ export function AccessRestrictionBanner({ restriction }: Readonly<AccessRestrict
           <div className="mt-2 space-y-2">
             <p>{restriction.reason}</p>
             <div className="flex items-center gap-4 pt-2">
-              <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">
-                <Link href="/dashboard/subscription">
-                  Restore Access
-                </Link>
+              <Button
+                size="sm"
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleRenew}
+              >
+                Restore Access
               </Button>
               <p className="text-sm">
                 All data is preserved. Renew your subscription to restore full access.

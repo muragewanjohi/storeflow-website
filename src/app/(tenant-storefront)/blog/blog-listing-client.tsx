@@ -73,7 +73,11 @@ export default function BlogListingClient({ blogs }: Readonly<BlogListingClientP
           {blogs.map((post) => (
             <Link
               key={post.id}
-              href={post.slug ? `/blog/${post.slug}` : `/blog/${post.id}`}
+              href={
+                post.slug
+                  ? `/blog/${encodeURIComponent(post.slug)}`
+                  : `/blog/${post.id}`
+              }
               className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 overflow-hidden border"
             >
               {/* Post Image */}

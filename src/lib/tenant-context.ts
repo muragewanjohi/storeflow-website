@@ -45,11 +45,15 @@ export interface Tenant {
   status: string;
   plan_id?: string | null;
   expire_date?: Date | null;
+  start_date?: Date | null;
   user_id?: string | null;
   theme_slug?: string | null;
   settings?: Record<string, any>;
   created_at: Date;
   updated_at: Date;
+  country?: string | null;
+  /** JSON field; may contain is_demo, business_type, etc. */
+  data?: Record<string, unknown> | null;
 }
 
 /**
@@ -105,21 +109,50 @@ export async function getTenantFromRequest(
       return null;
     }
 
-    // Try to find tenant by subdomain first
+    // Try to find tenant by subdomain
+    // Include both 'active' and 'expired' status (expired tenants are accessible during grace period)
+    // Exclude 'deleted' and 'suspended' (these are handled separately)
     let { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')
       .eq('subdomain', subdomain)
-      .eq('status', 'active')
+      .in('status', ['active', 'expired'])
       .maybeSingle();
 
+    // If not found, check if tenant exists with different status for diagnostics
+    if (!tenant && !error) {
+      const { data: tenantAnyStatus, error: statusError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('subdomain', subdomain)
+        .maybeSingle();
+      
+      if (tenantAnyStatus && !statusError) {
+        // Tenant exists but status is 'suspended' or 'deleted' - log for debugging
+        if (tenantAnyStatus.status === 'suspended' || tenantAnyStatus.status === 'deleted') {
+          console.warn('Tenant found but access is restricted:', {
+            hostname,
+            subdomain,
+            tenantId: tenantAnyStatus.id,
+            status: tenantAnyStatus.status,
+            name: tenantAnyStatus.name,
+            message: tenantAnyStatus.status === 'suspended' 
+              ? 'Tenant is suspended (past grace period)'
+              : 'Tenant is deleted',
+          });
+        }
+        // Don't return suspended/deleted tenants - they're blocked
+      }
+    }
+
     // If not found by subdomain, try custom domain
+    // Include both 'active' and 'expired' status (expired tenants are accessible during grace period)
     if (!tenant && !error) {
       const { data: customDomainTenant, error: customError } = await supabase
         .from('tenants')
         .select('*')
         .eq('custom_domain', hostnameWithoutPort)
-        .eq('status', 'active')
+        .in('status', ['active', 'expired'])
         .maybeSingle();
       
       if (customDomainTenant) {
@@ -130,14 +163,56 @@ export async function getTenantFromRequest(
     }
 
     if (error || !tenant) {
-      console.error('Tenant not found:', {
+      // Enhanced error logging with diagnostic info
+      const diagnosticInfo: any = {
         hostname,
         hostnameWithoutPort,
         subdomain,
         error: error?.message || 'No tenant found',
         errorCode: error?.code,
         errorDetails: error,
-      });
+      };
+
+      // Try to find tenant with any status for better diagnostics
+      try {
+        const { data: diagnosticTenant } = await supabase
+          .from('tenants')
+          .select('id, subdomain, status, name')
+          .eq('subdomain', subdomain)
+          .maybeSingle();
+        
+        if (diagnosticTenant) {
+          diagnosticInfo.diagnostic = {
+            tenantExists: true,
+            tenantId: diagnosticTenant.id,
+            tenantName: diagnosticTenant.name,
+            currentStatus: diagnosticTenant.status,
+            message: `Tenant exists but status is '${diagnosticTenant.status}' (expected 'active')`,
+          };
+        } else {
+          // Check for similar subdomains (case variations)
+          const { data: similarTenants } = await supabase
+            .from('tenants')
+            .select('id, subdomain, status, name')
+            .ilike('subdomain', subdomain);
+          
+          if (similarTenants && similarTenants.length > 0) {
+            diagnosticInfo.diagnostic = {
+              tenantExists: false,
+              similarSubdomains: similarTenants.map(t => ({
+                subdomain: t.subdomain,
+                status: t.status,
+                name: t.name,
+              })),
+              message: 'No exact match found, but similar subdomains exist',
+            };
+          }
+        }
+      } catch (diagError) {
+        // Non-critical - just log the original error
+      }
+
+      console.error('Tenant not found:', diagnosticInfo);
       return null;
     }
 

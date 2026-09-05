@@ -26,6 +26,15 @@ export default async function TenantSettingsPage() {
     redirect('/login');
   }
 
+  const currentPlan = tenant.plan_id
+    ? await prisma.price_plans.findUnique({
+        where: { id: tenant.plan_id },
+        select: { id: true, name: true },
+      })
+    : null;
+  const isBasicPlan = currentPlan?.name?.toLowerCase().includes('basic') ?? false;
+  const canUseExtraStorePhones = !isBasicPlan;
+
   // Fetch all settings with error handling
   let settings: Record<string, string | null> = {};
   try {
@@ -38,6 +47,8 @@ export default async function TenantSettingsPage() {
       'store_country',
       'store_postal_code',
       'store_phone',
+      'store_phone_2',
+      'store_phone_3',
       'store_logo',
       
       // Currency Settings
@@ -52,20 +63,29 @@ export default async function TenantSettingsPage() {
       'shipping_enabled',
       'shipping_method_type',
       'flat_rate_amount',
-      'dynamic_rate_per_km',
       'free_shipping_enabled',
       'free_shipping_threshold',
+      'default_estimated_delivery_days',
       
       // Payment Methods
-      'payment_pesapal_enabled',
-      'payment_paypal_enabled',
-      'payment_cash_on_delivery_enabled',
-      'default_payment_method',
+      'payment_cash_enabled',
+      'payment_mpesa_enabled',
+      'payment_mpesa_option',
+      'payment_mpesa_send_money_number',
+      'payment_mpesa_buy_goods_till',
+      'payment_mpesa_paybill_number',
+      'payment_mpesa_paybill_account',
+      'payment_mpesa_pochi_phone',
+      'payment_method',
+      'default_payment_method', // Keep for backward compatibility
+      'payment_tumizi_enabled',
+      'payment_timing',
       
       // Tax Settings
       'tax_enabled',
       'default_tax_rate',
-      'tax_included_in_price',
+      'tax_pricing_type',
+      'tax_included_in_price', // Keep for backward compatibility
       'tax_calculation_based_on',
     ]);
   } catch (error) {
@@ -109,6 +129,8 @@ export default async function TenantSettingsPage() {
     store_country: settings.store_country || '',
     store_postal_code: settings.store_postal_code || '',
     store_phone: settings.store_phone || '',
+    store_phone_2: settings.store_phone_2 || '',
+    store_phone_3: settings.store_phone_3 || '',
     store_logo: settings.store_logo || '',
     
     // Currency Settings
@@ -123,23 +145,45 @@ export default async function TenantSettingsPage() {
     shipping_enabled: settings.shipping_enabled === 'true' || settings.shipping_enabled === null,
     shipping_method_type: settings.shipping_method_type || 'flat_rate',
     flat_rate_amount: settings.flat_rate_amount ? parseFloat(settings.flat_rate_amount) : null,
-    dynamic_rate_per_km: settings.dynamic_rate_per_km ? parseFloat(settings.dynamic_rate_per_km) : null,
     free_shipping_enabled: settings.free_shipping_enabled === 'true',
     free_shipping_threshold: settings.free_shipping_threshold ? parseFloat(settings.free_shipping_threshold) : null,
     
+    // Pickup Options
+    pickup_enabled: settings.pickup_enabled === 'true',
+    pickup_location_name: settings.pickup_location_name || '',
+    pickup_instructions: settings.pickup_instructions || '',
+    pickup_hours: settings.pickup_hours || '',
+    
     // Payment Methods
-    payment_pesapal_enabled: settings.payment_pesapal_enabled === 'true' || settings.payment_pesapal_enabled === null,
-    payment_paypal_enabled: settings.payment_paypal_enabled === 'true',
-    payment_cash_on_delivery_enabled: settings.payment_cash_on_delivery_enabled === 'true' || settings.payment_cash_on_delivery_enabled === null,
-    default_payment_method: settings.default_payment_method || '',
+    payment_cash_enabled: settings.payment_cash_enabled === 'true' || settings.payment_cash_enabled === null,
+    payment_mpesa_enabled: settings.payment_mpesa_enabled === 'true',
+    payment_mpesa_option: settings.payment_mpesa_option || 'send_money',
+    payment_mpesa_send_money_number: settings.payment_mpesa_send_money_number || '',
+    payment_mpesa_buy_goods_till: settings.payment_mpesa_buy_goods_till || '',
+    payment_mpesa_paybill_number: settings.payment_mpesa_paybill_number || '',
+    payment_mpesa_paybill_account: settings.payment_mpesa_paybill_account || '',
+    payment_mpesa_pochi_phone: settings.payment_mpesa_pochi_phone || '',
+    payment_method: settings.payment_method || settings.default_payment_method || 'cash',
+    default_payment_method: settings.default_payment_method || settings.payment_method || 'cash', // Keep for backward compatibility
+    payment_tumizi_enabled: settings.payment_tumizi_enabled === 'true',
+    payment_timing: settings.payment_timing || 'before_delivery',
     
     // Tax Settings
     tax_enabled: settings.tax_enabled === 'true',
     default_tax_rate: settings.default_tax_rate ? parseFloat(settings.default_tax_rate) : null,
-    tax_included_in_price: settings.tax_included_in_price === 'true',
+    tax_pricing_type: settings.tax_pricing_type || (settings.tax_included_in_price === 'true' ? 'inclusive' : 'exclusive'),
+    tax_included_in_price: settings.tax_included_in_price === 'true', // Keep for backward compatibility
     tax_calculation_based_on: settings.tax_calculation_based_on || 'billing_address',
   };
 
-  return <TenantSettingsClient tenant={tenant} initialSettings={formattedSettings} countries={countries} />;
+  return (
+    <TenantSettingsClient
+      tenant={tenant}
+      initialSettings={formattedSettings}
+      countries={countries}
+      canUseExtraStorePhones={canUseExtraStorePhones}
+      extraStorePhonesPlanName={currentPlan?.name ?? null}
+    />
+  );
 }
 

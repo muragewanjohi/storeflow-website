@@ -1,76 +1,109 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 import { Menu, X } from 'lucide-react';
 import { ImageWithFallback } from './image-with-fallback';
 
+gsap.registerPlugin(useGSAP);
+
+const navLinks = [
+  { href: '/#features', label: 'Features' },
+  { href: '/#pricing', label: 'Pricing' },
+  { href: '/#about', label: 'About' },
+  { href: '/#faq', label: 'FAQ' },
+];
+
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      gsap.from(navRef.current, {
+        y: -20,
+        opacity: 0,
+        duration: 0.6,
+        ease: 'power2.out',
+      });
+    },
+    { scope: navRef },
+  );
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center space-x-2">
+    <nav
+      ref={navRef}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        scrolled
+          ? 'border-b border-[#0B33B7]/10 bg-white/85 shadow-sm backdrop-blur-xl'
+          : 'bg-transparent'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between lg:h-20">
+          <Link href="/" className="flex shrink-0 items-center">
             <ImageWithFallback
               src="/logo_with_name.png"
               alt="DukaNest"
-              className="h-12 md:h-14 w-auto object-contain"
+              className="h-10 w-auto object-contain md:h-11"
             />
           </Link>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/#home" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Home
-            </Link>
-            <Link href="/#shops" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Shops
-            </Link>
-            <Link href="/#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-            <Link href="/#themes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Templates
-            </Link>
-            <Link href="/#blog" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Blog
-            </Link>
-            <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Contact
-            </Link>
+
+          <div className="hidden md:flex md:flex-1 md:items-center md:justify-center md:gap-10">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-[#0c0528] transition-colors hover:text-[#0B33B7]"
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
 
-          {/* Mobile menu button */}
+          <Link
+            href="/register"
+            className="hidden rounded-xl bg-gradient-to-r from-[#0B33B7] to-[#082a94] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg md:inline-flex"
+          >
+            Start Free Trial
+          </Link>
+
           <button
-            className="md:hidden p-2"
+            className="p-2 md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-4">
-            <Link href="/#home" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Home
-            </Link>
-            <Link href="/#shops" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Shops
-            </Link>
-            <Link href="/#pricing" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Pricing
-            </Link>
-            <Link href="/#themes" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Templates
-            </Link>
-            <Link href="/#blog" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Blog
-            </Link>
-            <Link href="/contact" className="block text-sm font-medium text-muted-foreground hover:text-foreground">
-              Contact
+          <div className="space-y-4 border-t border-[#0B33B7]/10 py-4 md:hidden">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="block text-sm font-medium text-[#0c0528] hover:text-[#0B33B7]"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="/register"
+              className="block rounded-xl bg-gradient-to-r from-[#0B33B7] to-[#082a94] px-6 py-3 text-center font-semibold text-white"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Start Free Trial
             </Link>
           </div>
         )}

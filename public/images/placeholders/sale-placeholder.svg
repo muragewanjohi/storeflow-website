@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Sale banner placeholder</title>
+  <desc id="desc">Neutral placeholder shown when a sale banner image is unavailable.</desc>
+  <rect width="1200" height="600" fill="#f1f5f9"/>
+  <rect x="120" y="110" width="960" height="380" rx="22" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="8"/>
+  <path d="M240 390l130-130 95 95 90-80 120 115 120-145 130 145" fill="none" stroke="#94a3b8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="600" y="245" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" fill="#334155">Sale Banner</text>
+  <text x="600" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="30" fill="#64748b">Image unavailable</text>
+</svg>

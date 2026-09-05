@@ -9,6 +9,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import {
+  getOtpEmailDeliveryFailureMessage,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+} from '@/lib/mfa/otp-delivery-user-message';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -98,9 +102,10 @@ export async function POST(request: NextRequest) {
       console.error('Failed to send OTP:', otpError);
       await supabase.auth.signOut();
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to send code',
-          message: 'Unable to send verification code. Please try again.'
+          message: getOtpEmailDeliveryFailureMessage(),
+          code: OTP_EMAIL_SERVICE_ERROR_CODE,
         },
         { status: 500 }
       );

@@ -41,6 +41,7 @@ interface DashboardData {
     payment_status: string | null;
     created_at: Date | null;
   }>;
+  pendingDeliveryQuotes: number;
 }
 
 interface AccountDashboardClientProps {
@@ -118,6 +119,29 @@ export default function AccountDashboardClient({ data }: Readonly<AccountDashboa
           Here&apos;s an overview of your account activity
         </p>
       </div>
+
+      {data.pendingDeliveryQuotes > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-yellow-900">Action required on your orders</p>
+              <p className="text-sm text-yellow-800">
+                You have {data.pendingDeliveryQuotes} delivery fee quote{data.pendingDeliveryQuotes > 1 ? 's' : ''} waiting for approval or rejection.
+              </p>
+            </div>
+            <Link href="/account/orders?filter=requiring_action">
+              <Button size="sm" className="w-full sm:w-auto">
+                Review now
+              </Button>
+            </Link>
+            <Link href="/account/notifications">
+              <Button size="sm" variant="outline" className="w-full sm:w-auto">
+                View notifications
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

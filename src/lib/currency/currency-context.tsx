@@ -29,9 +29,26 @@ interface CurrencyContextType {
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
 
-export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrency] = useState<CurrencySettings>(DEFAULT_CURRENCY);
-  const [isLoading, setIsLoading] = useState(true);
+interface CurrencyProviderProps {
+  children: ReactNode;
+  /** When provided (e.g. from server), use as initial value so storefront shows correct currency on first paint */
+  initialCurrency?: CurrencySettings | null;
+}
+
+export function CurrencyProvider({ children, initialCurrency }: CurrencyProviderProps) {
+  const [currency, setCurrency] = useState<CurrencySettings>(
+    initialCurrency && typeof initialCurrency === 'object'
+      ? {
+          code: initialCurrency.code || DEFAULT_CURRENCY.code,
+          symbol: initialCurrency.symbol || DEFAULT_CURRENCY.symbol,
+          symbolPosition: initialCurrency.symbolPosition ?? DEFAULT_CURRENCY.symbolPosition,
+          thousandSeparator: initialCurrency.thousandSeparator ?? DEFAULT_CURRENCY.thousandSeparator,
+          decimalSeparator: initialCurrency.decimalSeparator ?? DEFAULT_CURRENCY.decimalSeparator,
+          decimalPlaces: initialCurrency.decimalPlaces ?? DEFAULT_CURRENCY.decimalPlaces,
+        }
+      : DEFAULT_CURRENCY
+  );
+  const [isLoading, setIsLoading] = useState(!initialCurrency);
 
   useEffect(() => {
     async function loadCurrencySettings() {

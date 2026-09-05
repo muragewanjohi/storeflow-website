@@ -1,6 +1,6 @@
 # Testing Guide
 
-This directory contains all tests for the StoreFlow application.
+This directory contains all tests for the DukaNest application.
 
 ## Test Structure
 

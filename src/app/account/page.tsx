@@ -104,6 +104,24 @@ export default async function AccountDashboardPage() {
     },
   });
 
+  // Count customer orders that require action (delivery fee quote decisions)
+  const pendingDeliveryQuotes = await prisma.orders.count({
+    where: {
+      tenant_id: tenant.id,
+      OR: [
+        { user_id: customer.id },
+        {
+          user_id: null,
+          email: {
+            equals: customer.email,
+            mode: 'insensitive',
+          },
+        },
+      ],
+      delivery_fee_status: 'quoted',
+    },
+  });
+
   const dashboardData = {
     customer: {
       name: customer.name,
@@ -115,6 +133,7 @@ export default async function AccountDashboardPage() {
       totalSpent,
       pendingOrders,
     },
+    pendingDeliveryQuotes,
     recentOrders: recentOrders.map((order: typeof recentOrders[0]) => ({
       ...order,
       total_amount: Number(order.total_amount),

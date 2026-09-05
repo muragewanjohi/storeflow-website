@@ -1,14 +1,15 @@
-# StoreFlow Postman Collection
+# DukaNest Postman Collection
 
-**Complete API testing collection for StoreFlow multi-tenant ecommerce platform**
+**Complete API testing collection for DukaNest multi-tenant ecommerce platform**
 
 ---
 
 ## 📦 Files
 
-- **`StoreFlow_API_Collection.json`** - Main Postman collection with all API endpoints
-- **`StoreFlow_Environment.json`** - Environment variables for different environments
-- **`README.md`** - This file
+- **`StoreFlow_API_Collection.json`** — Main Postman collection (import this file)
+- **`StoreFlow_Mobile_Tumizi_Collection.json`** — Focused native mobile Tumizi test collection
+- **`StoreFlow_Environment.json`** — Environment variables for different environments
+- **`README.md`** — This file
 
 ---
 
@@ -26,7 +27,7 @@
 1. Click **Import** button
 2. Select `StoreFlow_Environment.json`
 3. Click **Import**
-4. Select the **StoreFlow Environment** from the environment dropdown (top right)
+4. Select the **DukaNest Environment** from the environment dropdown (top right)
 
 ### 3. Configure Environment Variables
 
@@ -37,12 +38,40 @@ Update these variables in the environment:
 - **`tenant_id`** - Current tenant ID (auto-set by some requests)
 - **`tenant_subdomain`** - Tenant subdomain (default: `teststore`)
 - **`auth_token`** - Authentication token (auto-set after login)
+- **`mobile_access_token`** - Mobile bearer token (auto-set by Mobile Login)
+- **`mobile_refresh_token`** - Mobile refresh token (auto-set by Mobile Login/Refresh)
+- **`mobile_temp_access_token`** - Temporary token returned when login requires MFA
+- **`mobile_temp_refresh_token`** - Temporary refresh token returned when login requires MFA
+- **`mobile_requires_mfa`** - Indicates whether MFA verify step is pending
+- **`mobile_email`** - Mobile API login email
+- **`mobile_password`** - Mobile API login password
+- **`mobile_user_id`** - Mobile user ID (auto-set by Mobile Login)
+- **`mobile_user_email`** - Mobile user email (auto-set by Mobile Login)
+- **`mobile_mfa_code`** - OTP code for MFA verify (set manually while testing)
 - **`plan_id`** - Price plan ID (auto-set by Get Price Plans request)
 - **`cron_secret_token`** - Secret token for cron endpoints (set manually)
+- **`tumizi_base_url`** - Tumizi partner gateway base URL (e.g. `https://app.tumizi.africa`)
+- **`tumizi_partner_api_key`** - Tumizi partner bearer token
 - **`product_id`** - Product ID (auto-set by product requests)
 - **`variant_id`** - Product variant ID (auto-set by variant requests)
+- **`expense_id`** - Expense ID (set manually or from expense create/list response)
+- **`expense_category_id`** - Expense category ID (set manually or from expense category create/list response)
 - **`category_id`** - Category ID (auto-set by category requests)
 - **`product_image_url`** - Product image URL (auto-set by upload request)
+- **`onboarding_business_type`** - Business type for onboarding starter pack tests (e.g., `Pets`)
+- **`onboarding_selling`** - Niche/free-text selling value (e.g., `Ornamental Fish`)
+- **`onboarding_theme_slug`** - Theme slug for onboarding starter pack generation (e.g., `grocery`)
+- **`starter_pack_job_id`** - Async starter-pack job ID (auto-set by Create Job request)
+- **`starter_pack_image_url`** - Generated image URL used by Save Assets request
+- **`mobile_device_id`** - Stable device id for register-device / notification preferences (default: `postman-device-1`)
+- **`mobile_push_token`** - FCM/APNs registration token for **Mobile Register Device**
+- **`mobile_mpesa_checkout_request_id`** - Set automatically by **Mobile M-Pesa Initiate** for **Mobile M-Pesa Status**
+- **`tumizi_provisioning_queued`** - Captures registration response flag indicating async Tumizi merchant provisioning was queued
+- **`tumizi_merchant_external_id`** - Set automatically by mobile Tumizi settings/merchant responses
+- **`tumizi_withdrawal_phone`** - Kenya M-Pesa phone used by the mobile Tumizi withdrawal test
+- **`tumizi_withdrawal_amount`** - Withdrawal test amount; keep low in live environments
+- **`tumizi_withdrawal_narration`** - Narration sent with withdrawal test
+- **`tumizi_withdrawal_external_reference`** - Set automatically after mobile Tumizi withdrawal request
 
 ---
 
@@ -63,6 +92,18 @@ Update these variables in the environment:
 - **Get Price Plans** - List available price plans
 - **Subscription Expiry Checker** - Check for expired subscriptions (cron)
 
+### Tumizi Provisioning & Payments
+- **Register Tenant (mobile/web register endpoint)** - Creates tenant and queues Tumizi provisioning when Tumizi env is configured.
+- **Tumizi Provision Pending Merchants** (`/api/admin/integrations/tumizi/provision-pending`) - Cron worker that creates merchants for queued tenants.
+- **Tumizi Create Merchant** (`npm run tumizi:create-merchant ...`) - Script for manual create/validation.
+- **Tumizi Test Customer Payment** (`npm run tumizi:test-customer-payment ...`) - Script for live payment + status polling.
+
+Queue values written after registration:
+- `tenant_tumizi_integrations.metadata.autoProvision = true`
+- `tenant_tumizi_integrations.metadata.provisioning_status = "pending"`
+
+The merchant is created asynchronously by the provision-pending cron worker, not inline in registration.
+
 ### Products (Day 15)
 - **List Products** - List products with search, filtering, and pagination
 - **Get Product** - Get product details by ID
@@ -81,6 +122,38 @@ Update these variables in the environment:
 - **Create Category** - Create new category
 - **Update Category** - Update category
 - **Delete Category** - Delete category
+
+### Mobile API (Phase 0)
+- **Mobile Login** - Get mobile access and refresh tokens
+- **Mobile Refresh Token** - Refresh mobile access token
+- **Mobile Forgot Password** - Supabase password reset email (`/api/v1/mobile/auth/forgot-password`)
+- **Mobile MFA Status** - Check whether MFA is required/enabled
+- **Mobile MFA Send Code** - Send OTP code to mobile user email
+- **Mobile MFA Verify** - Verify OTP code
+- **Mobile Logout** - Revoke/close mobile session and clear tokens
+- **Mobile Dashboard Overview** - Metrics + recent orders
+- **Mobile Dashboard Products** - Mobile product list with filters/pagination
+- **Mobile Dashboard Products (Remove Demo)** - Removes demo products from the tenant catalog
+- **Mobile Dashboard Orders** - Mobile order list with filters/pagination
+- **Mobile Dashboard Customers** - Mobile customer list with filters/pagination
+- **Mobile Dashboard Inventory** - Mobile inventory list with stock metrics
+- **Mobile Dashboard Settings** - Core store settings for mobile app
+- **Mobile Dashboard Sales** - Sales/promotions list with pagination
+- **Mobile Dashboard Analytics** - Revenue/trends/top products (`days` query)
+- **Mobile Dashboard P&L** - Profit & loss summary (`start_date`, `end_date`)
+- **Mobile Dashboard Expense Categories (List/Create/Update/Delete)** - Tenant-specific categories for expenses
+- **Mobile Dashboard Expenses (List/Create/Update/Delete)** - Tenant expense ledger for P&L
+- **Mobile Media Upload** - Multipart image upload (`file` field)
+- **Mobile M-Pesa Initiate** / **Mobile M-Pesa Status** - STK push + poll (`checkoutRequestId`)
+- **Mobile Tumizi Settings/Merchant/Wallet/Refunds** - Import `StoreFlow_Mobile_Tumizi_Collection.json` for focused native mobile Tumizi route tests.
+- **Mobile Notifications List** - Derived in-app notifications feed
+- **Mobile Register Device** - Upsert push token + device metadata
+- **Mobile Notification Preferences (GET/PUT)** - Per-device notification toggles
+- **Onboarding Selling Exists** - Precheck if `selling` niche already exists
+- **Onboarding Starter Pack (Sync)** - Build starter-pack payload + precheck decision
+- **Onboarding Starter Pack Create Job** - Create async generation job for Flutter
+- **Onboarding Starter Pack Job Status** - Poll async starter-pack job
+- **Onboarding Starter Pack Save Assets** - Persist generated image URLs/metadata
 
 ### Domain Management (Day 11)
 - **Add Custom Domain** - Add a custom domain to tenant
@@ -116,6 +189,47 @@ Each request includes automated tests that verify:
 3. **Check Response:**
    - View response in **Body** tab
    - Check **Headers** for additional info
+
+### Mobile MFA Test Order (Phase 0)
+
+For tenant accounts that require MFA, run requests in this order:
+
+1. **Mobile Login**
+   - Expected: `requiresMfa: true`
+   - Auto-sets `mobile_user_id`, `mobile_temp_access_token`, `mobile_temp_refresh_token`
+2. **Mobile MFA Status**
+   - Confirms MFA requirement/enabled flags for the user
+3. **Mobile MFA Send Code**
+   - Sends OTP to the login email
+4. **Mobile MFA Verify**
+   - Uses `mobile_mfa_code` + temp session to finalize auth
+   - Auto-promotes to `mobile_access_token` / `mobile_refresh_token`
+5. **Mobile Dashboard Overview** (or any protected mobile dashboard endpoint)
+   - Confirms bearer token works end-to-end
+
+### Onboarding Starter Pack Test Order (Gemini + Nano Banana)
+
+Use this sequence for niche onboarding tests (Flutter-compatible flow):
+
+1. **Onboarding Selling Exists**
+   - Endpoint: `POST /api/onboarding/selling-exists`
+   - Purpose: check if `selling` already exists and avoid unnecessary generation.
+2. **Onboarding Starter Pack Create Job**
+   - Endpoint: `POST /api/onboarding/starter-pack-jobs`
+   - Purpose: create async job for starter-pack generation (recommended mobile flow).
+   - Auto-sets `starter_pack_job_id`.
+3. **Onboarding Starter Pack Job Status**
+   - Endpoint: `GET /api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}`
+   - Purpose: poll until status is `success` or `failed`.
+4. **(External step) Generate images from `nanoBanana.jobs`**
+   - Use returned prompts with your Nano Banana service.
+   - Upload resulting images to your storage and capture final URLs.
+5. **Onboarding Starter Pack Save Assets**
+   - Endpoint: `POST /api/onboarding/starter-pack-jobs/{{starter_pack_job_id}}/save-assets`
+   - Purpose: persist generated image URLs/metadata to job result and optionally tenant profile.
+
+Optional:
+- **Onboarding Starter Pack (Sync)** can be used for quick contract tests or dry runs without async job polling.
 
 ---
 
@@ -250,17 +364,9 @@ pm.test("Response has expected data", function () {
 
 ## 🔐 Authentication
 
-Currently, authentication is not implemented. When Day 12 (Authentication) is complete:
-
-1. **Add Auth Token:**
-   - Login endpoint will return `auth_token`
-   - Set `auth_token` in environment variables
-   - Collection will auto-include token in headers
-
-2. **Update Collection:**
-   - Add Authorization header to all requests
-   - Add login/logout endpoints
-   - Add token refresh endpoint
+- **Web-style routes** (`/api/*` outside mobile): use `auth_token` from tenant/landlord login where applicable; the collection prerequest script sends `Authorization: Bearer` when `auth_token` or `mobile_access_token` is set.
+- **Mobile routes** (`/api/v1/mobile/*`): run **Mobile Login** (or **Mobile MFA Verify** after MFA). Tokens are stored in `mobile_access_token` / `mobile_refresh_token` and mirrored to `auth_token` for shared headers.
+- **Forgot password** does not require a bearer token (collection may still attach one if present; harmless).
 
 ---
 
@@ -343,9 +449,8 @@ After each day, verify:
 
 ## 📝 Notes
 
-- **Collection Version:** 1.0
-- **Last Updated:** Day 11
-- **Next Update:** Day 12 (Authentication)
+- **Collection:** `StoreFlow_API_Collection.json` — keep in sync when adding or changing API routes.
+- **Last documentation pass:** March 2026 (mobile dashboard extensions + onboarding starter-pack requests).
 
 ---
 

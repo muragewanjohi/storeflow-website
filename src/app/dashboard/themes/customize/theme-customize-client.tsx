@@ -15,11 +15,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code, Undo2 } from 'lucide-react';
+import { Save, ArrowLeft, Upload, X, Sparkles, Download, Upload as UploadIcon, Code, Undo2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { useRef } from 'react';
+import { THEME_COLOR_SETTINGS } from '@/lib/themes/color-settings';
+import { FONT_OPTIONS, FONT_WEIGHTS } from '@/lib/themes/font-settings';
+import { hasCustomCssAccess } from '@/lib/themes/theme-access';
+import HomepageImagesTab from './homepage-images-tab';
+import LiveThemePreview from './live-theme-preview';
 
 interface ThemeColors {
   primary?: string;
@@ -50,6 +55,7 @@ interface CurrentTheme {
   theme: {
     id: string;
     title: string;
+    slug: string;
     colors: ThemeColors | null;
     typography: ThemeTypography | null;
   } | null;
@@ -67,28 +73,12 @@ interface CurrentTheme {
   } | null;
 }
 
-const FONT_OPTIONS = [
-  { value: 'Inter', label: 'Inter' },
-  { value: 'Roboto', label: 'Roboto' },
-  { value: 'Open Sans', label: 'Open Sans' },
-  { value: 'Lato', label: 'Lato' },
-  { value: 'Montserrat', label: 'Montserrat' },
-  { value: 'Poppins', label: 'Poppins' },
-  { value: 'Playfair Display', label: 'Playfair Display' },
-  { value: 'Merriweather', label: 'Merriweather' },
-];
-
-const FONT_WEIGHTS = [
-  { value: '300', label: 'Light (300)' },
-  { value: '400', label: 'Regular (400)' },
-  { value: '500', label: 'Medium (500)' },
-  { value: '600', label: 'Semi Bold (600)' },
-  { value: '700', label: 'Bold (700)' },
-];
-
-export default function ThemeCustomizeClient() {
+export default function ThemeCustomizeClient({
+  currentPlanName,
+}: Readonly<{ currentPlanName: string | null }>) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const canUseCustomCss = hasCustomCssAccess(currentPlanName);
 
   // Fetch current theme and customizations
   const { data: currentThemeData, isLoading } = useQuery({
@@ -103,9 +93,10 @@ export default function ThemeCustomizeClient() {
   // Form state
   const [customColors, setCustomColors] = useState<ThemeColors>({});
   const [customFonts, setCustomFonts] = useState<ThemeTypography>({});
+  const [aiStylePrompt, setAiStylePrompt] = useState('');
+  const [aiStyleUrl, setAiStyleUrl] = useState('');
   const [customLayouts, setCustomLayouts] = useState<ThemeLayout>({});
   const [customCss, setCustomCss] = useState('');
-  const [customJs, setCustomJs] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [faviconUrl, setFaviconUrl] = useState('');
   const [metaTitle, setMetaTitle] = useState('');
@@ -124,7 +115,6 @@ export default function ThemeCustomizeClient() {
     fonts: ThemeTypography;
     layouts: ThemeLayout;
     css: string;
-    js: string;
     logoUrl: string;
     faviconUrl: string;
     metaTitle: string;
@@ -140,7 +130,6 @@ export default function ThemeCustomizeClient() {
         fonts: customizations.custom_fonts || {},
         layouts: customizations.custom_layouts || {},
         css: customizations.custom_css || '',
-        js: (customizations as any).custom_js || '',
         logoUrl: customizations.logo_url || '',
         faviconUrl: customizations.favicon_url || '',
         metaTitle: customizations.meta_title || '',
@@ -155,7 +144,6 @@ export default function ThemeCustomizeClient() {
       setCustomFonts(initial.fonts);
       setCustomLayouts(initial.layouts);
       setCustomCss(initial.css);
-      setCustomJs(initial.js);
       setLogoUrl(initial.logoUrl);
       setFaviconUrl(initial.faviconUrl);
       setMetaTitle(initial.metaTitle);
@@ -170,7 +158,6 @@ export default function ThemeCustomizeClient() {
       custom_fonts?: ThemeTypography;
       custom_layouts?: ThemeLayout;
       custom_css?: string;
-      custom_js?: string;
       logo_url?: string;
       favicon_url?: string;
       meta_title?: string;
@@ -201,8 +188,10 @@ export default function ThemeCustomizeClient() {
       custom_colors: customColors,
       custom_fonts: customFonts,
       custom_layouts: customLayouts,
-      custom_css: customCss,
-      custom_js: customJs,
+      // Non-Pro tenants never get to type into the Custom CSS field (it's
+      // locked in the UI below), but guard here too so a save can never
+      // accidentally submit CSS text this tenant isn't entitled to save.
+      custom_css: canUseCustomCss ? customCss : '',
       logo_url: logoUrl,
       favicon_url: faviconUrl,
       meta_title: metaTitle,
@@ -212,6 +201,116 @@ export default function ThemeCustomizeClient() {
 
   const handleColorChange = (key: string, value: string) => {
     setCustomColors((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Theme Track B2.1 — AI-assisted styling from a free-text mood prompt.
+  // Generate-then-preview only: populates the SAME customColors/customFonts
+  // state the manual pickers and the live preview panel already read from,
+  // so the merchant sees the AI suggestion rendered live before deciding to
+  // Save (or tweak individual colors/fonts further) — nothing is persisted
+  // by this mutation itself.
+  const aiStyleMutation = useMutation({
+    mutationFn: async (prompt: string) => {
+      const response = await fetch('/api/themes/ai-style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate a style');
+      }
+      return response.json() as Promise<{
+        custom_colors: ThemeColors;
+        custom_fonts: { headingFont: string; bodyFont: string; headingWeight: number; bodyWeight: number };
+      }>;
+    },
+    onSuccess: (data) => {
+      // Bug fix: this used to only populate local state and leave the Save
+      // button (further down the page) for the merchant to notice and click
+      // — easy to miss, so the AI-generated style silently reverted on
+      // navigation. Save immediately with the merged values (not the stale
+      // `customColors`/`customFonts` closures) so nothing is lost.
+      const mergedColors = { ...customColors, ...data.custom_colors };
+      const mergedFonts = { ...customFonts, ...data.custom_fonts };
+      setCustomColors(mergedColors);
+      setCustomFonts(mergedFonts);
+      updateMutation.mutate({
+        custom_colors: mergedColors,
+        custom_fonts: mergedFonts,
+        custom_css: canUseCustomCss ? customCss : '',
+        logo_url: logoUrl,
+        favicon_url: faviconUrl,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+      });
+      toast.success('Applied and saved your AI-generated style.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate a style');
+    },
+  });
+
+  const handleGenerateAiStyle = () => {
+    const trimmed = aiStylePrompt.trim();
+    if (!trimmed) {
+      toast.error('Describe the mood or style you want first (e.g. "warm and earthy").');
+      return;
+    }
+    aiStyleMutation.mutate(trimmed);
+  };
+
+  // Theme Track B2.2 — AI-assisted styling from a reference-site screenshot.
+  // Same generate-then-preview contract as B2.1's aiStyleMutation above —
+  // populates the same customColors/customFonts state, nothing persisted
+  // until Save. Can genuinely take 10-20+ seconds (real headless-browser
+  // capture + a Claude vision call), so the button below shows a real
+  // "this takes a moment" note rather than looking stuck.
+  const aiStyleFromUrlMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await fetch('/api/themes/ai-style-from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate a style from that site');
+      }
+      return response.json() as Promise<{
+        custom_colors: ThemeColors;
+        custom_fonts: { headingFont: string; bodyFont: string; headingWeight: number; bodyWeight: number };
+      }>;
+    },
+    onSuccess: (data) => {
+      // Same immediate-save fix as aiStyleMutation above.
+      const mergedColors = { ...customColors, ...data.custom_colors };
+      const mergedFonts = { ...customFonts, ...data.custom_fonts };
+      setCustomColors(mergedColors);
+      setCustomFonts(mergedFonts);
+      updateMutation.mutate({
+        custom_colors: mergedColors,
+        custom_fonts: mergedFonts,
+        custom_css: canUseCustomCss ? customCss : '',
+        logo_url: logoUrl,
+        favicon_url: faviconUrl,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+      });
+      toast.success('Applied and saved a style inspired by that site.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to generate a style from that site');
+    },
+  });
+
+  const handleGenerateAiStyleFromUrl = () => {
+    const trimmed = aiStyleUrl.trim();
+    if (!trimmed) {
+      toast.error('Enter a website URL first (e.g. "https://example.com").');
+      return;
+    }
+    aiStyleFromUrlMutation.mutate(trimmed);
   };
 
   // Generate favicon from logo using Canvas API
@@ -388,7 +487,6 @@ export default function ThemeCustomizeClient() {
       setCustomFonts(initialValues.fonts);
       setCustomLayouts(initialValues.layouts);
       setCustomCss(initialValues.css);
-      setCustomJs(initialValues.js);
       setLogoUrl(initialValues.logoUrl);
       setFaviconUrl(initialValues.faviconUrl);
       setMetaTitle(initialValues.metaTitle);
@@ -470,13 +568,45 @@ export default function ThemeCustomizeClient() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start">
       <Tabs defaultValue="colors" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="colors">Colors</TabsTrigger>
-          <TabsTrigger value="typography">Typography</TabsTrigger>
-          <TabsTrigger value="layout">Layout</TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="advanced" disabled title="Coming soon">
+        <TabsList className="bg-muted/50 border border-border">
+          <TabsTrigger 
+            value="colors"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Colors
+          </TabsTrigger>
+          <TabsTrigger 
+            value="typography"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Typography
+          </TabsTrigger>
+          <TabsTrigger 
+            value="layout"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Layout
+          </TabsTrigger>
+          <TabsTrigger
+            value="branding"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Branding
+          </TabsTrigger>
+          <TabsTrigger
+            value="images"
+            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground/70 hover:text-foreground"
+          >
+            Homepage Images
+          </TabsTrigger>
+          <TabsTrigger
+            value="advanced"
+            disabled
+            title="Coming soon"
+            className="data-[state=inactive]:text-muted-foreground/50"
+          >
             Advanced
             <span className="ml-1.5 text-xs">🚧</span>
           </TabsTrigger>
@@ -510,25 +640,127 @@ export default function ThemeCustomizeClient() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {[
-                { key: 'primary', description: 'Used for: Primary buttons, links, active navigation items, CTAs, badges, and accent elements' },
-                { key: 'secondary', description: 'Used for: Secondary buttons, hover states, complementary UI elements' },
-                { key: 'accent', description: 'Used for: Highlights, special features, decorative elements, hover effects, and active links' },
-                { key: 'background', description: 'Used for: Page background color (applied via CSS variables)' },
-                { key: 'text', description: 'Used for: Main text color, headings, body text (applied via CSS variables)' },
-                { key: 'muted', description: 'Used for: Muted text, placeholders, secondary text, borders' },
-                { key: 'buttonBackground', description: 'Used for: Button background color (applied via CSS variables --button-background)' },
-                { key: 'buttonText', description: 'Used for: Button text color (applied via CSS variables --button-text)' },
-              ].map(({ key: colorKey, description }) => {
-                const defaultValue = (defaultColors as ThemeColors)[colorKey] || '#000000';
+              {/* Theme Track B2.1 — AI-assisted styling */}
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    Style with AI
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                    Describe a mood — inspired by, not a clone of — and I&apos;ll suggest colors and fonts. Never changes your layout, images, or text.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={aiStylePrompt}
+                    onChange={(e) => setAiStylePrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !aiStyleMutation.isPending) handleGenerateAiStyle();
+                    }}
+                    placeholder='e.g. "warm and earthy" or "energetic and bold"'
+                    className="bg-background"
+                    disabled={aiStyleMutation.isPending}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateAiStyle}
+                    disabled={aiStyleMutation.isPending}
+                    className="shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {aiStyleMutation.isPending ? 'Generating…' : 'Generate'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Theme Track B2.2 — AI-assisted styling from a reference site */}
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    Style from a reference site
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                    Share a link to a site whose overall feeling you like — inspired by, not a clone of. I&apos;ll look at its general colors and typography, never its layout, images, logo, or text.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    value={aiStyleUrl}
+                    onChange={(e) => setAiStyleUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !aiStyleFromUrlMutation.isPending) handleGenerateAiStyleFromUrl();
+                    }}
+                    placeholder="https://example.com"
+                    className="bg-background"
+                    disabled={aiStyleFromUrlMutation.isPending}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateAiStyleFromUrl}
+                    disabled={aiStyleFromUrlMutation.isPending}
+                    className="shrink-0"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {aiStyleFromUrlMutation.isPending ? 'Capturing & generating…' : 'Generate'}
+                  </Button>
+                </div>
+                {aiStyleFromUrlMutation.isPending && (
+                  <p className="text-xs text-purple-700 dark:text-purple-300">
+                    This can take up to 20 seconds — capturing the page and analyzing its style.
+                  </p>
+                )}
+              </div>
+
+              {/* Recommended Color Schemes Info */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h4 className="text-sm font-semibold mb-2 text-blue-900 dark:text-blue-100">
+                  💡 Color Scheme Recommendations
+                </h4>
+                <p className="text-xs text-blue-800 dark:text-blue-200 mb-3">
+                  Based on design best practices, ensure proper contrast ratios (WCAG AA: 4.5:1 for text, 3:1 for UI elements).
+                  Avoid using similar shades for background and muted colors to maintain visibility.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <strong className="text-blue-900 dark:text-blue-100">E-commerce Best Practices:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-700 dark:text-blue-300">
+                      <li>Primary: Use brand color (blue/green recommended)</li>
+                      <li>Background: Light neutral (#FFFFFF or #FAFAFA)</li>
+                      <li>Text: Dark neutral (#212121 or #1A1A1A)</li>
+                      <li>Muted: Medium grey (#6B7280 or #9CA3AF)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-blue-900 dark:text-blue-100">Contrast Guidelines:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5 text-blue-700 dark:text-blue-300">
+                      <li>Text on background: ≥ 4.5:1</li>
+                      <li>UI components: ≥ 3:1</li>
+                      <li>Muted should be 40-60% lighter than text</li>
+                      <li>Test with contrast checker tools</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {THEME_COLOR_SETTINGS.map(({ key: colorKey, description, recommended, note }) => {
+                const defaultValue = (defaultColors as ThemeColors)[colorKey] || recommended || '#000000';
                 const currentValue = customColors[colorKey] || defaultValue;
                 return (
                   <div key={colorKey} className="space-y-2">
                     <div>
                       <Label htmlFor={`color-${colorKey}`} className="capitalize">
-                        {colorKey} Color
+                        {colorKey === 'buttonBackground' ? 'Button Background' : 
+                         colorKey === 'buttonText' ? 'Button Text' : 
+                         colorKey} Color
                       </Label>
                       <p className="text-xs text-muted-foreground mt-1">{description}</p>
+                      {note && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                          💡 {note}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <Input
@@ -536,27 +768,33 @@ export default function ThemeCustomizeClient() {
                         type="color"
                         value={currentValue}
                         onChange={(e) => handleColorChange(colorKey, e.target.value)}
-                        className="w-20 h-10 cursor-pointer"
+                        className="w-20 h-10 cursor-pointer border border-border rounded"
                       />
                       <Input
                         type="text"
                         value={currentValue}
                         onChange={(e) => handleColorChange(colorKey, e.target.value)}
                         placeholder={defaultValue}
-                        className="flex-1"
+                        className="flex-1 font-mono text-sm"
+                        pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setCustomColors((prev) => {
-                            const newColors = { ...prev };
-                            delete newColors[colorKey];
-                            return newColors;
-                          });
+                          if (recommended) {
+                            handleColorChange(colorKey, recommended);
+                          } else {
+                            setCustomColors((prev) => {
+                              const newColors = { ...prev };
+                              delete newColors[colorKey];
+                              return newColors;
+                            });
+                          }
                         }}
+                        title={recommended ? `Set to recommended: ${recommended}` : 'Reset to default'}
                       >
-                        Reset
+                        {recommended ? 'Use Recommended' : 'Reset'}
                       </Button>
                     </div>
                   </div>
@@ -936,69 +1174,58 @@ export default function ThemeCustomizeClient() {
           </Card>
         </TabsContent>
 
+        {/* Homepage Images Tab (DA.25) */}
+        <TabsContent value="images">
+          <HomepageImagesTab />
+        </TabsContent>
+
         {/* Advanced Tab */}
         <TabsContent value="advanced">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <div className="space-y-4">
-                <div className="text-4xl">🚧</div>
-                <h3 className="text-xl font-semibold">Coming Soon</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  The Advanced section with Custom CSS and JavaScript customization will be available soon.
-                  This will allow you to add custom styling and functionality to your theme.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          {/* Keep the content but hide it for now */}
-          <div className="hidden space-y-6">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Custom CSS</CardTitle>
-                <CardDescription>
-                  Add custom CSS to further customize your theme. Use with caution.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Custom CSS</CardTitle>
+                    <CardDescription>
+                      Add custom CSS to further customize your theme. Use with caution.
+                    </CardDescription>
+                  </div>
+                  {!canUseCustomCss && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                      <Lock className="h-3 w-3" />
+                      Pro feature
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="custom-css">Custom CSS</Label>
-                  <Textarea
-                    id="custom-css"
-                    value={customCss}
-                    onChange={(e) => setCustomCss(e.target.value)}
-                    placeholder=".my-custom-class { color: red; }"
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    CSS will be injected into the storefront pages. Make sure your selectors are specific to avoid conflicts.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom JavaScript</CardTitle>
-                <CardDescription>
-                  Add custom JavaScript code to your storefront. Use with extreme caution.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="custom-js">Custom JavaScript</Label>
-                  <Textarea
-                    id="custom-js"
-                    value={customJs}
-                    onChange={(e) => setCustomJs(e.target.value)}
-                    placeholder="console.log('Custom script loaded');"
-                    rows={10}
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    JavaScript will be executed on all storefront pages. Ensure your code is safe and doesn&apos;t conflict with existing functionality.
-                  </p>
-                </div>
+                {canUseCustomCss ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-css">Custom CSS</Label>
+                    <Textarea
+                      id="custom-css"
+                      value={customCss}
+                      onChange={(e) => setCustomCss(e.target.value)}
+                      placeholder=".my-custom-class { color: red; }"
+                      rows={10}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      CSS is sanitized and injected into your storefront pages. Make sure your selectors are specific to avoid conflicts.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-3">
+                    <Lock className="h-6 w-6 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Custom CSS is available on Pro plans. Upgrade to add your own styling on top of this theme.
+                    </p>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/dashboard/subscription">Upgrade to Pro</Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1029,9 +1256,19 @@ export default function ThemeCustomizeClient() {
               </Card>
             )}
           </div>
-          {/* End of hidden content */}
         </TabsContent>
       </Tabs>
+
+      {currentThemeData?.theme?.slug && (
+        <div className="hidden lg:block">
+          <LiveThemePreview
+            slug={currentThemeData.theme.slug}
+            colors={customColors}
+            typography={customFonts as Record<string, string | number | undefined>}
+          />
+        </div>
+      )}
+      </div>
 
       {/* Save and Cancel buttons at the bottom */}
       <div className="mt-8 pt-6 border-t flex items-center justify-end gap-4">

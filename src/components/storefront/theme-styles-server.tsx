@@ -5,8 +5,44 @@
  * This runs server-side and applies colors before the page renders
  */
 
+import { headers } from 'next/headers';
+import { Prisma } from '@prisma/client';
 import { getTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
+
+/** Avoid DB work on error/static routes (middleware sets `x-pathname`). */
+const THEME_STYLES_SKIP_PATH_PREFIXES = [
+  '/404',
+  '/tenant-suspended',
+  '/tenant-expired',
+  '/auth/',
+  '/api/',
+  '/_next/',
+] as const;
+
+const PRISMA_THEME_QUERY_MS = 4_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise
+      .then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(t);
+        reject(e);
+      });
+  });
+}
+
+/** Postgres UUID string — Prisma rejects non-UUID values with `Invalid ... invocation`. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isTenantUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value.trim());
+}
 
 // Helper function to convert hex to HSL for Tailwind CSS variables
 function hexToHsl(hex: string): string {
@@ -42,30 +78,72 @@ function hexToHsl(hex: string): string {
 
 export default async function ThemeStylesServer() {
   try {
+    const headerList = await headers();
+    const pathname = headerList.get('x-pathname') || '';
+    if (
+      pathname &&
+      THEME_STYLES_SKIP_PATH_PREFIXES.some(
+        (prefix) => pathname === prefix || pathname.startsWith(prefix),
+      )
+    ) {
+      return null;
+    }
+
     // Use getTenant() instead of requireTenant() to gracefully handle marketing sites
-    // Marketing sites (like storeflow-website) don't have tenants and should skip theme styles
+    // Marketing sites (like dukanest-website) don't have tenants and should skip theme styles
     const tenant = await getTenant();
-    
+
     // If no tenant (e.g., marketing site), return null - no theme styles needed
     if (!tenant) {
       return null;
     }
 
-    const tenantTheme = await prisma.tenant_themes.findFirst({
-      where: {
-        tenant_id: tenant.id,
-        is_active: true,
-      },
-    });
+    // Invalid or missing tenant id breaks Prisma UUID filters and surfaces as "Invalid ... invocation"
+    if (!isTenantUuid(tenant.id)) {
+      console.warn('[ThemeStylesServer] Skipping: tenant.id is not a valid UUID', {
+        subdomain: tenant.subdomain,
+        idPreview: String(tenant.id).slice(0, 24),
+      });
+      return null;
+    }
+
+    const tenantId = tenant.id.trim();
+
+    let tenantTheme;
+    try {
+      tenantTheme = await withTimeout(
+        prisma.tenant_themes.findFirst({
+          where: {
+            tenant_id: tenantId,
+            is_active: true,
+          },
+        }),
+        PRISMA_THEME_QUERY_MS,
+        'tenant_themes.findFirst',
+      );
+    } catch (dbError) {
+      logThemeStylesDbError('tenant_themes.findFirst', dbError);
+      return null;
+    }
 
     if (!tenantTheme) {
       return null;
     }
 
     // Fetch the theme separately
-    const theme = await prisma.themes.findUnique({
-      where: { id: tenantTheme.theme_id },
-    });
+    let theme;
+    try {
+      theme = await withTimeout(
+        prisma.themes.findUnique({
+          where: { id: tenantTheme.theme_id },
+        }),
+        PRISMA_THEME_QUERY_MS,
+        'themes.findUnique',
+      );
+    } catch (dbError) {
+      logThemeStylesDbError('themes.findUnique', dbError);
+      return null;
+    }
 
     if (!theme) {
       return null;
@@ -80,7 +158,9 @@ export default async function ThemeStylesServer() {
     const cssVariables: string[] = [];
 
     // Apply color CSS variables
-    Object.entries(colors).forEach(([key, value]) => {
+    Object.entries(colors)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([key, value]) => {
       if (value && typeof value === 'string' && value.trim()) {
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
         cssVariables.push(`--color-${cssKey}: ${value};`);
@@ -177,12 +257,47 @@ export default async function ThemeStylesServer() {
     return (
       <style
         id="theme-styles-server"
+        suppressHydrationWarning
         dangerouslySetInnerHTML={{ __html: cssString }}
       />
     );
   } catch (error) {
-    // Silently fail - theme will be applied client-side
-    console.error('Error generating theme styles server-side:', error);
+    logThemeStylesDbError('ThemeStylesServer', error);
     return null;
   }
+}
+
+function isTimeoutLike(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const anyErr = error as { code?: string; message?: string };
+  const code = String(anyErr.code || '');
+  const msg = String(anyErr.message || '');
+  return (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'ECONNREFUSED' ||
+    /ETIMEDOUT|timed out|timeout/i.test(msg)
+  );
+}
+
+function logThemeStylesDbError(context: string, error: unknown): void {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const hint =
+      error.code === 'P2021'
+        ? ' Table missing in DB — run `npx prisma db push` or apply migrations so `tenant_themes` exists.'
+        : '';
+    console.error(`[ThemeStylesServer] ${context} (${error.code}):`, error.message, hint);
+    return;
+  }
+
+  if (isTimeoutLike(error)) {
+    console.warn(
+      `[ThemeStylesServer] ${context}: database unreachable or slow (timeout). ` +
+        'Check DATABASE_URL, that Postgres is running, and network/VPN/firewall. Theme CSS skipped for this request.',
+      error,
+    );
+    return;
+  }
+
+  console.error(`[ThemeStylesServer] ${context}:`, error);
 }

@@ -55,9 +55,19 @@ export default async function PagesPage({
       ];
     }
 
-    // Status filter
-    if (status) {
+    // Status filter - only apply if explicitly set, don't filter by default
+    if (status && status !== 'all') {
       where.status = status;
+    }
+    
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Pages List] Query params:', {
+        tenantId: tenant.id,
+        search,
+        status,
+        where,
+      });
     }
 
     // Calculate pagination

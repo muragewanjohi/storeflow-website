@@ -1,4 +1,7 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/admin/subscriptions/expiry-checker",
@@ -27,6 +30,22 @@
     {
       "path": "/api/admin/sales/automate",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/admin/cleanup/pre-deletion-warnings",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/admin/analytics/send-scheduled-reports",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/admin/onboarding/image-retry",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/admin/integrations/tumizi/provision-pending",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

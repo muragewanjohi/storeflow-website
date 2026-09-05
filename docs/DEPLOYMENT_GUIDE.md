@@ -218,7 +218,7 @@ PESAPAL_ENVIRONMENT=production
 
 1. **Project Settings:**
    - Framework Preset: Next.js
-   - Root Directory: `storeflow` (if monorepo)
+   - Root Directory: `dukanest` (if monorepo)
    - Build Command: `npm run build`
    - Output Directory: `.next`
    - Install Command: `npm install`

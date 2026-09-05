@@ -1,11 +1,11 @@
+'use client';
+
 /**
  * Email Verification Page
  * 
  * Page for verifying customer email with token from email
  * Accessible via tenant subdomain at /verify-email?token=...
  */
-
-'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';

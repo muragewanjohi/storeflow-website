@@ -8,6 +8,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ export default function CategoryFormClient({
   parentCategories,
 }: Readonly<CategoryFormClientProps>) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!category;
 
@@ -113,6 +115,7 @@ export default function CategoryFormClient({
         throw new Error(data.error || `Failed to ${isEditing ? 'update' : 'create'} category`);
       }
 
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-getting-started'] });
       router.push('/dashboard/categories');
     } catch (err: any) {
       setError(err.message || `Failed to ${isEditing ? 'update' : 'create'} category`);

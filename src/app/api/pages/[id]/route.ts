@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { requireAuth } from '@/lib/auth/server';
@@ -122,6 +123,16 @@ export async function PUT(
       }
     }
 
+    // When publishing, snapshot content into published_content so visitors still see it when page is later set to draft
+    const contentToSave = validatedData.content !== undefined ? validatedData.content : existingPage.content;
+    const isPublishing = validatedData.status === 'published';
+    // Backfill: when saving as draft, if we have no published_content yet but had content (e.g. was published), preserve it so visitors still see the previous version
+    const publishedContentUpdate = isPublishing
+      ? { published_content: contentToSave ?? existingPage.published_content }
+      : !existingPage.published_content && existingPage.content
+        ? { published_content: existingPage.content }
+        : {};
+
     // Update page
     const page = await prisma.pages.update({
       where: { id },
@@ -129,6 +140,7 @@ export async function PUT(
         title: validatedData.title,
         slug: slug || undefined,
         content: validatedData.content !== undefined ? validatedData.content : undefined,
+        ...publishedContentUpdate,
         banner_image: validatedData.banner_image !== undefined ? (validatedData.banner_image || null) : undefined,
         meta_title: validatedData.meta_title !== undefined ? validatedData.meta_title : undefined,
         meta_description: validatedData.meta_description !== undefined ? validatedData.meta_description : undefined,
@@ -137,6 +149,25 @@ export async function PUT(
         updated_at: new Date(),
       },
     });
+
+    // Revalidate the page cache to ensure changes appear immediately on storefront
+    try {
+      // Revalidate the specific page path
+      if (page.slug) {
+        revalidatePath(`/${page.slug}`);
+      }
+      // Also revalidate old slug if it changed
+      if (existingPage.slug && existingPage.slug !== page.slug) {
+        revalidatePath(`/${existingPage.slug}`);
+      }
+      // Revalidate homepage if slug is 'home' or empty
+      if (page.slug === 'home' || page.slug === '') {
+        revalidatePath('/');
+      }
+    } catch (revalidateError) {
+      // Non-critical - log but don't fail the request
+      console.warn('[Page Update] Failed to revalidate cache:', revalidateError);
+    }
 
     return NextResponse.json({ page });
   } catch (error) {
@@ -192,6 +223,32 @@ export async function DELETE(
         { error: 'Page not found' },
         { status: 404 }
       );
+    }
+
+    // Protect required system pages from deletion
+    const PROTECTED_PAGE_SLUGS = ['home', 'about', 'contact'];
+    const pageSlugLower = page.slug?.toLowerCase() || '';
+    
+    if (PROTECTED_PAGE_SLUGS.includes(pageSlugLower)) {
+      return NextResponse.json(
+        { 
+          error: `Cannot delete "${page.title}". This is a required system page (home, about, or contact) and cannot be removed.`,
+          protected: true
+        },
+        { status: 403 }
+      );
+    }
+
+    // Revalidate the page cache before deleting
+    try {
+      if (page.slug) {
+        revalidatePath(`/${page.slug}`);
+      }
+      if (page.slug === 'home' || page.slug === '') {
+        revalidatePath('/');
+      }
+    } catch (revalidateError) {
+      console.warn('[Page Delete] Failed to revalidate cache:', revalidateError);
     }
 
     // Delete page

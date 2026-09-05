@@ -69,7 +69,7 @@ export default function InventorySettingsClient({
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/inventory">
             <ArrowLeftIcon className="mr-2 h-4 w-4" />
@@ -123,7 +123,7 @@ export default function InventorySettingsClient({
               </p>
             </div>
 
-            <div className="flex justify-end gap-4 pt-4">
+            <div className="flex flex-wrap justify-start gap-3 pt-4 sm:justify-end sm:gap-4">
               <Button type="button" variant="outline" asChild>
                 <Link href="/dashboard/inventory">Cancel</Link>
               </Button>

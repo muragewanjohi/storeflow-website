@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { prisma } from '@/lib/prisma/client';
 import type { UserRole, AuthUser } from './types';
 
 /**
@@ -58,11 +59,42 @@ export async function getUser(): Promise<AuthUser | null> {
       return null;
     }
 
+    const userRole = (user.user_metadata?.role as UserRole) || 'customer';
+    let resolvedTenantId =
+      typeof user.user_metadata?.tenant_id === 'string'
+        ? user.user_metadata.tenant_id
+        : undefined;
+
+    // Fallback for tenant owner accounts that were created without tenant_id metadata.
+    // Login allows this path via tenants.user_id, so resolve it once here to keep
+    // dashboard guards consistent and prevent redirect loops back to /dashboard/login.
+    if (!resolvedTenantId && (userRole === 'tenant_admin' || userRole === 'tenant_staff')) {
+      try {
+        const ownedTenant = await prisma.tenants.findFirst({
+          where: {
+            user_id: user.id,
+            deleted_at: null,
+          },
+          select: { id: true },
+        });
+
+        if (ownedTenant?.id) {
+          resolvedTenantId = ownedTenant.id;
+          console.log('[Auth Server] Resolved missing tenant_id via tenants.user_id', {
+            userId: user.id,
+            tenantId: ownedTenant.id,
+          });
+        }
+      } catch (tenantLookupError) {
+        console.error('[Auth Server] Failed tenant fallback lookup:', tenantLookupError);
+      }
+    }
+
     const authUser = {
       id: user.id,
       email: user.email!,
-      role: (user.user_metadata?.role as UserRole) || 'customer',
-      tenant_id: user.user_metadata?.tenant_id,
+      role: userRole,
+      tenant_id: resolvedTenantId,
       metadata: user.user_metadata as any,
     };
     

@@ -15,9 +15,9 @@ export default function ModernFooter() {
   const footerLinks = {
     shop: [
       { name: 'All Products', href: '/products' },
-      { name: 'Laptops', href: '/products?category=laptops' },
-      { name: 'Phones', href: '/products?category=phones' },
-      { name: 'Audio', href: '/products?category=audio' },
+      { name: 'Laptops', href: '/collections/laptops' },
+      { name: 'Phones', href: '/collections/phones' },
+      { name: 'Audio', href: '/collections/audio' },
     ],
     support: [
       { name: 'Tech Support', href: '/support' },

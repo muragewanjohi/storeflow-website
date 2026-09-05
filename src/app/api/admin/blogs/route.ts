@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate slug if not provided
-    const slug = validatedData.slug || generateSlug(validatedData.title);
+    const slug =
+      (validatedData.slug ?? generateSlug(validatedData.title)) || `blog-${Date.now()}`;
 
     // Check if slug already exists for this tenant
     const existingBlog = await prisma.blogs.findFirst({

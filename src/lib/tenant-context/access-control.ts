@@ -24,7 +24,10 @@ export interface TenantAccessRestriction {
   canRenew: boolean;
   canViewData: boolean;
   canEditData: boolean;
+  /** Merchant dashboard: fulfill/update orders */
   canProcessOrders: boolean;
+  /** Customer storefront: place new orders (allowed during grace period) */
+  canAcceptCustomerOrders: boolean;
   daysRemaining?: number;
   gracePeriodEnd?: Date;
 }
@@ -63,6 +66,7 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
       canViewData: false,
       canEditData: false,
       canProcessOrders: false,
+      canAcceptCustomerOrders: false,
     };
   }
 
@@ -75,13 +79,14 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
       canViewData: false,
       canEditData: false,
       canProcessOrders: false,
+      canAcceptCustomerOrders: false,
     };
   }
 
   // Expired tenants - check grace period
   if (tenant.status === 'expired' || (expireDate && daysExpired >= 0)) {
     if (daysExpired <= GRACE_PERIOD_DAYS) {
-      // Still in grace period - read-only access
+      // Still in grace period - merchant dashboard read-only; storefront stays open
       return {
         level: 'read-only',
         reason: `Subscription expired. Grace period ends in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}. Please renew to continue full access.`,
@@ -89,6 +94,7 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
         canViewData: true,
         canEditData: false,
         canProcessOrders: false,
+        canAcceptCustomerOrders: true,
         daysRemaining,
         gracePeriodEnd: gracePeriodEnd || undefined,
       };
@@ -101,6 +107,7 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
         canViewData: false,
         canEditData: false,
         canProcessOrders: false,
+        canAcceptCustomerOrders: false,
       };
     }
   }
@@ -114,6 +121,7 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
       canViewData: true,
       canEditData: true,
       canProcessOrders: true,
+      canAcceptCustomerOrders: true,
     };
   }
 
@@ -125,6 +133,7 @@ export function getTenantAccessRestriction(tenant: Tenant): TenantAccessRestrict
     canViewData: false,
     canEditData: false,
     canProcessOrders: false,
+    canAcceptCustomerOrders: false,
   };
 }
 
@@ -162,5 +171,9 @@ export function canEditData(tenant: Tenant): boolean {
  */
 export function canProcessOrders(tenant: Tenant): boolean {
   return getTenantAccessRestriction(tenant).canProcessOrders;
+}
+
+export function canAcceptCustomerOrders(tenant: Tenant): boolean {
+  return getTenantAccessRestriction(tenant).canAcceptCustomerOrders;
 }
 

@@ -93,7 +93,7 @@ export default function AttributesListClient({
   if (dbError) {
     return (
       <div>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Attributes</h1>
             <p className="text-muted-foreground mt-2">
@@ -114,7 +114,7 @@ export default function AttributesListClient({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Attributes</h1>
           <p className="text-muted-foreground mt-2">
@@ -148,6 +148,7 @@ export default function AttributesListClient({
               </Button>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -207,6 +208,7 @@ export default function AttributesListClient({
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

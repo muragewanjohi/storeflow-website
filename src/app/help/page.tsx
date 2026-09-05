@@ -7,9 +7,9 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma/client';
 import UserGuideContent from './user-guide-content';
 import MarketingHeader from '@/components/marketing/header';
-import { Footer as MarketingFooter } from '@/components/marketing/footer';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,8 @@ export default async function HelpPage() {
     hostnameWithoutPort === 'dukanest.com' ||
     (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
     hostnameWithoutPort === '127.0.0.1' ||
-    hostnameWithoutPort.includes('storeflow') ||
+    hostnameWithoutPort === 'www.storeflow.com' ||
+    hostnameWithoutPort === 'storeflow.com' ||
     hostnameWithoutPort.includes('vercel.app') ||
     hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
   
@@ -47,13 +48,32 @@ export default async function HelpPage() {
     redirect(`${protocol}//${marketingDomain}${port ? `:${port}` : ''}/help`);
   }
 
+  // Fetch user guide data from database
+  const categories = await prisma.user_guide_categories.findMany({
+    where: {
+      is_active: true,
+    },
+    include: {
+      articles: {
+        where: {
+          is_active: true,
+        },
+        orderBy: {
+          sort_order: 'asc',
+        },
+      },
+    },
+    orderBy: {
+      sort_order: 'asc',
+    },
+  });
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <MarketingHeader />
-      <main className="flex-1">
-        <UserGuideContent tenantName="DukaNest Stores" />
+      <main className="flex-1 min-h-0">
+        <UserGuideContent tenantName="DukaNest Stores" categories={categories} />
       </main>
-      <MarketingFooter />
     </div>
   );
 }

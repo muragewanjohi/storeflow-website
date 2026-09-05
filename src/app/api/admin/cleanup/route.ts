@@ -14,20 +14,30 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
+import { startCronJobLog, completeCronJobLog } from '@/lib/cron-jobs/logger';
 
 /**
  * GET /api/admin/cleanup
  * Perform data cleanup tasks
  */
 export async function GET(request: NextRequest) {
+  const logId = await startCronJobLog({
+    jobName: 'Data Cleanup',
+    jobPath: '/api/admin/cleanup',
+  });
+
   try {
-    // Optional: Add secret token check for security
-    const authHeader = request.headers.get('authorization');
-    const expectedToken = process.env.CRON_SECRET_TOKEN;
+    // Security: Use shared auth utility
+    // Vercel automatically sends CRON_SECRET in Authorization header when CRON_SECRET env var is set
+    const { verifyCronJobAuth } = await import('@/lib/cron-jobs/auth');
+    const authResult = verifyCronJobAuth(request);
     
-    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+    if (!authResult.authorized) {
+      await completeCronJobLog(logId, 'failed', {
+        error: `Unauthorized - ${authResult.reason || 'Invalid token'}`,
+      });
       return NextResponse.json(
-        { message: 'Unauthorized' },
+        { message: 'Unauthorized', error: authResult.reason || 'Invalid token' },
         { status: 401 }
       );
     }
@@ -95,6 +105,10 @@ export async function GET(request: NextRequest) {
     // 5. Clean up expired password reset tokens (if stored in database)
     // This would depend on your auth implementation
 
+    await completeCronJobLog(logId, 'success', {
+      result: results,
+    });
+
     return NextResponse.json(
       {
         message: 'Data cleanup completed',
@@ -105,6 +119,11 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error during data cleanup:', error);
+    
+    await completeCronJobLog(logId, 'failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    
     return NextResponse.json(
       {
         message: process.env.NODE_ENV === 'development'

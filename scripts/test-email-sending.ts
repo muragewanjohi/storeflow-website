@@ -8,7 +8,7 @@
  *   tsx scripts/test-email-sending.ts your-email@example.com
  * 
  * Prerequisites:
- *   - SENDGRID_API_KEY must be set in .env.local
+ *   - RESEND_API_KEY must be set in .env.local
  *   - At least one tenant with a plan must exist in database
  */
 
@@ -27,15 +27,15 @@ async function testEmailSending(testEmail: string) {
   console.log('🧪 Testing Email Sending for Subscription Reminders\n');
   console.log('='.repeat(60));
 
-  // Check SendGrid API key
-  if (!process.env.SENDGRID_API_KEY) {
-    console.error('❌ SENDGRID_API_KEY is not set in environment variables');
-    console.log('\nPlease set SENDGRID_API_KEY in your .env.local file:');
-    console.log('SENDGRID_API_KEY=your-sendgrid-api-key');
+  // Check Resend API key (legacy SENDGRID_API_KEY accepted for compatibility)
+  if (!process.env.RESEND_API_KEY && !process.env.SENDGRID_API_KEY) {
+    console.error('❌ RESEND_API_KEY is not set in environment variables');
+    console.log('\nPlease set RESEND_API_KEY in your .env.local file:');
+    console.log('RESEND_API_KEY=re_...');
     process.exit(1);
   }
 
-  console.log('✅ SendGrid API key found\n');
+  console.log('✅ Email provider API key found\n');
 
   // Try to get a real tenant, but fall back to mock data if database is unavailable
   let testTenant: any = null;
@@ -118,7 +118,7 @@ async function testEmailSending(testEmail: string) {
       console.log('   ❌ Failed:', result.error);
       results.push({ type: 'Renewal Reminder', success: false, error: result.error });
     } else if (result?.skipped) {
-      console.log('   ⚠️  Skipped (SendGrid API key not configured)');
+      console.log('   ⚠️  Skipped (email provider API key not configured)');
       results.push({ type: 'Renewal Reminder', success: false, error: 'Skipped - API key not configured' });
     } else {
       console.log('   ✅ Sent successfully');
@@ -146,7 +146,7 @@ async function testEmailSending(testEmail: string) {
       console.log('   ❌ Failed:', result.error);
       results.push({ type: 'Payment Due Reminder', success: false, error: result.error });
     } else if (result?.skipped) {
-      console.log('   ⚠️  Skipped (SendGrid API key not configured)');
+      console.log('   ⚠️  Skipped (email provider API key not configured)');
       results.push({ type: 'Payment Due Reminder', success: false, error: 'Skipped - API key not configured' });
     } else {
       console.log('   ✅ Sent successfully');
@@ -172,7 +172,7 @@ async function testEmailSending(testEmail: string) {
       console.log('   ❌ Failed:', result.error);
       results.push({ type: 'Subscription Expired', success: false, error: result.error });
     } else if (result?.skipped) {
-      console.log('   ⚠️  Skipped (SendGrid API key not configured)');
+      console.log('   ⚠️  Skipped (email provider API key not configured)');
       results.push({ type: 'Subscription Expired', success: false, error: 'Skipped - API key not configured' });
     } else {
       console.log('   ✅ Sent successfully');
@@ -201,8 +201,8 @@ async function testEmailSending(testEmail: string) {
 
   if (failed > 0) {
     console.log('\n⚠️  Some emails failed to send. Check:');
-    console.log('   1. SendGrid API key is correct');
-    console.log('   2. Sender email is verified in SendGrid');
+    console.log('   1. RESEND_API_KEY is correct');
+    console.log('   2. Sender domain/email is verified in Resend');
     console.log('   3. Email address is valid');
     process.exit(1);
   } else {

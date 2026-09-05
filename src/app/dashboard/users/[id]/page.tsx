@@ -56,6 +56,7 @@ export default async function EditUserPage({ params }: Readonly<PageProps>) {
     email: userToEdit.email || '',
     name: userToEdit.user_metadata?.name || '',
     role: (userToEdit.user_metadata?.role || 'tenant_staff') as 'tenant_admin' | 'tenant_staff',
+    customPermissions: (userToEdit.user_metadata?.permissions as string[] | undefined) || undefined,
   };
 
   return <EditUserForm user={userObject} currentUserId={user.id} />;

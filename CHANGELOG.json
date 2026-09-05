@@ -1,0 +1,212 @@
+{
+  "version": "0.1.9",
+  "entries": [
+    {
+      "version": "0.1.9",
+      "date": "2026-03-16",
+      "features": [
+        "Onboarding starter-pack generation now prefers existing packs by selling/business match before creating a new one, with clearer response/source tracing for cache vs tenant-match vs generated",
+        "Starter-pack completeness checks now top up missing categories, products, and sales promotions from selling-based fallbacks to prevent partial onboarding payloads",
+        "Landlord tenants table enhancements: added Phone column, added Onboarding completion percentage column with progress bar, and included onboarding progress data for each tenant",
+        "Landlord tenant details now include an Onboarding Journey card showing overall completion plus completed and incomplete setup steps",
+        "Landlord tenants table actions simplified by removing Delete action from table rows and removing the Custom Domain column",
+        "Getting Started checklist redesigned to a 7-step flow: Add first product, Preview store, Share store, Get order alerts via SMS, Set payments, Configure shipping, Add logo",
+        "Getting Started now includes a new 'Preview your store' step that opens storefront in a new tab and tracks completion",
+        "Getting Started copy improvements: contact-phone step rewritten to SMS-alert messaging and inline help added under first product step ('Takes 2 minutes')",
+        "Storefront image reliability improvements: added neutral placeholder assets for products/categories/sales and fallback helpers to avoid unrelated random images",
+        "Image delivery hardening: added conditional unoptimized handling for Supabase public storage URLs to avoid Next.js image optimizer timeouts, plus expanded allowed image domains",
+        "AI-driven theming improvements: tenant registration now prioritizes starter-pack themeConfig colors (AI or cached-by-selling) over local business-type color defaults",
+        "Starter-pack generation now retries theme-only color generation when Gemini returns default-like palette values, reducing generic green/orange carryover for new niches"
+      ],
+      "bugfixes": [
+        "Fixed missing/invalid storefront images by adding stable placeholders and bypassing optimization for slow upstream Supabase image responses",
+        "Fixed LCP image warnings by prioritizing first meaningful product/category/banner images in storefront listing and homepage contexts",
+        "Fixed TypeScript narrowing issues in starter-pack image repair route for Prisma JsonValue handling",
+        "Fixed sales URL breakage when slug contains special characters by enforcing slug sanitization on sale create/update APIs and auto-cleaning slug input in sale form",
+        "Fixed occasional malformed starter-pack theme behavior by validating useful theme variation against defaults before caching/applying generated colors"
+      ]
+    },
+    {
+      "version": "0.1.8",
+      "date": "2026-03-06",
+      "features": [
+        "Mobile dashboard shell: expanded immersive mobile behavior to Products and Settings pages so mobile uses bottom navigation without the global top header",
+        "Products page (tenant dashboard): implemented dedicated mobile-first UI with gradient header, add-product CTA, summary KPI cards, mobile filters, and product action cards",
+        "Order detail page (tenant dashboard): improved mobile responsiveness with stacked actions, card spacing updates, mobile-safe bottom padding, and theme-consistent status styling",
+        "Analytics page (mobile): replaced header quick-range button with timeframe dropdown, added Today timeframe, and set Today as the default mobile analytics range",
+        "Customer account: added Notifications section with delivery quote updates (quoted/approved/rejected) and direct order actions",
+        "Customer account UX: surfaced delivery quote alerts beyond orders list by adding badges to storefront Account entry, account sidebar, and dashboard action-required callouts",
+        "Delivery quote emails: updated customer CTA to account requiring-action view and improved subtotal/total calculation to prevent quote double-counting",
+        "Checkout flow: for out-of-zone delivery orders that require quoted delivery fee, customers can now place orders without immediate payment and pay after quote approval"
+      ],
+      "bugfixes": [
+        "Fixed tenant delivery quote approval/rejection email links to open direct dashboard order detail URLs",
+        "Fixed checkout payment verification gating so M-Pesa transaction ID is only required when immediate payment is actually needed",
+        "Fixed mobile settings/header overlap by ensuring settings route follows the same bottom-navigation-only mobile shell pattern"
+      ]
+    },
+    {
+      "version": "0.1.7",
+      "date": "2026-02-16",
+      "features": [
+        "Page editor: replaced tab-based section navigation with split-panel layout (section list on left, editor on right) for better workflow",
+        "Page editor: added drag-and-drop section reordering using @dnd-kit with keyboard accessibility support",
+        "Page editor: grouped section picker with search filter organized into Hero & Headers, Products, Content, Social Proof, Conversion, and Other categories",
+        "Page editor: section list now shows summaries (e.g. product count, title preview, feature count) for quick overview",
+        "Page editor: added hide/show toggle per section with hidden badge indicator; hidden sections are excluded from preview and storefront",
+        "Page editor: added duplicate section functionality for quick content replication",
+        "Page editor: quick-add buttons between sections for inserting new sections at specific positions",
+        "Page editor: contextual empty states with helpful guidance for new users",
+        "Page editor: sticky bottom action bar with Preview, Save draft, and Publish buttons always visible",
+        "Page editor: unsaved changes warning with browser beforeunload prompt and 'Unsaved changes' indicator",
+        "Page editor: simplified 'Header Image Type' to 'Header Style' with clearer radio labels (Banner image / Hero section)",
+        "Page editor: renamed 'Rich Text Editor' tab to 'Simple Editor' with descriptive subtitles for each content mode",
+        "Page editor: slug field now shows full URL preview and has a Regenerate button to create slug from title",
+        "Hero section editor: reorganized ~19 flat fields into 4 collapsible groups (Content, Image & Background, Call to Action, Advanced Styling)",
+        "Hero section editor: moved font sizes and color pickers into collapsed Advanced Styling group to reduce initial complexity by ~60%",
+        "Hero section editor: color pickers now default to theme colors (primary, buttonBackground, buttonText) instead of hardcoded black",
+        "Hero section editor: replaced Background Type dropdown with clearer radio buttons (None / Color / Image) with conditional field display",
+        "Hero section editor: renamed 'Normal Image' to 'Foreground Image' with clearer description",
+        "All section editors: applied consistent 'Advanced Styling' collapsed accordion pattern for color pickers across Categories, Features, Products, Testimonials, Text, Blogs, Location, ProductTabs, Form, SalesTab, CTA, and Banners editors",
+        "Banners section: per-banner color pickers (Title, Subtitle, CTA Text, CTA Button, Background) now grouped in collapsible 'Banner Styling' sub-section within each banner card; improved subtitle placeholder to 'e.g. Limited time offer'"
+      ],
+      "bugfixes": []
+    },
+    {
+      "version": "0.1.6",
+      "date": "2026-02-16",
+      "features": [
+        "Landlord dashboard tenant settings: added Store Details and Tenant Details tabs for better organization",
+        "Landlord dashboard tenant settings: added Country and Contact Email fields to Tenant Details tab",
+        "Landlord dashboard: country field affects pricing and payment options (e.g. Kenya for M-Pesa, KES)",
+        "Updated beauty business type theme colors to stronger pink/purple palette (inspired by Sephora, Ulta)",
+        "Aligned all business type theme colors with industry standards: Fashion (black/white), Electronics (Amazon blue/orange), Pets (Petco/Chewy blue), Hardware (Home Depot orange), Shoes (Nike black/orange), and others",
+        "Added explicit background color to business type color schemes for consistency across themes"
+      ],
+      "bugfixes": []
+    },
+    {
+      "version": "0.1.5",
+      "date": "2026-02-06",
+      "features": [
+        "Enhanced home page with 'Why E-commerce' section explaining platform benefits and comparison with building custom websites",
+        "Updated 'How It Works' section to start with 14-day free trial period and repositioned subscription purchase as 'Renew Subscription' final step",
+        "Expanded FAQs from 4 to 16 entries covering system features, manual payment verification, and custom domain status",
+        "Updated Terms of Service with comprehensive inactive store termination section detailing tenant lifecycle statuses and email notifications",
+        "Redesigned footer with blue gradient theme colors, improved contrast for icons and links, and enhanced hover states",
+        "Enhanced marketing navigation with Resources dropdown (Knowledge Center link) and integrated theme colors throughout",
+        "Redesigned public user guide page (/help) with left sidebar navigation, search functionality, and modern three-column layout inspired by Medusa",
+        "Migrated user guide content from hardcoded data to database-driven system with user_guide_categories and user_guide_articles tables",
+        "Created comprehensive admin interface in landlord dashboard for managing user guide categories and articles (CRUD operations)",
+        "Implemented API endpoints for user guide management (admin routes) and public content retrieval",
+        "Added seed script for populating initial user guide data with proper database connection handling",
+        "Removed /dashboard/help route, keeping only public /help page for unified user guide experience"
+      ],
+      "bugfixes": [
+        "Fixed Vercel deployment errors caused by unescaped apostrophes in JSX (replaced with &apos; in Terms of Service and Why E-commerce components)",
+        "Fixed list rendering issue in user guide content where items were creating separate lists instead of grouping consecutive items",
+        "Fixed database connection issues in seed script by adding proper environment variable loading and Prisma adapter initialization",
+        "Fixed TypeScript build errors by creating missing Switch UI component (src/components/ui/switch.tsx)",
+        "Fixed TypeScript type errors by adding explicit boolean type annotations to Switch onCheckedChange handlers in admin forms",
+        "Fixed JSX namespace error in user guide content component by changing JSX.Element[] to React.ReactElement[]",
+        "Fixed seed script database connection handling for Prisma Accelerate URLs and IPv4 compatibility with Session Pooler connections"
+      ]
+    },
+    {
+      "version": "0.1.4",
+      "date": "2026-01-30",
+      "features": [
+        "Subscription activation email now shows correct duration (12 months for yearly, 1 month for monthly) and actual amount paid with correct currency (KSh or $) from the payment",
+        "Billing history on Subscription & Billing page now shows all completed payments from payment_logs with actual amount and currency per entry",
+        "Page edit (Split Layout): when Banner is selected on left or right, Text Alignment and Vertical Alignment are hidden; Image Position option removed; banner uses standardized dimensions (1080×1080 or 1080×1350) without cropping and fits a 4:5 aspect-ratio container",
+        "Sales page: Shop Now button uses full page navigation so it reliably directs to the individual sale page; removed redundant 'Open sale page' link from sale cards"
+      ],
+      "bugfixes": [
+        "Fixed Sales page 'Shop Now' not directing to individual sale page (client-side navigation could fail to update; now uses native anchor for reliable full page navigation)",
+        "Fixed subscription activation email showing 'Duration: 1 month' and wrong price/currency when user paid for yearly subscription (email now uses actual payment amount, currency, and purchased interval)",
+        "Fixed Subscription & Billing page showing only one billing entry instead of full payment history (API now returns all completed payment_logs for the tenant)"
+      ]
+    },
+    {
+      "version": "0.1.3",
+      "date": "2025-01-22",
+      "features": [
+        "Implemented comprehensive Advanced Analytics suite for Pro and Premium plans",
+        "Added Conversion Funnel analytics tracking visitors → add to cart → checkout → orders with abandonment rates",
+        "Added Geographic Analytics showing sales breakdown by country, state/region, and city",
+        "Added Product Performance Deep Dive with actual page views, conversion rates, and performance trends",
+        "Added Refunds & Returns Analytics with refund rates, trends, and net revenue calculations",
+        "Added Real-Time Analytics with live visitor count, hourly orders, and recent activity feed",
+        "Added Period Comparison analytics comparing metrics between two time periods with growth percentages",
+        "Implemented comprehensive analytics tracking system with session, page view, and event tracking",
+        "Added automatic page view tracking for all storefront pages via AnalyticsProvider component",
+        "Added automatic event tracking for add to cart, checkout start, checkout complete, and checkout failed events",
+        "Added Traffic Sources Analytics tracking UTM parameters, referrers, and revenue attribution",
+        "Implemented session tracking with 30-minute expiry, UTM parameter capture, and device/browser detection",
+        "Added Scheduled Reports functionality with daily, weekly, and monthly email delivery (CSV/PDF formats)",
+        "Implemented real-time analytics polling that auto-refreshes every 30 seconds when Advanced tab is active",
+        "Added plan-based feature gating for advanced analytics (Basic plan shows upgrade banner, Pro/Premium get full access)",
+        "Enhanced analytics dashboard with dynamic theme color support replacing hardcoded colors",
+        "Added Traffic Sources card in Advanced Analytics showing top sources, campaigns, and revenue",
+        "Added Scheduled Reports Manager UI component for creating and managing automated reports",
+        "Created analytics tracking database schema with analytics_sessions, analytics_page_views, and analytics_events tables",
+        "Added cron job for automated scheduled report delivery (runs daily at 9 AM UTC)"
+      ],
+      "bugfixes": [
+        "Fixed product performance API async/await issue by refactoring to fetch all page views in single query",
+        "Fixed TypeScript errors in analytics routes by properly handling tenant data type casting",
+        "Fixed conversion funnel to use actual tracked data from analytics tables with fallback to estimates",
+        "Fixed product performance to use real page views from analytics_page_views table instead of estimates"
+      ]
+    },
+    {
+      "version": "0.1.2",
+      "date": "2025-01-20",
+      "features": [
+        "Fixed delivery quote email sending to properly await and send notifications to customers",
+        "Added notification badge to Account button in storefront header showing pending delivery quotes count",
+        "Implemented tabs in customer orders list: 'All Orders' and 'Requiring Action' for better order management",
+        "Enhanced order detail page with prominent delivery quote action UI (approve/reject buttons) when quote is sent",
+        "Added 'Action Required' badge on orders with pending delivery quotes in orders list",
+        "Improved notification polling in header (updates every 30 seconds) for real-time delivery quote alerts"
+      ],
+      "bugfixes": [
+        "Fixed Vercel deployment errors by adding 'force-dynamic' export to pages using headers/cookies",
+        "Fixed ESLint configuration format for better compatibility",
+        "Fixed notification count fetching logic in header component",
+        "Fixed orders page query to properly fetch delivery_fee_status for filtering"
+      ]
+    },
+    {
+      "version": "0.1.1",
+      "date": "2025-01-20",
+      "features": [
+        "Added welcome email with store details for new tenant users (includes store name, URL, dashboard link, and user role)",
+        "Enhanced user registration with tenant-specific email confirmation redirect URLs",
+        "Updated payment method settings to support Cash Before Delivery and Cash After Delivery options",
+        "Implemented pagination for cron job execution logs (10 items per page)",
+        "Added version information display in dashboard settings with changelog",
+        "Enhanced delivery fee quote workflow with customer approval/rejection functionality",
+        "Improved order management with delivery zone and fee information display",
+        "Added delivery method selection in checkout (delivery vs store pickup)",
+        "Enhanced order detail pages to show delivery zone information and pending quotes"
+      ],
+      "bugfixes": [
+        "Fixed React Hook error in 2FA settings component (useEffect called conditionally)",
+        "Fixed TypeScript errors in sendUserWelcomeEmail function signature",
+        "Fixed Vercel deployment issues by removing unsupported healthCheck configuration",
+        "Fixed dotenv dependency issue for Vercel builds by moving to dependencies",
+        "Fixed email confirmation redirect to point to tenant dashboard instead of marketing page",
+        "Fixed cron job authentication to use consistent token for manual and automatic runs"
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "date": "2024-01-01",
+      "features": [
+        "Initial release of DukaNest platform"
+      ],
+      "bugfixes": []
+    }
+  ]
+}

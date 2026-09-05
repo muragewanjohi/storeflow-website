@@ -12,6 +12,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
+import { shouldBypassMfaForReviewer } from '@/lib/auth/reviewer-mfa-bypass';
+import {
+  getOtpEmailDeliveryFailureMessage,
+  getOtpEmailSendingLimitMessage,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+  OTP_SENDGRID_CREDITS_ERROR_CODE,
+} from '@/lib/mfa/otp-delivery-user-message';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -23,13 +31,29 @@ const loginSchema = z.object({
   trustDevice: z.boolean().optional().default(false),
 });
 
+function setTenantSubdomainCookie(response: NextResponse, subdomain?: string | null): void {
+  if (!subdomain) return;
+
+  response.cookies.set('tenant-subdomain', subdomain.toLowerCase(), {
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  console.log('[Login API] Request received', {
+  
+  // Log immediately with clear markers for Vercel logs
+  console.log('========================================');
+  console.log('[LOGIN API] POST /api/auth/tenant/login');
+  console.log('[LOGIN API] Request received', {
     url: request.url,
     method: request.method,
     timestamp: new Date().toISOString(),
   });
+  console.log('========================================');
 
   try {
     console.log('[Login API] Step 1: Parsing request body');
@@ -43,9 +67,27 @@ export async function POST(request: NextRequest) {
     console.log('[Login API] Input validated', { email, hasDeviceFingerprint: !!deviceFingerprint });
     
     // Get client IP address
-    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                     request.headers.get('x-real-ip') ||
-                     null;
+    const ipAddress = getClientIp(request);
+
+    const loginIpLimit = await checkRateLimit(`ratelimit:auth:login:ip:${ipAddress}`, 20, 60);
+    if (!loginIpLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(loginIpLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const loginEmailLimit = await checkRateLimit(
+      `ratelimit:auth:login:email:${email.toLowerCase()}`,
+      8,
+      60
+    );
+    if (!loginEmailLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts for this account. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(loginEmailLimit.retryAfterSeconds) } }
+      );
+    }
 
     // Get tenant from middleware
     console.log('[Login API] Step 3: Getting tenant from context');
@@ -225,33 +267,29 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      setTenantSubdomainCookie(response, tenant.subdomain);
       // Set auth cookies (Supabase handles this automatically via middleware)
       return response;
     }
 
-    // TEMPORARY: Check if 2FA bypass is enabled (development/testing only)
-    // ⚠️ WARNING: Only use this while waiting for email service setup
-    // Remove this flag once SendGrid is properly configured
-    const bypassMFA = process.env.DISABLE_MFA_TEMPORARILY === 'true' && 
-                      (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test');
-    
+    const bypassMFA = shouldBypassMfaForReviewer(authData.user.email);
     if (bypassMFA) {
-      console.warn('[Login API] ⚠️ 2FA BYPASS ENABLED - This should only be used temporarily while email service is unavailable');
-      console.warn('[Login API] Set DISABLE_MFA_TEMPORARILY=false and remove this flag once SendGrid is configured');
-      
+      console.warn('[Login API] Reviewer MFA bypass applied for Play Store review account');
+
       // Complete login without 2FA
       const response = NextResponse.json({
         success: true,
         requiresMFA: false,
-        message: 'Login successful (2FA temporarily disabled)',
-        warning: '2FA is currently bypassed. Re-enable it once email service is configured.',
+        message: 'Login successful',
+        warning: 'Reviewer MFA bypass is currently active for this account.',
         user: {
           id: authData.user.id,
           email: authData.user.email,
         },
       });
       
-      console.log('[Login API] Login completed with 2FA bypass (temporary flag enabled)');
+      setTenantSubdomainCookie(response, tenant.subdomain);
+      console.log('[Login API] Login completed with reviewer MFA bypass');
       return response;
     }
 
@@ -316,6 +354,7 @@ export async function POST(request: NextRequest) {
         },
         message: `A 6-digit code has been sent to ${authData.user.email}. Please check your inbox and enter the code to complete login.`,
       });
+      setTenantSubdomainCookie(response, tenant.subdomain);
       console.log('[Login API] Login flow completed successfully', {
         duration: Date.now() - startTime,
         userId: authData.user.id,
@@ -352,6 +391,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        setTenantSubdomainCookie(response, tenant.subdomain);
         console.log('[Login API] Login completed with 2FA bypass due to SendGrid credits');
         return response;
       }
@@ -359,15 +399,12 @@ export async function POST(request: NextRequest) {
       // For production or other errors, require proper 2FA
       await supabase.auth.signOut();
 
-      // Provide more specific error message
-      let errorMessage = 'Unable to send verification code. Please try again.';
-      let errorCode = 'EMAIL_SERVICE_ERROR';
+      let errorMessage = getOtpEmailDeliveryFailureMessage();
+      let errorCode = OTP_EMAIL_SERVICE_ERROR_CODE;
 
       if (isSendGridCreditError) {
-        errorMessage = 'Email service temporarily unavailable due to sending limits exceeded. Please contact support or try again later.';
-        errorCode = 'SENDGRID_CREDITS_EXCEEDED';
-      } else if (isDevelopment && otpError.message) {
-        errorMessage = `Unable to send verification code: ${otpError.message}`;
+        errorMessage = getOtpEmailSendingLimitMessage();
+        errorCode = OTP_SENDGRID_CREDITS_ERROR_CODE;
       }
 
       return NextResponse.json(

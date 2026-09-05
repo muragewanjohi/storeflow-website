@@ -4,7 +4,7 @@
  * Handles retrieving and formatting subscription prices with currency
  */
 
-import { getLocalizedPrice } from '@/lib/pricing/location';
+import { resolvePlanMonthlyPrice } from '@/lib/pricing/location';
 
 export interface SubscriptionPricing {
   price: number;
@@ -26,6 +26,7 @@ export function getTenantSubscriptionPricing(
   plan: {
     name: string;
     price: any; // Prisma Decimal
+    price_kes?: any;
   } | null,
   isKenya: boolean = false
 ): SubscriptionPricing | null {
@@ -44,8 +45,10 @@ export function getTenantSubscriptionPricing(
     };
   }
 
-  // Fallback: Calculate based on plan name and location
-  const localizedPrice = getLocalizedPrice(plan.name, isKenya);
+  const localizedPrice = resolvePlanMonthlyPrice(
+    { price: plan.price, price_kes: plan.price_kes },
+    isKenya,
+  );
   return {
     price: localizedPrice,
     currency: isKenya ? 'KES' : 'USD',

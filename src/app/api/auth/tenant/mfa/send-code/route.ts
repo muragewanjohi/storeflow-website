@@ -10,7 +10,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { generateAndSendOTP } from '@/lib/mfa/email-otp';
+import {
+  getOtpEmailDeliveryFailureMessage,
+  OTP_EMAIL_SERVICE_ERROR_CODE,
+} from '@/lib/mfa/otp-delivery-user-message';
 import { z } from 'zod';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 
 const sendCodeSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -23,9 +28,37 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = sendCodeSchema.parse(body);
     const { email, userId } = validatedData;
+    const clientIp = getClientIp(request);
 
-    // Generate and send OTP
-    await generateAndSendOTP(userId, email, tenant.name);
+    const ipLimit = await checkRateLimit(`ratelimit:auth:mfa-send:ip:${clientIp}`, 10, 60);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many OTP requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
+    }
+
+    const userLimit = await checkRateLimit(`ratelimit:auth:mfa-send:user:${userId}`, 3, 300);
+    if (!userLimit.allowed) {
+      return NextResponse.json(
+        { error: 'OTP resend limit reached. Please wait before requesting another code.' },
+        { status: 429, headers: { 'Retry-After': String(userLimit.retryAfterSeconds) } }
+      );
+    }
+
+    try {
+      await generateAndSendOTP(userId, email, tenant.name);
+    } catch (sendErr) {
+      console.error('Send OTP error:', sendErr);
+      return NextResponse.json(
+        {
+          error: 'Failed to send code',
+          message: getOtpEmailDeliveryFailureMessage(),
+          code: OTP_EMAIL_SERVICE_ERROR_CODE,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -46,11 +79,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('Send OTP error:', error);
+    console.error('Send OTP route error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to send code',
-        message: error.message || 'An unexpected error occurred'
+        message: 'Something went wrong. Please try again.',
       },
       { status: 500 }
     );

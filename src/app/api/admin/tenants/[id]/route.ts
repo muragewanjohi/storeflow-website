@@ -17,6 +17,8 @@ const updateTenantSchema = z.object({
   status: z.enum(['active', 'suspended', 'expired']).optional(),
   plan_id: z.string().uuid().nullable().optional(),
   expire_date: z.string().nullable().optional(),
+  country: z.string().max(2).nullable().optional(),
+  contact_email: z.union([z.string().email(), z.literal('')]).nullable().optional(),
 });
 
 interface RouteParams {
@@ -158,6 +160,14 @@ export async function PUT(
         ? new Date(validatedData.expire_date) 
         : null;
     }
+    
+    if (validatedData.country !== undefined) {
+      updateData.country = validatedData.country || null;
+    }
+    
+    if (validatedData.contact_email !== undefined) {
+      updateData.contact_email = validatedData.contact_email === '' ? null : validatedData.contact_email;
+    }
 
     // Update tenant
     const updatedTenant = await prisma.tenants.update({
@@ -250,7 +260,8 @@ export async function DELETE(
     // Remove subdomain from Vercel (non-blocking)
     const projectId = process.env.VERCEL_PROJECT_ID;
     if (projectId && tenant.subdomain) {
-      const subdomainUrl = `${tenant.subdomain}.dukanest.com`;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
+      const subdomainUrl = `${tenant.subdomain}.${baseDomain}`;
       removeTenantDomain(subdomainUrl, projectId).catch((error) => {
         // Log error but don't fail tenant deletion
         console.error(`Failed to remove subdomain ${subdomainUrl} from Vercel:`, error);

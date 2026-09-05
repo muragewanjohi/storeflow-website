@@ -1,6 +1,6 @@
-# StoreFlow Technical Documentation
+# DukaNest Technical Documentation
 
-**Complete technical documentation for the StoreFlow multi-tenant ecommerce platform**
+**Complete technical documentation for the DukaNest multi-tenant ecommerce platform**
 
 ---
 
@@ -13,6 +13,7 @@
 
 ### 🔌 **API & Integration**
 - **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** - Complete API reference and endpoints
+- **[TUMIZI_MOBILE_AND_SETTINGS.md](./tumizi/TUMIZI_MOBILE_AND_SETTINGS.md)** - Tumizi: mobile app parity with web settings, checkout readiness, and API routes
 
 ### 🚀 **Deployment & Operations**
 - **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Production deployment and hosting
@@ -20,13 +21,15 @@
 
 ### 👥 **Administration**
 - **[ADMIN_DOCUMENTATION.md](./ADMIN_DOCUMENTATION.md)** - Admin panel usage and management
+- **[TENANT_GUIDE.md](./TENANT_GUIDE.md)** - Tenant-facing guide: dashboard features and storefront (share with store owners)
+- **[CANVA_BRANDING_GUIDE.md](./CANVA_BRANDING_GUIDE.md)** - Brand details for Canva (name, colors, fonts, logo, tagline)
 
 ---
 
 ## 📁 **Project Structure**
 
 ```
-storeflow/
+dukanest/
 ├── docs/                          # 📚 Technical documentation
 │   ├── README.md                  # This index
 │   ├── ARCHITECTURE.md            # System architecture
@@ -86,7 +89,7 @@ storeflow/
 
 ---
 
-**🚀 Ready to work with StoreFlow? Start with the [Development Setup](../DEVELOPMENT.md) or explore the [System Architecture](./ARCHITECTURE.md).**
+**🚀 Ready to work with DukaNest? Start with the [Development Setup](../DEVELOPMENT.md) or explore the [System Architecture](./ARCHITECTURE.md).**
 
 **Last Updated:** January 2026
 

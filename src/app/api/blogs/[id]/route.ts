@@ -103,12 +103,14 @@ export async function PUT(
       );
     }
 
-    // Generate slug if title is being updated and slug is not provided
-    let slug = validatedData.slug;
-    if (validatedData.title && !validatedData.slug) {
+    const { slug: parsedSlug, ...blogFields } = validatedData;
+
+    let slug = parsedSlug;
+    if (validatedData.title && parsedSlug === undefined) {
       slug = generateSlug(validatedData.title);
-      
-      // Check if new slug conflicts with another blog
+    }
+
+    if (slug !== undefined) {
       const slugConflict = await prisma.blogs.findFirst({
         where: {
           tenant_id: tenant.id,
@@ -125,12 +127,12 @@ export async function PUT(
       }
     }
 
-    // Update blog
+    // Update blog (do not spread parsed slug; it is applied explicitly when set)
     const blog = await prisma.blogs.update({
       where: { id },
       data: {
-        ...validatedData,
-        ...(slug && { slug }),
+        ...blogFields,
+        ...(slug !== undefined ? { slug } : {}),
         updated_at: new Date(),
       },
       include: {

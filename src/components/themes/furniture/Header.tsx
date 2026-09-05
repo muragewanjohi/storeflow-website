@@ -75,7 +75,7 @@ export default function FurnitureHeader() {
           <Link href="/" className="flex items-center gap-2">
             <div className="w-[50px] h-[32px] flex items-center justify-center">
               <svg width="50" height="32" viewBox="0 0 50 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M25 0L50 32H0L25 0Z" fill="#B88E2F"/>
+                <path d="M25 0L50 32H0L25 0Z" fill="var(--color-primary)"/>
               </svg>
             </div>
             <span className="text-[34px] font-bold text-black" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -96,7 +96,7 @@ export default function FurnitureHeader() {
                       onNavigate(item.href);
                     }}
                     className={`text-[16px] font-medium transition-colors ${
-                      isActive ? 'text-black' : 'text-black hover:text-[#B88E2F]'
+                      isActive ? 'text-black' : 'text-black hover:text-[var(--color-primary)]'
                     }`}
                     style={{ fontFamily: 'Poppins, sans-serif' }}
                   >
@@ -109,7 +109,7 @@ export default function FurnitureHeader() {
                   key={item.name}
                   href={item.href}
                   className={`text-[16px] font-medium transition-colors ${
-                    isActive ? 'text-black' : 'text-black hover:text-[#B88E2F]'
+                    isActive ? 'text-black' : 'text-black hover:text-[var(--color-primary)]'
                   }`}
                   style={{ fontFamily: 'Poppins, sans-serif' }}
                 >
@@ -147,7 +147,7 @@ export default function FurnitureHeader() {
             >
               <ShoppingCartIcon className="w-6 h-6 text-black" />
               {cartItemCount > 0 && (
-                <span className="absolute top-0 right-0 bg-[#B88E2F] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute top-0 right-0 bg-[var(--color-primary)] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}

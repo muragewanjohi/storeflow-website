@@ -8,17 +8,24 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeftIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeftIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PhotoIcon } from '@heroicons/react/24/solid';
 import { generateVariantName } from '@/lib/products/variant-helpers';
 import ProductSalesSection from './product-sales-section';
+import RichTextEditor from '@/components/content/rich-text-editor';
+import ContextualHelp from '@/components/dashboard/contextual-help';
+import { compressImageForMobile, uploadImageWithProgress } from '@/lib/media/mobile-image-upload';
+import { defaultRequiresShippingForBusinessType } from '@/lib/categories/business-type-taxonomy';
 
 interface Product {
   id: string;
@@ -28,11 +35,19 @@ interface Product {
   description?: string | null;
   short_description?: string | null;
   price: number;
+  cost_price?: number | null;
   sale_price?: number | null;
-  stock_quantity: number;
+  stock_quantity: number | null;
   status: 'active' | 'inactive' | 'draft' | 'archived';
   image?: string | null;
   category_id?: string | null;
+  estimated_delivery_days?: number | null;
+  deposit_type?: 'none' | 'fixed' | 'percentage' | null;
+  deposit_value?: number | null;
+  requires_shipping?: boolean | null;
+  is_bookable?: boolean | null;
+  booking_duration_minutes?: number | null;
+  booking_capacity?: number | null;
 }
 
 interface Category {
@@ -58,6 +73,7 @@ interface Variant {
   id: string;
   sku: string | null;
   price: number | null;
+  cost_price?: number | null;
   stock_quantity: number;
   image: string | null;
   variant_attributes?: Array<{
@@ -81,15 +97,22 @@ interface ProductFormClientProps {
   product?: Product;
   variants?: Variant[];
   categories: Category[];
+  /** Tenant's registered business type (register/page.tsx) — used only to
+   * pre-set the "physical product" toggle sensibly for a NEW product; an
+   * existing product's own stored value always wins. */
+  businessType?: string | null;
 }
 
 export default function ProductFormClient({
   product,
   variants: initialVariants = [],
   categories,
+  businessType,
 }: Readonly<ProductFormClientProps>) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!product;
 
   // Determine initial parent category and subcategory
@@ -146,7 +169,8 @@ export default function ProductFormClient({
         })
         .catch(err => console.error('Error fetching category:', err));
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.category_id]); // Only run when category_id changes, fetchSubcategories is stable
 
 
   const [formData, setFormData] = useState({
@@ -155,11 +179,28 @@ export default function ProductFormClient({
     short_description: product?.short_description || '',
     description: product?.description || '',
     price: product?.price?.toString() || '',
+    cost_price: product?.cost_price?.toString() || '',
     sale_price: product?.sale_price?.toString() || '',
     stock_quantity: product?.stock_quantity?.toString() || '0',
     status: product?.status || ('draft' as 'active' | 'inactive' | 'draft' | 'archived'),
     category_id: product?.category_id || 'none',
     image: product?.image || '',
+    estimated_delivery_days: product?.estimated_delivery_days?.toString() || '',
+    deposit_type: product?.deposit_type || ('none' as 'none' | 'fixed' | 'percentage'),
+    deposit_value: product?.deposit_value?.toString() || '',
+    // User-requested connection: for a NEW product, start from the
+    // tenant's registered business type (false only for the 10
+    // service-only business types) instead of always defaulting to true —
+    // still just a starting point, the toggle below remains fully
+    // editable. Editing an existing product always keeps its own stored
+    // value regardless of business type.
+    requires_shipping: product
+      ? product.requires_shipping !== false
+      : defaultRequiresShippingForBusinessType(businessType),
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    is_bookable: product?.is_bookable === true,
+    booking_duration_minutes: product?.booking_duration_minutes?.toString() || '',
+    booking_capacity: product?.booking_capacity?.toString() || '1',
   });
 
   // Initialize variants from props if editing, or empty array if creating
@@ -167,6 +208,7 @@ export default function ProductFormClient({
     id?: string;
     sku: string;
     price: string;
+    cost_price: string;
     stock_quantity: string;
     image: string;
     attributes: Array<{ attribute_id: string; attribute_value_id: string }>;
@@ -177,6 +219,7 @@ export default function ProductFormClient({
         id: variant.id,
         sku: variant.sku || '',
         price: variant.price?.toString() || '',
+        cost_price: variant.cost_price?.toString() || '',
         stock_quantity: variant.stock_quantity.toString(),
         image: variant.image || '',
         attributes: variant.variant_attributes?.map((attr: any) => ({
@@ -194,10 +237,25 @@ export default function ProductFormClient({
 
   const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadContext, setUploadContext] = useState<string>('image');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<string[]>([]);
+
+  // AI Phase 5 — Product Photo QA. Purely advisory (never auto-applied);
+  // reset whenever the image changes so stale feedback for a removed/
+  // replaced photo never lingers on screen.
+  const [photoQaResult, setPhotoQaResult] = useState<{
+    qualityScore: 'good' | 'needs_improvement' | 'poor';
+    issues: string[];
+    reshootSuggestions: string[];
+    suggestedAltText: string;
+    suggestedSeoDescription: string;
+  } | null>(null);
+  const [photoQaLoading, setPhotoQaLoading] = useState(false);
+  const [photoQaError, setPhotoQaError] = useState<string | null>(null);
 
   // Fetch attributes on component mount
   useEffect(() => {
@@ -245,29 +303,61 @@ export default function ProductFormClient({
 
     // Upload image
     setIsUploading(true);
+    setUploadContext('main image');
+    setUploadProgress(0);
     setError(null);
+    setPhotoQaResult(null);
+    setPhotoQaError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/products/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to upload image');
-      }
-
-      const data = await response.json();
+      const compressedFile = await compressImageForMobile(file);
+      const data = await uploadImageWithProgress(
+        '/api/products/upload',
+        compressedFile,
+        (percent) => setUploadProgress(percent),
+      );
       setFormData((prev) => ({ ...prev, image: data.url }));
     } catch (err: any) {
       setError(err.message || 'Failed to upload image');
       setImagePreview(null);
     } finally {
+      setUploadProgress(0);
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  };
+
+  // AI Phase 5 — advisory only. Never writes to formData itself; the
+  // merchant explicitly chooses to use a suggestion via its own button.
+  const handleCheckPhotoQuality = async () => {
+    if (!formData.image) return;
+    setPhotoQaLoading(true);
+    setPhotoQaError(null);
+    setPhotoQaResult(null);
+    try {
+      const res = await fetch('/api/products/photo-qa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: formData.image,
+          productName: formData.name.trim() || undefined,
+          // Always 'monthly' — this manual form has no reliable signal for
+          // "this is part of initial onboarding" vs. routine ongoing
+          // product creation months later; 'setup' is reserved for the
+          // Store Starter Pack's own dedicated bulk-onboarding code path.
+          bucket: 'monthly',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Photo QA is temporarily unavailable.');
+      }
+      setPhotoQaResult(data);
+    } catch (err: any) {
+      setPhotoQaError(err.message || 'Photo QA is temporarily unavailable.');
+    } finally {
+      setPhotoQaLoading(false);
     }
   };
 
@@ -297,8 +387,38 @@ export default function ProductFormClient({
       }
     }
 
-    // Only validate product-level stock if no variants exist
-    if (variants.length === 0) {
+    if (formData.cost_price) {
+      const costPrice = parseFloat(formData.cost_price);
+      if (isNaN(costPrice) || costPrice < 0) {
+        errors.cost_price = 'Cost price must be zero or a positive number';
+      }
+    }
+
+    // Basic deposit support (docs/SERVICES_PLAN.md)
+    if (formData.deposit_type !== 'none') {
+      const depositValue = parseFloat(formData.deposit_value);
+      if (!formData.deposit_value.trim() || isNaN(depositValue) || depositValue <= 0) {
+        errors.deposit_value = 'Enter a deposit amount greater than zero';
+      } else if (formData.deposit_type === 'percentage' && depositValue > 100) {
+        errors.deposit_value = 'A percentage deposit cannot exceed 100';
+      }
+    }
+
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    if (formData.is_bookable) {
+      const duration = parseInt(formData.booking_duration_minutes, 10);
+      if (!formData.booking_duration_minutes.trim() || isNaN(duration) || duration <= 0) {
+        errors.booking_duration_minutes = 'Enter how many minutes a booking takes';
+      }
+      const capacity = parseInt(formData.booking_capacity, 10);
+      if (!formData.booking_capacity.trim() || isNaN(capacity) || capacity <= 0) {
+        errors.booking_capacity = 'Enter how many bookings this service can handle at once';
+      }
+    }
+
+    // Only validate product-level stock if no variants exist and this
+    // product actually ships (a service has no stock field shown at all).
+    if (variants.length === 0 && formData.requires_shipping) {
       const stockQuantity = parseInt(formData.stock_quantity, 10);
       if (isNaN(stockQuantity) || stockQuantity < 0) {
         errors.stock_quantity = 'Stock quantity must be a non-negative number';
@@ -341,10 +461,26 @@ export default function ProductFormClient({
           return;
         }
       }
+
+      // Parse cost price if provided
+      let parsedCostPrice: number | null = null;
+      if (formData.cost_price && formData.cost_price.trim()) {
+        parsedCostPrice = parseFloat(formData.cost_price);
+        if (isNaN(parsedCostPrice) || parsedCostPrice < 0) {
+          setValidationErrors({ cost_price: 'Cost price must be zero or a positive number' });
+          return;
+        }
+      }
       
-      // Validate category_id - ensure it's either null or a valid UUID
+      // Category is required — a product must always belong to a category
+      // (user-requested change: prompt for a category before the product
+      // can be saved, same discipline as requiring a name/price).
       let categoryId: string | null = null;
-      if (formData.category_id && formData.category_id !== 'none') {
+      if (!formData.category_id || formData.category_id === 'none') {
+        setValidationErrors({ category_id: 'Please select a category for this product' });
+        return;
+      }
+      {
         // Validate UUID format
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (uuidRegex.test(formData.category_id)) {
@@ -362,17 +498,43 @@ export default function ProductFormClient({
         // Send null if description is empty (not empty string)
         description: formData.description.trim() || null,
         price: parsedPrice,
-        // When variants exist, product-level stock is calculated from variants (set to 0 or sum)
-        // When no variants exist, use the product-level stock
-        stock_quantity: variants.length > 0 
-          ? totalVariantStock // Use calculated total when variants exist
-          : parseInt(formData.stock_quantity, 10) || 0, // Use product-level stock when no variants
+        // When variants exist, product-level stock is calculated from variants (set to 0 or sum).
+        // When this doesn't ship (a service), stock isn't tracked at all — null, not 0 (0 would
+        // read as "out of stock" at checkout, see docs/SERVICES_PLAN.md).
+        // Otherwise, use the product-level stock entered above.
+        stock_quantity: !formData.requires_shipping
+          ? null
+          : variants.length > 0
+            ? totalVariantStock
+            : parseInt(formData.stock_quantity, 10) || 0,
         status: formData.status,
         category_id: categoryId,
+        // Estimated delivery days (null means use tenant default)
+        estimated_delivery_days: formData.estimated_delivery_days
+          ? parseInt(formData.estimated_delivery_days, 10)
+          : null,
+        // Basic deposit support (docs/SERVICES_PLAN.md)
+        deposit_type: formData.deposit_type,
+        deposit_value: formData.deposit_type !== 'none' && formData.deposit_value.trim()
+          ? parseFloat(formData.deposit_value)
+          : null,
+        // Basic services support (docs/SERVICES_PLAN.md)
+        requires_shipping: formData.requires_shipping,
+        // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+        is_bookable: formData.is_bookable,
+        booking_duration_minutes: formData.is_bookable && formData.booking_duration_minutes.trim()
+          ? parseInt(formData.booking_duration_minutes, 10)
+          : null,
+        booking_capacity: formData.is_bookable && formData.booking_capacity.trim()
+          ? parseInt(formData.booking_capacity, 10)
+          : 1,
       };
 
       if (parsedSalePrice !== null) {
         payload.sale_price = parsedSalePrice;
+      }
+      if (parsedCostPrice !== null) {
+        payload.cost_price = parsedCostPrice;
       }
 
       if (formData.image) {
@@ -434,6 +596,7 @@ export default function ProductFormClient({
             const variantPayload: any = {
               sku: variant.sku || null,
               price: variant.price ? parseFloat(variant.price) : null,
+              cost_price: variant.cost_price ? parseFloat(variant.cost_price) : null,
               stock_quantity: parseInt(variant.stock_quantity, 10) || 0,
               image: variant.image || null,
             };
@@ -469,6 +632,7 @@ export default function ProductFormClient({
         }
       }
 
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-getting-started'] });
       router.push(`/dashboard/products/${productId}`);
     } catch (err: any) {
       setError(err.message || `Failed to ${isEditing ? 'update' : 'create'} product`);
@@ -572,8 +736,99 @@ export default function ProductFormClient({
                   )}
                 </div>
 
+                {/* Category — required, prompted up front (user-requested
+                    change: every product must belong to a category, and
+                    picking one should be one of the first things a
+                    merchant does, not a buried, skippable afterthought). */}
                 <div className="space-y-2">
-                  <Label htmlFor="sku">SKU</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="category_id">
+                      Category <span className="text-destructive">*</span>
+                    </Label>
+                    <ContextualHelp
+                      title="Category"
+                      description="Every product needs a category so customers can browse your store easily. If available, add a subcategory for better organization."
+                      learnMoreHref="/help?article=managing-categories"
+                    />
+                  </div>
+                  <Select
+                    value={parentCategoryId || 'none'}
+                    onValueChange={(value) => {
+                      setParentCategoryId(value);
+                      // When parent changes, set category_id to parent (user can select subcategory after)
+                      setFormData({ ...formData, category_id: value });
+                      // Fetch subcategories for the selected parent
+                      fetchSubcategories(value);
+                    }}
+                  >
+                    <SelectTrigger id="category_id">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category: any) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {validationErrors.category_id && (
+                    <p className="text-sm text-destructive">{validationErrors.category_id}</p>
+                  )}
+                </div>
+
+                {/* Subcategory dropdown - only show if parent category has subcategories */}
+                {parentCategoryId && parentCategoryId !== 'none' && (
+                  <>
+                    {loadingSubcategories ? (
+                      <div className="text-xs text-muted-foreground">
+                        Loading subcategories...
+                      </div>
+                    ) : subcategories.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="subcategory_id">Subcategory</Label>
+                        <Select
+                          value={
+                            formData.category_id !== parentCategoryId &&
+                            subcategories.some((sc: any) => sc.id === formData.category_id)
+                              ? formData.category_id
+                              : 'none'
+                          }
+                          onValueChange={(value) => {
+                            // Use subcategory as category_id, or parent if "none" selected
+                            const finalCategoryId = value === 'none' ? parentCategoryId : value;
+                            setFormData({ ...formData, category_id: finalCategoryId });
+                          }}
+                        >
+                          <SelectTrigger id="subcategory_id">
+                            <SelectValue placeholder="Select a subcategory (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Subcategory</SelectItem>
+                            {subcategories.map((subcategory: any) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Select a subcategory or leave as parent category
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="sku">SKU</Label>
+                    <ContextualHelp
+                      title="SKU (Stock Keeping Unit)"
+                      description="Use a unique code to quickly identify this product in your catalog and orders. If left blank, DukaNest will auto-generate one."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <Input
                     id="sku"
                     value={formData.sku}
@@ -598,25 +853,33 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Full Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => {
-                      setFormData({ ...formData, description: e.target.value });
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="description">Full Description</Label>
+                    <ContextualHelp
+                      title="Full Description"
+                      description="A detailed description helps customers trust your product and improves SEO. Include key features, sizing, materials, and usage details."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
+                  <RichTextEditor
+                    content={formData.description}
+                    onChange={(content) => {
+                      setFormData({ ...formData, description: content });
                       // Clear warnings when user starts typing
-                      if (e.target.value.trim() && warnings.length > 0) {
+                      if (content.trim() && warnings.length > 0) {
                         setWarnings([]);
                       }
                     }}
-                    placeholder="Detailed product description"
-                    rows={8}
+                    placeholder="Detailed product description. Use the toolbar to format text, add images, links, and more."
                   />
                   {!formData.description.trim() && (
                     <p className="text-xs text-amber-600 dark:text-amber-400">
                       ⚠️ Leaving the description empty may negatively affect SEO and customer understanding of your product.
                     </p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    Use the toolbar to format text, add images, links, and more
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -628,7 +891,7 @@ export default function ProductFormClient({
                 <CardDescription>Set product price and stock levels</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="price">
                       Regular Price <span className="text-destructive">*</span>
@@ -649,7 +912,37 @@ export default function ProductFormClient({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="sale_price">Sale Price</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="cost_price">Cost Price</Label>
+                      <ContextualHelp
+                        title="Cost Price (COGS)"
+                        description="Your internal unit cost for this product. Used to calculate gross and net profit in P&L reports."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <Input
+                      id="cost_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                      placeholder="0.00"
+                    />
+                    {validationErrors.cost_price && (
+                      <p className="text-sm text-destructive">{validationErrors.cost_price}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="sale_price">Sale Price</Label>
+                      <ContextualHelp
+                        title="Sale Price"
+                        description="Optional discounted price shown to customers. It must be lower than the regular price."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
                     <Input
                       id="sale_price"
                       type="number"
@@ -666,41 +959,190 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="stock_quantity">
-                    Stock Quantity
-                    {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
-                  </Label>
-                  <Input
-                    id="stock_quantity"
-                    type="number"
-                    min="0"
-                    value={hasVariants ? totalVariantStock.toString() : formData.stock_quantity}
-                    onChange={(e) => {
-                      if (!hasVariants) {
-                        setFormData({ ...formData, stock_quantity: e.target.value });
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="deposit_type">Deposit</Label>
+                    <ContextualHelp
+                      title="Deposit"
+                      description="Charge only part of the price now and collect the rest later — useful for services like a booking or a made-to-order item. Leave as 'No deposit' to charge the full price at checkout, as before."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select
+                      value={formData.deposit_type}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, deposit_type: value as 'none' | 'fixed' | 'percentage' })
                       }
-                    }}
-                    placeholder="0"
-                    disabled={hasVariants}
-                    className={hasVariants ? 'bg-muted cursor-not-allowed' : ''}
-                  />
-                  {validationErrors.stock_quantity && (
-                    <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
-                  )}
-                  {hasVariants ? (
-                    <p className="text-xs text-muted-foreground">
-                      Total stock: {totalVariantStock} units (sum of all variant stocks).
-                      <span className="block mt-1 text-blue-600">
-                        When variants exist, only variant stock quantities are used for inventory tracking. 
-                        Edit stock in the Variants section below.
-                      </span>
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Set the stock quantity for this product. Add variants below to manage stock per variant.
-                    </p>
-                  )}
+                    >
+                      <SelectTrigger id="deposit_type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No deposit — charge full price</SelectItem>
+                        <SelectItem value="fixed">Fixed amount</SelectItem>
+                        <SelectItem value="percentage">Percentage of price</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {formData.deposit_type !== 'none' && (
+                      <div className="space-y-2">
+                        <Input
+                          id="deposit_value"
+                          type="number"
+                          step={formData.deposit_type === 'percentage' ? '1' : '0.01'}
+                          min="0"
+                          max={formData.deposit_type === 'percentage' ? '100' : undefined}
+                          value={formData.deposit_value}
+                          onChange={(e) => setFormData({ ...formData, deposit_value: e.target.value })}
+                          placeholder={formData.deposit_type === 'percentage' ? 'e.g. 30' : 'e.g. 500'}
+                        />
+                        {validationErrors.deposit_value && (
+                          <p className="text-sm text-destructive">{validationErrors.deposit_value}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="requires_shipping">This is a physical product</Label>
+                      <ContextualHelp
+                        title="Shipping"
+                        description="Turn this off for a service, booking, or digital item — checkout won't ask for a delivery address or charge a delivery fee for it. Leave it on for anything you ship or hand over in person as a physical good."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.requires_shipping
+                        ? 'Ships to the customer — delivery/pickup is collected at checkout.'
+                        : "Doesn't ship — a service or digital item. No delivery address or fee at checkout."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="requires_shipping"
+                    checked={formData.requires_shipping}
+                    onCheckedChange={(checked) => setFormData({ ...formData, requires_shipping: checked })}
+                    aria-label="Toggle whether this product requires shipping"
+                  />
+                </div>
+
+                {formData.requires_shipping && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="stock_quantity">
+                        Stock Quantity
+                        {hasVariants && <span className="text-xs text-muted-foreground ml-2">(Calculated from variants)</span>}
+                      </Label>
+                      <ContextualHelp
+                        title="Stock Quantity"
+                        description="If your product has no variants, set stock here. If variants exist, stock is calculated from variant stock values."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <Input
+                      id="stock_quantity"
+                      type="number"
+                      min="0"
+                      value={hasVariants ? totalVariantStock.toString() : formData.stock_quantity}
+                      onChange={(e) => {
+                        if (!hasVariants) {
+                          setFormData({ ...formData, stock_quantity: e.target.value });
+                        }
+                      }}
+                      placeholder="0"
+                      disabled={hasVariants}
+                      className={hasVariants ? 'bg-muted cursor-not-allowed' : ''}
+                    />
+                    {validationErrors.stock_quantity && (
+                      <p className="text-sm text-destructive">{validationErrors.stock_quantity}</p>
+                    )}
+                    {hasVariants ? (
+                      <p className="text-xs text-muted-foreground">
+                        Total stock: {totalVariantStock} units (sum of all variant stocks).
+                        <span className="block mt-1 text-blue-600">
+                          When variants exist, only variant stock quantities are used for inventory tracking.
+                          Edit stock in the Variants section below.
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Set the stock quantity for this product. Add variants below to manage stock per variant.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="is_bookable">This is a bookable service</Label>
+                      <ContextualHelp
+                        title="Bookings"
+                        description="Turn this on for a service customers book a specific time slot for — a haircut, a consultation, a repair appointment. Customers pick an available slot at checkout; you manage bookings from the Bookings page."
+                        learnMoreHref="/help?article=managing-products"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.is_bookable
+                        ? 'Customers pick a real available time slot at checkout.'
+                        : "Doesn't require a booked time slot — sold like a regular item/service."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_bookable"
+                    checked={formData.is_bookable}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_bookable: checked })}
+                    aria-label="Toggle whether this product requires a booked time slot"
+                  />
+                </div>
+
+                {formData.is_bookable && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="booking_duration_minutes">Duration (minutes)</Label>
+                        <ContextualHelp
+                          title="Booking duration"
+                          description="How long one booking of this service takes, e.g. 30 for a quick haircut, 60 for a full consultation."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
+                      <Input
+                        id="booking_duration_minutes"
+                        type="number"
+                        min="1"
+                        value={formData.booking_duration_minutes}
+                        onChange={(e) => setFormData({ ...formData, booking_duration_minutes: e.target.value })}
+                        placeholder="e.g. 30"
+                      />
+                      {validationErrors.booking_duration_minutes && (
+                        <p className="text-sm text-destructive">{validationErrors.booking_duration_minutes}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="booking_capacity">Capacity</Label>
+                        <ContextualHelp
+                          title="Capacity"
+                          description="How many of these bookings you can handle at the exact same time slot — e.g. 3 if you have 3 chairs/stylists. Leave at 1 if only one at a time."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
+                      <Input
+                        id="booking_capacity"
+                        type="number"
+                        min="1"
+                        value={formData.booking_capacity}
+                        onChange={(e) => setFormData({ ...formData, booking_capacity: e.target.value })}
+                        placeholder="1"
+                      />
+                      {validationErrors.booking_capacity && (
+                        <p className="text-sm text-destructive">{validationErrors.booking_capacity}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -733,7 +1175,14 @@ export default function ProductFormClient({
                     </div>
                     {/* Variant Attributes */}
                     <div className="space-y-3">
-                      <Label>Attributes (e.g., Size, Color, Weight)</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label>Attributes (e.g., Size, Color, Weight)</Label>
+                        <ContextualHelp
+                          title="Variant Attributes"
+                          description="Use attributes to create product options like Size or Color. Each unique combination creates a variant with its own SKU, stock, and optional image."
+                          learnMoreHref="/help?article=managing-products"
+                        />
+                      </div>
                       {variant.attributes.map((attr: any, attrIndex: any) => {
                         const selectedAttribute = attributes.find((a) => a.id === attr.attribute_id);
                         return (
@@ -888,41 +1337,37 @@ export default function ProductFormClient({
                               if (!file) return;
 
                               setIsUploading(true);
+                              setUploadContext(`variant ${index + 1} image`);
+                              setUploadProgress(0);
                               try {
-                                const formData = new FormData();
-                                formData.append('file', file);
-
-                                const response = await fetch('/api/products/upload', {
-                                  method: 'POST',
-                                  body: formData,
-                                });
-
-                                if (!response.ok) {
-                                  const data = await response.json();
-                                  throw new Error(data.error || 'Failed to upload image');
-                                }
-
-                                const data = await response.json();
+                                const compressedFile = await compressImageForMobile(file);
+                                const data = await uploadImageWithProgress(
+                                  '/api/products/upload',
+                                  compressedFile,
+                                  (percent) => setUploadProgress(percent),
+                                );
                                 const newVariants = [...variants];
                                 newVariants[index].image = data.url;
                                 setVariants(newVariants);
                               } catch (err: any) {
                                 setError(err.message || 'Failed to upload image');
                               } finally {
+                                setUploadProgress(0);
                                 setIsUploading(false);
                               }
                             };
+                            input.capture = 'environment';
                             input.click();
                           }}
                         >
                           <PhotoIcon className="h-8 w-8 text-muted-foreground" />
-                          <p className="mt-2 text-xs text-muted-foreground">Upload</p>
+                          <p className="mt-2 text-xs text-muted-foreground">Camera / Upload</p>
                         </div>
                       )}
                     </div>
 
                     {/* Variant Details */}
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <div className="space-y-2">
                         <Label htmlFor={`variant-sku-${index}`}>SKU</Label>
                         <Input
@@ -954,6 +1399,22 @@ export default function ProductFormClient({
                         />
                       </div>
                       <div className="space-y-2">
+                        <Label htmlFor={`variant-cost-price-${index}`}>Cost Price</Label>
+                        <Input
+                          id={`variant-cost-price-${index}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.cost_price}
+                          onChange={(e) => {
+                            const newVariants = [...variants];
+                            newVariants[index].cost_price = e.target.value;
+                            setVariants(newVariants);
+                          }}
+                          placeholder="COGS override"
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor={`variant-stock-${index}`}>Stock</Label>
                         <Input
                           id={`variant-stock-${index}`}
@@ -980,6 +1441,7 @@ export default function ProductFormClient({
                       {
                         sku: '',
                         price: '',
+                        cost_price: '',
                         stock_quantity: '0',
                         image: '',
                         attributes: [],
@@ -1041,6 +1503,8 @@ export default function ProductFormClient({
                       onClick={() => {
                         setImagePreview(null);
                         setFormData({ ...formData, image: '' });
+                        setPhotoQaResult(null);
+                        setPhotoQaError(null);
                         if (fileInputRef.current) {
                           fileInputRef.current.value = '';
                         }
@@ -1070,15 +1534,125 @@ export default function ProductFormClient({
                   disabled={isUploading}
                 />
                 {!imagePreview && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? 'Uploading...' : 'Choose Image'}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      Use Camera
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      Upload File
+                    </Button>
+                  </div>
+                )}
+                {isUploading && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Uploading {uploadContext}... {uploadProgress}%
+                    </p>
+                    <div className="h-2 w-full rounded bg-muted">
+                      <div
+                        className="h-2 rounded bg-primary transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Phase 5 — Product Photo QA. Advisory only; never
+                    auto-applies anything to the form. */}
+                {formData.image && !isUploading && (
+                  <div className="space-y-3 border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleCheckPhotoQuality}
+                      disabled={photoQaLoading}
+                    >
+                      <SparklesIcon className="mr-2 h-4 w-4" />
+                      {photoQaLoading ? 'Checking photo…' : 'Check photo quality'}
+                    </Button>
+
+                    {photoQaError && (
+                      <p className="text-xs text-muted-foreground">{photoQaError}</p>
+                    )}
+
+                    {photoQaResult && (
+                      <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              photoQaResult.qualityScore === 'good'
+                                ? 'default'
+                                : photoQaResult.qualityScore === 'needs_improvement'
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                          >
+                            {photoQaResult.qualityScore === 'good'
+                              ? 'Good quality'
+                              : photoQaResult.qualityScore === 'needs_improvement'
+                                ? 'Could be improved'
+                                : 'Needs a retake'}
+                          </Badge>
+                        </div>
+
+                        {photoQaResult.issues.length > 0 && (
+                          <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                            {photoQaResult.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {photoQaResult.reshootSuggestions.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium">Tips for a better photo:</p>
+                            <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                              {photoQaResult.reshootSuggestions.map((tip) => (
+                                <li key={tip}>{tip}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium">Suggested alt text</p>
+                          <p className="text-xs text-muted-foreground">{photoQaResult.suggestedAltText}</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium">Suggested SEO description</p>
+                          <p className="text-xs text-muted-foreground">{photoQaResult.suggestedSeoDescription}</p>
+                          {!formData.description.trim() && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto px-2 py-1 text-xs"
+                              onClick={() =>
+                                setFormData((prev) => ({ ...prev, description: photoQaResult.suggestedSeoDescription }))
+                              }
+                            >
+                              Use as description
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1087,11 +1661,18 @@ export default function ProductFormClient({
             <Card>
               <CardHeader>
                 <CardTitle>Settings</CardTitle>
-                <CardDescription>Product status and category</CardDescription>
+                <CardDescription>Product status, category, and shipping</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="status">Status</Label>
+                    <ContextualHelp
+                      title="Product Status"
+                      description="Draft keeps the product hidden while you prepare it. Active makes it visible to customers. Inactive and Archived remove it from active selling."
+                      learnMoreHref="/help?article=managing-products"
+                    />
+                  </div>
                   <Select
                     value={formData.status}
                     onValueChange={(value: any) =>
@@ -1111,74 +1692,28 @@ export default function ProductFormClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category_id">Category</Label>
-                  <Select
-                    value={parentCategoryId || 'none'}
-                    onValueChange={(value) => {
-                      const newParentId = value === 'none' ? 'none' : value;
-                      setParentCategoryId(newParentId);
-                      // When parent changes, set category_id to parent (user can select subcategory after)
-                      setFormData({ ...formData, category_id: newParentId });
-                      // Fetch subcategories for the selected parent
-                      fetchSubcategories(newParentId);
-                    }}
-                  >
-                    <SelectTrigger id="category_id">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No Category</SelectItem>
-                      {categories.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="estimated_delivery_days">Estimated Delivery (Days)</Label>
+                    <ContextualHelp
+                      title="Estimated Delivery"
+                      description="Set a product-specific delivery estimate in days. Leave this empty to use your store default delivery setting."
+                      learnMoreHref="/help?article=managing-delivery"
+                    />
+                  </div>
+                  <Input
+                    id="estimated_delivery_days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={formData.estimated_delivery_days}
+                    onChange={(e) => setFormData({ ...formData, estimated_delivery_days: e.target.value })}
+                    placeholder="Use store default"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Override store default delivery time. Leave empty to use store settings.
+                  </p>
                 </div>
 
-                {/* Subcategory dropdown - only show if parent category has subcategories */}
-                {parentCategoryId !== 'none' && (
-                  <>
-                    {loadingSubcategories ? (
-                      <div className="text-xs text-muted-foreground">
-                        Loading subcategories...
-                      </div>
-                    ) : subcategories.length > 0 ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="subcategory_id">Subcategory</Label>
-                        <Select
-                          value={
-                            formData.category_id !== parentCategoryId && 
-                            subcategories.some((sc: any) => sc.id === formData.category_id)
-                              ? formData.category_id 
-                              : 'none'
-                          }
-                          onValueChange={(value) => {
-                            // Use subcategory as category_id, or parent if "none" selected
-                            const finalCategoryId = value === 'none' ? parentCategoryId : value;
-                            setFormData({ ...formData, category_id: finalCategoryId });
-                          }}
-                        >
-                          <SelectTrigger id="subcategory_id">
-                            <SelectValue placeholder="Select a subcategory (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Subcategory</SelectItem>
-                            {subcategories.map((subcategory: any) => (
-                              <SelectItem key={subcategory.id} value={subcategory.id}>
-                                {subcategory.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Optional: Select a subcategory or leave as parent category
-                        </p>
-                      </div>
-                    ) : null}
-                  </>
-                )}
               </CardContent>
             </Card>
 
@@ -1212,6 +1747,15 @@ export default function ProductFormClient({
                 : 'Create Product'}
           </Button>
         </div>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleImageChange}
+          className="hidden"
+          disabled={isUploading}
+        />
       </form>
     </div>
   );

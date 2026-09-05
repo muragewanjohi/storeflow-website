@@ -200,14 +200,14 @@ export default function InventoryDashboardClient({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
           <p className="text-muted-foreground mt-2">
             Monitor stock levels, track adjustments, and manage inventory
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/dashboard/inventory/adjust">Adjust Stock</Link>
           </Button>
@@ -412,6 +412,7 @@ export default function InventoryDashboardClient({
             {filteredLowStockProducts.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-semibold mb-3">Products</h3>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -455,12 +456,14 @@ export default function InventoryDashboardClient({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             )}
 
             {filteredLowStockVariants.length > 0 && (
               <div>
                 <h3 className="text-sm font-semibold mb-3">Variants</h3>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -509,6 +512,7 @@ export default function InventoryDashboardClient({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             )}
           </CardContent>
@@ -531,6 +535,7 @@ export default function InventoryDashboardClient({
           </div>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -607,6 +612,7 @@ export default function InventoryDashboardClient({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

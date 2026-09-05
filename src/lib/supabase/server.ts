@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { getSharedAuthCookieDomain } from '@/lib/supabase/auth-cookie-domain';
 
 export async function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,12 +9,14 @@ export async function createClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       'Missing Supabase environment variables. ' +
-      'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set. ' +
-      'Check your Vercel project settings: https://vercel.com/docs/concepts/projects/environment-variables'
+        'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set. ' +
+        'Check your Vercel project settings: https://vercel.com/docs/concepts/projects/environment-variables'
     );
   }
 
   const cookieStore = await cookies();
+  const headerList = await headers();
+  const authCookieDomain = getSharedAuthCookieDomain(headerList.get('host'));
 
   return createServerClient(
     supabaseUrl,
@@ -26,7 +29,14 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                // Ensure proper security options for auth cookies
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/',
+                ...(authCookieDomain ? { domain: authCookieDomain } : {}),
+              })
             );
           } catch {
             // The `setAll` method was called from a Server Component.

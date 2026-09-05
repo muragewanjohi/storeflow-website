@@ -4,6 +4,8 @@
  * Legal terms and conditions for using DukaNest
  */
 
+export const dynamic = 'force-dynamic';
+
 import MarketingHeader from '@/components/marketing/header';
 import { Footer } from '@/components/marketing/footer';
 
@@ -192,6 +194,68 @@ export default function TermsOfServicePage() {
                 If you wish to terminate your account, you may simply discontinue using the Service or contact us to request 
                 account deletion.
               </p>
+
+              <h3 className="text-xl font-semibold text-[#0c0528] mb-3 mt-6">9.1 Termination of Inactive Stores</h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                DukaNest has a structured process for handling inactive or expired subscriptions to ensure fair treatment and 
+                data preservation. The following outlines the lifecycle of store termination:
+              </p>
+
+              <h4 className="text-lg font-semibold text-[#0c0528] mb-2 mt-4">9.1.1 Expired Status (Grace Period)</h4>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                When your subscription expires, your store enters an &quot;expired&quot; status with a 2-day grace period. During this period:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 text-gray-700 mb-4">
+                <li>You will receive an email notification on the expiration day</li>
+                <li>You will receive daily payment reminder emails during the grace period</li>
+                <li>Your dashboard access becomes read-only</li>
+                <li>Your storefront remains accessible but checkout is disabled</li>
+                <li>All your data (products, orders, customers, settings) is fully preserved</li>
+              </ul>
+
+              <h4 className="text-lg font-semibold text-[#0c0528] mb-2 mt-4">9.1.2 Suspended Status</h4>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                If you do not renew within the 2-day grace period, your store will be suspended. During suspension:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 text-gray-700 mb-4">
+                <li>You will receive a suspension email notification</li>
+                <li>Your storefront will redirect to a suspension page</li>
+                <li>Dashboard access is restricted to renewal pages only</li>
+                <li>All your data remains fully preserved and safe</li>
+                <li>You can restore access immediately by renewing your subscription</li>
+              </ul>
+
+              <h4 className="text-lg font-semibold text-[#0c0528] mb-2 mt-4">9.1.3 Soft-Deleted Status</h4>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                If your account doesn&apos;t renew, it enters a 90-day retention period. During this period:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 text-gray-700 mb-4">
+                <li>You will receive a warning email 30 days before permanent deletion</li>
+                <li>You will receive a warning email 7 days before permanent deletion</li>
+                <li>You will receive a final warning email 1 day before permanent deletion</li>
+                <li>All access is completely blocked</li>
+                <li>Your data is preserved for 90 days and can be recovered by contacting support</li>
+              </ul>
+
+              <h4 className="text-lg font-semibold text-[#0c0528] mb-2 mt-4">9.1.4 Hard-Deleted Status</h4>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                After 90 days in soft-deleted status, your account and all associated data will be permanently deleted:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 text-gray-700 mb-4">
+                <li>All products, orders, customers, and settings will be permanently removed</li>
+                <li>Your storefront and subdomain will be removed</li>
+                <li>All files and media will be deleted</li>
+                <li>This action cannot be undone</li>
+              </ul>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 my-4">
+                <p className="text-gray-700 mb-2">
+                  <strong>Important:</strong> We send multiple email notifications at each stage of the termination process. 
+                  It is your responsibility to ensure your registered email address is current and that you monitor your emails 
+                  for these notifications. Failure to receive notifications due to an incorrect email address or email filtering 
+                  does not exempt you from these terms.
+                </p>
+              </div>
             </section>
 
             <section className="mb-8">
@@ -242,9 +306,7 @@ export default function TermsOfServicePage() {
                 If you have any questions about these Terms of Service, please contact us at:
               </p>
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-700 mb-2"><strong>Email:</strong> support@dukanest.com</p>
-                <p className="text-gray-700 mb-2"><strong>Phone:</strong> 1-800-DUKA-NEST</p>
-                <p className="text-gray-700"><strong>Address:</strong> 123 Commerce Street, San Francisco, CA 94102</p>
+                <p className="text-gray-700"><strong>Email:</strong> support@dukanest.com</p>
               </div>
             </section>
           </div>

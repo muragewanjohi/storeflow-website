@@ -25,10 +25,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     // Get base URL
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
     const baseUrl = tenant.custom_domain
       ? `https://${tenant.custom_domain}`
       : tenant.subdomain
-      ? `https://${tenant.subdomain}.dukanest.com`
+      ? `https://${tenant.subdomain}.${baseDomain}`
       : `https://${hostname}`;
 
     // Get published pages
@@ -72,12 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       })),
       // Blog posts
-      ...blogs.map((blog: any) => ({
-        url: `${baseUrl}/blog/${blog.slug || ''}`,
-        lastModified: blog.updated_at || new Date(),
-        changeFrequency: 'weekly' as const,
-        priority: 0.7,
-      })),
+      ...blogs
+        .filter((blog): blog is typeof blog & { slug: string } => Boolean(blog.slug?.trim()))
+        .map((blog) => ({
+          url: `${baseUrl}/blog/${encodeURIComponent(blog.slug)}`,
+          lastModified: blog.updated_at || new Date(),
+          changeFrequency: 'weekly' as const,
+          priority: 0.7,
+        })),
     ];
 
     return entries;

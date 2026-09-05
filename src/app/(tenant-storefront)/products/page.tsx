@@ -7,11 +7,17 @@
  */
 
 import type { Metadata } from 'next';
-import { requireTenant } from '@/lib/tenant-context/server';
+import { redirect } from 'next/navigation';
+import { getTenant, requireTenant } from '@/lib/tenant-context/server';
 import ProductsListingClient from './products-listing-client';
 import { prisma } from '@/lib/prisma/client';
 import { ErrorState } from '@/components/storefront/error-boundary';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import {
+  appendQueryString,
+  getCollectionPath,
+  parseSingleCategorySlugFromProductsQuery,
+} from '@/lib/storefront/collection-urls';
 
 /**
  * Caching Strategy: Dynamic Rendering with Response Caching
@@ -28,7 +34,8 @@ import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const tenant = await requireTenant();
+  const tenant = await getTenant();
+  if (!tenant) return { title: 'Products' };
   return generateStorefrontMetadata({
     tenant,
     title: 'Products',
@@ -62,8 +69,28 @@ export default async function ProductsPage({
   let total = 0;
   let categories: any[] = [];
 
-  // Get initial products
   const params = await searchParams;
+
+  const categorySlug = parseSingleCategorySlugFromProductsQuery(
+    typeof params.category === 'string' ? params.category : undefined,
+  );
+  if (categorySlug) {
+    const redirectParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'category') {
+        continue;
+      }
+      if (typeof value === 'string') {
+        redirectParams.set(key, value);
+      } else if (Array.isArray(value)) {
+        for (const item of value) {
+          redirectParams.append(key, item);
+        }
+      }
+    }
+    redirect(appendQueryString(getCollectionPath(categorySlug), redirectParams));
+  }
+
   const page = parseInt(params.page as string) || 1;
   const limit = 12;
   const search = (params.search as string) || '';
@@ -187,9 +214,22 @@ export default async function ProductsPage({
   // Handle attribute filters
   const attributeFilters: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (typeof key === 'string' && key.startsWith('attr_')) {
+    if (typeof key === 'string' && key.startsWith('attr_') && value) {
       const attributeId = key.replace('attr_', '');
-      const valueIds = (value as string).split(',').filter(id => id.trim());
+      let valueIds: string[] = [];
+      
+      // Handle both string and array values (URL params can be either)
+      if (Array.isArray(value)) {
+        // Value is an array of strings - flatten and split any comma-separated values
+        valueIds = value
+          .flatMap(v => typeof v === 'string' ? v.split(',') : [])
+          .map(id => id.trim())
+          .filter(id => id.length > 0);
+      } else if (typeof value === 'string') {
+        // Value is a single string - split by comma
+        valueIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      }
+      
       if (valueIds.length > 0) {
         attributeFilters[attributeId] = valueIds;
       }

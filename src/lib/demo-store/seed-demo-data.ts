@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '@/lib/prisma/client';
+import { buildDemoProductMetadata } from '@/lib/products/demo-products';
 
 interface DemoProduct {
   name: string;
@@ -128,6 +129,7 @@ export async function seedDemoStoreData(tenantId: string): Promise<void> {
           status: 'active',
           category_id: categoryId || null,
           image: product.image || `https://images.unsplash.com/photo-${Math.random().toString(36).substring(7)}?w=800&h=600&fit=crop`,
+          metadata: buildDemoProductMetadata('demo_store_seed', 'demo_store_seed'),
         },
       });
       console.log(`✅ Created product: ${product.name}`);
@@ -148,19 +150,11 @@ export async function seedDemoStoreData(tenantId: string): Promise<void> {
     });
     console.log('✅ Created demo blog post');
 
-    // 4. Create a sample page
-    await prisma.pages.create({
-      data: {
-        tenant_id: tenantId,
-        title: 'About Us',
-        slug: 'about-us',
-        content: '<h1>About Our Demo Store</h1><p>This is a demonstration of our e-commerce platform. All content and products shown here are for showcase purposes.</p>',
-        status: 'published',
-        meta_title: 'About Us - Demo Store',
-        meta_description: 'Learn more about our demo store and platform features.',
-      },
-    });
-    console.log('✅ Created demo page');
+    // 4. Create a sample page (use 'about' slug, not 'about-us')
+    // Note: This page creation is optional and may conflict with theme installation pages
+    // The about page should be created by theme installation with slug 'about'
+    // Skipping to avoid duplicate pages
+    console.log('ℹ️ Skipping demo page creation - about page should be created by theme installation');
 
     console.log(`✅ Demo store seeding completed for tenant: ${tenantId}`);
   } catch (error) {

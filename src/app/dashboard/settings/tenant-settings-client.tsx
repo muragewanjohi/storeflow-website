@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,15 +29,158 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { MapPinIcon, AlertCircle, AlertTriangle, Clock } from 'lucide-react';
 import type { Tenant } from '@/lib/tenant-context';
 import MFASettings from './mfa-settings';
 import TrustedDevicesSettings from './trusted-devices-settings';
+import { VersionInfo } from '@/components/dashboard/version-info';
+import TumiziDashboardClient from '../tumizi/tumizi-dashboard-client';
+import { RegistrationPhoneField } from '@/components/phone/registration-phone-field';
+import {
+  parseStoredPhoneToParts,
+  parseToE164Digits,
+  type CountryCode,
+} from '@/lib/phone/parse';
+
+// Store Hours Editor Component
+interface StoreHoursEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function StoreHoursEditor({ value, onChange }: StoreHoursEditorProps) {
+  const daysOfWeek = [
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+    { key: 'sunday', label: 'Sunday' },
+  ];
+
+  // Parse hours from JSON string
+  const parseHours = (): Record<string, { open: string; close: string; closed: boolean }> => {
+    if (!value) {
+      return {};
+    }
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  };
+
+  const hours = parseHours();
+
+  const updateDay = (day: string, updates: Partial<{ open: string; close: string; closed: boolean }>) => {
+    const newHours = {
+      ...hours,
+      [day]: {
+        ...hours[day],
+        ...updates,
+      },
+    };
+    onChange(JSON.stringify(newHours));
+  };
+
+  const setAllDays = (open: string, close: string, closed: boolean) => {
+    const newHours: Record<string, { open: string; close: string; closed: boolean }> = {};
+    daysOfWeek.forEach((day) => {
+      newHours[day.key] = { open, close, closed };
+    });
+    onChange(JSON.stringify(newHours));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Actions */}
+      <div className="flex gap-2 flex-wrap">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('09:00', '17:00', false)}
+        >
+          Set All: 9 AM - 5 PM
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('08:00', '18:00', false)}
+        >
+          Set All: 8 AM - 6 PM
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAllDays('', '', true)}
+        >
+          Close All
+        </Button>
+      </div>
+
+      {/* Day-by-day editor */}
+      <div className="space-y-3">
+        {daysOfWeek.map((day) => {
+          const dayHours = hours[day.key] || { open: '09:00', close: '17:00', closed: false };
+          return (
+            <div key={day.key} className="flex items-center gap-4 p-3 border rounded-lg">
+              <div className="w-24 font-medium">{day.label}</div>
+              <Checkbox
+                checked={!dayHours.closed}
+                onCheckedChange={(checked) => updateDay(day.key, { closed: !checked })}
+              />
+              {!dayHours.closed ? (
+                <>
+                  <Input
+                    type="time"
+                    value={dayHours.open || '09:00'}
+                    onChange={(e) => updateDay(day.key, { open: e.target.value })}
+                    className="w-32"
+                  />
+                  <span className="text-muted-foreground">to</span>
+                  <Input
+                    type="time"
+                    value={dayHours.close || '17:00'}
+                    onChange={(e) => updateDay(day.key, { close: e.target.value })}
+                    className="w-32"
+                  />
+                </>
+              ) : (
+                <span className="text-muted-foreground">Closed</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface TenantSettingsClientProps {
   tenant: Tenant;
   initialSettings: Record<string, any>;
   countries: Array<{ id: string; name: string; code: string | null }>;
+  canUseExtraStorePhones: boolean;
+  extraStorePhonesPlanName: string | null;
 }
 
 const CURRENCIES = [
@@ -52,7 +196,18 @@ const CURRENCIES = [
   { code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr' },
 ];
 
-export default function TenantSettingsClient({ tenant, initialSettings, countries }: Readonly<TenantSettingsClientProps>) {
+/** Top Settings tabs: active label + underline use theme `--primary` (shadcn + tenant ThemeStylesServer). */
+const SETTINGS_TAB_TRIGGER_CLASS =
+  'relative rounded-none border-b-[3px] border-transparent bg-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground focus-visible:ring-offset-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:!text-[hsl(var(--primary))] data-[state=active]:!border-b-[hsl(var(--primary))]';
+
+export default function TenantSettingsClient({
+  tenant,
+  initialSettings,
+  countries,
+  canUseExtraStorePhones,
+  extraStorePhonesPlanName,
+}: Readonly<TenantSettingsClientProps>) {
+  const GOOGLE_LINK_PENDING_STORAGE_KEY = 'dukanest:tenant-google-link-pending';
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -62,8 +217,105 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
   const [contactEmailError, setContactEmailError] = useState<string | null>(null);
   const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  
-  const [formData, setFormData] = useState({
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [linkedAuthProviders, setLinkedAuthProviders] = useState<string[]>([]);
+  const [isLoadingAuthProviders, setIsLoadingAuthProviders] = useState(true);
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const [showExtraPhonesUpgradeDialog, setShowExtraPhonesUpgradeDialog] = useState(false);
+  const [tumiziConfigState, setTumiziConfigState] = useState<{
+    enabled: boolean;
+    merchantExternalId?: string;
+  } | null>(null);
+  const [tumiziToggleLoading, setTumiziToggleLoading] = useState(false);
+  const tenantData = tenant.data && typeof tenant.data === 'object' ? (tenant.data as Record<string, unknown>) : {};
+  const initialBusinessType = typeof tenantData.business_type === 'string' ? tenantData.business_type : '';
+  const initialSelling = typeof tenantData.selling === 'string' ? tenantData.selling : '';
+  const accountDeletionConfirmationPhrase = `DELETE ${tenant.subdomain}`;
+
+  const tumiziCheckoutReady =
+    Boolean(tumiziConfigState?.enabled && tumiziConfigState?.merchantExternalId);
+
+  const tumiziOfferedForValidation =
+    initialSettings.payment_tumizi_enabled === true || tumiziCheckoutReady;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/tumizi/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled || !d.success || !d.data) return;
+        setTumiziConfigState({
+          enabled: Boolean(d.data.enabled),
+          merchantExternalId:
+            typeof d.data.merchantExternalId === 'string' ? d.data.merchantExternalId : undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTumiziConfigState({ enabled: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleTumiziToggle = async (checked: boolean) => {
+    setSettingsError(null);
+    setSettingsSuccess(null);
+    setError(null);
+    setTumiziToggleLoading(true);
+    try {
+      const response = await fetch('/api/tumizi/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: checked,
+          createMerchantIfMissing: checked,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update Tumizi');
+      }
+      setTumiziConfigState({
+        enabled: Boolean(data.data?.enabled),
+        merchantExternalId:
+          typeof data.data?.merchantExternalId === 'string'
+            ? data.data.merchantExternalId
+            : undefined,
+      });
+      if (!checked && formData.payment_method === 'tumizi') {
+        setFormData((prev) => ({
+          ...prev,
+          payment_method: prev.payment_mpesa_enabled ? 'mpesa' : 'cash',
+        }));
+      }
+      setSettingsSuccess(
+        checked ? 'Tumizi enabled for automatic M-Pesa checkout.' : 'Tumizi checkout disabled.',
+      );
+      router.refresh();
+    } catch (err) {
+      setSettingsError(err instanceof Error ? err.message : 'Tumizi update failed');
+    } finally {
+      setTumiziToggleLoading(false);
+    }
+  };
+
+  const getSupabaseClient = async () => {
+    const { createClient } = await import('@/lib/supabase/client');
+    return createClient();
+  };
+
+  const phoneFallbackCountry: CountryCode = 'KE';
+
+  const [formData, setFormData] = useState(() => {
+    const p1 = parseStoredPhoneToParts(initialSettings.store_phone, phoneFallbackCountry);
+    const p2 = parseStoredPhoneToParts(initialSettings.store_phone_2, phoneFallbackCountry);
+    const p3 = parseStoredPhoneToParts(initialSettings.store_phone_3, phoneFallbackCountry);
+    return {
     // Contact Email
     contactEmail: tenant.contact_email || '',
     
@@ -74,8 +326,15 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     store_state: initialSettings.store_state || '',
     store_country: initialSettings.store_country || '',
     store_postal_code: initialSettings.store_postal_code || '',
-    store_phone: initialSettings.store_phone || '',
+    store_phone_country: p1.country,
+    store_phone_national: p1.national,
+    store_phone_2_country: p2.country,
+    store_phone_2_national: p2.national,
+    store_phone_3_country: p3.country,
+    store_phone_3_national: p3.national,
     store_logo: initialSettings.store_logo || '',
+    business_type: initialBusinessType,
+    selling: initialSelling,
     
     // Currency Settings
     currency_code: initialSettings.currency_code || 'USD',
@@ -89,22 +348,53 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     shipping_enabled: initialSettings.shipping_enabled ?? true,
     shipping_method_type: initialSettings.shipping_method_type || 'flat_rate',
     flat_rate_amount: initialSettings.flat_rate_amount || '',
-    dynamic_rate_per_km: initialSettings.dynamic_rate_per_km || '',
     free_shipping_enabled: initialSettings.free_shipping_enabled ?? false,
     free_shipping_threshold: initialSettings.free_shipping_threshold || '',
+    default_estimated_delivery_days: initialSettings.default_estimated_delivery_days || '',
+    
+    // Pickup Options
+    pickup_enabled: initialSettings.pickup_enabled ?? false,
+    pickup_location_name: initialSettings.pickup_location_name || '',
+    pickup_instructions: initialSettings.pickup_instructions || '',
+    pickup_hours: initialSettings.pickup_hours || '',
     
     // Payment Methods
-    payment_pesapal_enabled: initialSettings.payment_pesapal_enabled ?? true,
-    payment_paypal_enabled: initialSettings.payment_paypal_enabled ?? false,
-    payment_cash_on_delivery_enabled: initialSettings.payment_cash_on_delivery_enabled ?? true,
-    default_payment_method: initialSettings.default_payment_method || '',
+    payment_cash_enabled: initialSettings.payment_cash_enabled ?? true,
+    payment_mpesa_enabled: initialSettings.payment_mpesa_enabled ?? false,
+    payment_mpesa_option: initialSettings.payment_mpesa_option || 'send_money',
+    payment_mpesa_send_money_number: initialSettings.payment_mpesa_send_money_number || '',
+    payment_mpesa_buy_goods_till: initialSettings.payment_mpesa_buy_goods_till || '',
+    payment_mpesa_paybill_number: initialSettings.payment_mpesa_paybill_number || '',
+    payment_mpesa_paybill_account: initialSettings.payment_mpesa_paybill_account || '',
+    payment_mpesa_pochi_phone: initialSettings.payment_mpesa_pochi_phone || '',
+    payment_method:
+      initialSettings.payment_method ||
+      initialSettings.default_payment_method ||
+      (initialSettings.payment_tumizi_enabled ? 'tumizi' : 'cash'),
+    payment_timing: initialSettings.payment_timing || 'before_delivery',
     
     // Tax Settings
     tax_enabled: initialSettings.tax_enabled ?? false,
     default_tax_rate: initialSettings.default_tax_rate || '',
-    tax_included_in_price: initialSettings.tax_included_in_price ?? false,
+    tax_pricing_type: initialSettings.tax_pricing_type || (initialSettings.tax_included_in_price ? 'inclusive' : 'exclusive'),
     tax_calculation_based_on: initialSettings.tax_calculation_based_on || 'billing_address',
+  };
   });
+
+  useEffect(() => {
+    const p1 = parseStoredPhoneToParts(initialSettings.store_phone, phoneFallbackCountry);
+    const p2 = parseStoredPhoneToParts(initialSettings.store_phone_2, phoneFallbackCountry);
+    const p3 = parseStoredPhoneToParts(initialSettings.store_phone_3, phoneFallbackCountry);
+    setFormData((prev) => ({
+      ...prev,
+      store_phone_country: p1.country,
+      store_phone_national: p1.national,
+      store_phone_2_country: p2.country,
+      store_phone_2_national: p2.national,
+      store_phone_3_country: p3.country,
+      store_phone_3_national: p3.national,
+    }));
+  }, [initialSettings.store_phone, initialSettings.store_phone_2, initialSettings.store_phone_3]);
 
   // Update currency symbol when currency code changes
   useEffect(() => {
@@ -113,6 +403,109 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       setFormData(prev => ({ ...prev, currency_symbol: currency.symbol }));
     }
   }, [formData.currency_code]);
+
+  const loadLinkedAuthProviders = async (): Promise<string[]> => {
+    const supabase = await getSupabaseClient();
+    const { data, error: userError } = await supabase.auth.getUser();
+    if (userError || !data.user) {
+      return [];
+    }
+
+    const identities = ((data.user as any).identities ?? []) as Array<{ provider?: string }>;
+    return Array.from(
+      new Set(
+        identities
+          .map((identity) => identity.provider)
+          .filter((provider): provider is string => Boolean(provider)),
+      ),
+    );
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const initLinkedProviders = async () => {
+      try {
+        const providers = await loadLinkedAuthProviders();
+        if (isCancelled) return;
+
+        setLinkedAuthProviders(providers);
+        const hadPendingLink = window.localStorage.getItem(GOOGLE_LINK_PENDING_STORAGE_KEY) === '1';
+        if (hadPendingLink) {
+          window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+          if (providers.includes('google')) {
+            setSuccess('Google sign-in linked successfully. You can now log in with email/password or Google.');
+          } else {
+            setError('Google linking was cancelled or failed. Please try again.');
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setError('Unable to load linked sign-in methods.');
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingAuthProviders(false);
+        }
+      }
+    };
+
+    initLinkedProviders();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const handleLinkGoogleAccount = async () => {
+    setError(null);
+    setSuccess(null);
+    setIsLinkingGoogle(true);
+
+    try {
+      const supabase = await getSupabaseClient();
+      const hostname = window.location.hostname;
+      const isRootLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+      const returnUrl = `${window.location.origin}/dashboard/settings`;
+      const cookieDomain = isRootLocalHost
+        ? ''
+        : hostname.endsWith('.dukanest.com')
+          ? '; Domain=.dukanest.com'
+          : hostname.endsWith('.storeflow.com')
+            ? '; Domain=.storeflow.com'
+            : '';
+      document.cookie = `dukanest_oauth_next=${encodeURIComponent(returnUrl)}; Path=/; Max-Age=900; SameSite=Lax${cookieDomain}`;
+      window.localStorage.setItem(GOOGLE_LINK_PENDING_STORAGE_KEY, '1');
+
+      const redirectTo = isRootLocalHost
+        ? `http://localhost:${window.location.port || '3000'}/auth/callback`
+        : `${window.location.origin}/auth/callback`;
+      const authClient = supabase.auth as any;
+
+      if (typeof authClient.linkIdentity !== 'function') {
+        window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+        throw new Error('Google account linking is not supported by the current auth client.');
+      }
+
+      const { error: linkError } = await authClient.linkIdentity({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (linkError) {
+        window.localStorage.removeItem(GOOGLE_LINK_PENDING_STORAGE_KEY);
+        throw new Error(linkError.message || 'Failed to start Google account linking.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to link Google account.');
+      setIsLinkingGoogle(false);
+    }
+  };
 
   const handleContactEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -153,13 +546,67 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
   const handleSettingsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setSettingsError(null);
     setSettingsSuccess(null);
     setError(null);
     setSuccess(null);
+    
+    // Validate that at least one payment method is enabled
+    if (
+      !formData.payment_cash_enabled &&
+      !formData.payment_mpesa_enabled &&
+      !tumiziOfferedForValidation
+    ) {
+      setSettingsError('At least one payment method must be enabled');
+      return;
+    }
+
+    // Validate that payment method is one of the enabled methods
+    if (formData.payment_method === 'cash' && !formData.payment_cash_enabled) {
+      setSettingsError('Payment method must be one of the enabled payment methods');
+      return;
+    }
+    if (formData.payment_method === 'mpesa' && !formData.payment_mpesa_enabled) {
+      setSettingsError('Payment method must be one of the enabled payment methods');
+      return;
+    }
+    if (formData.payment_method === 'tumizi' && !tumiziOfferedForValidation) {
+      setSettingsError('Enable Tumizi wallet before using it as the default checkout method');
+      return;
+    }
+    
+    setIsSubmitting(true);
 
     try {
+      const toE164 = (national: string, country: string) => {
+        if (!national.trim()) return null;
+        return parseToE164Digits(national.trim(), country as CountryCode);
+      };
+
+      const primaryE164 = toE164(formData.store_phone_national, formData.store_phone_country);
+      if (formData.store_phone_national.trim() && !primaryE164) {
+        setSettingsError('Enter a valid primary store phone number, or clear the field.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      let phone2E164: string | null = null;
+      let phone3E164: string | null = null;
+      if (canUseExtraStorePhones) {
+        phone2E164 = toE164(formData.store_phone_2_national, formData.store_phone_2_country);
+        if (formData.store_phone_2_national.trim() && !phone2E164) {
+          setSettingsError('Enter a valid number for additional phone 2, or clear it.');
+          setIsSubmitting(false);
+          return;
+        }
+        phone3E164 = toE164(formData.store_phone_3_national, formData.store_phone_3_country);
+        if (formData.store_phone_3_national.trim() && !phone3E164) {
+          setSettingsError('Enter a valid number for additional phone 3, or clear it.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const payload: any = {
         // Store Details (store_name is stored in tenants table, not here)
         store_description: formData.store_description || null,
@@ -168,8 +615,16 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         store_state: formData.store_state || null,
         store_country: formData.store_country || null,
         store_postal_code: formData.store_postal_code || null,
-        store_phone: formData.store_phone || null,
+        store_phone: primaryE164,
+        ...(canUseExtraStorePhones
+          ? {
+              store_phone_2: phone2E164,
+              store_phone_3: phone3E164,
+            }
+          : {}),
         store_logo: formData.store_logo || null,
+        business_type: formData.business_type?.trim() || null,
+        selling: formData.selling?.trim() || null,
         
         // Currency Settings
         currency_code: formData.currency_code,
@@ -182,21 +637,37 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         // Shipping Methods
         shipping_enabled: formData.shipping_enabled,
         shipping_method_type: formData.shipping_method_type,
-        flat_rate_amount: formData.flat_rate_amount ? parseFloat(formData.flat_rate_amount) : null,
-        dynamic_rate_per_km: formData.dynamic_rate_per_km ? parseFloat(formData.dynamic_rate_per_km) : null,
+        flat_rate_amount: formData.shipping_method_type === 'flat_rate' && formData.flat_rate_amount 
+          ? parseFloat(formData.flat_rate_amount) 
+          : null,
         free_shipping_enabled: formData.free_shipping_enabled,
         free_shipping_threshold: formData.free_shipping_threshold ? parseFloat(formData.free_shipping_threshold) : null,
+        default_estimated_delivery_days: formData.default_estimated_delivery_days ? parseInt(formData.default_estimated_delivery_days) : null,
+        
+        // Pickup Options
+        pickup_enabled: formData.pickup_enabled,
+        pickup_location_name: formData.pickup_location_name || null,
+        pickup_instructions: formData.pickup_instructions || null,
+        pickup_hours: formData.pickup_hours || null,
         
         // Payment Methods
-        payment_pesapal_enabled: formData.payment_pesapal_enabled,
-        payment_paypal_enabled: formData.payment_paypal_enabled,
-        payment_cash_on_delivery_enabled: formData.payment_cash_on_delivery_enabled,
-        default_payment_method: formData.default_payment_method || null,
+        payment_cash_enabled: formData.payment_cash_enabled,
+        payment_mpesa_enabled: formData.payment_mpesa_enabled,
+        payment_mpesa_option: formData.payment_mpesa_option,
+        payment_mpesa_send_money_number: formData.payment_mpesa_send_money_number || null,
+        payment_mpesa_buy_goods_till: formData.payment_mpesa_buy_goods_till || null,
+        payment_mpesa_paybill_number: formData.payment_mpesa_paybill_number || null,
+        payment_mpesa_paybill_account: formData.payment_mpesa_paybill_account || null,
+        payment_mpesa_pochi_phone: formData.payment_mpesa_pochi_phone || null,
+        payment_method: formData.payment_method || 'cash',
+        default_payment_method: formData.payment_method || 'cash', // Keep for backward compatibility
+        payment_timing: formData.payment_timing || 'user_choice',
         
         // Tax Settings
         tax_enabled: formData.tax_enabled,
         default_tax_rate: formData.default_tax_rate ? parseFloat(formData.default_tax_rate) : null,
-        tax_included_in_price: formData.tax_included_in_price,
+        tax_pricing_type: formData.tax_pricing_type || 'exclusive',
+        tax_included_in_price: formData.tax_pricing_type === 'inclusive', // Keep for backward compatibility
         tax_calculation_based_on: formData.tax_calculation_based_on,
       };
 
@@ -226,6 +697,43 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setDeleteAccountError(null);
+    setIsDeletingAccount(true);
+
+    try {
+      const response = await fetch('/api/dashboard/settings/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          confirmation: deleteConfirmation,
+          reason: deleteReason.trim() ? deleteReason : undefined,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to delete account');
+      }
+
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('Client sign out after account deletion failed:', signOutError);
+      }
+
+      const redirectTo = typeof data.redirectTo === 'string' ? data.redirectTo : '/';
+      window.location.href = redirectTo;
+    } catch (err) {
+      setDeleteAccountError(err instanceof Error ? err.message : 'Failed to delete account');
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div>
@@ -249,21 +757,93 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
       )}
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="currency">Currency</TabsTrigger>
-          <TabsTrigger value="shipping">Shipping</TabsTrigger>
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-          <TabsTrigger value="tax">Tax</TabsTrigger>
+        <TabsList className="flex h-auto w-full flex-wrap items-end justify-start gap-0 rounded-none border-0 border-b border-border bg-transparent p-0 shadow-none">
+          <TabsTrigger value="general" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            General
+          </TabsTrigger>
+          <TabsTrigger value="currency" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Currency
+          </TabsTrigger>
+          <TabsTrigger value="shipping" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Shipping
+          </TabsTrigger>
+          <TabsTrigger value="payment" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Payments
+          </TabsTrigger>
+          <TabsTrigger value="tumizi" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Tumizi
+          </TabsTrigger>
+          <TabsTrigger value="tax" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Tax
+          </TabsTrigger>
+          <TabsTrigger value="version" className={SETTINGS_TAB_TRIGGER_CLASS}>
+            Version
+          </TabsTrigger>
         </TabsList>
 
         {/* General Settings Tab */}
         <TabsContent value="general" className="space-y-6">
-          {/* Two-Factor Authentication */}
-          <MFASettings />
+          {/* Booking Hours Link — real scheduling/booking (S2, docs/SERVICES_PLAN.md) */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Booking Hours</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Set your working hours for bookable services (appointments, consultations, repairs)
+                  </p>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="/dashboard/settings/booking-hours">
+                    <Clock className="mr-2 h-4 w-4" />
+                    Manage Hours
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Trusted Devices */}
-          <TrustedDevicesSettings />
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign-in Methods</CardTitle>
+              <CardDescription>
+                Link Google to this admin account so you can sign in with either email/password or Google.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
+                  Email &amp; Password
+                </span>
+                <span
+                  className={
+                    linkedAuthProviders.includes('google')
+                      ? 'inline-flex items-center rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm'
+                      : 'inline-flex items-center rounded-md border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-semibold text-foreground'
+                  }
+                >
+                  {linkedAuthProviders.includes('google') ? 'Google Linked' : 'Google Not Linked'}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant={linkedAuthProviders.includes('google') ? 'outline' : 'default'}
+                onClick={handleLinkGoogleAccount}
+                disabled={isLoadingAuthProviders || isLinkingGoogle || linkedAuthProviders.includes('google')}
+              >
+                {isLoadingAuthProviders
+                  ? 'Checking...'
+                  : linkedAuthProviders.includes('google')
+                    ? 'Google account linked'
+                    : isLinkingGoogle
+                      ? 'Redirecting to Google...'
+                      : 'Link Google account'}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Tip: use the same Google email as your existing tenant admin account for the cleanest experience.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Store Details */}
           <Card>
@@ -301,6 +881,113 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                 </p>
               </div>
             </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <RegistrationPhoneField
+                idPrefix="settings-store-phone-primary"
+                label="Store phone number"
+                description="Shown to customers where relevant. Used for SMS order alerts so you don&apos;t miss new orders—same flow as registration (country + number)."
+                countryCode={formData.store_phone_country}
+                nationalNumber={formData.store_phone_national}
+                onCountryCodeChange={(code) =>
+                  setFormData({ ...formData, store_phone_country: code as CountryCode })
+                }
+                onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_national: value })}
+                required={false}
+              />
+            </div>
+            {canUseExtraStorePhones ? (
+              <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm text-muted-foreground">
+                  Add up to two more numbers for the same SMS order alerts (and subscription reminders). Clear a field and save to remove it.
+                </p>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RegistrationPhoneField
+                        idPrefix="settings-store-phone-2"
+                        label="Additional phone 2"
+                        description="Optional. Same SMS alerts as your primary number."
+                        countryCode={formData.store_phone_2_country}
+                        nationalNumber={formData.store_phone_2_national}
+                        onCountryCodeChange={(code) =>
+                          setFormData({ ...formData, store_phone_2_country: code as CountryCode })
+                        }
+                        onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_2_national: value })}
+                        required={false}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          store_phone_2_national: '',
+                          store_phone_2_country: phoneFallbackCountry,
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RegistrationPhoneField
+                        idPrefix="settings-store-phone-3"
+                        label="Additional phone 3"
+                        description="Optional. Same SMS alerts as your primary number."
+                        countryCode={formData.store_phone_3_country}
+                        nationalNumber={formData.store_phone_3_national}
+                        onCountryCodeChange={(code) =>
+                          setFormData({ ...formData, store_phone_3_country: code as CountryCode })
+                        }
+                        onNationalNumberChange={(value) => setFormData({ ...formData, store_phone_3_national: value })}
+                        required={false}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          store_phone_3_national: '',
+                          store_phone_3_country: phoneFallbackCountry,
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="font-medium text-foreground">Additional store phone numbers</strong> (up to two) are included on non-Basic
+                  plans. Your current plan ({extraStorePhonesPlanName || 'Basic'}) includes the primary number only.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" asChild size="sm">
+                    <Link href="/dashboard/subscription?tab=plans">View plans &amp; pricing</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowExtraPhonesUpgradeDialog(true)}
+                  >
+                    Why upgrade?
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="store_logo">Store Logo</Label>
               <div className="flex items-start gap-4">
@@ -412,11 +1099,21 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="store_phone">Phone Number</Label>
+                <Label htmlFor="business_type">Business Type</Label>
                 <Input
-                  id="store_phone"
-                  value={formData.store_phone}
-                  onChange={(e) => setFormData({ ...formData, store_phone: e.target.value })}
+                  id="business_type"
+                  value={formData.business_type}
+                  onChange={(e) => setFormData({ ...formData, business_type: e.target.value })}
+                  placeholder="e.g. Fashion / Clothing"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="selling">What are you selling?</Label>
+                <Input
+                  id="selling"
+                  value={formData.selling}
+                  onChange={(e) => setFormData({ ...formData, selling: e.target.value })}
+                  placeholder="e.g. Bags"
                 />
               </div>
             </div>
@@ -555,6 +1252,48 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
           </div>
         </form>
       </Card>
+
+          {/* Trusted Devices */}
+          <TrustedDevicesSettings />
+
+          {/* Two-Factor Authentication */}
+          <MFASettings />
+
+          {/* Account Deletion (Danger Zone) */}
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Account
+              </CardTitle>
+              <CardDescription>
+                Permanently close your store. Your storefront and dashboard access will be disabled immediately.
+                Store data is retained for up to {process.env.NEXT_PUBLIC_TENANT_RETENTION_DAYS || '90'} days before permanent deletion.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>This action is serious</AlertTitle>
+                <AlertDescription>
+                  Deleting your account will sign you out, disable your store, and schedule hard deletion after the retention period.
+                  If you change your mind, contact support before the retention period expires.
+                </AlertDescription>
+              </Alert>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    setDeleteAccountError(null);
+                    setShowDeleteAccountDialog(true);
+                  }}
+                >
+                  Delete my account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Currency Settings Tab */}
@@ -666,6 +1405,26 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* Shipping Methods Tab */}
         <TabsContent value="shipping" className="space-y-6">
+          {/* Delivery Zones Link */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Delivery Zones</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Manage delivery zones and pricing for different locations
+                  </p>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="/dashboard/settings/delivery-zones">
+                    <MapPinIcon className="mr-2 h-4 w-4" />
+                    Manage Zones
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
         <form onSubmit={handleSettingsSubmit}>
           <CardHeader>
@@ -687,21 +1446,78 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
             </div>
             {formData.shipping_enabled && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="shipping_method_type">Shipping Method Type *</Label>
-                  <Select
+                <Alert className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertTitle>Finish delivery pricing for checkout</AlertTitle>
+                  <AlertDescription className="text-sm mt-2 space-y-2 [&_p]:leading-relaxed">
+                    <p>
+                      When <strong>delivery</strong> is enabled, customers expect a clear shipping price at checkout.
+                      If delivery is not set up correctly yet, they may be <strong>unable to complete a delivery order</strong>,
+                      or shipping may only be confirmed <strong>after</strong> the order is placed.
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        <strong>Flat rate:</strong> enter a flat rate amount below so every delivery order has a fixed fee.
+                      </li>
+                      <li>
+                        <strong>Delivery zones:</strong> create at least one active zone in{' '}
+                        <Link href="/dashboard/settings/delivery-zones" className="font-medium underline underline-offset-2">
+                          Delivery Zones
+                        </Link>
+                        . If you choose zones but none exist, checkout falls back to flat rate—so you should still set a flat rate as a backup.
+                      </li>
+                    </ul>
+                    <p className="text-xs text-muted-foreground dark:text-amber-100/85">
+                      Not ready to ship? Turn off &quot;Enable Shipping&quot; above and use store pickup instead.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-4">
+                  <Label>Shipping Method Type *</Label>
+                  <RadioGroup
                     value={formData.shipping_method_type}
-                    onValueChange={(value) => setFormData({ ...formData, shipping_method_type: value as 'flat_rate' | 'dynamic_rate' })}
+                    onValueChange={(value) => setFormData({ ...formData, shipping_method_type: value as 'flat_rate' | 'delivery_zones' })}
                   >
-                    <SelectTrigger id="shipping_method_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="flat_rate">Flat Rate</SelectItem>
-                      <SelectItem value="dynamic_rate">Dynamic Rate (Charge per km)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                      <RadioGroupItem value="flat_rate" id="flat_rate" />
+                      <Label htmlFor="flat_rate" className="flex-1 cursor-pointer">
+                        <div>
+                          <div className="font-semibold">Flat Rate</div>
+                          <div className="text-sm text-muted-foreground">
+                            Fixed shipping cost for all orders
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                      <RadioGroupItem value="delivery_zones" id="delivery_zones" />
+                      <Label htmlFor="delivery_zones" className="flex-1 cursor-pointer">
+                        <div>
+                          <div className="font-semibold">Delivery Zones</div>
+                          <div className="text-sm text-muted-foreground">
+                            Different prices based on delivery location zones
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
                 </div>
+                
+                {/* Show delivery zones info when selected */}
+                {formData.shipping_method_type === 'delivery_zones' && (
+                  <div className="p-4 border rounded-lg bg-primary/5">
+                    <p className="text-sm text-muted-foreground">
+                      Configure your delivery zones and pricing in the{' '}
+                      <a 
+                        href="/dashboard/settings/delivery-zones" 
+                        className="text-primary underline hover:text-primary/80"
+                      >
+                        Delivery Zones
+                      </a>{' '}
+                      section above.
+                    </p>
+                  </div>
+                )}
                 {formData.shipping_method_type === 'flat_rate' && (
                   <div className="space-y-2">
                     <Label htmlFor="flat_rate_amount">Flat Rate Amount *</Label>
@@ -713,26 +1529,10 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                       value={formData.flat_rate_amount}
                       onChange={(e) => setFormData({ ...formData, flat_rate_amount: e.target.value })}
                       placeholder="0.00"
+                      required
                     />
                     <p className="text-xs text-muted-foreground">
                       Fixed shipping cost for all orders
-                    </p>
-                  </div>
-                )}
-                {formData.shipping_method_type === 'dynamic_rate' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="dynamic_rate_per_km">Rate Per Kilometer *</Label>
-                    <Input
-                      id="dynamic_rate_per_km"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.dynamic_rate_per_km}
-                      onChange={(e) => setFormData({ ...formData, dynamic_rate_per_km: e.target.value })}
-                      placeholder="0.00"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Shipping cost per kilometer (calculated based on delivery distance)
                     </p>
                   </div>
                 )}
@@ -762,7 +1562,129 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     </p>
                   </div>
                 )}
+                
+                {/* Estimated Delivery Time */}
+                <div className="pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="default_estimated_delivery_days">Default Estimated Delivery Time (Days)</Label>
+                    <Input
+                      id="default_estimated_delivery_days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={formData.default_estimated_delivery_days}
+                      onChange={(e) => setFormData({ ...formData, default_estimated_delivery_days: e.target.value })}
+                      placeholder="e.g., 3-5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Default estimated delivery time shown to customers. Individual products can override this value.
+                      Leave empty to not display delivery estimates.
+                    </p>
+                  </div>
+                </div>
               </>
+            )}
+          </CardContent>
+          <div className="px-6 pb-6 flex items-center gap-4">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+            {settingsSuccess && (
+              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                {settingsSuccess}
+              </div>
+            )}
+            {settingsError && (
+              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                {settingsError}
+              </div>
+            )}
+          </div>
+        </form>
+      </Card>
+
+      {/* Pickup Options */}
+      <Card>
+        <form onSubmit={handleSettingsSubmit}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Pickup Options</CardTitle>
+                <CardDescription>
+                  Configure store pickup for brick-and-mortar stores. Customers can choose to pick up their orders at your store location.
+                </CardDescription>
+              </div>
+              <Checkbox
+                id="pickup_enabled"
+                checked={formData.pickup_enabled}
+                onCheckedChange={(checked) => {
+                  const newValue = checked === true;
+                  // Validate that store address exists
+                  if (newValue && !formData.store_address && !formData.store_city && !formData.store_country) {
+                    setSettingsError('Store pickup requires a physical address. Please add store address in the General tab first.');
+                    return;
+                  }
+                  setFormData({ ...formData, pickup_enabled: newValue });
+                  setSettingsError(null);
+                }}
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.pickup_enabled ? (
+              <>
+                {(!formData.store_address || !formData.store_city || !formData.store_country) && (
+                  <div className="p-4 border border-yellow-500/50 rounded-lg bg-yellow-500/10">
+                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                      ⚠️ Store pickup requires a physical address. Please add your store address in the <strong>General</strong> tab first.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="pickup_location_name">Pickup Location Name (Optional)</Label>
+                  <Input
+                    id="pickup_location_name"
+                    value={formData.pickup_location_name}
+                    onChange={(e) => setFormData({ ...formData, pickup_location_name: e.target.value })}
+                    placeholder="e.g., Main Store, Downtown Location"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A friendly name for your pickup location. If left empty, your store name will be used.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pickup_instructions">Pickup Instructions (Optional)</Label>
+                  <Textarea
+                    id="pickup_instructions"
+                    value={formData.pickup_instructions}
+                    onChange={(e) => setFormData({ ...formData, pickup_instructions: e.target.value })}
+                    rows={3}
+                    placeholder="e.g., Enter through the main entrance. Orders are ready at the customer service desk. Please bring a valid ID."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Instructions for customers on how to pick up their orders. This will be shown during checkout and in order confirmations.
+                  </p>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <div>
+                    <Label>Store Hours</Label>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Set your store&apos;s opening and closing times for each day of the week. Customers will see these hours when selecting pickup.
+                    </p>
+                    <StoreHoursEditor
+                      value={formData.pickup_hours}
+                      onChange={(hours) => setFormData({ ...formData, pickup_hours: hours })}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Enable store pickup to allow customers to collect their orders at your physical location. This is ideal for brick-and-mortar stores.
+              </div>
             )}
           </CardContent>
           <div className="px-6 pb-6 flex items-center gap-4">
@@ -786,72 +1708,338 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
 
         {/* Payment Methods Tab */}
         <TabsContent value="payment" className="space-y-6">
-          <Card>
-        <form onSubmit={handleSettingsSubmit}>
-          <CardHeader>
-            <CardTitle>Payment Methods</CardTitle>
-            <CardDescription>
-              Enable or disable payment gateways for your store.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_pesapal_enabled"
-                checked={formData.payment_pesapal_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_pesapal_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_pesapal_enabled" className="cursor-pointer">
-                Enable Pesapal
-              </Label>
+          <form onSubmit={handleSettingsSubmit}>
+            <div className="space-y-6">
+              {/* Payment Method - Moved to first position */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Method</CardTitle>
+                  <CardDescription>
+                    The default payment method shown to customers during checkout
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Select Payment Method</Label>
+                    <Select
+                      value={formData.payment_method}
+                      onValueChange={(value) => setFormData({ ...formData, payment_method: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tumiziOfferedForValidation && (
+                          <SelectItem value="tumizi">M-Pesa via Tumizi (STK + auto verify)</SelectItem>
+                        )}
+                        {formData.payment_cash_enabled && (
+                          <SelectItem value="cash">Cash</SelectItem>
+                        )}
+                        {formData.payment_mpesa_enabled && (
+                          <SelectItem value="mpesa">Manual M-PESA Verification</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {!formData.payment_cash_enabled &&
+                      !formData.payment_mpesa_enabled &&
+                      !tumiziOfferedForValidation && (
+                      <p className="text-sm text-destructive mt-2">
+                        Please enable at least one payment method
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Payment Timing</Label>
+                    <RadioGroup
+                      value={formData.payment_timing}
+                      onValueChange={(value) => setFormData({ ...formData, payment_timing: value })}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="before_delivery" id="timing_before" className="mt-1" />
+                          <Label htmlFor="timing_before" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Pay Before Delivery</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers must pay before the order is delivered
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="after_delivery" id="timing_after" className="mt-1" />
+                          <Label htmlFor="timing_after" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">Pay After Delivery</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers pay when the order is delivered (Cash on Delivery)
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                        <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                          <RadioGroupItem value="user_choice" id="timing_choice" className="mt-1" />
+                          <Label htmlFor="timing_choice" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-semibold">User Can Pay Before or After</div>
+                              <div className="text-sm text-muted-foreground">
+                                Customers can choose to pay before or after delivery
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <CardTitle>Tumizi wallet</CardTitle>
+                      <CardDescription>
+                        Customers pay with an M-Pesa STK prompt; payments confirm automatically when this is on.
+                      </CardDescription>
+                    </div>
+                    <Switch
+                      checked={
+                        initialSettings.payment_tumizi_enabled === true ||
+                        Boolean(tumiziConfigState?.enabled)
+                      }
+                      disabled={tumiziToggleLoading || tumiziConfigState === null}
+                      onCheckedChange={(checked) => void handleTumiziToggle(checked)}
+                      aria-label="Toggle Tumizi automatic M-Pesa checkout"
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  {tumiziToggleLoading && <p>Updating Tumizi…</p>}
+                  {initialSettings.payment_tumizi_enabled && !tumiziCheckoutReady && (
+                    <p>
+                      Wallet provisioning may still be running. Automatic checkout unlocks as soon as Tumizi is fully linked.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Cash Payment Method */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Cash</CardTitle>
+                      <CardDescription>
+                        Cash
+                      </CardDescription>
+                    </div>
+                    <Checkbox
+                      id="payment_cash_enabled"
+                      checked={formData.payment_cash_enabled}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        if (!newValue && !formData.payment_mpesa_enabled && !tumiziOfferedForValidation) {
+                          setError('At least one payment method must be enabled');
+                          return;
+                        }
+                        let nextMethod = formData.payment_method;
+                        if (!newValue) {
+                          if (formData.payment_mpesa_enabled) nextMethod = 'mpesa';
+                          else if (tumiziOfferedForValidation) nextMethod = 'tumizi';
+                        }
+                        setFormData({
+                          ...formData,
+                          payment_cash_enabled: newValue,
+                          payment_method: nextMethod,
+                        });
+                        setError(null);
+                      }}
+                    />
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* M-Pesa */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Manual M-PESA Verification</CardTitle>
+                      <CardDescription>
+                        Mobile money payment method
+                      </CardDescription>
+                    </div>
+                    <Checkbox
+                      id="payment_mpesa_enabled"
+                      checked={formData.payment_mpesa_enabled}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        if (!newValue && !formData.payment_cash_enabled && !tumiziOfferedForValidation) {
+                          setError('At least one payment method must be enabled');
+                          return;
+                        }
+                        let nextMethod = formData.payment_method;
+                        if (!newValue) {
+                          if (formData.payment_cash_enabled) nextMethod = 'cash';
+                          else if (tumiziOfferedForValidation) nextMethod = 'tumizi';
+                        }
+                        setFormData({
+                          ...formData,
+                          payment_mpesa_enabled: newValue,
+                          payment_method: nextMethod,
+                        });
+                        setError(null);
+                      }}
+                    />
+                  </div>
+                </CardHeader>
+                {formData.payment_mpesa_enabled && (
+                  <CardContent className="space-y-4">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Manual Verification Required</AlertTitle>
+                      <AlertDescription>
+                        All M-Pesa payment options require manual verification. The system cannot automatically verify payments. You will need to manually confirm payments before fulfilling orders.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="space-y-4">
+                      <Label>M-Pesa Payment Option</Label>
+                      <RadioGroup
+                        value={formData.payment_mpesa_option}
+                        onValueChange={(value) => setFormData({ ...formData, payment_mpesa_option: value })}
+                      >
+                        <div className="space-y-3">
+                          {/* Option 1: Send Money */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="send_money" id="mpesa_send_money" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_send_money" className="cursor-pointer font-medium">
+                                Send Money
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers send money directly to your M-Pesa number
+                              </p>
+                              {formData.payment_mpesa_option === 'send_money' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter M-Pesa number (e.g., 0712345678)"
+                                    value={formData.payment_mpesa_send_money_number}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_send_money_number: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 2: Buy Goods */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="buy_goods" id="mpesa_buy_goods" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_buy_goods" className="cursor-pointer font-medium">
+                                Buy Goods
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Till Number
+                              </p>
+                              {formData.payment_mpesa_option === 'buy_goods' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter Till Number (e.g., 123456)"
+                                    value={formData.payment_mpesa_buy_goods_till}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_buy_goods_till: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 3: Paybill */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="paybill" id="mpesa_paybill" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_paybill" className="cursor-pointer font-medium">
+                                Paybill
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Paybill number and account number
+                              </p>
+                              {formData.payment_mpesa_option === 'paybill' && (
+                                <div className="pt-2 space-y-2">
+                                  <Input
+                                    placeholder="Enter Paybill Number (e.g., 123456)"
+                                    value={formData.payment_mpesa_paybill_number}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_paybill_number: e.target.value })}
+                                  />
+                                  <Input
+                                    placeholder="Enter Account Number"
+                                    value={formData.payment_mpesa_paybill_account}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_paybill_account: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Option 4: Pochi la Biashara */}
+                          <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value="pochi" id="mpesa_pochi" className="mt-1" />
+                            <div className="flex-1 space-y-2">
+                              <Label htmlFor="mpesa_pochi" className="cursor-pointer font-medium">
+                                Pochi la Biashara
+                              </Label>
+                              <p className="text-sm text-muted-foreground">
+                                Customers pay using your Pochi la Biashara phone number
+                              </p>
+                              {formData.payment_mpesa_option === 'pochi' && (
+                                <div className="pt-2">
+                                  <Input
+                                    placeholder="Enter Phone Number (e.g., 0712345678)"
+                                    value={formData.payment_mpesa_pochi_phone}
+                                    onChange={(e) => setFormData({ ...formData, payment_mpesa_pochi_phone: e.target.value })}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_paypal_enabled"
-                checked={formData.payment_paypal_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_paypal_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_paypal_enabled" className="cursor-pointer">
-                Enable PayPal
-              </Label>
+
+            <div className="mt-6 flex items-center gap-4">
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+              {settingsSuccess && (
+                <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
+                  {settingsSuccess}
+                </div>
+              )}
+              {settingsError && (
+                <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                  {settingsError}
+                </div>
+              )}
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="payment_cash_on_delivery_enabled"
-                checked={formData.payment_cash_on_delivery_enabled}
-                onCheckedChange={(checked) => setFormData({ ...formData, payment_cash_on_delivery_enabled: checked === true })}
-              />
-              <Label htmlFor="payment_cash_on_delivery_enabled" className="cursor-pointer">
-                Enable Cash on Delivery
-              </Label>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="default_payment_method">Default Payment Method</Label>
-              <Input
-                id="default_payment_method"
-                value={formData.default_payment_method}
-                onChange={(e) => setFormData({ ...formData, default_payment_method: e.target.value })}
-                placeholder="e.g., pesapal"
-              />
-            </div>
-          </CardContent>
-          <div className="px-6 pb-6 flex items-center gap-4">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
-            {settingsSuccess && (
-              <div className="rounded-lg bg-green-500/10 px-4 py-2 text-sm text-green-600 dark:text-green-400">
-                {settingsSuccess}
-              </div>
-            )}
-            {settingsError && (
-              <div className="rounded-lg bg-destructive/10 px-4 py-2 text-sm text-destructive">
-                {settingsError}
-              </div>
-            )}
-          </div>
-        </form>
-      </Card>
+          </form>
+        </TabsContent>
+
+        {/* Tumizi Settings Tab */}
+        <TabsContent value="tumizi" className="space-y-6">
+          <TumiziDashboardClient
+            tenantName={tenant.name || tenant.subdomain}
+            isTumiziEnabled={
+              initialSettings.payment_tumizi_enabled === true ||
+              Boolean(tumiziConfigState?.enabled)
+            }
+            embedded
+          />
         </TabsContent>
 
         {/* Tax Settings Tab */}
@@ -889,17 +2077,51 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
                     onChange={(e) => setFormData({ ...formData, default_tax_rate: e.target.value })}
                     placeholder="0.00"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    The default tax rate applied to orders. Can be overridden per product or region.
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="tax_included_in_price"
-                    checked={formData.tax_included_in_price}
-                    onCheckedChange={(checked) => setFormData({ ...formData, tax_included_in_price: checked === true })}
-                  />
-                  <Label htmlFor="tax_included_in_price" className="cursor-pointer">
-                    Prices include tax
-                  </Label>
+                
+                <div className="space-y-4">
+                  <Label>Tax Pricing Type</Label>
+                  <RadioGroup
+                    value={formData.tax_pricing_type}
+                    onValueChange={(value) => setFormData({ ...formData, tax_pricing_type: value as 'inclusive' | 'exclusive' })}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                        <RadioGroupItem value="inclusive" id="tax_inclusive" className="mt-1" />
+                        <Label htmlFor="tax_inclusive" className="flex-1 cursor-pointer">
+                          <div>
+                            <div className="font-semibold">Tax-Inclusive Pricing</div>
+                            <div className="text-sm text-muted-foreground">
+                              Product prices already include tax. Tax amount is shown separately in cart and checkout for transparency.
+                              <br />
+                              <span className="text-xs">Example: Product shows $110 (includes $10 tax at 10% rate)</span>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                      <div className="flex items-start space-x-3 p-4 border rounded-lg">
+                        <RadioGroupItem value="exclusive" id="tax_exclusive" className="mt-1" />
+                        <Label htmlFor="tax_exclusive" className="flex-1 cursor-pointer">
+                          <div>
+                            <div className="font-semibold">Tax-Exclusive Pricing</div>
+                            <div className="text-sm text-muted-foreground">
+                              Product prices do not include tax. Tax is added at checkout.
+                              <br />
+                              <span className="text-xs">Example: Product shows $100, tax ($10) added at checkout = $110 total</span>
+                            </div>
+                          </div>
+                        </Label>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    This follows the same pattern as Shopify and WooCommerce. Tax will always be displayed as a separate line item in cart and checkout for transparency.
+                  </p>
                 </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="tax_calculation_based_on">Calculate Tax Based On</Label>
                   <Select
@@ -937,7 +2159,106 @@ export default function TenantSettingsClient({ tenant, initialSettings, countrie
         </form>
       </Card>
         </TabsContent>
+
+        {/* Version Tab */}
+        <TabsContent value="version" className="space-y-6">
+          <VersionInfo />
+        </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showExtraPhonesUpgradeDialog} onOpenChange={setShowExtraPhonesUpgradeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Additional phone numbers</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                On Pro and higher plans you can add two more store numbers. All configured numbers receive the same SMS
+                alerts for new orders and subscription reminders.
+              </p>
+              <p>Upgrade to unlock this alongside other Pro features.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                router.push('/dashboard/subscription?tab=plans');
+              }}
+            >
+              View plans &amp; pricing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showDeleteAccountDialog}
+        onOpenChange={(open) => {
+          if (isDeletingAccount) return;
+          setShowDeleteAccountDialog(open);
+          if (!open) {
+            setDeleteConfirmation('');
+            setDeleteReason('');
+            setDeleteAccountError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately disable <strong>{tenant.name || tenant.subdomain}</strong>.
+              Type <strong>{accountDeletionConfirmationPhrase}</strong> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            {deleteAccountError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {deleteAccountError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-account-confirmation">Confirmation</Label>
+              <Input
+                id="delete-account-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder={accountDeletionConfirmationPhrase}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="delete-account-reason">Reason (optional)</Label>
+              <Textarea
+                id="delete-account-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                placeholder="Help us improve by sharing why you are closing your store."
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAccount}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={
+                isDeletingAccount ||
+                deleteConfirmation.trim() !== accountDeletionConfirmationPhrase
+              }
+            >
+              {isDeletingAccount ? 'Deleting account...' : 'Confirm delete'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

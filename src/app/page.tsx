@@ -70,7 +70,8 @@ export default async function HomePage() {
       hostnameWithoutPort === 'dukanest.com' ||
       (hostnameWithoutPort === 'localhost' && !hasDefaultTenant) ||
       hostnameWithoutPort === '127.0.0.1' ||
-      hostnameWithoutPort.includes('storeflow') ||
+      hostnameWithoutPort === 'www.storeflow.com' ||
+      hostnameWithoutPort === 'storeflow.com' ||
       hostnameWithoutPort.includes('vercel.app') ||
       hostnameWithoutPort === process.env.MARKETING_DOMAIN?.split(':')[0];
     
@@ -93,11 +94,10 @@ export default async function HomePage() {
   // Fetch store settings for logo (will be used by header)
   const settings = await getStaticOptions(tenant.id, ['store_logo']);
 
-  // Try to find a homepage page (could be marked as homepage or slug = 'home')
-  const homepage = await prisma.pages.findFirst({
+  // Find this tenant's home page (by slug only — draft or published)
+  const homePageAnyStatus = await prisma.pages.findFirst({
     where: {
       tenant_id: tenant.id,
-      status: 'published',
       OR: [
         { slug: 'home' },
         { slug: '' },
@@ -108,10 +108,11 @@ export default async function HomePage() {
     },
   });
 
-  // If homepage exists and has page builder content, render it
-  if (homepage?.content) {
+  // Helper to render homepage from parsed page builder content
+  const renderHomeFromContent = (content: string | null | undefined) => {
+    if (!content) return null;
     try {
-      const pageData: PageBuilderData = JSON.parse(homepage.content);
+      const pageData: PageBuilderData = JSON.parse(content);
       if (pageData.sections && pageData.sections.length > 0) {
         return (
           <ThemeProviderWrapper>
@@ -119,6 +120,7 @@ export default async function HomePage() {
               <StorefrontHeader />
               <main className="flex-1">
                 {pageData.sections
+                  .filter((s: any) => !s.hidden)
                   .sort((a: any, b: any) => a.order - b.order)
                   .map((section: any) => (
                     <SectionRenderer key={section.id} section={section} isPreview={false} />
@@ -130,11 +132,46 @@ export default async function HomePage() {
         );
       }
     } catch {
-      // If JSON parsing fails, fall back to default homepage
+      // If JSON parsing fails, return null
     }
+    return null;
+  };
+
+  // Published home page → show current content (live version)
+  if (homePageAnyStatus?.status === 'published' && homePageAnyStatus.content) {
+    const rendered = renderHomeFromContent(homePageAnyStatus.content);
+    if (rendered) return rendered;
   }
 
-  // Default homepage with featured products
+  // Draft home page but we have a previous published version → show that so visitors don't see "updating"
+  if (homePageAnyStatus?.status === 'draft' && homePageAnyStatus.published_content) {
+    const rendered = renderHomeFromContent(homePageAnyStatus.published_content);
+    if (rendered) return rendered;
+  }
+
+  // Tenant has a home page in draft and no previous published version → show "updating" message
+  if (homePageAnyStatus?.status === 'draft') {
+    return (
+      <ThemeProviderWrapper>
+        <div className="min-h-screen flex flex-col">
+          <StorefrontHeader />
+          <main className="flex-1 flex items-center justify-center px-4 py-16">
+            <div className="text-center max-w-md">
+              <h1 className="text-2xl font-semibold text-foreground mb-2">
+                We&apos;re updating our homepage
+              </h1>
+              <p className="text-muted-foreground">
+                {tenant.name || 'This store'}&apos;s homepage is being updated. Check back soon.
+              </p>
+            </div>
+          </main>
+          <StorefrontFooter />
+        </div>
+      </ThemeProviderWrapper>
+    );
+  }
+
+  // No home page exists yet → default homepage with featured products
   const featuredProductsRaw = await prisma.products.findMany({
     where: {
       tenant_id: tenant.id,

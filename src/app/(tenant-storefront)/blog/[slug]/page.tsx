@@ -7,7 +7,19 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma/client';
 import { requireTenant } from '@/lib/tenant-context/server';
+import { generateSlug } from '@/lib/content/validation';
 import BlogPostClient from './blog-post-client';
+
+function blogSlugLookupVariants(raw: string): string[] {
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // keep raw
+  }
+  const normalized = generateSlug(decoded);
+  return [...new Set([raw, decoded, normalized].filter((s) => typeof s === 'string' && s.length > 0))];
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -34,15 +46,16 @@ export default async function BlogPostPage({ params }: PageProps) {
       status: 'published',
     };
 
+    const slugVariants = blogSlugLookupVariants(slug);
+
     if (isUUID) {
-      // If it looks like a UUID, try both slug and ID
       whereClause.OR = [
-        { slug },
         { id: slug },
+        ...slugVariants.map((s) => ({ slug: s })),
       ];
     } else {
-      // If it's not a UUID, only search by slug
-      whereClause.slug = slug;
+      // Match stored slug, decoded path segment, or normalized (hyphens-only) slug
+      whereClause.OR = slugVariants.map((s) => ({ slug: s }));
     }
 
     // Try to find blog by slug first, then by ID (if UUID format)

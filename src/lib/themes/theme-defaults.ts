@@ -20,17 +20,17 @@ export interface ThemeDefaults {
  */
 export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
   const defaults: Record<string, ThemeDefaults> = {
-    // Grocery Theme - Fresh, vibrant colors for food/grocery stores
+    // Grocery Theme - E-commerce-friendly color scheme (based on Figma & Shopify best practices)
     grocery: {
       colors: {
-        primary: '#4CAF50',      // Fresh green
-        secondary: '#FF9800',    // Orange accent
-        accent: '#8BC34A',       // Light green
-        background: '#FFFFFF',   // White background
-        text: '#212121',         // Dark gray text
-        muted: '#757575',        // Medium gray
-        buttonBackground: '#4CAF50', // Green button background
-        buttonText: '#FFFFFF',   // White button text
+        primary: '#4CAF50',      // Green - trust and action (e-commerce friendly)
+        secondary: '#10b981',    // Emerald - complements primary
+        accent: '#FF9800',       // Orange - use sparingly for emphasis
+        background: '#FFFFFF',   // White background - clean and professional
+        text: '#212121',         // Dark gray text - optimal contrast
+        muted: '#6B7280',        // Medium gray - 40-60% lighter than text for visibility
+        buttonBackground: '#4CAF50', // Green button background - matches primary
+        buttonText: '#FFFFFF',   // White button text - optimal contrast
       },
       fonts: {
         headingFont: 'Inter',
@@ -230,6 +230,31 @@ export function getThemeDefaults(themeSlug: string): ThemeDefaults | null {
       },
     },
 
+    // Furniture Theme - Warm wood/gold tones, derived from the real
+    // component code's own hardcoded colors (src/components/themes/
+    // furniture/{Header,Homepage}.tsx) rather than invented, so this
+    // matches what the theme actually looks like — real primary #B88E2F
+    // accent, #3a3a3a heading text, #616161 muted, Poppins throughout.
+    furniture: {
+      colors: {
+        primary: '#B88E2F',      // Warm gold/wood accent
+        secondary: '#3a3a3a',    // Dark charcoal heading text
+        accent: '#B88E2F',
+        background: '#FFFFFF',
+        text: '#3a3a3a',
+        muted: '#616161',
+        buttonBackground: '#B88E2F',
+        buttonText: '#FFFFFF',
+      },
+      fonts: {
+        headingFont: 'Poppins',
+        bodyFont: 'Poppins',
+        baseFontSize: 16,
+        headingWeight: 600,
+        bodyWeight: 400,
+      },
+    },
+
     // Default Theme - Fallback for unknown themes
     default: {
       colors: {
@@ -273,4 +298,180 @@ export function getAvailableThemeSlugs(): string[] {
     'minimal',
     'default',
   ];
+}
+
+/**
+ * Get color scheme based on business type
+ * Returns color scheme that will override theme defaults
+ */
+export function getBusinessTypeColorScheme(businessType: string): Partial<ThemeColors> | null {
+  if (!businessType) return null;
+
+  const type = businessType.toLowerCase();
+
+  // Grocery Store / Supermarket (Whole Foods, fresh produce - green = freshness, trust)
+  if (type.includes('grocery') || type.includes('supermarket')) {
+    return {
+      primary: '#4CAF50',      // Fresh green - industry standard for produce/freshness
+      secondary: '#2E7D32',    // Dark green - depth
+      accent: '#FF9800',       // Warm orange - CTAs and promotions
+      background: '#FFFFFF',
+      buttonBackground: '#4CAF50',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Pharmacy / Health & Wellness (Walgreens, CVS - blue/teal = trust, 85% of healthcare uses blue)
+  if (type.includes('pharmacy') || type.includes('health') || type.includes('wellness')) {
+    return {
+      primary: '#009688',       // Teal - trust, care, professionalism
+      secondary: '#4DB6AC',     // Light teal - welcoming
+      accent: '#FF9800',        // Orange - CTAs
+      background: '#FFFFFF',
+      buttonBackground: '#009688',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Fashion / Clothing (Zara, Nike, luxury - black/white = sophistication)
+  if (type.includes('fashion') || type.includes('clothing')) {
+    return {
+      primary: '#000000',       // Black - luxury standard (Chanel, Nike, YSL)
+      secondary: '#757575',     // Elegant gray
+      accent: '#E91E63',        // Pink accent - Hermès-style differentiation
+      background: '#FFFFFF',
+      buttonBackground: '#000000',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Electronics & Mobile Phones (Amazon, Best Buy - blue = trust, orange = action)
+  if (type.includes('electronics') || type.includes('mobile') || type.includes('phones')) {
+    return {
+      primary: '#146EB4',       // Amazon blue - trust, recognition
+      secondary: '#232F3E',     // Dark gray - tech feel
+      accent: '#FF9900',        // Amazon orange - CTAs
+      background: '#FFFFFF',
+      buttonBackground: '#146EB4',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Beauty & Personal Care (inspired by Sephora, Ulta, luxury beauty ecommerce)
+  if (type.includes('beauty') || type.includes('personal care')) {
+    return {
+      primary: '#E91E63',        // Material Pink 500 - strong, premium (not pastel)
+      secondary: '#9C27B0',      // Purple - elegant complement
+      accent: '#FF4081',         // Pink accent - vibrant for CTAs
+      background: '#FFFFFF',    // Clean white - product-focused
+      buttonBackground: '#E91E63',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Home & Kitchen (IKEA, Wayfair - warm browns = cozy, timeless)
+  if (type.includes('home') || type.includes('kitchen')) {
+    return {
+      primary: '#6D4C41',       // Rich brown - 2025 furniture trend
+      secondary: '#8D6E63',    // Warm brown gray
+      accent: '#FF7043',       // Cozy orange - warmth
+      background: '#FFFFFF',
+      buttonBackground: '#6D4C41',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Baby & Kids Products (pastels = gentle, nurturing - industry standard)
+  if (type.includes('baby') || type.includes('kids')) {
+    return {
+      primary: '#F48FB1',       // Soft pink - gentle
+      secondary: '#90CAF9',     // Soft blue - calming
+      accent: '#CE93D8',       // Lavender - soft complement
+      background: '#FFFFFF',
+      buttonBackground: '#F48FB1',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Food & Beverages / Restaurant (DoorDash, Grubhub - red/orange = appetite, urgency)
+  if (type.includes('food') || type.includes('beverages') || type.includes('restaurant')) {
+    return {
+      primary: '#E53935',       // Red - stimulates appetite, urgency
+      secondary: '#FF6F00',     // Orange - warmth, excitement
+      accent: '#FF9800',        // Amber - CTAs
+      background: '#FFFFFF',
+      buttonBackground: '#E53935',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Convenience Store / Duka (friendly, accessible - blue/green = trust, freshness)
+  if (type.includes('convenience') || type.includes('duka')) {
+    return {
+      primary: '#1C49C2',       // Chewy-style blue - trust, recognition
+      secondary: '#4CAF50',    // Green - freshness, accessibility
+      accent: '#FFC107',       // Warm yellow - promotions
+      background: '#FFFFFF',
+      buttonBackground: '#1C49C2',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Furniture & Home Decor (IKEA, Wayfair - browns, warm earth tones)
+  if (type.includes('furniture') || type.includes('home decor')) {
+    return {
+      primary: '#5D4037',       // Dark brown - timeless, natural
+      secondary: '#8D6E63',     // Warm brown gray
+      accent: '#D4AF37',        // Gold - premium accent
+      background: '#FFFFFF',
+      buttonBackground: '#5D4037',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Pets (Petco, Chewy - blue = trust, green = nature)
+  if (type.includes('pet')) {
+    return {
+      primary: '#1C49C2',       // Chewy blue - trust, pet industry standard
+      secondary: '#4CAF50',     // Green - nature, pets, vitality
+      accent: '#FF9800',       // Orange - friendly, energetic
+      background: '#FFFFFF',
+      buttonBackground: '#1C49C2',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Hardware (Home Depot - orange = iconic, Lowe's = blue)
+  if (type.includes('hardware')) {
+    return {
+      primary: '#F77000',       // Home Depot orange - industry recognition
+      secondary: '#37474F',     // Industrial gray - tools, metal
+      accent: '#FF9800',        // Warm orange - CTAs
+      background: '#FFFFFF',
+      buttonBackground: '#F77000',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Shoes / Footwear (Nike, Adidas - black/white = athletic, premium)
+  if (type.includes('shoes') || type.includes('footwear')) {
+    return {
+      primary: '#000000',       // Black - Nike, Adidas athletic standard
+      secondary: '#424242',     // Dark gray
+      accent: '#FF6700',        // Nike orange - energy, sport
+      background: '#FFFFFF',
+      buttonBackground: '#000000',
+      buttonText: '#FFFFFF',
+    };
+  }
+
+  // Default/Other - neutral, trustworthy blue
+  return {
+    primary: '#0066CC',
+    secondary: '#00A8E8',
+    accent: '#4A90E2',
+    background: '#FFFFFF',
+    buttonBackground: '#0066CC',
+    buttonText: '#FFFFFF',
+  };
 }

@@ -415,11 +415,15 @@ model order_products {
   user_id    String?   @db.Uuid
   quantity   Int
   price      Decimal   @db.Decimal(10, 2)
+  discount_amount Decimal @default(0) @db.Decimal(10, 2)
+  unit_cost_at_sale Decimal? @db.Decimal(10, 2)
+  cogs_total Decimal? @db.Decimal(12, 2)
   total      Decimal   @db.Decimal(10, 2)
   created_at DateTime? @default(now()) @db.Timestamp(6)
   orders     orders    @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   products   products? @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  service_bookings service_bookings[]
 
   @@index([order_id], map: "idx_order_products_order_id")
   @@index([product_id], map: "idx_order_products_product_id")
@@ -432,6 +436,7 @@ model orders {
   id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id                String           @db.Uuid
   order_number             String           @unique @db.VarChar(100)
+  invoice_number           String?          @db.VarChar(100)
   user_id                  String?          @db.Uuid
   name                     String?          @db.VarChar(255)
   email                    String?          @db.VarChar(255)
@@ -448,38 +453,59 @@ model orders {
   payment_meta             Json?
   coupon                   String?          @db.VarChar(100)
   coupon_discounted        Decimal?         @db.Decimal(10, 2)
+  deposit_amount           Decimal?         @db.Decimal(10, 2) // amount actually charged now; NULL = no deposit involved — see docs/SERVICES_PLAN.md
+  balance_amount           Decimal?         @db.Decimal(10, 2) // total_amount - deposit_amount; NULL when deposit_amount is NULL
   shipping_address_id      String?          @db.Uuid
   selected_shipping_option String?          @db.VarChar(255)
   checkout_type            String?          @db.VarChar(50)
+  delivery_zone_id         String?          @db.Uuid
+  delivery_zone_name       String?          @db.VarChar(100)
+  delivery_fee             Decimal?         @db.Decimal(10, 2)
+  delivery_fee_status      String?          @default("pending") @db.VarChar(50) // pending, quoted, approved, rejected
+  delivery_fee_quote       Decimal?         @db.Decimal(10, 2) // Store owner's calculated fee for out-of-zone
+  delivery_fee_notes       String?          @db.Text // Notes from store owner about delivery fee
   checkout_image_path      String?
   message                  String?
+  channel                  String           @default("online") @db.VarChar(20) // 'online' | 'pos'
+  client_sale_id           String?          @db.Uuid // POS: client-generated idempotency key
+  served_by                String?          @db.Uuid // POS: staff/owner auth user id (no FK)
+  pos_device_label         String?          @db.VarChar(100)
+  amount_tendered          Decimal?         @db.Decimal(10, 2)
+  change_due               Decimal?         @db.Decimal(10, 2)
+  offline_created_at       DateTime?        @db.Timestamptz(6) // POS: real sale time when created offline
   created_at               DateTime?        @default(now()) @db.Timestamp(6)
   updated_at               DateTime?        @default(now()) @db.Timestamp(6)
   order_products           order_products[]
   tenants                  tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  delivery_zone            delivery_zones?  @relation(fields: [delivery_zone_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  service_bookings         service_bookings[]
 
+  @@unique([tenant_id, client_sale_id], map: "idx_orders_tenant_client_sale_id")
   @@index([order_number], map: "idx_orders_order_number")
   @@index([tenant_id], map: "idx_orders_tenant_id")
   @@index([tenant_id, status], map: "idx_orders_tenant_status")
+  @@index([tenant_id, channel], map: "idx_orders_tenant_channel")
   @@index([user_id], map: "idx_orders_user_id")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model pages {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id        String    @db.Uuid
-  title            String    @db.VarChar(255)
-  slug             String?   @unique @db.VarChar(255)
-  content          String?
-  meta_title       String?   @db.VarChar(255)
-  meta_description String?
-  meta_tags        String?
-  status           String?   @default("draft") @db.VarChar(50)
-  created_at       DateTime? @default(now()) @db.Timestamp(6)
-  updated_at       DateTime? @default(now()) @db.Timestamp(6)
-  banner_image     String?   @db.VarChar(255)
-  tenants          tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  title              String    @db.VarChar(255)
+  slug               String?   @db.VarChar(255)
+  content            String?
+  published_content  String?   @db.Text
+  meta_title         String?   @db.VarChar(255)
+  meta_description   String?
+  meta_tags          String?
+  status             String?   @default("draft") @db.VarChar(50)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+  banner_image       String?   @db.VarChar(255)
+  tenants            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  @@unique([tenant_id, slug], map: "idx_pages_tenant_slug_unique")
   @@index([slug], map: "idx_pages_slug")
   @@index([tenant_id, created_at], map: "idx_pages_tenant_created")
   @@index([tenant_id], map: "idx_pages_tenant_id")
@@ -529,12 +555,15 @@ model price_plans {
   id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                      String                 @db.VarChar(255)
   price                     Decimal                @db.Decimal(10, 2)
+  price_kes                 Decimal?               @db.Decimal(10, 2)
   duration_months           Int
   features                  Json?                  @default("{}")
   status                    String?                @default("active") @db.VarChar(50)
   created_at                DateTime?               @default(now()) @db.Timestamp(6)
   updated_at                DateTime?               @default(now()) @db.Timestamp(6)
   trial_days                Int?                    @default(0)
+  onboarding_reward_window_days Int?                @default(30)
+  onboarding_reward_bonus_days  Int?                @default(30)
   tenants                   tenants[]
   scheduled_tenants         tenants[]               @relation("ScheduledPlan")
   subscription_changes_from subscription_changes[] @relation("FromPlan")
@@ -604,8 +633,10 @@ model product_variants {
   attribute_id               String?                      @db.Uuid
   attribute_value_id         String?                      @db.Uuid
   price                      Decimal?                     @db.Decimal(10, 2)
+  cost_price                 Decimal?                     @db.Decimal(10, 2)
   stock_quantity             Int?                         @default(0)
   sku                        String?                      @db.VarChar(100)
+  barcode                    String?                      @db.VarChar(100) // POS scan-to-add lookup
   image                      String?                      @db.VarChar(255)
   created_at                 DateTime?                    @default(now()) @db.Timestamp(6)
   updated_at                 DateTime?                    @default(now()) @db.Timestamp(6)
@@ -616,6 +647,7 @@ model product_variants {
 
   @@index([product_id], map: "idx_product_variants_product_id")
   @@index([tenant_id], map: "idx_product_variants_tenant_id")
+  @@index([tenant_id, barcode], map: "idx_product_variants_tenant_barcode")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -637,25 +669,34 @@ model product_wishlists {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model products {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenant_id          String               @db.Uuid
-  name               String               @db.VarChar(255)
-  slug               String?              @db.VarChar(255)
-  description        String?
-  short_description  String?
-  price              Decimal              @db.Decimal(10, 2)
-  sale_price         Decimal?             @db.Decimal(10, 2)
-  sku                String?              @db.VarChar(100)
-  stock_quantity     Int?                 @default(0)
-  status             String?              @default("active") @db.VarChar(50)
-  image              String?              @db.VarChar(255)
-  gallery            Json?                @default("[]")
-  category_id        String?              @db.Uuid
-  brand_id           String?              @db.Uuid
-  created_by         String?              @db.Uuid
-  metadata           Json?                @default("{}")
-  created_at         DateTime?            @default(now()) @db.Timestamp(6)
-  updated_at         DateTime?            @default(now()) @db.Timestamp(6)
+  id                      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id               String               @db.Uuid
+  name                    String               @db.VarChar(255)
+  slug                    String?              @db.VarChar(255)
+  description             String?
+  short_description       String?
+  price                   Decimal              @db.Decimal(10, 2)
+  cost_price              Decimal?             @db.Decimal(10, 2)
+  sale_price              Decimal?             @db.Decimal(10, 2)
+  deposit_type            String               @default("none") @db.VarChar(20) // 'none' | 'fixed' | 'percentage' — see docs/SERVICES_PLAN.md
+  deposit_value           Decimal?             @db.Decimal(10, 2) // KES amount for 'fixed', 0-100 for 'percentage'
+  sku                     String?              @db.VarChar(100)
+  barcode                 String?              @db.VarChar(100) // POS scan-to-add lookup
+  stock_quantity          Int?                 @default(0)
+  status                  String?              @default("active") @db.VarChar(50)
+  image                   String?              @db.VarChar(255)
+  gallery                 Json?                @default("[]")
+  category_id             String?              @db.Uuid
+  brand_id                String?              @db.Uuid
+  created_by              String?              @db.Uuid
+  metadata                Json?                @default("{}")
+  estimated_delivery_days Int?                 // Product-specific delivery time override (in days). NULL means use tenant default.
+  requires_shipping       Boolean              @default(true) // false = a service/digital item — see docs/SERVICES_PLAN.md
+  is_bookable             Boolean              @default(false) // real scheduling/booking (S2) — see docs/SERVICES_PLAN.md
+  booking_duration_minutes Int?                // required when is_bookable
+  booking_capacity        Int                  @default(1) // concurrent bookings this service supports (capacity, not named staff — see S2)
+  created_at              DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at              DateTime?            @default(now()) @db.Timestamp(6)
   cart_items         cart_items[]
   inventory_history  inventory_history[]
   order_products     order_products[]
@@ -664,11 +705,13 @@ model products {
   product_variants   product_variants[]
   product_wishlists  product_wishlists[]
   product_sales      product_sales[]
+  service_bookings   service_bookings[]
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([slug], map: "idx_products_slug")
   @@index([tenant_id], map: "idx_products_tenant_id")
   @@index([tenant_id, status], map: "idx_products_tenant_status")
+  @@index([tenant_id, barcode], map: "idx_products_tenant_barcode")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -755,6 +798,32 @@ model trusted_devices {
   @@index([user_id, ip_pattern], map: "idx_trusted_devices_ip_pattern")
 }
 
+model mobile_push_devices {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id                String    @db.Uuid
+  user_id                  String    @db.Uuid
+  device_id                String    @db.VarChar(191)
+  push_token               String    @db.VarChar(1024)
+  platform                 String    @db.VarChar(20) // android | ios | web
+  app_version              String?   @db.VarChar(50)
+  device_name              String?   @db.VarChar(255)
+  active                   Boolean?  @default(true)
+  notify_new_order         Boolean?  @default(true)
+  notify_pending_payment   Boolean?  @default(true)
+  notify_low_stock         Boolean?  @default(true)
+  notify_support_ticket    Boolean?  @default(true)
+  notify_delivery_updates  Boolean?  @default(true)
+  last_seen_at             DateTime? @default(now()) @db.Timestamp(6)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  tenants                  tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, user_id, device_id], map: "idx_mobile_push_devices_unique")
+  @@index([tenant_id], map: "idx_mobile_push_devices_tenant")
+  @@index([tenant_id, active], map: "idx_mobile_push_devices_tenant_active")
+  @@index([user_id], map: "idx_mobile_push_devices_user")
+}
+
 model mfa_otp_codes {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id    String     @db.Uuid
@@ -793,6 +862,71 @@ model tenant_themes {
   @@index([theme_id], map: "idx_tenant_themes_theme_id")
 }
 
+model onboarding_starter_packs {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  selling_key      String    @db.VarChar(255)
+  selling_raw      String?   @db.VarChar(255)
+  business_type    String?   @db.VarChar(255)
+  theme_slug       String    @default("default") @db.VarChar(100)
+  locale           String    @default("en-KE") @db.VarChar(20)
+  currency         String    @default("KES") @db.VarChar(10)
+  source_tenant_id String?   @db.Uuid
+  starter_pack_data Json?    @default("{}")
+  is_complete      Boolean?  @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+  tenants          tenants?  @relation(fields: [source_tenant_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([selling_key, theme_slug, locale, currency], map: "idx_onboarding_starter_packs_key_theme_locale_currency")
+  @@index([selling_key], map: "idx_onboarding_starter_packs_selling_key")
+  @@index([theme_slug], map: "idx_onboarding_starter_packs_theme_slug")
+  @@index([source_tenant_id], map: "idx_onboarding_starter_packs_source_tenant")
+}
+
+/// DA.24: cache of the 5 generic homepage images (hero/banners/split-layout)
+/// generated for the niche-agnostic starter pack path (see
+/// buildGenericHomepageImageJobs in src/app/api/onboarding/starter-pack/route.ts).
+/// Deliberately separate from onboarding_starter_packs — that cache exists for
+/// specific-looking (fake) product photos and intentionally strips reused image
+/// URLs (stripReusedImageUrls) so competing tenants never render identical
+/// "product" photos. These 5 images are never product-specific (generic
+/// hero/banner/split-layout dressing only), so reuse across tenants sharing a
+/// style is safe and expected -- the same reasoning Wix/Squarespace/Shopify's
+/// Burst library rely on for shared stock/template imagery. No FK relation to
+/// tenants (source_tenant_id is informational only) -- deliberately kept out of
+/// the tenants model to avoid touching that high-stakes file for this.
+model onboarding_generic_image_cache {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  style_key        String    @db.VarChar(255)
+  style_raw        String?   @db.VarChar(255)
+  theme_slug       String    @default("default") @db.VarChar(100)
+  hero_url         String
+  banner_urls      Json      @default("[]")
+  split_url        String?
+  reuse_count      Int       @default(0)
+  source_tenant_id String?   @db.Uuid
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+
+  @@unique([style_key, theme_slug], map: "idx_generic_image_cache_style_theme")
+  @@index([style_key], map: "idx_generic_image_cache_style_key")
+}
+
+/// DA.26: platform-wide, landlord-editable key/value settings. First real
+/// use: the DA.24 starter-pack generic-image reuse cap, previously a
+/// hardcoded constant -- requested directly by the user ("make it an
+/// editable configuration on admin dashboard"). See
+/// src/lib/settings/platform-settings.ts for the typed accessor. No FK to
+/// auth.users for updated_by -- informational only, same reasoning as
+/// onboarding_generic_image_cache's source_tenant_id.
+model platform_settings {
+  key         String    @id @db.VarChar(100)
+  value       String
+  description String?
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_by  String?   @db.Uuid
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model tenants {
   id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -825,6 +959,8 @@ model tenants {
   cities                     cities[]
   countries                  countries[]
   coupons                    coupons[]
+  expenses                   expenses[]
+  ai_usage_logs              ai_usage_log[]
   customers                  customers[]
   form_builders              form_builders[]
   form_submissions           form_submissions[]
@@ -840,6 +976,7 @@ model tenants {
   subscription_changes       subscription_changes[]
   scheduled_plan             price_plans?                  @relation("ScheduledPlan", fields: [scheduled_plan_id], references: [id])
   product_variant_attributes product_variant_attributes[]
+  delivery_zones             delivery_zones[]
   product_variants           product_variants[]
   product_wishlists          product_wishlists[]
   products                   products[]
@@ -847,16 +984,137 @@ model tenants {
   static_options             static_options[]
   support_ticket_messages    support_ticket_messages[]
   support_tickets            support_tickets[]
+  mobile_push_devices        mobile_push_devices[]
+  onboarding_starter_packs   onboarding_starter_packs[]
   price_plans                price_plans?                 @relation(fields: [plan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   user_delivery_addresses    user_delivery_addresses[]
   wallets                    wallets[]
   sales                      sales[]
   product_sales              product_sales[]
+  service_bookings           service_bookings[]
+  expense_categories         expense_categories[]
+  tenant_tumizi_integrations tenant_tumizi_integrations[]
+  tumizi_webhook_events      tumizi_webhook_events[]
+  referrals_made             tenant_referrals[]            @relation("ReferralReferrer")
+  referral_received          tenant_referrals[]            @relation("ReferralReferred")
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
   @@index([subdomain], map: "idx_tenants_subdomain")
   @@index([deleted_at], map: "idx_tenants_deleted_at")
+}
+
+/// Tenant-level Tumizi integration state (opt-in, merchant mapping, wallet sync).
+model tenant_tumizi_integrations {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  enabled               Boolean?  @default(false)
+  merchant_external_id  String?   @db.VarChar(120)
+  wallet_account_number String?   @db.VarChar(120)
+  wallet_currency       String?   @db.VarChar(10)
+  webhook_url           String?   @db.VarChar(500)
+  webhook_events        Json?     @default("[]")
+  metadata              Json?     @default("{}")
+  created_at            DateTime? @default(now()) @db.Timestamp(6)
+  updated_at            DateTime? @default(now()) @db.Timestamp(6)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id], map: "idx_tenant_tumizi_integrations_tenant_unique")
+  @@unique([merchant_external_id], map: "idx_tenant_tumizi_integrations_merchant_external_unique")
+  @@index([enabled], map: "idx_tenant_tumizi_integrations_enabled")
+  @@index([tenant_id], map: "idx_tenant_tumizi_integrations_tenant_id")
+}
+
+/// Raw Tumizi webhook events for idempotency, replay and audit.
+model tumizi_webhook_events {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id           String?   @db.Uuid
+  event_name          String    @db.VarChar(120)
+  external_reference  String?   @db.VarChar(255)
+  merchant_external_id String?  @db.VarChar(120)
+  payload             Json
+  processing_status   String    @default("received") @db.VarChar(40)
+  processing_error    String?
+  processed_at        DateTime? @db.Timestamp(6)
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  tenants             tenants?  @relation(fields: [tenant_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([event_name, external_reference], map: "idx_tumizi_webhook_events_name_ref_unique")
+  @@index([tenant_id], map: "idx_tumizi_webhook_events_tenant_id")
+  @@index([event_name], map: "idx_tumizi_webhook_events_event_name")
+  @@index([processing_status], map: "idx_tumizi_webhook_events_processing_status")
+  @@index([merchant_external_id], map: "idx_tumizi_webhook_events_merchant_external_id")
+}
+
+/// Store expense ledger for profit and loss reporting.
+model expenses {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id      String    @db.Uuid
+  expense_date   DateTime  @db.Date
+  category_id    String?   @db.Uuid
+  category       String    @db.VarChar(80)
+  amount         Decimal   @db.Decimal(12, 2)
+  tax_amount     Decimal?  @db.Decimal(12, 2)
+  payment_method String?   @db.VarChar(50)
+  reference      String?   @db.VarChar(255)
+  notes          String?
+  created_by     String?   @db.Uuid
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  tenants        tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expense_categories expense_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_expenses_tenant_id")
+  @@index([category_id], map: "idx_expenses_category_id")
+  @@index([tenant_id, expense_date], map: "idx_expenses_tenant_expense_date")
+  @@index([tenant_id, category], map: "idx_expenses_tenant_category")
+}
+
+/// Tenant-specific expense categories for P&L reporting.
+model expense_categories {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String     @db.Uuid
+  name        String     @db.VarChar(80)
+  slug        String     @db.VarChar(80)
+  description String?
+  is_default  Boolean?   @default(false)
+  created_at  DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?  @default(now()) @db.Timestamp(6)
+  tenants     tenants    @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expenses    expenses[]
+
+  @@unique([tenant_id, slug], map: "idx_expense_categories_tenant_slug_unique")
+  @@index([tenant_id], map: "idx_expense_categories_tenant_id")
+}
+
+/// Usage log for every Claude-powered AI feature call. Backs per-tenant quota
+/// enforcement (setup vs. monthly buckets — see docs/AI_FEATURES_PLAN.md) and
+/// cost/anomaly monitoring. One row per AI request, not per generated item —
+/// a batched call generating 10 product descriptions is one row.
+model ai_usage_log {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Nullable: Gemini's real call site (onboarding Store Starter Pack) can
+  // run before a tenant row exists — see migration
+  // 20260824180000_ai_usage_log_provider_and_nullable_tenant.sql. Every
+  // Claude call site always has a real tenant, so this stays non-null in
+  // practice for provider='claude' rows.
+  tenant_id        String?   @db.Uuid
+  feature          String    @db.VarChar(50) // e.g. 'product_description', 'expense_categorization', 'analytics_insight', 'theme_styling', 'photo_qa', 'marketing_image_prompt', 'legal_page_draft', 'delivery_zone_intake', 'starter_pack_content', 'starter_pack_image'
+  bucket           String    @db.VarChar(20) // 'setup' | 'monthly'
+  input_tokens     Int
+  output_tokens    Int
+  estimated_cost   Decimal   @db.Decimal(10, 6) // USD, at each provider's real list pricing (see @/lib/ai/claude-client.ts for Claude, @/lib/ai/gemini-cost.ts for Gemini)
+  item_count       Int?      @default(1) // items generated in this call, e.g. 10 for a batched description call
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  // 'claude' (default, every pre-existing row) | 'gemini'
+  provider         String    @default("claude") @db.VarChar(20)
+  tenants          tenants?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_ai_usage_log_tenant_id")
+  @@index([tenant_id, bucket], map: "idx_ai_usage_log_tenant_bucket")
+  @@index([tenant_id, feature, created_at], map: "idx_ai_usage_log_tenant_feature_created")
+  @@index([provider, created_at], map: "idx_ai_usage_log_provider_created")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -922,6 +1180,24 @@ model wallets {
   @@index([user_id], map: "idx_wallets_user_id")
 }
 
+/// Delivery Zones - Tenant-scoped
+model delivery_zones {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String    @db.Uuid
+  name        String    @db.VarChar(100)
+  price       Decimal   @db.Decimal(10, 2)
+  locations   String[]  // Array of location names (e.g., ["Westlands", "Parklands"])
+  is_active   Boolean?  @default(true)
+  sort_order  Int?      @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+  tenants     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orders      orders[]
+
+  @@index([tenant_id], map: "idx_delivery_zones_tenant_id")
+  @@index([tenant_id, is_active], map: "idx_delivery_zones_tenant_active")
+}
+
 model cron_job_logs {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   job_name     String    @db.VarChar(255)
@@ -959,6 +1235,27 @@ model subscription_changes {
   @@index([tenant_id], map: "idx_subscription_changes_tenant_id")
   @@index([effective_date], map: "idx_subscription_changes_effective_date")
   @@index([scheduled_change_date], map: "idx_subscription_changes_scheduled_date")
+}
+
+model tenant_referrals {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referrer_tenant_id  String    @db.Uuid
+  referred_tenant_id  String    @unique @db.Uuid
+  referral_identifier String    @db.VarChar(120)
+  status              String    @default("pending") @db.VarChar(20)
+  qualified_at        DateTime? @db.Timestamp(6)
+  rewarded_at         DateTime? @db.Timestamp(6)
+  reward_months       Int?      @default(1)
+  rejection_reason    String?   @db.VarChar(255)
+  metadata            Json?     @default("{}")
+  created_at          DateTime? @default(now()) @db.Timestamp(6)
+  updated_at          DateTime? @default(now()) @db.Timestamp(6)
+  referrer_tenant     tenants   @relation("ReferralReferrer", fields: [referrer_tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  referred_tenant     tenants   @relation("ReferralReferred", fields: [referred_tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([referrer_tenant_id], map: "idx_tenant_referrals_referrer")
+  @@index([status], map: "idx_tenant_referrals_status")
+  @@index([created_at], map: "idx_tenant_referrals_created_at")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -1006,4 +1303,80 @@ model product_sales {
   @@index([product_id], map: "idx_product_sales_product")
   @@index([sale_id], map: "idx_product_sales_sale")
   @@index([tenant_id, sale_id, order_index], map: "idx_product_sales_active")
+}
+
+/// Real scheduling/booking (S2, docs/SERVICES_PLAN.md). Capacity, not named
+/// staff — see products.booking_capacity; staff_label is free text only,
+/// staff accounts live in Supabase Auth (no Prisma model), not referenced
+/// here.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model service_bookings {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id        String    @db.Uuid
+  order_id         String?   @db.Uuid
+  order_product_id String?   @db.Uuid
+  product_id       String?   @db.Uuid
+  customer_name    String?   @db.VarChar(255)
+  customer_phone   String?   @db.VarChar(50)
+  customer_email   String?   @db.VarChar(255)
+  booking_date     DateTime  @db.Date
+  start_time       DateTime  @db.Time
+  end_time         DateTime  @db.Time
+  staff_label      String?   @db.VarChar(100)
+  status           String    @default("pending") @db.VarChar(20) // pending|confirmed|completed|cancelled|no_show
+  notes            String?
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime? @default(now()) @db.Timestamptz(6)
+  tenants          tenants        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orders           orders?        @relation(fields: [order_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  order_products   order_products? @relation(fields: [order_product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  products         products?      @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([tenant_id, booking_date], map: "idx_service_bookings_tenant_date")
+  @@index([tenant_id, status], map: "idx_service_bookings_tenant_status")
+  @@index([order_id], map: "idx_service_bookings_order_id")
+  @@index([product_id, booking_date], map: "idx_service_bookings_product_date")
+}
+
+/// User Guide Categories - Central table (for public help page)
+model user_guide_categories {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String              @db.VarChar(255)
+  slug        String?             @unique @db.VarChar(255)
+  icon        String?             @db.VarChar(50) // Icon name (e.g., "UserIcon", "ShoppingCartIcon")
+  color       String?             @db.VarChar(50) // Color class (e.g., "text-blue-600")
+  bg_color    String?            @map("bg_color") @db.VarChar(50) // Background color class
+  sort_order  Int?               @default(0) @map("sort_order")
+  is_active   Boolean?            @default(true) @map("is_active")
+  created_at  DateTime?          @default(now()) @map("created_at") @db.Timestamp(6)
+  updated_at  DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  articles    user_guide_articles[]
+
+  @@index([slug], map: "idx_user_guide_categories_slug")
+  @@index([sort_order], map: "idx_user_guide_categories_sort_order")
+  @@map("user_guide_categories")
+}
+
+/// User Guide Articles - Central table (for public help page)
+model user_guide_articles {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id String                @db.Uuid
+  title       String                @db.VarChar(255)
+  slug        String?               @unique @db.VarChar(255)
+  content     String                @db.Text
+  image       String?               @db.VarChar(255)
+  image_alt   String?               @map("image_alt") @db.VarChar(255)
+  sort_order  Int?                  @default(0) @map("sort_order")
+  is_active   Boolean?               @default(true) @map("is_active")
+  is_popular  Boolean?              @default(false) @map("is_popular")
+  created_at  DateTime?             @default(now()) @map("created_at") @db.Timestamp(6)
+  updated_at  DateTime?             @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  category    user_guide_categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([category_id], map: "idx_user_guide_articles_category_id")
+  @@index([slug], map: "idx_user_guide_articles_slug")
+  @@index([sort_order], map: "idx_user_guide_articles_sort_order")
+  @@index([is_active], map: "idx_user_guide_articles_is_active")
+  @@index([is_popular], map: "idx_user_guide_articles_is_popular")
+  @@map("user_guide_articles")
 }

@@ -44,6 +44,7 @@ export async function GET(
             attribute_id: true,
             attribute_value_id: true,
             price: true,
+            cost_price: true,
             stock_quantity: true,
             sku: true,
             image: true,
@@ -152,6 +153,7 @@ export async function PUT(
     if (validatedData.description !== undefined) updateData.description = validatedData.description;
     if (validatedData.short_description !== undefined) updateData.short_description = validatedData.short_description;
     if (validatedData.price !== undefined) updateData.price = validatedData.price;
+    if (validatedData.cost_price !== undefined) updateData.cost_price = validatedData.cost_price;
     if (validatedData.sale_price !== undefined) updateData.sale_price = validatedData.sale_price;
     if (validatedData.sku !== undefined) updateData.sku = validatedData.sku;
     if (validatedData.stock_quantity !== undefined) updateData.stock_quantity = validatedData.stock_quantity;
@@ -161,6 +163,17 @@ export async function PUT(
     if (validatedData.category_id !== undefined) updateData.category_id = validatedData.category_id;
     if (validatedData.brand_id !== undefined) updateData.brand_id = validatedData.brand_id;
     if (validatedData.metadata !== undefined) updateData.metadata = validatedData.metadata;
+    // Estimated delivery days (null means use tenant default)
+    if (validatedData.estimated_delivery_days !== undefined) updateData.estimated_delivery_days = validatedData.estimated_delivery_days;
+    // Basic deposit support (docs/SERVICES_PLAN.md)
+    if (validatedData.deposit_type !== undefined) updateData.deposit_type = validatedData.deposit_type;
+    if (validatedData.deposit_value !== undefined) updateData.deposit_value = validatedData.deposit_value;
+    // Basic services support (docs/SERVICES_PLAN.md)
+    if (validatedData.requires_shipping !== undefined) updateData.requires_shipping = validatedData.requires_shipping;
+    // Real scheduling/booking (S2, docs/SERVICES_PLAN.md)
+    if (validatedData.is_bookable !== undefined) updateData.is_bookable = validatedData.is_bookable;
+    if (validatedData.booking_duration_minutes !== undefined) updateData.booking_duration_minutes = validatedData.booking_duration_minutes;
+    if (validatedData.booking_capacity !== undefined) updateData.booking_capacity = validatedData.booking_capacity;
 
     // Update product
     const product = await prisma.products.update({

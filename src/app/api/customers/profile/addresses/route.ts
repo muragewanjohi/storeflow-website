@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { customerAddressSchema } from '@/lib/customers/validation';
+import { parseStoredAddress, serializeStoredAddress } from '@/lib/customers/address-storage';
 
 /**
  * GET /api/customers/profile/addresses - Get customer's addresses
@@ -17,35 +18,21 @@ export async function GET(request: NextRequest) {
   try {
     const tenant = await requireTenant();
     
-    // TODO: Get customer from session
-    const customerId = new URL(request.url).searchParams.get('customer_id');
+    // Get customer from session
+    const { getCurrentCustomer } = await import('@/lib/customers/get-current-customer');
+    const customer = await getCurrentCustomer();
     
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Customer ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer exists
-    const customer = await prisma.customers.findFirst({
-      where: {
-        id: customerId,
-        tenant_id: tenant.id,
-      },
-    });
-
     if (!customer) {
       return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
     // Get addresses
     const addresses = await prisma.user_delivery_addresses.findMany({
       where: {
-        user_id: customerId,
+        user_id: customer.id,
         tenant_id: tenant.id,
       },
       orderBy: [
@@ -56,20 +43,27 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      addresses: addresses.map((address: any) => ({
-        id: address.id,
-        name: address.name,
-        email: address.email,
-        phone: address.phone,
-        address: address.address,
-        city: address.city,
-        state_id: address.state_id,
-        country_id: address.country_id,
-        postal_code: address.postal_code,
-        is_default: address.is_default,
-        created_at: address.created_at,
-        updated_at: address.updated_at,
-      })),
+      addresses: addresses.map((address: any) => {
+        const parsedAddress = parseStoredAddress(address.address);
+        
+        return {
+          id: address.id,
+          name: address.name,
+          email: address.email,
+          phone: address.phone,
+          address: parsedAddress.address,
+          city: address.city || '',
+          state_id: address.state_id,
+          state: parsedAddress.state || address.state_id || '', // Return state name if available
+          country_id: address.country_id,
+          country: parsedAddress.country || address.country_id || '', // Return country name if available
+          postal_code: address.postal_code || '',
+          address_label: parsedAddress.addressLabel,
+          is_default: address.is_default,
+          created_at: address.created_at,
+          updated_at: address.updated_at,
+        };
+      }),
     });
   } catch (error: any) {
     console.error('Error fetching customer addresses:', error);
@@ -89,28 +83,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = customerAddressSchema.parse(body);
     
-    // TODO: Get customer from session
-    const customerId = body.customer_id;
+    // Get customer from session
+    const { getCurrentCustomer } = await import('@/lib/customers/get-current-customer');
+    const customer = await getCurrentCustomer();
     
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Customer ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify customer exists
-    const customer = await prisma.customers.findFirst({
-      where: {
-        id: customerId,
-        tenant_id: tenant.id,
-      },
-    });
-
     if (!customer) {
       return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
@@ -118,7 +98,7 @@ export async function POST(request: NextRequest) {
     if (validatedData.is_default) {
       await prisma.user_delivery_addresses.updateMany({
         where: {
-          user_id: customerId,
+          user_id: customer.id,
           tenant_id: tenant.id,
           is_default: true,
         },
@@ -128,18 +108,54 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Try to look up state_id and country_id if state/country names are provided
+    let stateId = validatedData.state_id;
+    let countryId = validatedData.country_id;
+
+    // If state is provided as string, try to find or create it
+    if (!stateId && validatedData.state) {
+      // Try to find existing state by name
+      const existingState = await prisma.states.findFirst({
+        where: {
+          name: validatedData.state,
+          tenant_id: tenant.id,
+        },
+      });
+      stateId = existingState?.id || null;
+    }
+
+    // If country is provided as string, try to find or create it
+    if (!countryId && validatedData.country) {
+      // Try to find existing country by name
+      const existingCountry = await prisma.countries.findFirst({
+        where: {
+          name: validatedData.country,
+          tenant_id: tenant.id,
+        },
+      });
+      countryId = existingCountry?.id || null;
+    }
+
+    const shouldStoreStateName = Boolean(validatedData.state && !stateId);
+    const shouldStoreCountryName = Boolean(validatedData.country && !countryId);
+    const addressField = serializeStoredAddress(validatedData.address, {
+      state: shouldStoreStateName ? validatedData.state : null,
+      country: shouldStoreCountryName ? validatedData.country : null,
+      addressLabel: validatedData.address_label,
+    });
+
     // Create address
     const address = await prisma.user_delivery_addresses.create({
       data: {
         tenant_id: tenant.id,
-        user_id: customerId,
+        user_id: customer.id,
         name: validatedData.name,
         email: validatedData.email,
         phone: validatedData.phone,
-        address: validatedData.address,
-        city: validatedData.city,
-        state_id: validatedData.state_id,
-        country_id: validatedData.country_id,
+        address: addressField,
+        city: validatedData.city || null,
+        state_id: stateId,
+        country_id: countryId,
         postal_code: validatedData.postal_code,
         is_default: validatedData.is_default,
       },
@@ -148,19 +164,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        address: {
-          id: address.id,
-          name: address.name,
-          email: address.email,
-          phone: address.phone,
-          address: address.address,
-          city: address.city,
-          state_id: address.state_id,
-          country_id: address.country_id,
-          postal_code: address.postal_code,
-          is_default: address.is_default,
-          created_at: address.created_at,
-        },
+        address: (() => {
+          const parsedAddress = parseStoredAddress(address.address);
+          return {
+            address: parsedAddress.address,
+            state: parsedAddress.state || '',
+            country: parsedAddress.country || '',
+            address_label: parsedAddress.addressLabel,
+            id: address.id,
+            name: address.name,
+            email: address.email,
+            phone: address.phone,
+            city: address.city || '',
+            state_id: address.state_id,
+            country_id: address.country_id,
+            postal_code: address.postal_code || '',
+            is_default: address.is_default,
+            created_at: address.created_at,
+          };
+        })(),
       },
       { status: 201 }
     );

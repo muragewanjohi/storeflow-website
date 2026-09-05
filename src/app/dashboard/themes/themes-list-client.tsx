@@ -20,9 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Download, Eye, Sparkles, Edit } from 'lucide-react';
-import Image from 'next/image';
+import { ImageWithFallback } from '@/components/marketing/image-with-fallback';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -57,15 +66,35 @@ export default function ThemesListClient() {
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
   const [includeDemoContent, setIncludeDemoContent] = useState(false);
   const [includeDemoAttributes, setIncludeDemoAttributes] = useState(false);
+  const [businessType, setBusinessType] = useState<string>('');
+  const [otherBusinessType, setOtherBusinessType] = useState<string>('');
+
+  // Business types for Kenya/Africa market
+  const businessTypes = [
+    'Grocery Store / Supermarket',
+    'Pharmacy / Health & Wellness',
+    'Fashion / Clothing',
+    'Electronics & Mobile Phones',
+    'Beauty & Personal Care',
+    'Home & Kitchen',
+    'Baby & Kids Products',
+    'Food & Beverages / Restaurant',
+    'Convenience Store / Duka',
+    'Furniture & Home Decor',
+    'Pets',
+    'Hardware',
+    'Other',
+  ];
 
   // Fetch all themes
-  const { data: themesData, isLoading: themesLoading } = useQuery({
+  const { data: themesData, isLoading: themesLoading, isError: themesError } = useQuery({
     queryKey: ['themes'],
     queryFn: async () => {
       const response = await fetch('/api/themes');
       if (!response.ok) throw new Error('Failed to fetch themes');
       const data = await response.json();
-      return data.themes as Theme[];
+      const list = data?.themes;
+      return Array.isArray(list) ? list : [];
     },
   });
 
@@ -98,14 +127,16 @@ export default function ThemesListClient() {
   }, [currentThemeData]);
 
   useEffect(() => {
-    if (installedThemesData) {
-      setInstalledThemes(installedThemesData);
-    }
+    // Ensure we never set null/undefined so installedThemes[theme.id] never throws
+    const map = installedThemesData;
+    setInstalledThemes(
+      typeof map === 'object' && map !== null && !Array.isArray(map) ? map : {}
+    );
   }, [installedThemesData]);
 
   // Install/activate theme mutation
   const installThemeMutation = useMutation({
-    mutationFn: async ({ themeId, includeDemo, includeAttributes }: { themeId: string; includeDemo: boolean; includeAttributes: boolean }) => {
+    mutationFn: async ({ themeId, includeDemo, includeAttributes, businessType }: { themeId: string; includeDemo: boolean; includeAttributes: boolean; businessType?: string }) => {
       const response = await fetch('/api/themes/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,6 +144,7 @@ export default function ThemesListClient() {
           theme_id: themeId,
           include_demo_content: includeDemo,
           include_demo_attributes: includeAttributes,
+          business_type: businessType,
         }),
       });
       if (!response.ok) {
@@ -131,6 +163,8 @@ export default function ThemesListClient() {
       setInstallDialogOpen(false);
       setIncludeDemoContent(false);
       setIncludeDemoAttributes(false);
+      setBusinessType('');
+      setOtherBusinessType('');
       
       // Build success message
       const messages: string[] = [];
@@ -219,16 +253,20 @@ export default function ThemesListClient() {
       setInstallDialogOpen(true);
     } else {
       // Theme is installed but not active - switch to it (no demo content option)
-      installThemeMutation.mutate({ themeId, includeDemo: false, includeAttributes: false });
+      installThemeMutation.mutate({ themeId, includeDemo: false, includeAttributes: false, businessType: undefined });
     }
   };
 
   const handleConfirmInstall = () => {
     if (selectedThemeId) {
+      // Determine final business type (use "Other" text if "Other" is selected)
+      const finalBusinessType = businessType === 'Other' ? otherBusinessType : businessType;
+      
       installThemeMutation.mutate({ 
         themeId: selectedThemeId, 
         includeDemo: includeDemoContent,
         includeAttributes: includeDemoAttributes,
+        businessType: finalBusinessType || undefined,
       });
     }
   };
@@ -241,7 +279,35 @@ export default function ThemesListClient() {
     );
   }
 
-  const themes = themesData || [];
+  if (themesError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <p className="text-muted-foreground">Failed to load themes.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // Defensive: ensure themes is always an array (avoids crash if API returns null or malformed data)
+  const themes = Array.isArray(themesData) ? themesData : [];
+  const installedMap = typeof installedThemes === 'object' && installedThemes !== null && !Array.isArray(installedThemes) ? installedThemes : {};
+
+  // Helper function to check if a theme is the Multipurpose theme (previously Grocery)
+  const isMultipurposeTheme = (theme: Theme) => {
+    return theme.slug?.toLowerCase() === 'grocery' || 
+           theme.title?.toLowerCase().includes('grocery') ||
+           theme.title?.toLowerCase().includes('multipurpose');
+  };
+  
+  // Helper function to get display name for theme
+  const getThemeDisplayName = (theme: Theme): string => {
+    if (isMultipurposeTheme(theme)) {
+      return theme.title?.replace(/Grocery/gi, 'Multipurpose') || 'Multipurpose Theme';
+    }
+    return theme.title || 'Unknown Theme';
+  };
 
   return (
     <div>
@@ -262,7 +328,7 @@ export default function ThemesListClient() {
                   Active Theme
                 </CardTitle>
                 <CardDescription className="mt-1">
-                  {currentThemeData.theme.title} - {currentThemeData.theme.description || 'No description'}
+                  {getThemeDisplayName(currentThemeData.theme)} - {currentThemeData.theme.description || 'No description'}
                 </CardDescription>
               </div>
               <Link href="/dashboard/themes/customize">
@@ -276,8 +342,10 @@ export default function ThemesListClient() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {themes.map((theme: any) => {
           const isActive = activeThemeId === theme.id;
-          const isInstalled = installedThemes[theme.id] !== undefined;
+          const isInstalled = installedMap[theme.id] !== undefined;
           const isInstalling = installThemeMutation.isPending && installThemeMutation.variables?.themeId === theme.id;
+          const isAvailable = isMultipurposeTheme(theme);
+          const displayName = getThemeDisplayName(theme);
           
           // Determine button text and icon
           let buttonText = 'Install';
@@ -294,7 +362,7 @@ export default function ThemesListClient() {
             <Card key={theme.id} className={isActive ? 'border-primary ring-2 ring-primary' : ''}>
               <div className="relative aspect-video w-full overflow-hidden rounded-t-lg bg-muted">
                 {theme.screenshot_url ? (
-                  <Image
+                  <ImageWithFallback
                     src={theme.screenshot_url}
                     alt={theme.title}
                     fill
@@ -305,17 +373,19 @@ export default function ThemesListClient() {
                     No preview available
                   </div>
                 )}
-                {isActive && (
-                  <div className="absolute top-2 right-2">
+                <div className="absolute top-2 right-2">
+                  {isActive ? (
                     <Badge className="bg-primary">Active</Badge>
-                  </div>
-                )}
+                  ) : !isAvailable ? (
+                    <Badge variant="secondary">Coming Soon</Badge>
+                  ) : null}
+                </div>
               </div>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <CardTitle className="flex items-center gap-2">
-                      {theme.title}
+                      {displayName}
                       {theme.is_premium && (
                         <Sparkles className="h-4 w-4 text-yellow-500" />
                       )}
@@ -343,36 +413,49 @@ export default function ThemesListClient() {
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="flex-1"
-                >
-                  <Link href={`/dashboard/themes/preview/${theme.id}`}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Preview
-                  </Link>
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleInstallTheme(theme.id)}
-                  disabled={isActive || isInstalling}
-                >
-                  {isInstalling ? (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      {isInstalled ? 'Switching...' : 'Installing...'}
-                    </>
-                  ) : (
-                    <>
-                      <ButtonIcon className="h-4 w-4 mr-2" />
-                      {buttonText}
-                    </>
-                  )}
-                </Button>
+                {isAvailable ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="flex-1"
+                    >
+                      <Link href={`/dashboard/themes/preview/${theme.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleInstallTheme(theme.id)}
+                      disabled={isActive || isInstalling}
+                    >
+                      {isInstalling ? (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          {isInstalled ? 'Switching...' : 'Installing...'}
+                        </>
+                      ) : (
+                        <>
+                          <ButtonIcon className="h-4 w-4 mr-2" />
+                          {buttonText}
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 w-full"
+                    disabled
+                  >
+                    Coming Soon
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           );
@@ -393,10 +476,34 @@ export default function ThemesListClient() {
           <DialogHeader>
             <DialogTitle>Install Theme</DialogTitle>
             <DialogDescription>
-              Would you like to install this theme with demo content? This will create sample products and categories to help you get started.
+              Configure your theme installation. Select your business type to automatically apply industry-appropriate colors.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="business-type">Business Type</Label>
+              <Select value={businessType} onValueChange={setBusinessType}>
+                <SelectTrigger id="business-type">
+                  <SelectValue placeholder="Select your business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {businessTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {businessType === 'Other' && (
+                <div className="mt-2">
+                  <Input
+                    placeholder="Enter your business type"
+                    value={otherBusinessType}
+                    onChange={(e) => setOtherBusinessType(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="demo-content"
@@ -441,7 +548,7 @@ export default function ThemesListClient() {
             </Button>
             <Button
               onClick={handleConfirmInstall}
-              disabled={installThemeMutation.isPending || !selectedThemeId}
+              disabled={installThemeMutation.isPending || !selectedThemeId || !businessType || (businessType === 'Other' && !otherBusinessType.trim())}
             >
               {installThemeMutation.isPending ? 'Installing...' : 'Install Theme'}
             </Button>

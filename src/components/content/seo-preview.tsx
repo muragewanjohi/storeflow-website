@@ -8,7 +8,6 @@
 
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 
 interface SEOPreviewProps {
@@ -42,14 +41,7 @@ export default function SEOPreview({
     : 'Add a meta description to see how it will appear in search results.';
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>SEO Preview</CardTitle>
-        <CardDescription>
-          How your page will appear in search engine results
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
         <div className="space-y-2">
           <Label>Search Result Preview</Label>
           <div className="border rounded-lg p-4 bg-background">
@@ -98,8 +90,7 @@ export default function SEOPreview({
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 

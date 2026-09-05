@@ -26,10 +26,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!customer || !customer.password) {
+    if (!customer) {
       // Don't reveal whether email exists or password is wrong (security best practice)
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: 'Invalid credentials', code: 'CUSTOMER_NOT_FOUND' },
+        { status: 401 }
+      );
+    }
+
+    if (!customer.password) {
+      return NextResponse.json(
+        { error: 'Invalid credentials', code: 'PASSWORD_LOGIN_UNAVAILABLE' },
         { status: 401 }
       );
     }
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     if (!isPasswordValid) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: 'Invalid credentials', code: 'INVALID_PASSWORD' },
         { status: 401 }
       );
     }

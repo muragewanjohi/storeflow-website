@@ -2,13 +2,19 @@
  * Notification Types
  */
 
-export type NotificationType = 
-  | 'new_order' 
-  | 'pending_payment' 
-  | 'failed_payment' 
+export type NotificationType =
+  | 'new_order'
+  | 'pending_payment'
+  | 'failed_payment'
   | 'low_stock'
   | 'new_support_ticket'
-  | 'support_ticket_reply';
+  | 'support_ticket_reply'
+  | 'delivery_fee_approved'
+  | 'delivery_fee_rejected'
+  // AI Phase 8.2 — usage approaching/at a real plan quota, see
+  // @/lib/subscriptions/ai-quota-warnings.ts.
+  | 'ai_quota_warning'
+  | 'ai_quota_reached';
 
 export interface Notification {
   id: string;
