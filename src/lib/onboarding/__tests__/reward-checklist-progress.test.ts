@@ -73,7 +73,7 @@ describe('buildRewardChecklistProgress', () => {
       productCount: 5,
       categoryCount: 2,
       activeSaleCount: 1,
-      maxProductsOnActiveSale: 2,
+      maxProductsOnActiveSale: 1,
       homePageContent: buildHomeContent({
         heroImage: MERCHANT,
         heroDescription: 'Fresh local produce',

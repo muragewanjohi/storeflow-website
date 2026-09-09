@@ -53,6 +53,7 @@ import { getStaticOptions } from '@/lib/settings/static-options';
 import { buildGettingStartedProgress, GETTING_STARTED_OPTION_NAMES } from '@/lib/onboarding/getting-started-progress';
 import { generateSlug } from '@/lib/products/validation';
 import { createSaleSchema, generateSaleSlug, sanitizeSaleName } from '@/lib/sales/validation';
+import { addProductToSale, SaleProductError } from '@/lib/sales/product-sales';
 import { getBusinessProfile } from '@/lib/tenant-context/business-profile';
 import {
   regenerateHomepageImage,
@@ -61,7 +62,7 @@ import {
   HOMEPAGE_IMAGE_SLOT_LABELS,
   isHomepageImageSlot,
 } from '@/lib/homepage-images/regenerate-shared';
-import { canUseAiFeature } from '@/lib/subscriptions/limits';
+import { canUseAiFeature, formatMarketingImagesExhaustedMessage, formatMarketingImagesRemainingNote } from '@/lib/subscriptions/limits';
 import {
   writeMarketingImageBatch,
   renderAndSaveMarketingImages,
@@ -134,6 +135,9 @@ export function buildClassifySystemPrompt(includeConfigurationGuidance: boolean)
       ? 'If your own previous message in this conversation proposed specific category names (or asked to confirm creating something) and the merchant\'s latest message is a short affirmative reply agreeing to it (e.g. "yes", "sure", "go ahead", "create those", "sounds good") — that is still configuration_guidance, continuing the same request, not unclear.'
       : undefined,
     includeConfigurationGuidance
+      ? 'Similarly, if your own previous message just created a SALE/PROMOTION and offered to add products to it (or asked for a product name and discount), OR offered to generate a banner for that sale, and the merchant\'s latest message is a short affirmative ("yes", "sure", "go ahead") OR names a product and/or discount to put on that sale (e.g. "Manzinj with 10% off", "add the leather bag at 15%") OR asks for a banner — that is still configuration_guidance, continuing the same sale setup, not unclear and not a brand-new product_intake or marketing_images request.'
+      : undefined,
+    includeConfigurationGuidance
       ? 'Similarly, if your own previous message listed what you CAN help set up right now (e.g. "I can help you add a new product or category, regenerate one of your homepage images, generate a new marketing image, or set up a delivery zone") and the merchant\'s latest message is a short reply agreeing to proceed without repeating which specific one (e.g. "okay add them", "yes please", "do it", "let\'s do that") — that is STILL configuration_guidance, not unclear, even though it doesn\'t name one specific option on its own. Let the target classification step try to work out which one from context, or ask which one if it genuinely can\'t.'
       : undefined,
     'If in doubt between help_question/configuration_guidance and business_advice, ask: is this about DukaNest\'s UI (where a button is, how to save a setting) or retail judgment no DukaNest document would ever contain (what to sell, what to name things, what to charge)? "How do I add a category" is about the UI, not business_advice; "what categories should I add" is retail judgment, business_advice.',
@@ -198,12 +202,28 @@ export const configTargetSchema = {
     // named the sale explicitly in their message (e.g. "create a sale
     // called Black Friday"), OR (b) YOUR OWN previous message asked "what
     // would you like to name this sale?" and the merchant's latest message
-    // answers it — extract that answer as the name. Left empty for a bare
-    // "create a sale"/"I want to add a sale" with no name given or answered
-    // yet — never invent a sale name or theme, unlike category suggestions
-    // (a sale is a real promotional event tied to the merchant's own actual
-    // plans, not a generic catalog bucket).
+    // answers it — extract that answer as the name. Also filled when they
+    // are adding a product to an existing/just-created sale and named which
+    // sale (or YOUR prior message named it — extract that same name). Left
+    // empty for a bare "create a sale" with no name yet — never invent a
+    // sale name or theme.
     saleName: { type: 'string' },
+    // Populated when target === 'sales' and the merchant wants to ADD an
+    // existing catalog product onto a sale (e.g. "add Manzinj with 10% off
+    // to the sale", or answering "which product?" with "Manzinj"). Extract
+    // the product name as they wrote it. Empty when only creating/naming
+    // the sale, or when they only said "yes" without naming a product yet.
+    saleProductName: { type: 'string' },
+    // Populated with target === 'sales' + saleProductName when they stated
+    // a discount percent (e.g. 10 for "10% off" / "10 percent"). null when
+    // no percent was given — never invent a discount.
+    saleDiscountPercent: { type: ['number', 'null'] },
+    // true when target === 'sales' and they want an AI banner image generated
+    // and attached to the sale: (a) YOUR previous message offered to generate
+    // a banner and they confirmed (yes/go ahead), OR (b) they explicitly asked
+    // to generate/add a banner for a named (or just-created) sale. false
+    // otherwise — never invent this.
+    saleWantBanner: { type: 'boolean' },
     // Populated when target === 'homepage_image' and YOUR OWN previous
     // message already proposed ONE specific slot (see proposedImageSlot
     // below) AND the merchant's latest message confirms it — one of
@@ -256,6 +276,9 @@ export const configTargetSchema = {
     'categoryNames',
     'suggestedCategoryNames',
     'saleName',
+    'saleProductName',
+    'saleDiscountPercent',
+    'saleWantBanner',
     'imageSlot',
     'proposedImageSlot',
     'marketingImageRequest',
@@ -271,6 +294,9 @@ export interface ConfigTargetParseResult {
   categoryNames: string[];
   suggestedCategoryNames: string[];
   saleName: string;
+  saleProductName: string;
+  saleDiscountPercent: number | null;
+  saleWantBanner: boolean;
   imageSlot: string;
   proposedImageSlot: string;
   marketingImageRequest: string;
@@ -320,15 +346,19 @@ export function buildConfigTargetSystemPrompt(
 
   return [
     'The merchant wants active, step-by-step help setting something up in DukaNest — not just an explanation.',
-    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "sales" — creating a new SALE/PROMOTION entity in the store (a real record on the Sales page — name only here, the merchant adds the banner/dates/discounted products afterward). "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing IMAGES (e.g. a banner graphic referencing a sale, images for social media, a promo graphic) — a picture, not the sale record itself. "blog_draft" — writing a full DRAFT BLOG POST (title, body, excerpt, SEO fields) on a topic and saving it to the store\'s Blog as a draft for review — not a short social caption (that\'s a different, separate capability), a real long-form blog article.',
-    'If their request is about adding or creating a product, return target: "product_intake". If it is about adding or creating a category, return target: "category". If it is about creating/adding/setting up a SALE or PROMOTION as a real thing in the store (e.g. "create a sale", "add a promotion called Black Friday", "I want to set up a flash sale") — actually creating the sale record, not just an image about it — return target: "sales". If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing IMAGE or images for some other purpose (a sale banner GRAPHIC, a social media post image, "make me a graphic for X") that is not one of the 5 fixed homepage slots and not a request to create the sale record itself, return target: "marketing_images". If it is about writing, drafting, or creating a BLOG POST or blog article for the store (e.g. "write a blog post about our new arrivals", "draft a blog article", "can you write a post for my blog") — a real long-form article, not a short social/WhatsApp/SMS message — return target: "blog_draft".',
+    'Currently supported guided setups: "product_intake" — adding a new product (name, price, stock, category, SKU). "category" — adding a new category (name, optional parent category). "sales" — creating a SALE/PROMOTION entity, generating its banner image, AND/OR adding existing catalog products onto a sale with a discount percent (e.g. "create a sale called Back to School", then "yes" for a banner, then "add Manzinj with 10% off"). Dates/publish can still be finished on the Sales page. "homepage_image" — regenerating one of the store\'s 5 EXISTING AI-generated homepage images (hero, one of 3 banners, or the split-layout image). "delivery_zone" — setting up a new delivery/shipping zone (a name, the real areas it covers, and a delivery fee). "marketing_images" — generating one or more NEW, free-form promotional/marketing IMAGES (e.g. a banner graphic for social media) that are NOT being attached to a sale record in this turn — a picture for the Media Library. If they want a banner ON a sale they just created/named, that is "sales" with saleWantBanner, not marketing_images. "blog_draft" — writing a full DRAFT BLOG POST (title, body, excerpt, SEO fields) on a topic and saving it to the store\'s Blog as a draft for review — not a short social caption (that\'s a different, separate capability), a real long-form blog article.',
+    'If their request is about adding or creating a NEW catalog PRODUCT (a product listing that does not exist yet — name/price/stock), return target: "product_intake". If it is about adding an EXISTING product onto a SALE/PROMOTION with a discount (e.g. "add Manzinj with 10% to the sale", "put the leather bag on Back to School at 15% off"), that is target: "sales", NOT product_intake. If it is about adding or creating a category, return target: "category". If it is about creating/adding/setting up a SALE or PROMOTION as a real thing in the store (e.g. "create a sale", "add a promotion called Black Friday", "I want to set up a flash sale") — actually creating the sale record, not just an image about it — return target: "sales". CRITICAL: if they ask to generate/create/add/make a BANNER (or banner image) FOR a named sale (e.g. "generate a banner for Back to school", "make a banner for my Black Friday sale", "add a banner to Weekend Deals") — ALWAYS return target: "sales" with saleWantBanner true and saleName set to that sale — NEVER marketing_images. marketing_images is only for free-form graphics that are NOT being attached to a specific sale record. If it is about changing, regenerating, updating, or getting a new version of one of the 5 EXISTING named homepage slots (the hero image, a banner, or the split-layout/side image) — NOT uploading their own photo, and NOT a product photo — return target: "homepage_image". If it is about setting up, adding, or configuring a delivery zone, shipping area, or delivery fee, return target: "delivery_zone". If it is about generating a NEW promotional/marketing IMAGE or images for some other purpose (a social media post image, "make me a graphic for X") that is not one of the 5 fixed homepage slots and not a banner for a named sale, return target: "marketing_images". If it is about writing, drafting, or creating a BLOG POST or blog article for the store (e.g. "write a blog post about our new arrivals", "draft a blog article", "can you write a post for my blog") — a real long-form article, not a short social/WhatsApp/SMS message — return target: "blog_draft".',
     'If target is "category", there are three cases:',
     '1. They already named the category/categories in THIS message (e.g. "create the categories Care Gadgets and Smart Home", "add a Electronics category") — extract each name EXACTLY as given into categoryNames. suggestedCategoryNames stays empty.',
     '2. They did not name any categories in this message, but YOUR OWN previous message in this conversation already proposed a specific list of category names AND their latest message clearly agrees to it (e.g. "yes", "sure, create those", "sounds good", "go ahead", "do it") — extract those SAME exact names you previously proposed into categoryNames now. suggestedCategoryNames stays empty. This is how an earlier suggestion becomes a real creation request.',
     `3. Otherwise — a first-time request with no names given (e.g. "help me create two categories for my store", "how do I add a category") — leave categoryNames empty, and instead propose 2-5 realistic, specific category names into suggestedCategoryNames, grounded in their real business context below. ${businessContext} ${existingList} ${curatedInstruction ?? 'No curated category list exists for their recorded business type — never invent categories unrelated to their actual business.'}`,
-    'If target is "sales", there are two cases:',
-    '1. They already named the sale in THIS message (e.g. "create a sale called Black Friday", "add a promotion named Back to School"), OR YOUR OWN previous message asked "what would you like to name this sale?" and their latest message answers it — extract the exact name into saleName.',
-    '2. Otherwise — a first-time request with no name given (e.g. "create a sale", "I want to set up a promotion") — leave saleName empty; you will ask them to name it. NEVER invent a sale name or theme yourself (unlike category suggestions) — a sale is a real promotional event tied to the merchant\'s own actual plans, not a generic catalog bucket.',
+    'If target is "sales", fill saleName / saleProductName / saleDiscountPercent / saleWantBanner as follows (leave unused fields empty/null/false):',
+    '1. Creating/naming a sale: They already named the sale in THIS message — including casual phrasing like "create a sale for weekend sale" (saleName = "weekend sale"), "create a sale called Black Friday", "add a promotion named Back to School", "set up a Flash Sale", "create a weekend sale" (saleName = "weekend sale"). OR YOUR OWN previous message asked "what would you like to name this sale?" and their latest message answers it — extract that answer into saleName. Prefer the merchant\'s own words; do NOT ask again when a usable name is already in THIS message. saleProductName empty, saleDiscountPercent null, saleWantBanner false.',
+    '2. Adding a product onto a sale: They named a catalog product to put on a sale (e.g. "add Manzinj with 10% discount to the sale") — set saleProductName, saleDiscountPercent if stated, saleName from this message or YOUR prior sale mention. saleWantBanner false.',
+    '3. Banner for a sale: YOUR OWN previous message offered to generate a banner for a sale AND they clearly agree (yes/sure/go ahead/do it), OR they explicitly ask to generate/add/create a banner for a sale — set saleWantBanner true, saleName to that sale from YOUR previous message or theirs. saleProductName empty, saleDiscountPercent null.',
+    '4. Affirmative after you offered ONLY to add products (no banner offer) with no product named — set saleName from YOUR previous message, saleWantBanner false, saleProductName empty.',
+    '5. Otherwise — a first-time request with NO name at all (e.g. bare "create a sale", "I want to set up a promotion") — leave saleName empty; never invent a sale name. saleWantBanner false.',
+    'IMPORTANT: "add product X to the sale" is ALWAYS target "sales" with saleProductName set — never product_intake. A request for a sale BANNER IMAGE while also creating/editing the sale record stays target "sales" (saleWantBanner), not marketing_images.',
     'If target is "homepage_image", the 5 real slots are: "hero" (the main top-of-homepage image), "banner1" (New Arrivals banner), "banner2" (Best Sellers banner), "banner3" (Special Offers banner), "split_layout" (the side/split-section image) — and all 5 together can also be requested at once, represented as the literal slot value "all". There are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed ONE SPECIFIC thing (a single named slot, or "all") and explicitly asked for a yes/no confirmation of THAT ONE THING (e.g. "Want me to regenerate your hero image?", "Want me to regenerate all 5 of your homepage images?") AND their latest message clearly agrees (e.g. "yes", "do it", "go ahead") — set imageSlot to that SAME exact value now ("hero"/"banner1"/"banner2"/"banner3"/"split_layout"/"all"). proposedImageSlot stays empty. This is how a proposal becomes a real regeneration request — regenerating costs real quota and must never happen on the very first mention. IMPORTANT: a message that merely LISTS multiple possible options for them to choose from (e.g. "which image would you like? Your options are: ... Or say all of them for all 5") is NOT a proposal of one specific thing, even though it mentions "all of them" as one of the choices — it is a question, not an offer. If their reply to a LIST like that names one option for the first time (including "all of them"), that is case 2 below, not case 1 — it still needs one more confirmation turn before anything is actually regenerated.',
     '2. Otherwise — set imageSlot to empty. If their message clearly identifies exactly ONE of the 5 slots (e.g. "regenerate my hero image" -> "hero"; "change the best sellers banner" -> "banner2"; "make me a new first banner" -> "banner1"; "update my split image" -> "split_layout"), set proposedImageSlot to that slot so it can be offered back for confirmation. If they clearly want ALL 5 regenerated (e.g. "all of them", "redo all my homepage images", "regenerate everything", "give me new images for my whole homepage"), set proposedImageSlot to "all" instead. If it is genuinely ambiguous which slot(s) they mean (e.g. "update my banner images" could be any of the 3, or a vague "make my homepage look better" with no clear scope), leave proposedImageSlot empty too — you will ask them which one(s).',
@@ -338,7 +368,7 @@ export function buildConfigTargetSystemPrompt(
     '2. Otherwise — a first-time request with no topic given (e.g. "write me a blog post", "can you draft something for my blog") — leave blogTopic empty; you will ask them what it should be about. NEVER invent a topic yourself.',
     'If target is "marketing_images", there are two cases:',
     '1. YOUR OWN previous message in this conversation already proposed generating images for a specific description AND their latest message clearly agrees (e.g. "yes", "go ahead", "do it") — set marketingImageRequest to that SAME description you previously proposed, set marketingImageCount to the SAME number you previously stated in that proposal (it will be written in your own prior message), set marketingImageConfirmed to true. This is how a proposal becomes a real generation request — generating costs real quota/money and must never happen on the very first mention.',
-    '2. Otherwise — a first-time request — set marketingImageRequest to a clear paraphrase of what they described wanting, set marketingImageConfirmed to false. If they stated a specific number of images (e.g. "3 images", "a couple of banners" -> 2), set marketingImageCount to that number; otherwise leave it null.',
+    '2. Otherwise — a first-time request — set marketingImageRequest to a clear paraphrase of what they described wanting, set marketingImageConfirmed to false. If the request is a banner/graphic for a SALE or promotion, set marketingImageCount to 1 (one banner per sale). Otherwise, if they stated a specific number of images (e.g. "3 images", "a couple of banners" -> 2), set marketingImageCount to that number; otherwise leave it null.',
     'For anything else (themes, payment settings, staff accounts, legal pages, or anything not about adding a product, a category, a sale, a homepage image, a delivery zone, a new marketing image, or a blog post), return target: "unsupported" — guided setup for those is not available yet. Fields for a target you did not return are always left at their empty default.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
@@ -347,6 +377,179 @@ export function buildConfigTargetSystemPrompt(
 /** Resolves the classify step's raw target string against the real allow-list — never trust it verbatim. */
 export function resolveConfigTarget(rawTarget: string): ConfigTarget {
   return (CONFIG_TARGETS as readonly string[]).includes(rawTarget) ? (rawTarget as ConfigTarget) : 'unsupported';
+}
+
+/**
+ * Deterministic fallback when the config-target LLM leaves saleName empty
+ * even though the merchant already named the sale (e.g. "create a sale for
+ * weekend sale"). Returns '' when no safe name can be pulled — never invents.
+ */
+function isWeakSaleNameToken(name: string): boolean {
+  return /^(a|an|the|new|my|please|promotional|promo|banner|graphic|image|it|this|that|them|one|sale|the sale|my sale|a sale)$/i.test(
+    name.trim(),
+  );
+}
+
+export function extractSaleNameHintFromUserMessage(text: string): string {
+  const raw = text.replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+
+  const stripTrailingJunk = (s: string) =>
+    s
+      .replace(/^["'`]+|["'`]+$/g, '')
+      .replace(/[.!?]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const namedPatterns: RegExp[] = [
+    /\b(?:create|add|set\s*up|make|start|launch)\s+(?:a\s+|an\s+|my\s+|the\s+)?(?:new\s+)?(?:sale|promotion|promo)\s+(?:for|called|named|titled|as)\s+(.+)$/i,
+    /\b(?:sale|promotion|promo)\s+(?:called|named|titled)\s+(.+)$/i,
+    // "banner for the Weekend Deals sale" / "graphic for Weekend Deals sale"
+    /\b(?:banner|graphic|image)s?\s+(?:for|of|on|to|onto)\s+(?:the\s+|my\s+|a\s+)?(.+?)\s+(?:sale|promotion|promo)\b/i,
+    // "add a banner to Weekend Deals" / "generate a banner for Back to school"
+    /\b(?:generate|create|add|make)\s+(?:a\s+|an\s+|my\s+|the\s+)?(?:banner|graphic)(?:\s+image)?\s+(?:for|to|onto|on)\s+(?:the\s+|my\s+|a\s+)?(.+)$/i,
+    /\b(?:banner|graphic)(?:\s+image)?\s+(?:for|to|onto|on)\s+(?:the\s+|my\s+|a\s+)?(.+)$/i,
+    /\b(?:for|on|to)\s+(?:the\s+|my\s+)?(.+?)\s+sale\b/i,
+  ];
+  for (const re of namedPatterns) {
+    const m = raw.match(re);
+    if (m?.[1]) {
+      let name = stripTrailingJunk(m[1]);
+      // "Weekend Deals sale" → keep "Weekend Deals" when the name already ends in sale/deals.
+      name = name.replace(/\s+(?:sale|promotion|promo)$/i, '').trim() || name;
+      if (
+        name.length >= 2 &&
+        !isWeakSaleNameToken(name)
+      ) {
+        return name;
+      }
+    }
+  }
+
+  // "create a weekend sale" / "add my flash sale" — name sits before the word sale.
+  const beforeSale = raw.match(
+    /\b(?:create|add|set\s*up|make|start|launch)\s+(?:a\s+|an\s+|my\s+|the\s+)?(?:new\s+)?(.+?)\s+(?:sale|promotion|promo)\b/i,
+  );
+  if (beforeSale?.[1]) {
+    const name = stripTrailingJunk(beforeSale[1]);
+    if (
+      name.length >= 2 &&
+      !/^(a|an|the|new|my|please|store|another)$/i.test(name)
+    ) {
+      if (!/\b(sale|promotion|promo)\b/i.test(name)) {
+        return `${name} Sale`;
+      }
+      return name;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Latest user turn in a chat history — used to backfill saleName / similar.
+ */
+export function latestUserMessageContent(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m?.role === 'user' && m.content.trim()) return m.content;
+  }
+  return '';
+}
+
+/** Pull sale name from an assistant turn that offered to generate a banner. */
+export function extractSaleNameFromAssistantBannerOffer(text: string): string {
+  const raw = text.replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const patterns: RegExp[] = [
+    /\b(?:generate|create|make)\s+a\s+banner(?:\s+image)?\s+for\s+(?:it|"([^"]+)"|'([^']+)'|(.+?))(?:\?|$)/i,
+    /\bbanner\s+for\s+"([^"]+)"/i,
+    /\bbanner\s+for\s+'([^']+)'/i,
+    /\bCreated\s+"([^"]+)"\.\s+(?:Want me|Would you like me) to generate a banner/i,
+    /\bWant me to generate (?:a )?banner(?: image)? for ["']([^"']+)["']/i,
+    /\bWould you like me to generate a banner for ["']([^"']+)["']/i,
+    /["']([^"']+)["'] already exists and has no banner/i,
+    // Marketing-images propose that named a sale campaign
+    /\b(?:promotional\s+)?banner\s+for\s+(?:the\s+)?(.+?)\s+campaign\b/i,
+    /\bI can generate \d+ images? of (?:a\s+)?(?:promotional\s+)?banner for (?:the\s+)?(.+?)(?:\.|\?|$)/i,
+  ];
+  for (const re of patterns) {
+    const m = raw.match(re);
+    let name = (m?.[1] || m?.[2] || m?.[3] || '').replace(/\s+/g, ' ').trim();
+    name = name.replace(/\s+(?:sale|promotion|promo|campaign)$/i, '').trim() || name;
+    if (name.length >= 2 && !isWeakSaleNameToken(name)) {
+      return name.replace(/[.!?]+$/g, '').trim();
+    }
+  }
+  return '';
+}
+
+/** Best-effort sale name from the whole chat (user create lines + assistant offers). */
+export function extractSaleNameFromConversation(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (!m?.content.trim()) continue;
+    if (m.role === 'assistant') {
+      const offered = extractSaleNameFromAssistantBannerOffer(m.content);
+      if (offered) return offered;
+      const created = m.content.match(/\bCreated(?: a new sale)?[:\s]+["']([^"']+)["']/i);
+      if (created?.[1]?.trim() && !isWeakSaleNameToken(created[1])) {
+        return created[1].trim();
+      }
+      continue;
+    }
+    const fromUser = extractSaleNameHintFromUserMessage(m.content);
+    if (fromUser && !isWeakSaleNameToken(fromUser)) return fromUser;
+  }
+  return '';
+}
+
+function isShortAffirmative(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim().toLowerCase();
+  return /^(yes|yep|yeah|yup|sure|ok|okay|please|do it|go ahead|go for it|sounds good|that works|generate it|generate one|make one|create it)([!.]?|$)/i.test(
+    t,
+  );
+}
+
+function looksLikeExplicitSaleBannerAsk(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (!/\bbanner\b/i.test(t) && !/\bgraphic\b/i.test(t)) return false;
+  return (
+    /\b(?:generate|create|add|make|attach|put)\b/i.test(t) ||
+    /\bbanner\s+(?:for|to|onto|on)\b/i.test(t)
+  );
+}
+
+/**
+ * Deterministic sale-banner continuation: after create we ask "Want me to
+ * generate a banner…?"; merchants often reply "yes" or "add a banner to X".
+ * Never invent a sale name — only reuse one from their message or our offer.
+ */
+export function resolveSaleBannerIntent(messages: ChatMessage[]): {
+  wantBanner: boolean;
+  saleName: string;
+} | null {
+  const latest = latestUserMessageContent(messages);
+  if (!latest) return null;
+
+  const explicitAsk = looksLikeExplicitSaleBannerAsk(latest);
+  const affirmative = isShortAffirmative(latest);
+  if (!explicitAsk && !affirmative) return null;
+
+  let saleName = extractSaleNameHintFromUserMessage(latest);
+  if (isWeakSaleNameToken(saleName)) saleName = '';
+
+  if (!saleName || affirmative) {
+    saleName = saleName || extractSaleNameFromConversation(messages);
+  }
+
+  // Pronoun-only asks ("generate a banner for it") still count when we can
+  // resolve a real sale name from earlier turns.
+  if (!saleName) return null;
+  if (affirmative || explicitAsk) {
+    return { wantBanner: true, saleName };
+  }
+  return null;
 }
 
 // Real recorded business_type/niche — moved to @/lib/tenant-context/business-profile
@@ -401,28 +604,55 @@ async function createCategoriesFromNames(tenantId: string, rawNames: string[]): 
  * products) — inventing a plausible-sounding sale name/theme the way
  * category suggestions invent generic catalog buckets would risk
  * fabricating something that reads as a real planned promotion. Created
- * sales always land as `status: 'draft'` (the real API's own default —
- * never overridden here), so nothing an AI creates ever goes live on the
- * storefront without the merchant separately publishing it from the Sales
- * page, where they'd also add the banner/dates/discounted products this
- * flow deliberately doesn't touch.
+ * sales default to `status: 'active'` (matching the Sales API/UI default)
+ * so a merchant can go live with one product immediately. Banner/dates can
+ * still be finished on the Sales page. After create, this flow can also
+ * attach existing catalog products with a discount percent (sale price
+ * derived from the product's regular price).
  */
-async function createSaleFromName(tenantId: string, rawName: string): Promise<{ created: string | null; skippedExisting: string | null; error: string | null }> {
+async function createSaleFromName(
+  tenantId: string,
+  rawName: string,
+): Promise<{
+  created: string | null;
+  createdId: string | null;
+  skippedExisting: string | null;
+  skippedExistingId: string | null;
+  error: string | null;
+}> {
   let validated;
   try {
     validated = createSaleSchema.parse({ name: rawName });
   } catch {
-    return { created: null, skippedExisting: null, error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.` };
+    return {
+      created: null,
+      createdId: null,
+      skippedExisting: null,
+      skippedExistingId: null,
+      error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.`,
+    };
   }
 
   const slug = generateSaleSlug(sanitizeSaleName(validated.name));
   if (!slug) {
-    return { created: null, skippedExisting: null, error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.` };
+    return {
+      created: null,
+      createdId: null,
+      skippedExisting: null,
+      skippedExistingId: null,
+      error: `"${rawName.trim()}" isn't a valid sale name — please try a shorter, plainer name.`,
+    };
   }
 
   const existing = await prisma.sales.findFirst({ where: { tenant_id: tenantId, slug } });
   if (existing) {
-    return { created: null, skippedExisting: existing.name, error: null };
+    return {
+      created: null,
+      createdId: null,
+      skippedExisting: existing.name,
+      skippedExistingId: existing.id,
+      error: null,
+    };
   }
 
   const sale = await prisma.sales.create({
@@ -432,63 +662,552 @@ async function createSaleFromName(tenantId: string, rawName: string): Promise<{ 
       slug,
       badge_text: 'SALE',
       badge_color: '#EF4444',
-      status: 'draft',
+      status: 'active',
       is_featured: false,
       metadata: {},
     },
   });
 
-  return { created: sale.name, skippedExisting: null, error: null };
+  return {
+    created: sale.name,
+    createdId: sale.id,
+    skippedExisting: null,
+    skippedExistingId: null,
+    error: null,
+  };
+}
+
+async function findSaleForAssistant(
+  tenantId: string,
+  saleName: string,
+): Promise<{ id: string; name: string } | null> {
+  const trimmed = saleName.trim();
+  const usableName = trimmed && !isWeakSaleNameToken(trimmed) ? trimmed : '';
+
+  if (usableName) {
+    const byName = await prisma.sales.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { equals: usableName, mode: 'insensitive' },
+      },
+      select: { id: true, name: true },
+      orderBy: { updated_at: 'desc' },
+    });
+    if (byName) return byName;
+
+    const byContains = await prisma.sales.findFirst({
+      where: {
+        tenant_id: tenantId,
+        name: { contains: usableName, mode: 'insensitive' },
+      },
+      select: { id: true, name: true },
+      orderBy: { updated_at: 'desc' },
+    });
+    if (byContains) return byContains;
+
+    // "September Sales campaign" → try without trailing campaign/sale words
+    const stripped = usableName
+      .replace(/\s+(?:campaign|promotion|promo|sale)$/i, '')
+      .trim();
+    if (stripped && stripped.toLowerCase() !== usableName.toLowerCase()) {
+      const byStripped = await prisma.sales.findFirst({
+        where: {
+          tenant_id: tenantId,
+          name: { equals: stripped, mode: 'insensitive' },
+        },
+        select: { id: true, name: true },
+        orderBy: { updated_at: 'desc' },
+      });
+      if (byStripped) return byStripped;
+    }
+  }
+
+  // Fallback: most recently updated sale — used when the merchant says
+  // "add X to the sale" / "generate a banner for it" right after creating one.
+  return prisma.sales.findFirst({
+    where: { tenant_id: tenantId },
+    select: { id: true, name: true },
+    orderBy: { updated_at: 'desc' },
+  });
+}
+
+async function findProductForSaleAttach(
+  tenantId: string,
+  productName: string,
+): Promise<
+  | { ok: true; product: { id: string; name: string; price: unknown } }
+  | { ok: false; reason: 'none' | 'ambiguous'; matches: string[] }
+> {
+  const trimmed = productName.trim();
+  if (!trimmed) return { ok: false, reason: 'none', matches: [] };
+
+  const exact = await prisma.products.findMany({
+    where: {
+      tenant_id: tenantId,
+      name: { equals: trimmed, mode: 'insensitive' },
+    },
+    select: { id: true, name: true, price: true },
+    take: 5,
+  });
+  if (exact.length === 1) return { ok: true, product: exact[0]! };
+  if (exact.length > 1) {
+    return { ok: false, reason: 'ambiguous', matches: exact.map((p) => p.name) };
+  }
+
+  const contains = await prisma.products.findMany({
+    where: {
+      tenant_id: tenantId,
+      name: { contains: trimmed, mode: 'insensitive' },
+    },
+    select: { id: true, name: true, price: true },
+    take: 5,
+    orderBy: { updated_at: 'desc' },
+  });
+  if (contains.length === 1) return { ok: true, product: contains[0]! };
+  if (contains.length > 1) {
+    return { ok: false, reason: 'ambiguous', matches: contains.map((p) => p.name) };
+  }
+  return { ok: false, reason: 'none', matches: [] };
+}
+
+function editSaleStep(
+  saleId: string,
+  saleName: string,
+  buildEditHref: (saleId: string) => string,
+) {
+  return {
+    id: 'sales',
+    label: 'Edit sale',
+    description: `Opens "${saleName}" so you can finish banner, dates, and publish`,
+    href: buildEditHref(saleId),
+    cta: 'Edit sale',
+  };
+}
+
+/**
+ * Generates one promotional banner via the marketing-image pipeline and
+ * writes it onto sales.banner_image (same attach pattern as registration
+ * starter-pack promotions). Best-effort on quota/API failures — caller
+ * surfaces the answer text; never throws for "couldn't generate".
+ */
+async function generateAndAttachSaleBanner(
+  tenant: Tenant,
+  sale: { id: string; name: string },
+): Promise<
+  | { ok: true; imageUrl: string; usage: AiUsage; remainingNote: string }
+  | { ok: false; answer: string; usage: AiUsage }
+> {
+  const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
+  const quota = await canUseAiFeature(tenant, 'marketing_image_prompt', 'monthly');
+  if (!quota.allowed) {
+    return {
+      ok: false,
+      answer: formatMarketingImagesExhaustedMessage(quota),
+      usage: zeroUsage,
+    };
+  }
+
+  const apiKey =
+    process.env.NANO_BANANA_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    return {
+      ok: false,
+      answer: `Image generation isn't configured right now — open "${sale.name}" and upload a banner from the sale editor.`,
+      usage: zeroUsage,
+    };
+  }
+
+  const { businessType, niche } = getBusinessProfile(tenant);
+  const description = `a wide ecommerce sale promotional banner image for a store sale named "${sale.name}"${
+    businessType ? ` (${businessType}${niche ? `, ${niche}` : ''})` : ''
+  } — bold promotional retail banner, space for sale title text, no tiny unreadable text`;
+
+  const { data: batch, usage: writeUsage } = await writeMarketingImageBatch({
+    tenantId: tenant.id,
+    businessType,
+    niche,
+    requestDescription: description,
+    requestedCount: 1,
+  });
+
+  if (batch.prompts.length === 0) {
+    return {
+      ok: false,
+      answer: `I couldn't design a banner for "${sale.name}" — try again, or upload one from the sale editor.`,
+      usage: writeUsage,
+    };
+  }
+
+  const { images } = await renderAndSaveMarketingImages({
+    tenantId: tenant.id,
+    apiKey,
+    prompts: batch.prompts.slice(0, 1),
+    bucket: 'monthly',
+  });
+
+  const imageUrl = images[0]?.imageUrl?.trim() ?? '';
+  if (!imageUrl) {
+    return {
+      ok: false,
+      answer: `Banner generation failed for "${sale.name}" — please try again later, or upload one from the sale editor.`,
+      usage: writeUsage,
+    };
+  }
+
+  // VarChar(255) on sales.banner_image — refuse overlong URLs rather than truncating.
+  if (imageUrl.length > 255) {
+    return {
+      ok: false,
+      answer: `I generated a banner but the image URL is too long to save on the sale. Open the Media Library to use it, or upload a banner from the sale editor.`,
+      usage: writeUsage,
+    };
+  }
+
+  await prisma.sales.update({
+    where: { id: sale.id },
+    data: { banner_image: imageUrl },
+  });
+
+  return {
+    ok: true,
+    imageUrl,
+    usage: writeUsage,
+    remainingNote: formatMarketingImagesRemainingNote(quota, 1),
+  };
 }
 
 /**
  * Answers a resolved 'sales' configuration_guidance target — shared
- * verbatim by both platforms, same reasoning as handleCategoryConfigTarget:
- * sale creation needs only a name, so both platforms can just do it. Two
- * cases (deliberately simpler than category's three — see
- * createSaleFromName()'s docblock for why no name-suggestion case exists):
- *  1. The merchant already named the sale (this turn, or confirming their
- *     own earlier answer to "what would you like to name this sale?") —
- *     creates it for real (as a draft) and confirms with the actual result.
- *  2. No name given — asks for one, creates nothing yet. A later message
- *     naming it re-enters this function via case 1.
+ * verbatim by both platforms. Cases:
+ *  1. No name + no product — ask for a sale name.
+ *  2. Name only — create sale, then offer banner + products.
+ *  3. Banner confirm / explicit banner request — generate + attach banner_image.
+ *  4. Affirmative / continue with name but no product yet — ask for product + %.
+ *  5. Product (+ optional %) — attach existing catalog product to the sale.
  */
 export async function handleSalesConfigTarget(
   tenant: Tenant,
   saleName: string,
-  pointer: { href: string; cta: string },
+  pointer: {
+    href: string;
+    cta: string;
+    buildEditHref: (saleId: string) => string;
+  },
+  extras: {
+    productName?: string;
+    discountPercent?: number | null;
+    wantBanner?: boolean;
+  } = {},
 ): Promise<HandlerResult> {
   const zeroUsage: AiUsage = { inputTokens: 0, outputTokens: 0 };
-  const pointerStep = { id: 'sales', label: 'Add a sale', description: 'Opens the sale form', href: pointer.href, cta: pointer.cta };
+  const newSaleStep = {
+    id: 'sales',
+    label: 'Add a sale',
+    description: 'Opens the sale form',
+    href: pointer.href,
+    cta: pointer.cta,
+  };
 
   const trimmedName = saleName.trim();
+  const trimmedProduct = (extras.productName ?? '').trim();
+  const wantBanner = extras.wantBanner === true;
+  const rawDiscount = extras.discountPercent;
+  const discountPercent =
+    typeof rawDiscount === 'number' && Number.isFinite(rawDiscount)
+      ? rawDiscount
+      : null;
+
+  // --- Generate / attach banner (before product attach so "yes" to banner wins) ---
+  if (wantBanner && !trimmedProduct) {
+    const sale = await findSaleForAssistant(tenant.id, trimmedName);
+    if (!sale) {
+      return {
+        intent: 'configuration_guidance',
+        answer:
+          'I couldn\'t find which sale to put the banner on. Name the sale (e.g. "generate a banner for Back to school"), or create the sale first.',
+        data: { target: 'sales', steps: [newSaleStep] },
+        usage: zeroUsage,
+      };
+    }
+
+    const existing = await prisma.sales.findFirst({
+      where: { id: sale.id, tenant_id: tenant.id },
+      select: { id: true, name: true, banner_image: true },
+    });
+    if (existing?.banner_image?.trim()) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `"${sale.name}" already has a banner. Want me to add a product with a discount? Reply like "Manzinj with 10% off", or open the sale to change the banner.`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+
+    const bannerResult = await generateAndAttachSaleBanner(tenant, sale);
+    if (!bannerResult.ok) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `${bannerResult.answer} You can still add products — reply with a name and percent (e.g. "Manzinj with 10% off").`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: bannerResult.usage,
+      };
+    }
+
+    return {
+      intent: 'configuration_guidance',
+      answer: `Added a banner to "${sale.name}" — it's on the sale now (also saved in your Media Library).${bannerResult.remainingNote} Want to add a product with a discount? Reply like "Manzinj with 10% off".`,
+      data: {
+        target: 'sales',
+        saleId: sale.id,
+        saleName: sale.name,
+        bannerImage: bannerResult.imageUrl,
+        steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+      },
+      usage: bannerResult.usage,
+    };
+  }
+
+  // --- Add product onto a sale (existing or just-created) ---
+  if (trimmedProduct) {
+    const sale = await findSaleForAssistant(tenant.id, trimmedName);
+    if (!sale) {
+      return {
+        intent: 'configuration_guidance',
+        answer:
+          'I couldn\'t find a sale to add that product to. Create one first (tell me the sale name), or open an existing sale from the Sales page.',
+        data: { target: 'sales', steps: [newSaleStep] },
+        usage: zeroUsage,
+      };
+    }
+
+    if (discountPercent == null || discountPercent <= 0 || discountPercent >= 100) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `Got it — which discount percent should "${trimmedProduct}" get on "${sale.name}"? Reply like "10%" or "15% off".`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          pendingProductName: trimmedProduct,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+
+    const productMatch = await findProductForSaleAttach(tenant.id, trimmedProduct);
+    if (!productMatch.ok) {
+      if (productMatch.reason === 'ambiguous') {
+        return {
+          intent: 'configuration_guidance',
+          answer: `I found more than one product matching "${trimmedProduct}": ${productMatch.matches.join(', ')}. Which exact name should I add to "${sale.name}"?`,
+          data: {
+            target: 'sales',
+            saleId: sale.id,
+            saleName: sale.name,
+            steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+          },
+          usage: zeroUsage,
+        };
+      }
+      return {
+        intent: 'configuration_guidance',
+        answer: `I couldn't find a product named "${trimmedProduct}" in your catalog. Check the spelling, or add the product first, then tell me again (e.g. "${trimmedProduct} with ${discountPercent}% off").`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+
+    const regularPrice = Number(productMatch.product.price);
+    if (!Number.isFinite(regularPrice) || regularPrice <= 0) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `"${productMatch.product.name}" doesn't have a usable regular price, so I can't apply a ${discountPercent}% discount. Set its price on the Products page, then try again.`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+
+    const salePrice = Math.round(regularPrice * (1 - discountPercent / 100) * 100) / 100;
+    if (salePrice <= 0) {
+      return {
+        intent: 'configuration_guidance',
+        answer: `A ${discountPercent}% discount on "${productMatch.product.name}" would wipe out the price — try a smaller percent (under 100).`,
+        data: {
+          target: 'sales',
+          saleId: sale.id,
+          saleName: sale.name,
+          steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+
+    try {
+      await addProductToSale(tenant.id, sale.id, {
+        product_id: productMatch.product.id,
+        sale_price: salePrice,
+      });
+    } catch (err) {
+      if (err instanceof SaleProductError) {
+        return {
+          intent: 'configuration_guidance',
+          answer: err.message,
+          data: {
+            target: 'sales',
+            saleId: sale.id,
+            saleName: sale.name,
+            steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+          },
+          usage: zeroUsage,
+        };
+      }
+      throw err;
+    }
+
+    const saleRow = await prisma.sales.findFirst({
+      where: { id: sale.id, tenant_id: tenant.id },
+      select: { banner_image: true },
+    });
+    const needsBanner = !saleRow?.banner_image?.trim();
+
+    return {
+      intent: 'configuration_guidance',
+      answer: `Added "${productMatch.product.name}" to "${sale.name}" at ${discountPercent}% off (sale price ${salePrice}).${
+        needsBanner
+          ? ' Want me to generate a banner for this sale? Say yes — or add another product with a name and percent.'
+          : ' Want another product? Reply with the name and percent (e.g. "Leather bag with 15% off").'
+      }`,
+      data: {
+        target: 'sales',
+        saleId: sale.id,
+        saleName: sale.name,
+        addedProduct: productMatch.product.name,
+        discountPercent,
+        salePrice,
+        steps: [editSaleStep(sale.id, sale.name, pointer.buildEditHref)],
+      },
+      usage: zeroUsage,
+    };
+  }
+
+  // --- Continue after create: known sale name, no product this turn ---
+  if (trimmedName) {
+    const existingNamed = await prisma.sales.findFirst({
+      where: {
+        tenant_id: tenant.id,
+        name: { equals: trimmedName, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, banner_image: true },
+      orderBy: { updated_at: 'desc' },
+    });
+    if (existingNamed) {
+      if (!existingNamed.banner_image?.trim()) {
+        return {
+          intent: 'configuration_guidance',
+          answer: `Want me to generate a banner for "${existingNamed.name}"? Reply "yes" to generate one — or add a product with a discount (e.g. "Manzinj with 10% off").`,
+          data: {
+            target: 'sales',
+            saleId: existingNamed.id,
+            saleName: existingNamed.name,
+            awaitingBannerConfirm: true,
+            steps: [editSaleStep(existingNamed.id, existingNamed.name, pointer.buildEditHref)],
+          },
+          usage: zeroUsage,
+        };
+      }
+      return {
+        intent: 'configuration_guidance',
+        answer: `Sure — which product should I add to "${existingNamed.name}", and at what discount? For example: "Manzinj with 10% off".`,
+        data: {
+          target: 'sales',
+          saleId: existingNamed.id,
+          saleName: existingNamed.name,
+          steps: [editSaleStep(existingNamed.id, existingNamed.name, pointer.buildEditHref)],
+        },
+        usage: zeroUsage,
+      };
+    }
+  }
+
   if (!trimmedName) {
     return {
       intent: 'configuration_guidance',
       answer: 'Sure — what would you like to name this sale?',
-      data: { target: 'sales', steps: [pointerStep] },
+      data: { target: 'sales', steps: [newSaleStep] },
       usage: zeroUsage,
     };
   }
 
-  const { created, skippedExisting, error } = await createSaleFromName(tenant.id, trimmedName);
+  const { created, createdId, skippedExisting, skippedExistingId, error } =
+    await createSaleFromName(tenant.id, trimmedName);
 
   if (error) {
-    return { intent: 'configuration_guidance', answer: error, data: { target: 'sales', steps: [pointerStep] }, usage: zeroUsage };
-  }
-  if (skippedExisting) {
     return {
       intent: 'configuration_guidance',
-      answer: `"${skippedExisting}" already exists, so it was left as-is. You can edit it from the Sales page.`,
-      data: { target: 'sales', skippedExisting },
+      answer: error,
+      data: { target: 'sales', steps: [newSaleStep] },
+      usage: zeroUsage,
+    };
+  }
+  if (skippedExisting && skippedExistingId) {
+    const skipped = await prisma.sales.findFirst({
+      where: { id: skippedExistingId, tenant_id: tenant.id },
+      select: { banner_image: true },
+    });
+    const needsBanner = !skipped?.banner_image?.trim();
+    return {
+      intent: 'configuration_guidance',
+      answer: needsBanner
+        ? `"${skippedExisting}" already exists and has no banner yet. Want me to generate one? Reply "yes" — or add a product with a discount (e.g. "Manzinj with 10% off").`
+        : `"${skippedExisting}" already exists. Want me to add a product to it? Reply with the product name and discount (e.g. "Manzinj with 10% off"), or open it to edit.`,
+      data: {
+        target: 'sales',
+        skippedExisting,
+        saleId: skippedExistingId,
+        saleName: skippedExisting,
+        awaitingBannerConfirm: needsBanner,
+        steps: [editSaleStep(skippedExistingId, skippedExisting, pointer.buildEditHref)],
+      },
       usage: zeroUsage,
     };
   }
 
+  const saleId = createdId!;
+  const saleLabel = created!;
   return {
     intent: 'configuration_guidance',
-    answer: `Created a new sale: "${created}" (saved as a draft — add a banner, dates, and products to it, then publish it from the Sales page when you're ready).`,
-    data: { target: 'sales', created, steps: [pointerStep] },
+    answer: `Created "${saleLabel}". Would you like me to generate a banner for it? Reply "yes" to generate one, or add a product with a discount (e.g. "Manzinj with 10% off").`,
+    data: {
+      target: 'sales',
+      created: saleLabel,
+      saleId,
+      saleName: saleLabel,
+      awaitingBannerConfirm: true,
+      steps: [editSaleStep(saleId, saleLabel, pointer.buildEditHref)],
+    },
     usage: zeroUsage,
   };
 }
@@ -499,10 +1218,8 @@ export async function handleSalesConfigTarget(
  * generation via @/lib/content/validation, same slug-collision check) —
  * same "run the real validated logic directly against Prisma instead of
  * over HTTP" reasoning as createCategoriesFromNames/createSaleFromName
- * above. Always created as `status: 'draft'` — the real API's own default,
- * never overridden here — so nothing an AI writes ever goes live on the
- * storefront without the merchant separately reviewing and publishing it
- * from the Blog page.
+ * above. Always created as `status: 'draft'` — blogs stay unpublished until
+ * the merchant reviews and publishes from the Blog page.
  */
 async function createBlogPostFromDraft(
   tenantId: string,
@@ -754,9 +1471,7 @@ export async function handleHomepageImageConfigTarget(
       if (!quota.allowed || slotsToDo === 0) {
         return {
           intent: 'configuration_guidance',
-          answer:
-            quota.reason ??
-            "You've used all of your homepage image regenerations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+          answer: formatMarketingImagesExhaustedMessage(quota),
           data: { target: 'homepage_image', slot: 'all', regenerated: false, reason: 'quota_exceeded' },
           usage: zeroUsage,
         };
@@ -790,15 +1505,18 @@ export async function handleHomepageImageConfigTarget(
           : '';
       const skippedNote =
         slotsToDo < HOMEPAGE_IMAGE_SLOTS.length
-          ? ` I could only do ${slotsToDo} of the 5 — you're low on regenerations this month.`
+          ? ` I could only do ${slotsToDo} of the 5 — you're low on AI images this month.`
           : '';
       const patchNote = result.pagePatched
         ? ''
         : " I couldn't automatically update your live homepage with them, though — check the Homepage Images tab in Theme Customize.";
-      const remainingAfter =
-        typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0) - succeeded.length) : null;
-      const remainingAfterNote =
-        remainingAfter !== null ? ` You have ${remainingAfter} regeneration${remainingAfter === 1 ? '' : 's'} left this month.` : '';
+      const remainingAfterNote = formatMarketingImagesRemainingNote(
+        {
+          ...quota,
+          current: (quota.current ?? 0) + succeeded.length,
+        },
+        0,
+      );
 
       return {
         intent: 'configuration_guidance',
@@ -815,8 +1533,8 @@ export async function handleHomepageImageConfigTarget(
       remaining === null
         ? ''
         : slotsToDo >= HOMEPAGE_IMAGE_SLOTS.length
-          ? ` (this will use ${HOMEPAGE_IMAGE_SLOTS.length} of your ${remaining} remaining regenerations this month)`
-          : ` (you have ${remaining} regeneration${remaining === 1 ? '' : 's'} left this month, so I'd only be able to do ${remaining} of the 5)`;
+          ? ` (this will use ${HOMEPAGE_IMAGE_SLOTS.length} of your ${remaining} monthly AI images)`
+          : ` (you have ${remaining} monthly AI image${remaining === 1 ? '' : 's'} left, so I'd only be able to do ${remaining} of the 5)`;
     return {
       intent: 'configuration_guidance',
       answer: `Want me to regenerate all 5 of your homepage images (${slotList})?${countNote} Just say the word.`,
@@ -830,9 +1548,7 @@ export async function handleHomepageImageConfigTarget(
     if (!quota.allowed) {
       return {
         intent: 'configuration_guidance',
-        answer:
-          quota.reason ??
-          "You've used all of your homepage image regenerations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+        answer: formatMarketingImagesExhaustedMessage(quota),
         data: { target: 'homepage_image', slot: imageSlot, regenerated: false, reason: 'quota_exceeded' },
         usage: zeroUsage,
       };
@@ -847,8 +1563,7 @@ export async function handleHomepageImageConfigTarget(
         usage: zeroUsage,
       };
     }
-    const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0) - 1) : null;
-    const remainingNote = remaining !== null ? ` You have ${remaining} regeneration${remaining === 1 ? '' : 's'} left this month.` : '';
+    const remainingNote = formatMarketingImagesRemainingNote(quota, 1);
     const patchNote = result.pagePatched
       ? ''
       : " I couldn't automatically update your live homepage with it, though — check the Homepage Images tab in Theme Customize.";
@@ -862,7 +1577,7 @@ export async function handleHomepageImageConfigTarget(
 
   const remainingNote =
     typeof quota.limit === 'number'
-      ? ` (this will use 1 of your ${Math.max(0, quota.limit - (quota.current ?? 0))} remaining regenerations this month)`
+      ? ` (this will use 1 of your ${Math.max(0, quota.limit - (quota.current ?? 0))} monthly AI images)`
       : '';
 
   // Case 2: one specific slot clearly identified this turn — offer it back for confirmation.
@@ -885,6 +1600,30 @@ export async function handleHomepageImageConfigTarget(
 }
 
 const DEFAULT_MARKETING_IMAGE_COUNT = 3;
+
+/** Sale records only need one banner — never batch 3 for a sale promo graphic. */
+function isSaleBannerImageRequest(description: string): boolean {
+  const d = description.toLowerCase();
+  if (!d.trim()) return false;
+  const mentionsBanner = /\bbanner\b/.test(d) || /\bgraphic\b/.test(d);
+  const mentionsSale =
+    /\bsale\b/.test(d) ||
+    /\bpromo(?:tion)?\b/.test(d) ||
+    /\bdeal(?:s)?\b/.test(d) ||
+    /\bflash\b/.test(d);
+  return mentionsBanner && mentionsSale;
+}
+
+function resolveMarketingImageCount(
+  description: string,
+  requestedCount: number | null,
+  remaining: number,
+): number {
+  const preferred = isSaleBannerImageRequest(description)
+    ? 1
+    : (requestedCount ?? DEFAULT_MARKETING_IMAGE_COUNT);
+  return Math.max(1, Math.min(preferred, remaining, MAX_MARKETING_IMAGES_PER_BATCH));
+}
 
 /**
  * DA.28 (AI Phase 6.1) — answers a resolved 'marketing_images'
@@ -921,19 +1660,24 @@ export async function handleMarketingImagesConfigTarget(
     if (!quota.allowed) {
       return {
         intent: 'configuration_guidance',
-        answer:
-          quota.reason ??
-          "You've used all of your marketing-image generations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+        answer: formatMarketingImagesExhaustedMessage(quota),
         data: { target: 'marketing_images', generated: false, reason: 'quota_exceeded' },
         usage: zeroUsage,
       };
     }
     const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0)) : MAX_MARKETING_IMAGES_PER_BATCH;
-    const count = Math.max(1, Math.min(requestedCount ?? DEFAULT_MARKETING_IMAGE_COUNT, remaining, MAX_MARKETING_IMAGES_PER_BATCH));
+    const count = resolveMarketingImageCount(description, requestedCount, remaining);
+    const leftNote = formatMarketingImagesRemainingNote(quota);
     return {
       intent: 'configuration_guidance',
-      answer: `I can generate ${count} image${count === 1 ? '' : 's'} of ${description}. Want me to go ahead?`,
-      data: { target: 'marketing_images', proposed: description, proposedCount: count },
+      answer: `I can generate ${count} image${count === 1 ? '' : 's'} of ${description}.${leftNote} Want me to go ahead?`,
+      data: {
+        target: 'marketing_images',
+        proposed: description,
+        proposedCount: count,
+        remaining: typeof quota.limit === 'number' ? remaining : null,
+        limit: typeof quota.limit === 'number' ? quota.limit : null,
+      },
       usage: zeroUsage,
     };
   }
@@ -942,9 +1686,7 @@ export async function handleMarketingImagesConfigTarget(
   if (!quota.allowed) {
     return {
       intent: 'configuration_guidance',
-      answer:
-        quota.reason ??
-        "You've used all of your marketing-image generations for this month. They reset next month, or you can upgrade your plan for a higher limit.",
+      answer: formatMarketingImagesExhaustedMessage(quota),
       data: { target: 'marketing_images', generated: false, reason: 'quota_exceeded' },
       usage: zeroUsage,
     };
@@ -961,7 +1703,7 @@ export async function handleMarketingImagesConfigTarget(
   }
 
   const remaining = typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0)) : MAX_MARKETING_IMAGES_PER_BATCH;
-  const count = Math.max(1, Math.min(requestedCount ?? DEFAULT_MARKETING_IMAGE_COUNT, remaining, MAX_MARKETING_IMAGES_PER_BATCH));
+  const count = resolveMarketingImageCount(description, requestedCount, remaining);
   const { businessType, niche } = getBusinessProfile(tenant);
 
   const { data: batch, usage: writeUsage } = await writeMarketingImageBatch({
@@ -999,12 +1741,94 @@ export async function handleMarketingImagesConfigTarget(
 
   const labelList = images.map((img) => img.label).join(', ');
   const failedNote = failed > 0 ? ` (${failed} failed and were skipped)` : '';
+  const remainingNote = formatMarketingImagesRemainingNote(quota, images.length);
+  const firstUrl = images[0]?.imageUrl?.trim() ?? '';
+  let attachedSaleName: string | null = null;
+  if (firstUrl && firstUrl.length <= 255) {
+    attachedSaleName = await tryAttachBannerToMatchingSale(tenant.id, description, firstUrl);
+  }
+
   return {
     intent: 'configuration_guidance',
-    answer: `Done! I generated ${images.length} image${images.length === 1 ? '' : 's'}: ${labelList}${failedNote}. You'll find them in your Media Library.`,
-    data: { target: 'marketing_images', generated: true, images: images.map((img) => ({ label: img.label, url: img.imageUrl })) },
+    answer: attachedSaleName
+      ? `Done! I generated ${images.length} image${images.length === 1 ? '' : 's'} and set one as the banner on "${attachedSaleName}"${failedNote}.${remainingNote} They're also in your Media Library.`
+      : `Done! I generated ${images.length} image${images.length === 1 ? '' : 's'}: ${labelList}${failedNote}.${remainingNote} You'll find them in your Media Library.`,
+    data: {
+      target: 'marketing_images',
+      generated: true,
+      images: images.map((img) => ({ label: img.label, url: img.imageUrl })),
+      remaining: typeof quota.limit === 'number' ? Math.max(0, quota.limit - (quota.current ?? 0) - images.length) : null,
+      limit: typeof quota.limit === 'number' ? quota.limit : null,
+      ...(attachedSaleName ? { attachedSaleName } : {}),
+    },
     usage: writeUsage,
   };
+}
+
+/** If the marketing request clearly names an existing sale without a banner, attach the first image. */
+async function tryAttachBannerToMatchingSale(
+  tenantId: string,
+  description: string,
+  imageUrl: string,
+): Promise<string | null> {
+  const desc = description.toLowerCase();
+  const looksSaleBanner =
+    /\bbanner\b/.test(desc) ||
+    /\bpromo/.test(desc) ||
+    /\bsale\b/.test(desc) ||
+    /\bcampaign\b/.test(desc) ||
+    /\bdeal/.test(desc);
+  if (!looksSaleBanner) return null;
+
+  if (imageUrl.length > 255) return null;
+
+  const candidates = await prisma.sales.findMany({
+    where: { tenant_id: tenantId },
+    select: { id: true, name: true, banner_image: true },
+    orderBy: { updated_at: 'desc' },
+    take: 30,
+  });
+
+  const withoutBanner = candidates.filter((s) => !s.banner_image?.trim());
+
+  const scoreMatch = (saleName: string): number => {
+    const name = saleName.trim().toLowerCase();
+    if (name.length < 2) return 0;
+    if (desc.includes(name)) return 100 + name.length;
+    // "September Sales" vs "september sales campaign"
+    if (name.length >= 4 && desc.includes(name.replace(/\s+sale$/i, '').trim()) && name.replace(/\s+sale$/i, '').trim().length >= 4) {
+      return 80 + name.length;
+    }
+    const tokens = name.split(/\s+/).filter((t) => t.length >= 3);
+    if (tokens.length === 0) return 0;
+    const hit = tokens.filter((t) => desc.includes(t)).length;
+    if (hit === tokens.length) return 60 + hit;
+    if (hit >= Math.ceil(tokens.length / 2)) return 30 + hit;
+    return 0;
+  };
+
+  let best: { id: string; name: string; score: number } | null = null;
+  for (const sale of withoutBanner) {
+    const score = scoreMatch(sale.name);
+    if (score <= 0) continue;
+    if (!best || score > best.score) {
+      best = { id: sale.id, name: sale.name, score };
+    }
+  }
+
+  // Sale-banner phrasing with no clear name match → most recent sale missing a banner.
+  if (!best && withoutBanner.length > 0 && (/\bbanner\b/.test(desc) || /\bcampaign\b/.test(desc))) {
+    const recent = withoutBanner[0]!;
+    best = { id: recent.id, name: recent.name, score: 1 };
+  }
+
+  if (!best) return null;
+
+  await prisma.sales.update({
+    where: { id: best.id },
+    data: { banner_image: imageUrl },
+  });
+  return best.name;
 }
 
 // ---------------------------------------------------------------------------

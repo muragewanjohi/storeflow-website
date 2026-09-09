@@ -48,7 +48,7 @@ export default function CreatePlanForm() {
       setupThemeStylingPasses: '5',
       setupLegalPageDrafts: '3',
       monthlyDescriptionsAndPhotoQa: '40',
-      monthlyMarketingImages: '4',
+      monthlyMarketingImages: '5',
       monthlyAnalyticsInsights: '',
       monthlyAssistantQueries: '50',
     },

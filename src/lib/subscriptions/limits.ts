@@ -186,24 +186,24 @@ export function defaultAiPlanLimits(planName: string | null | undefined): AiPlan
       themeStylingPasses: 5,
       legalPageDrafts: 3,
     },
-    monthly: {
-      descriptionsAndPhotoQa: 40,
-      marketingImages: 4,
-      analyticsInsights: null, // gated off entirely — use hasAdvancedAnalyticsAccess(), not this value, to enforce
-      // Available on Basic too, per DASHBOARD_AI_ASSISTANT_PLAN.md's
-      // resolved gating decision — quota-differentiated, not hard-gated.
-      // Raised from 20 to 50 (docs/IMPLEMENTATION_TRACKER.md, DA.14) after
-      // real device testing showed 20 gets burned in a single realistic
-      // onboarding session (Haiku 4.5 cost is trivial either way — ~$0.002
-      // real average per request, so ~$0.09/tenant/month worst case at 50;
-      // this was never a cost constraint, just too tight a UX ceiling).
-      // Admin-editable per plan from here down — see
-      // src/app/admin/price-plans/[id]/edit-plan-form.tsx; this default
-      // only applies until a plan's features.ai block is explicitly saved.
-      assistantQueries: 50,
-    },
-  };
-}
+      monthly: {
+        descriptionsAndPhotoQa: 40,
+        marketingImages: 5, // monthly only — exclusive of the 5 signup homepage images (starter_pack_image/setup)
+        analyticsInsights: null, // gated off entirely — use hasAdvancedAnalyticsAccess(), not this value, to enforce
+        // Available on Basic too, per DASHBOARD_AI_ASSISTANT_PLAN.md's
+        // resolved gating decision — quota-differentiated, not hard-gated.
+        // Raised from 20 to 50 (docs/IMPLEMENTATION_TRACKER.md, DA.14) after
+        // real device testing showed 20 gets burned in a single realistic
+        // onboarding session (Haiku 4.5 cost is trivial either way — ~$0.002
+        // real average per request, so ~$0.09/tenant/month worst case at 50;
+        // this was never a cost constraint, just too tight a UX ceiling).
+        // Admin-editable per plan from here down — see
+        // src/app/admin/price-plans/[id]/edit-plan-form.tsx; this default
+        // only applies until a plan's features.ai block is explicitly saved.
+        assistantQueries: 50,
+      },
+    };
+  }
 
 /**
  * Per-field "what would actually apply right now" snapshot — declared value
@@ -677,16 +677,62 @@ export async function canUseAiFeature(
   const current = agg._sum.item_count ?? 0;
 
   if (current >= limit) {
+    const period = bucket === 'setup' ? 'store setup' : 'month';
+    const upgradeHint =
+      bucket === 'monthly'
+        ? ' Upgrade your plan for a higher monthly limit.'
+        : '';
+    const friendlyFeature =
+      feature === 'marketing_image_prompt'
+        ? 'AI image'
+        : feature === 'assistant_query'
+          ? 'assistant'
+          : feature.replace(/_/g, ' ');
     return {
       allowed: false,
-      reason: `${feature} limit reached (${current}/${limit}) for this ${
-        bucket === 'setup' ? 'store setup' : 'month'
-      }. Please upgrade your plan to continue.`,
+      reason:
+        feature === 'marketing_image_prompt' && bucket === 'monthly'
+          ? `You've used all ${limit} monthly AI images (${current}/${limit}). Signup homepage images are separate and do not count toward this limit.${upgradeHint} You can still upload images manually.`
+          : feature === 'marketing_image_prompt'
+            ? `You've used all ${limit} AI images for this ${period} (${current}/${limit}).${upgradeHint} You can still upload images manually.`
+          : `${friendlyFeature} limit reached (${current}/${limit}) for this ${period}.${upgradeHint}`,
       current,
       limit,
     };
   }
 
   return { allowed: true, current, limit };
+}
+
+export type AiQuotaCheck = Awaited<ReturnType<typeof canUseAiFeature>>;
+
+/** Remaining units in a quota check (null when unlimited / not capped). */
+export function aiQuotaRemaining(quota: AiQuotaCheck): number | null {
+  if (typeof quota.limit !== 'number') return null;
+  return Math.max(0, quota.limit - (quota.current ?? 0));
+}
+
+/**
+ * User-facing remaining note for marketing / homepage / sale banner images.
+ * `afterUse` subtracts images about to be (or just) consumed this turn.
+ */
+export function formatMarketingImagesRemainingNote(
+  quota: AiQuotaCheck,
+  afterUse = 0,
+): string {
+  if (typeof quota.limit !== 'number') return '';
+  const left = Math.max(0, quota.limit - (quota.current ?? 0) - afterUse);
+  return ` You have ${left} of ${quota.limit} monthly AI images left (signup homepage images do not count).`;
+}
+
+export function formatMarketingImagesExhaustedMessage(quota: AiQuotaCheck): string {
+  if (typeof quota.limit === 'number') {
+    const current = quota.current ?? quota.limit;
+    return `You've used all ${quota.limit} monthly AI images (${current}/${quota.limit}). The 5 homepage images from store setup are separate and are not part of this limit. Upgrade your plan for a higher monthly allowance, or upload an image manually from the editor.`;
+  }
+  return (
+    quota.reason ??
+    "You've used all of your monthly AI images. Upgrade your plan for a higher limit, or upload an image manually from the editor."
+  );
 }
 

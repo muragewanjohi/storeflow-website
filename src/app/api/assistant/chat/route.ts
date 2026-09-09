@@ -52,9 +52,15 @@ import {
   configTargetSchema,
   buildConfigTargetSystemPrompt,
   resolveConfigTarget,
+  extractSaleNameHintFromUserMessage,
+  extractSaleNameFromConversation,
+  latestUserMessageContent,
+  resolveSaleBannerIntent,
 } from '@/lib/assistant/shared';
 
 export const dynamic = 'force-dynamic';
+/** Banner / marketing-image confirms run Nano Banana synchronously — allow time. */
+export const maxDuration = 120;
 
 const MAX_MESSAGES = 20;
 
@@ -77,7 +83,7 @@ const requestSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const CONFIG_UNSUPPORTED_REPLY =
-  "I can help you add a new product or category, create a sale, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes, or turning a product into a bookable service — that's a toggle on the product's edit page, with hours configurable in Settings) isn't available yet in chat — check the Help Center or the relevant Settings page for that in the meantime.";
+  "I can help you add a new product or category, create a sale and add discounted products to it, regenerate one of your homepage images, generate a new marketing image, draft a blog post, or set up a delivery zone right now. Guided setup for other things (like themes, or turning a product into a bookable service — that's a toggle on the product's edit page, with hours configurable in Settings) isn't available yet in chat — check the Help Center or the relevant Settings page for that in the meantime.";
 
 /**
  * Identifies which guided setup the merchant wants and answers it —
@@ -99,8 +105,29 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
     system: buildConfigTargetSystemPrompt(businessType, niche, existingCategories.map((c) => c.name)),
     messages,
     schema: configTargetSchema,
-    maxTokens: 300,
+    maxTokens: 400,
   });
+
+  const saleBannerIntent = resolveSaleBannerIntent(messages);
+  if (saleBannerIntent) {
+    const result = await handleSalesConfigTarget(
+      tenant,
+      saleBannerIntent.saleName,
+      {
+        href: '/dashboard/sales/new',
+        cta: 'Add sale',
+        buildEditHref: (saleId) => `/dashboard/sales/${saleId}`,
+      },
+      { wantBanner: true },
+    );
+    return {
+      ...result,
+      usage: {
+        inputTokens: usage.inputTokens + result.usage.inputTokens,
+        outputTokens: usage.outputTokens + result.usage.outputTokens,
+      },
+    };
+  }
 
   const target = resolveConfigTarget(data.target);
 
@@ -117,10 +144,23 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
   }
 
   if (target === 'sales') {
-    const result = await handleSalesConfigTarget(tenant, data.saleName ?? '', {
-      href: '/dashboard/sales/new',
-      cta: 'Add sale',
-    });
+    const saleName =
+      (data.saleName ?? '').trim() ||
+      extractSaleNameHintFromUserMessage(latestUserMessageContent(messages));
+    const result = await handleSalesConfigTarget(
+      tenant,
+      saleName,
+      {
+        href: '/dashboard/sales/new',
+        cta: 'Add sale',
+        buildEditHref: (saleId) => `/dashboard/sales/${saleId}`,
+      },
+      {
+        productName: data.saleProductName ?? '',
+        discountPercent: data.saleDiscountPercent ?? null,
+        wantBanner: data.saleWantBanner === true,
+      },
+    );
     return { ...result, usage: { inputTokens: usage.inputTokens + result.usage.inputTokens, outputTokens: usage.outputTokens + result.usage.outputTokens } };
   }
 
@@ -139,9 +179,50 @@ async function handleConfigurationGuidance(messages: ChatMessage[], tenant: Tena
   }
 
   if (target === 'marketing_images') {
+    // Sale banners must attach to sales.banner_image — never stop at Media Library.
+    const desc = data.marketingImageRequest ?? '';
+    const latest = latestUserMessageContent(messages);
+    const saleName =
+      extractSaleNameHintFromUserMessage(desc) ||
+      extractSaleNameHintFromUserMessage(latest) ||
+      extractSaleNameFromConversation(messages) ||
+      resolveSaleBannerIntent(messages)?.saleName ||
+      '';
+    const looksLikeSaleBanner =
+      (/\bbanner\b/i.test(desc) || /\bbanner\b/i.test(latest)) &&
+      (/\bsale\b/i.test(desc) ||
+        /\bsale\b/i.test(latest) ||
+        /\bpromo/i.test(desc) ||
+        /\bpromo/i.test(latest) ||
+        /\bdeal/i.test(desc) ||
+        /\bdeal/i.test(latest) ||
+        /\bcampaign\b/i.test(desc) ||
+        /\bfor it\b/i.test(latest) ||
+        Boolean(saleName) ||
+        Boolean(resolveSaleBannerIntent(messages)));
+    if (looksLikeSaleBanner) {
+      const result = await handleSalesConfigTarget(
+        tenant,
+        saleName,
+        {
+          href: '/dashboard/sales/new',
+          cta: 'Add sale',
+          buildEditHref: (saleId) => `/dashboard/sales/${saleId}`,
+        },
+        { wantBanner: true },
+      );
+      return {
+        ...result,
+        usage: {
+          inputTokens: usage.inputTokens + result.usage.inputTokens,
+          outputTokens: usage.outputTokens + result.usage.outputTokens,
+        },
+      };
+    }
+
     const result = await handleMarketingImagesConfigTarget(
       tenant,
-      data.marketingImageRequest ?? '',
+      desc,
       data.marketingImageCount ?? null,
       data.marketingImageConfirmed ?? false,
     );
@@ -195,7 +276,11 @@ export async function POST(request: NextRequest) {
     });
 
     let result: HandlerResult;
-    const intent = isIntent(classified.intent) ? classified.intent : 'unclear';
+    const saleBannerIntent = resolveSaleBannerIntent(input.messages);
+    let intent = isIntent(classified.intent) ? classified.intent : 'unclear';
+    if (saleBannerIntent) {
+      intent = 'configuration_guidance';
+    }
 
     if (intent === 'data_query') {
       result = await handleDataQuery(input.messages, tenant.id);

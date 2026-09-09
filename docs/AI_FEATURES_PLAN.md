@@ -107,7 +107,7 @@ Mirrors the real architectural split already in the codebase (`onboarding_starte
 | Bucket | Scope | Basic | Pro |
 |---|---|---:|---:|
 | **One-time setup allowance** (tied to store creation) | Product descriptions + product photo QA + marketing images/prompts + theme styling + legal-page drafts + delivery-zone collection, during initial build | 50 descriptions / 50 photo QA passes / 15 marketing images / 5 theme styling passes / 3 legal pages | Same or higher — onboarding success matters on every tier |
-| **Ongoing monthly quota** (resets monthly, post-setup) | New products, description regens, new photo QA, occasional new banners | 40 descriptions+photo-QA actions/month, 3–5 marketing images/month | 150/month or effectively unlimited |
+| **Ongoing monthly quota** (resets monthly, post-setup) | New products, description regens, new photo QA, occasional new banners | 40 descriptions+photo-QA actions/month, **5 marketing images/month** (exclusive of the 5 signup homepage images) | 150/month or effectively unlimited |
 | Expense categorization | — | Unlimited, rate-limited only | Same |
 | Analytics insights (Phase 3) | — | Not available (matches existing `hasAdvancedAnalyticsAccess()` gate) | 30/month |
 | Subscription monitoring (Phase 8) | — | Always on, no quota (near-zero cost, rules-based) | Always on |

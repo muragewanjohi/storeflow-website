@@ -11,7 +11,7 @@
  * data-fetching.
  *
  * Also links to the AI Usage page's plan-quota editor, where the DA.25
- * per-tier "regenerate my hero image" monthly cap (Basic 4/mo, Pro 20/mo)
+ * per-tier "regenerate my hero image" monthly cap (Basic 5/mo, Pro 20/mo)
  * is already editable — see AI_FEATURES_PLAN.md / DA.14. That one is a
  * per-plan quota (price_plans.features.ai), genuinely different from this
  * card's platform-wide reuse cap, so it isn't duplicated here.

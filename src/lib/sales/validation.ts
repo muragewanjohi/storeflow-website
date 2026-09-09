@@ -40,58 +40,72 @@ export function generateSaleSlug(name: string): string {
  */
 export const saleStatusEnum = z.enum(['draft', 'active', 'scheduled', 'ended']);
 
-/**
- * Sale creation schema
- */
-export const createSaleSchema = z.object({
+function coerceOptionalDate(val: unknown): Date | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null || val === '') return null;
+  if (val instanceof Date) return val;
+  if (typeof val === 'string') {
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+/** Map mobile camelCase keys onto snake_case before field validation. */
+function normalizeSaleBody(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const o = raw as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...o };
+  if (next.start_date === undefined && next.startDate !== undefined) {
+    next.start_date = next.startDate;
+  }
+  if (next.end_date === undefined && next.endDate !== undefined) {
+    next.end_date = next.endDate;
+  }
+  if (next.banner_image === undefined && next.bannerImage !== undefined) {
+    next.banner_image = next.bannerImage;
+  }
+  delete next.startDate;
+  delete next.endDate;
+  delete next.bannerImage;
+  return next;
+}
+
+const saleBodyFields = {
   name: z.preprocess(
     (val) => (typeof val === 'string' ? sanitizeSaleName(val) : val),
     z.string().min(1, 'Sale name is required').max(255, 'Sale name must be less than 255 characters'),
   ),
   slug: z.string().optional(),
   description: z.string().nullable().optional().or(z.literal('').transform(() => null)),
-  banner_image: z.string().url().optional().nullable().or(z.literal('').transform(() => null)),
+  banner_image: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().url().optional().nullable(),
+  ),
   badge_text: z.string().max(50, 'Badge text must be less than 50 characters').optional().nullable(),
   badge_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Badge color must be a valid hex color').optional().nullable(),
-  start_date: z.preprocess(
-    (val) => {
-      if (!val || val === '') return null;
-      if (val instanceof Date) return val;
-      if (typeof val === 'string') {
-        try {
-          return new Date(val);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    },
-    z.date().nullable().optional()
-  ),
-  end_date: z.preprocess(
-    (val) => {
-      if (!val || val === '') return null;
-      if (val instanceof Date) return val;
-      if (typeof val === 'string') {
-        try {
-          return new Date(val);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    },
-    z.date().nullable().optional()
-  ),
-  status: saleStatusEnum.default('draft').optional(),
+  start_date: z.preprocess(coerceOptionalDate, z.date().nullable().optional()),
+  end_date: z.preprocess(coerceOptionalDate, z.date().nullable().optional()),
+  status: saleStatusEnum.default('active').optional(),
   is_featured: z.boolean().default(false).optional(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
-}).strip();
+};
+
+/**
+ * Sale creation schema
+ */
+export const createSaleSchema = z.preprocess(
+  normalizeSaleBody,
+  z.object(saleBodyFields).strip(),
+);
 
 /**
  * Sale update schema (all fields optional)
  */
-export const updateSaleSchema = createSaleSchema.partial().strip();
+export const updateSaleSchema = z.preprocess(
+  normalizeSaleBody,
+  z.object(saleBodyFields).partial().strip(),
+);
 
 /**
  * Sale query/filter schema

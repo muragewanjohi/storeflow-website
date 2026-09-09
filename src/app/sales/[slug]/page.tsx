@@ -15,6 +15,7 @@ import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
 import { storefrontSalePath } from '@/lib/sales/slug-url';
+import { isSaleLiveAt } from '@/lib/sales/schedule';
 import { getCurrencyForTenant } from '@/lib/currency/get-currency-server';
 import SalePageClient from './sale-page-client';
 import SalePageCurrencyWrapper from './sale-page-currency-wrapper';
@@ -118,15 +119,9 @@ export default async function SalePage({
     notFound();
   }
 
-  // Check if sale is currently active based on dates
+  // Check if sale is currently active based on dates (calendar-day tolerant)
   const now = new Date();
-  const startDate = sale.start_date ? new Date(sale.start_date) : null;
-  const endDate = sale.end_date ? new Date(sale.end_date) : null;
-
-  const isActive =
-    (!startDate || now >= startDate) && (!endDate || now <= endDate);
-
-  if (!isActive) {
+  if (!isSaleLiveAt(now, sale.start_date, sale.end_date)) {
     notFound();
   }
 

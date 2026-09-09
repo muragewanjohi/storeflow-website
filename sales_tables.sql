@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "sales" (
     "badge_color" VARCHAR(7) DEFAULT '#EF4444',
     "start_date" TIMESTAMP(6),
     "end_date" TIMESTAMP(6),
-    "status" VARCHAR(50) DEFAULT 'draft',
+    "status" VARCHAR(50) DEFAULT 'active',
     "is_featured" BOOLEAN DEFAULT false,
     "metadata" JSONB DEFAULT '{}',
     "created_at" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,

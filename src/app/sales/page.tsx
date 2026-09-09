@@ -13,6 +13,7 @@ import StorefrontHeader from '@/components/storefront/header-server';
 import StorefrontFooter from '@/components/storefront/footer';
 import ThemeProviderWrapper from '@/components/storefront/theme-provider-wrapper';
 import { generateStorefrontMetadata } from '@/lib/seo/storefront-metadata';
+import { isSaleLiveAt } from '@/lib/sales/schedule';
 import AllSalesClient from './all-sales-client';
 
 export const dynamic = 'force-dynamic';
@@ -30,24 +31,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AllSalesPage() {
   const tenant = await requireTenant();
 
-  // Fetch all active sales
-  const now = new Date();
+  // Status-only query; date window is applied with calendar-day helpers so
+  // timezone-naive mobile saves still appear when intended.
   const sales = await prisma.sales.findMany({
     where: {
       tenant_id: tenant.id,
       status: 'active',
-      OR: [
-        { start_date: null },
-        { start_date: { lte: now } },
-      ],
-      AND: [
-        {
-          OR: [
-            { end_date: null },
-            { end_date: { gte: now } },
-          ],
-        },
-      ],
     },
     include: {
       _count: {
@@ -62,23 +51,17 @@ export default async function AllSalesPage() {
     ],
   });
 
-  // Filter sales that are actually active based on dates
-  const activeSales = sales.filter((sale) => {
-    const startDate = sale.start_date ? new Date(sale.start_date) : null;
-    const endDate = sale.end_date ? new Date(sale.end_date) : null;
-    return (!startDate || now >= startDate) && (!endDate || now <= endDate);
-  });
-
-  // Filter out sales without slugs and log warnings
-  const validSales = activeSales
-    .filter(sale => {
+  const now = new Date();
+  const validSales = sales
+    .filter((sale) => isSaleLiveAt(now, sale.start_date, sale.end_date))
+    .filter((sale) => {
       if (!sale.slug) {
         console.warn('[All Sales Page] Sale missing slug:', sale.id, sale.name);
         return false;
       }
       return true;
     })
-    .map(sale => ({
+    .map((sale) => ({
       ...sale,
       status: (sale.status || 'draft') as 'draft' | 'active' | 'scheduled' | 'ended',
       is_featured: sale.is_featured ?? false,

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenant } from '@/lib/tenant-context/server';
 import { prisma } from '@/lib/prisma/client';
 import { saleQuerySchema } from '@/lib/sales/validation';
+import { isSaleLiveAt } from '@/lib/sales/schedule';
 import { z } from 'zod';
 
 /**
@@ -58,94 +59,64 @@ export async function GET(request: NextRequest) {
       sort_order = 'desc',
     } = validatedQuery;
 
-    // Build where clause - only active sales
-    const now = new Date();
+    // Status (+ optional search/featured); live window applied after fetch so
+    // timezone-naive mobile start/end stamps still match merchant intent.
     const where: any = {
       tenant_id: tenant.id,
       status: 'active',
-      // Check if sale is currently active based on dates
-      OR: [
-        // Sales with no dates (always active)
-        {
-          start_date: null,
-          end_date: null,
-        },
-        // Sales that have started and not ended
-        {
-          start_date: { lte: now },
-          end_date: { gte: now },
-        },
-        // Sales that have started but no end date
-        {
-          start_date: { lte: now },
-          end_date: null,
-        },
-        // Sales with no start date but have end date in future
-        {
-          start_date: null,
-          end_date: { gte: now },
-        },
-      ],
     };
 
-    // Search filter
     if (search) {
-      where.AND = [
-        {
-          OR: [
-            { name: { contains: search.trim(), mode: 'insensitive' } },
-            { description: { contains: search.trim(), mode: 'insensitive' } },
-            { slug: { contains: search.trim(), mode: 'insensitive' } },
-          ],
-        },
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { description: { contains: search.trim(), mode: 'insensitive' } },
+        { slug: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
 
-    // Featured filter
     if (is_featured !== undefined) {
       where.is_featured = is_featured;
     }
 
-    // Calculate pagination
     const pageNum = typeof page === 'number' ? page : parseInt(String(page), 10);
     const limitNum = typeof limit === 'number' ? limit : parseInt(String(limit), 10);
-    const skip = (pageNum - 1) * limitNum;
 
-    // Build orderBy
     const orderBy: any = {};
     orderBy[sort_by] = sort_order;
 
-    // Fetch sales with pagination
-    const [sales, total] = await Promise.all([
-      prisma.sales.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          banner_image: true,
-          badge_text: true,
-          badge_color: true,
-          start_date: true,
-          end_date: true,
-          is_featured: true,
-          created_at: true,
-          _count: {
-            select: {
-              product_sales: true,
-            },
+    const allSales = await prisma.sales.findMany({
+      where,
+      orderBy,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        banner_image: true,
+        badge_text: true,
+        badge_color: true,
+        start_date: true,
+        end_date: true,
+        is_featured: true,
+        created_at: true,
+        _count: {
+          select: {
+            product_sales: true,
           },
         },
-      }),
-      prisma.sales.count({ where }),
-    ]);
+      },
+    });
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(total / limitNum);
+    const now = new Date();
+    const liveSales = allSales.filter((sale) =>
+      isSaleLiveAt(now, sale.start_date, sale.end_date),
+    );
+
+    const total = liveSales.length;
+    const skip = (pageNum - 1) * limitNum;
+    const sales = liveSales.slice(skip, skip + limitNum);
+
+    const totalPages = Math.ceil(total / limitNum) || 0;
     const hasNextPage = pageNum < totalPages;
     const hasPrevPage = pageNum > 1;
 

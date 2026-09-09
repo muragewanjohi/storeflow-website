@@ -54,7 +54,7 @@ function buildCompletionFlags(input: BuildRewardChecklistInput) {
     hero_image: evaluateHeroImage(hero, snapshot, input.tenantId),
     hero_description: evaluateHeroDescription(hero, snapshot),
     sale_active: input.activeSaleCount >= 1,
-    sale_products_two: input.maxProductsOnActiveSale >= 2,
+    sale_products_one: input.maxProductsOnActiveSale >= 1,
     banner_updated: evaluateBannerUpdated(bannersSection, snapshot, input.tenantId),
     split_layout_image: evaluateSplitLayoutImage(splitLayout, snapshot, input.tenantId),
   };
@@ -97,10 +97,10 @@ export function buildRewardChecklistProgress(
       completed: completion.sale_active,
     },
     {
-      id: 'sale_products_two',
-      label: 'Add 2 products to a sale',
-      description: 'Include at least two products in one of your active sales',
-      completed: completion.sale_products_two,
+      id: 'sale_products_one',
+      label: 'Add a product to a sale',
+      description: 'Include at least one product in one of your active sales',
+      completed: completion.sale_products_one,
     },
     {
       id: 'banner_updated',

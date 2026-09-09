@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
         badge_color: validatedData.badge_color || '#EF4444',
         start_date: startDate,
         end_date: endDate,
-        status: validatedData.status || 'draft',
+        status: validatedData.status || 'active',
         is_featured: validatedData.is_featured || false,
         metadata: validatedData.metadata || {},
       },

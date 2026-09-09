@@ -105,23 +105,23 @@ export default function HomepageImagesTab() {
         <CardHeader>
           <CardTitle>Homepage Images</CardTitle>
           <CardDescription>
-            These 5 AI-generated images were created automatically for your store. Regenerate any one of them individually if you&apos;d like a different look.
+            These 5 AI-generated images were included when you set up your store and do not count against your monthly AI image limit. Regenerating any of them uses your monthly quota.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {quota.allowed ? (
             <p className="text-sm text-muted-foreground">
               {remaining !== null
-                ? `${remaining} of ${quota.limit} regeneration${quota.limit === 1 ? '' : 's'} remaining this month.`
-                : 'Unlimited regenerations on your plan.'}
+                ? `${remaining} of ${quota.limit} monthly AI images left.`
+                : 'Unlimited AI images on your plan.'}
             </p>
           ) : (
             <p className="text-sm text-amber-600">
-              {quota.reason ?? "You've used all your regenerations for this month."} Resets next month, or{' '}
+              {quota.reason ?? "You've used all your monthly AI images."}{' '}
               <a href="/dashboard/subscription" className="underline">
-                upgrade your plan
+                Upgrade your plan
               </a>{' '}
-              for a higher limit.
+              for a higher limit, or upload images manually.
             </p>
           )}
           {!images.homepageFound && (

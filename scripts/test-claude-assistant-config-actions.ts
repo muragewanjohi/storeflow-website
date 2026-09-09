@@ -332,21 +332,29 @@ async function main() {
   console.log('\n--- 5. handleSalesConfigTarget: "create a sale called Test Repro Sale" ---');
   const salesBeforeCount = await prisma.sales.count({ where: { tenant_id: TEST_TENANT_ID } });
 
-  const salesResult = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', { href: '/dashboard/sales/new', cta: 'Add sale' });
+  const salesResult = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', {
+    href: '/dashboard/sales/new',
+    cta: 'Add sale',
+    buildEditHref: (saleId: string) => `/dashboard/sales/${saleId}`,
+  });
   totalCost += estimateCostUsd(salesResult.usage);
   console.log('answer:', salesResult.answer);
   console.log('data:', salesResult.data);
 
   const createdSale = await prisma.sales.findFirst({ where: { tenant_id: TEST_TENANT_ID, slug: 'test-repro-sale' } });
-  if (createdSale && createdSale.status === 'draft') {
-    console.log('✅ Sale genuinely created (confirmed via direct DB read), correctly saved as draft (not live)');
+  if (createdSale && createdSale.status === 'active') {
+    console.log('✅ Sale genuinely created (confirmed via direct DB read), correctly saved as active');
   } else {
-    console.log('❌ Sale missing from DB, or not saved as draft — investigate');
+    console.log('❌ Sale missing from DB, or not saved as active — investigate');
     failures++;
   }
 
   console.log('\n--- 5b. Re-requesting the same sale name should skip cleanly, not duplicate ---');
-  const salesResult2 = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', { href: '/dashboard/sales/new', cta: 'Add sale' });
+  const salesResult2 = await handleSalesConfigTarget(tenant as any, 'Test Repro Sale', {
+    href: '/dashboard/sales/new',
+    cta: 'Add sale',
+    buildEditHref: (saleId: string) => `/dashboard/sales/${saleId}`,
+  });
   totalCost += estimateCostUsd(salesResult2.usage);
   console.log('answer:', salesResult2.answer);
   const salesCountAfterRepeat = await prisma.sales.count({ where: { tenant_id: TEST_TENANT_ID, slug: 'test-repro-sale' } });
