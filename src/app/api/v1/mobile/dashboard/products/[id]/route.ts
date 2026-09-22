@@ -53,7 +53,28 @@ export async function GET(
       return NextResponse.json(mobileError('NOT_FOUND', 'Product not found'), { status: 404 });
     }
 
-    return NextResponse.json(mobileSuccess({ product }), { status: 200 });
+    const gallery = Array.isArray(product.gallery)
+      ? (product.gallery as unknown[]).filter(
+          (u): u is string => typeof u === 'string' && u.trim().length > 0,
+        )
+      : [];
+    const image =
+      (typeof product.image === 'string' && product.image.trim().length > 0
+        ? product.image
+        : null) ??
+      gallery[0] ??
+      null;
+
+    return NextResponse.json(
+      mobileSuccess({
+        product: {
+          ...product,
+          image,
+          gallery,
+        },
+      }),
+      { status: 200 },
+    );
   } catch (e) {
     console.error('[Mobile product GET]', e);
     return NextResponse.json(mobileError('INTERNAL_ERROR', 'Failed to fetch product'), { status: 500 });

@@ -822,7 +822,7 @@ async function generateAndAttachSaleBanner(
   const { businessType, niche } = getBusinessProfile(tenant);
   const description = `a wide ecommerce sale promotional banner image for a store sale named "${sale.name}"${
     businessType ? ` (${businessType}${niche ? `, ${niche}` : ''})` : ''
-  } — bold promotional retail banner, space for sale title text, no tiny unreadable text`;
+  } — bold colorful promotional retail photography/illustration mood only, NO text, NO letters, NO words, NO sale title, NO prices, NO watermarks; leave the image completely blank of typography so the merchant can add their own title later`;
 
   const { data: batch, usage: writeUsage } = await writeMarketingImageBatch({
     tenantId: tenant.id,

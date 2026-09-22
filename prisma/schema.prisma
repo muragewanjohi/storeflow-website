@@ -684,7 +684,7 @@ model products {
   barcode                 String?              @db.VarChar(100) // POS scan-to-add lookup
   stock_quantity          Int?                 @default(0)
   status                  String?              @default("active") @db.VarChar(50)
-  image                   String?              @db.VarChar(255)
+  image                   String?
   gallery                 Json?                @default("[]")
   category_id             String?              @db.Uuid
   brand_id                String?              @db.Uuid
@@ -997,6 +997,16 @@ model tenants {
   tumizi_webhook_events      tumizi_webhook_events[]
   referrals_made             tenant_referrals[]            @relation("ReferralReferrer")
   referral_received          tenant_referrals[]            @relation("ReferralReferred")
+  proximity_locations        proximity_locations[]
+  proximity_zones            proximity_zones[]
+  proximity_beacons          proximity_beacons[]
+  proximity_advertisers      proximity_advertisers[]
+  proximity_sdk_apps         proximity_sdk_apps[]
+  proximity_campaigns        proximity_campaigns[]
+  proximity_campaign_placements proximity_campaign_placements[]
+  proximity_events           proximity_events[]
+  proximity_claims           proximity_claims[]
+  proximity_invoices         proximity_invoices[]
 
   @@index([custom_domain], map: "idx_tenants_custom_domain")
   @@index([status], map: "idx_tenants_status")
@@ -1379,4 +1389,231 @@ model user_guide_articles {
   @@index([is_active], map: "idx_user_guide_articles_is_active")
   @@index([is_popular], map: "idx_user_guide_articles_is_popular")
   @@map("user_guide_articles")
+}
+
+model proximity_locations {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id  String    @db.Uuid
+  name       String    @db.VarChar(255)
+  slug       String    @db.VarChar(120)
+  address    String?
+  timezone   String    @default("Africa/Nairobi") @db.VarChar(64)
+  status     String    @default("active") @db.VarChar(20)
+  metadata   Json?     @default("{}")
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+  tenants    tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  zones      proximity_zones[]
+  beacons    proximity_beacons[]
+  placements proximity_campaign_placements[]
+  events     proximity_events[]
+
+  @@unique([tenant_id, slug], map: "proximity_locations_tenant_id_slug_key")
+  @@index([tenant_id], map: "idx_proximity_locations_tenant")
+}
+
+model proximity_zones {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String              @db.Uuid
+  location_id String              @db.Uuid
+  name        String              @db.VarChar(255)
+  slug        String              @db.VarChar(120)
+  kind        String              @default("department") @db.VarChar(40)
+  status      String              @default("active") @db.VarChar(20)
+  metadata    Json?               @default("{}")
+  created_at  DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?           @default(now()) @db.Timestamptz(6)
+  tenants     tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  location    proximity_locations @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  beacons     proximity_beacons[]
+  placements  proximity_campaign_placements[]
+  events      proximity_events[]
+
+  @@unique([location_id, slug], map: "proximity_zones_location_id_slug_key")
+  @@index([tenant_id, location_id], map: "idx_proximity_zones_tenant_location")
+}
+
+model proximity_beacons {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id       String              @db.Uuid
+  location_id     String              @db.Uuid
+  zone_id         String              @db.Uuid
+  name            String?             @db.VarChar(255)
+  mac_address     String?             @db.VarChar(32)
+  qr_code         String?             @db.VarChar(128)
+  ibeacon_uuid    String              @default("6e8a4c12-9f3d-4b71-a2e8-1d7c0b5e4a91") @db.VarChar(36)
+  major           Int
+  minor           Int
+  tx_power_dbm    Decimal             @default(-13.5) @db.Decimal(4, 1)
+  adv_interval_ms Int                 @default(500)
+  status          String              @default("active") @db.VarChar(20)
+  last_seen_at    DateTime?           @db.Timestamptz(6)
+  battery_mv      Int?
+  installed_at    DateTime?           @db.Timestamptz(6)
+  metadata        Json?               @default("{}")
+  created_at      DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?           @default(now()) @db.Timestamptz(6)
+  tenants         tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  location        proximity_locations @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  zone            proximity_zones     @relation(fields: [zone_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  events          proximity_events[]
+
+  @@unique([tenant_id, ibeacon_uuid, major, minor], map: "proximity_beacons_tenant_id_ibeacon_uuid_major_minor_key")
+  @@unique([tenant_id, mac_address], map: "proximity_beacons_tenant_id_mac_address_key")
+  @@index([tenant_id, zone_id], map: "idx_proximity_beacons_tenant_zone")
+  @@index([ibeacon_uuid, major, minor], map: "idx_proximity_beacons_uuid_major_minor")
+  @@index([tenant_id, last_seen_at], map: "idx_proximity_beacons_last_seen")
+}
+
+model proximity_advertisers {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  name              String    @db.VarChar(255)
+  email             String?   @db.VarChar(255)
+  phone             String?   @db.VarChar(40)
+  access_token_hash String?   @db.VarChar(128)
+  status            String    @default("active") @db.VarChar(20)
+  notes             String?
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  campaigns         proximity_campaigns[]
+  invoices          proximity_invoices[]
+
+  @@index([tenant_id], map: "idx_proximity_advertisers_tenant")
+}
+
+model proximity_sdk_apps {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id    String    @db.Uuid
+  name         String    @db.VarChar(255)
+  flavor       String    @db.VarChar(20)
+  key_prefix   String    @unique @db.VarChar(24)
+  key_hash     String    @db.VarChar(128)
+  status       String    @default("active") @db.VarChar(20)
+  last_used_at DateTime? @db.Timestamptz(6)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  tenants      tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenant_id, flavor], map: "idx_proximity_sdk_apps_tenant")
+}
+
+model proximity_campaigns {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id             String    @db.Uuid
+  advertiser_id         String?   @db.Uuid
+  name                  String    @db.VarChar(255)
+  headline              String    @db.VarChar(255)
+  body                  String?
+  image_url             String?   @db.VarChar(500)
+  cta_label             String?   @default("View offer") @db.VarChar(80)
+  cta_url               String?   @db.VarChar(500)
+  coupon_enabled        Boolean   @default(false)
+  coupon_label          String?   @db.VarChar(120)
+  coupon_discount_type  String?   @db.VarChar(20)
+  coupon_discount_value Decimal?  @db.Decimal(10, 2)
+  starts_at             DateTime  @db.Timestamptz(6)
+  ends_at               DateTime  @db.Timestamptz(6)
+  timezone              String    @default("Africa/Nairobi") @db.VarChar(64)
+  trading_hours_start   DateTime? @db.Time(6)
+  trading_hours_end     DateTime? @db.Time(6)
+  frequency_cap_per_day Int       @default(1)
+  visit_storm_cap       Int       @default(3)
+  dwell_ms              Int       @default(2500)
+  priority              Int       @default(40)
+  brand_safety_category String?   @db.VarChar(80)
+  status                String    @default("draft") @db.VarChar(20)
+  rejection_reason      String?
+  fee_amount            Decimal?  @db.Decimal(12, 2)
+  supermarket_share_pct Decimal   @default(70) @db.Decimal(5, 2)
+  billing_paused        Boolean   @default(false)
+  terms_accepted_at     DateTime? @db.Timestamptz(6)
+  metadata              Json?     @default("{}")
+  created_at            DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime? @default(now()) @db.Timestamptz(6)
+  tenants               tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  advertiser            proximity_advertisers? @relation(fields: [advertiser_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  placements            proximity_campaign_placements[]
+  events                proximity_events[]
+  claims                proximity_claims[]
+  invoices              proximity_invoices[]
+
+  @@index([tenant_id, status], map: "idx_proximity_campaigns_tenant_status")
+  @@index([advertiser_id], map: "idx_proximity_campaigns_advertiser")
+  @@index([tenant_id, starts_at, ends_at], map: "idx_proximity_campaigns_window")
+}
+
+model proximity_campaign_placements {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id   String              @db.Uuid
+  campaign_id String              @db.Uuid
+  location_id String              @db.Uuid
+  zone_id     String              @db.Uuid
+  created_at  DateTime?           @default(now()) @db.Timestamptz(6)
+  tenants     tenants             @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  campaign    proximity_campaigns @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  location    proximity_locations @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  zone        proximity_zones     @relation(fields: [zone_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([campaign_id, location_id, zone_id], map: "proximity_placements_campaign_slot_key")
+  @@index([tenant_id, location_id, zone_id], map: "idx_proximity_placements_zone")
+}
+
+model proximity_events {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id            String    @db.Uuid
+  campaign_id          String?   @db.Uuid
+  location_id          String?   @db.Uuid
+  zone_id              String?   @db.Uuid
+  beacon_id            String?   @db.Uuid
+  opaque_customer_id   String    @db.VarChar(128)
+  visit_id             String?   @db.VarChar(64)
+  event_type           String    @db.VarChar(20)
+  source               String    @default("ble") @db.VarChar(10)
+  consent              Boolean   @default(false)
+  impression_on_screen Boolean   @default(false)
+  metadata             Json?     @default("{}")
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  tenants              tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  campaign             proximity_campaigns? @relation(fields: [campaign_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  location             proximity_locations? @relation(fields: [location_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  zone                 proximity_zones? @relation(fields: [zone_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  beacon               proximity_beacons? @relation(fields: [beacon_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([tenant_id, created_at], map: "idx_proximity_events_tenant_created")
+  @@index([campaign_id, event_type], map: "idx_proximity_events_campaign_type")
+  @@index([tenant_id, opaque_customer_id, event_type, created_at], map: "idx_proximity_events_customer_day")
+}
+
+model proximity_claims {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id          String    @db.Uuid
+  campaign_id        String    @db.Uuid
+  opaque_customer_id String    @db.VarChar(128)
+  code               String    @db.VarChar(40)
+  expires_at         DateTime  @db.Timestamptz(6)
+  claimed_at         DateTime? @default(now()) @db.Timestamptz(6)
+  tenants            tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  campaign           proximity_campaigns @relation(fields: [campaign_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenant_id, code], map: "proximity_claims_tenant_id_code_key")
+  @@index([campaign_id, opaque_customer_id], map: "idx_proximity_claims_campaign")
+}
+
+model proximity_invoices {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String    @db.Uuid
+  campaign_id       String?   @db.Uuid
+  advertiser_id     String?   @db.Uuid
+  amount            Decimal   @db.Decimal(12, 2)
+  supermarket_share Decimal   @db.Decimal(12, 2)
+  dukanest_share    Decimal   @db.Decimal(12, 2)
+  status            String    @default("draft") @db.VarChar(20)
+  notes             String?
+  created_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  tenants           tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  campaign          proximity_campaigns? @relation(fields: [campaign_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  advertiser        proximity_advertisers? @relation(fields: [advertiser_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 }

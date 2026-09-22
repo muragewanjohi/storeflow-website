@@ -185,6 +185,7 @@ export async function generateSocialContentImage(params: {
     niche: params.niche,
     requestDescription,
     requestedCount: 1,
+    allowTextInImage: true,
   });
 
   if (batch.prompts.length === 0) {
@@ -196,6 +197,7 @@ export async function generateSocialContentImage(params: {
     apiKey: params.apiKey,
     prompts: batch.prompts,
     bucket: 'monthly',
+    allowTextInImage: true,
   });
 
   if (images.length === 0) {

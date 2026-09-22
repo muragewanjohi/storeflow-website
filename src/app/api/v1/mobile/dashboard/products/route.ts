@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
           stock_quantity: true,
           status: true,
           image: true,
+          gallery: true,
           category_id: true,
           created_at: true,
           updated_at: true,
@@ -128,22 +129,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       mobileSuccess(
         {
-          items: items.map((item) => ({
-            id: item.id,
-            name: item.name,
-            slug: item.slug,
-            sku: item.sku,
-            description: item.description,
-            price: Number(item.price),
-            costPrice: item.cost_price != null ? Number(item.cost_price) : null,
-            salePrice: item.sale_price ? Number(item.sale_price) : null,
-            stockQuantity: item.stock_quantity ?? 0,
-            status: item.status ?? 'active',
-            image: item.image,
-            categoryId: item.category_id,
-            createdAt: item.created_at?.toISOString() ?? null,
-            updatedAt: item.updated_at?.toISOString() ?? null,
-          })),
+          items: items.map((item) => {
+            const gallery = Array.isArray(item.gallery)
+              ? (item.gallery as unknown[]).filter(
+                  (u): u is string => typeof u === 'string' && u.trim().length > 0,
+                )
+              : [];
+            const image =
+              (typeof item.image === 'string' && item.image.trim().length > 0
+                ? item.image
+                : null) ??
+              gallery[0] ??
+              null;
+            return {
+              id: item.id,
+              name: item.name,
+              slug: item.slug,
+              sku: item.sku,
+              description: item.description,
+              price: Number(item.price),
+              costPrice: item.cost_price != null ? Number(item.cost_price) : null,
+              salePrice: item.sale_price ? Number(item.sale_price) : null,
+              stockQuantity: item.stock_quantity ?? 0,
+              status: item.status ?? 'active',
+              image,
+              gallery,
+              categoryId: item.category_id,
+              createdAt: item.created_at?.toISOString() ?? null,
+              updatedAt: item.updated_at?.toISOString() ?? null,
+            };
+          }),
         },
         {
           page,
@@ -251,14 +266,24 @@ export async function POST(request: NextRequest) {
         cost_price: validatedData.cost_price != null ? Number(validatedData.cost_price) : null,
         sale_price: validatedData.sale_price != null ? Number(validatedData.sale_price) : null,
         sku: finalSku,
-        // null means unlimited/not tracked (a service — see docs/SERVICES_PLAN.md);
-        // preserved explicitly since `?? 0` would only apply to undefined,
-        // but a bare `|| 0`-style coercion elsewhere in this codebase has
-        // gotten this wrong before, so this stays explicit.
-        stock_quantity: validatedData.stock_quantity === null ? null : (validatedData.stock_quantity ?? 0),
+        // Prefer an explicit stock number from the client (quick-add quantity).
+        // Only treat null as "unlimited / not tracked" when the client sends null.
+        stock_quantity:
+          validatedData.stock_quantity === null
+            ? null
+            : (validatedData.stock_quantity ?? 0),
         status: validatedData.status ?? 'active',
-        image: validatedData.image ?? null,
-        gallery: Array.isArray(validatedData.gallery) ? validatedData.gallery : [],
+        image: validatedData.image?.trim() || null,
+        gallery: (() => {
+          const fromClient = Array.isArray(validatedData.gallery)
+            ? validatedData.gallery.filter((u) => typeof u === 'string' && u.trim().length > 0)
+            : [];
+          const primary = validatedData.image?.trim();
+          if (primary && !fromClient.includes(primary)) {
+            return [primary, ...fromClient];
+          }
+          return fromClient;
+        })(),
         category_id: validatedData.category_id ?? null,
         brand_id: validatedData.brand_id ?? null,
         created_by: user.id,

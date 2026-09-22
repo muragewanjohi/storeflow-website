@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 export function isMobileOrPublicRegistrationApiPath(pathname: string): boolean {
   return (
     pathname.startsWith('/api/v1/mobile') ||
+    pathname.startsWith('/api/v1/proximity') ||
     pathname === '/api/tenants/register' ||
     pathname === '/api/tenants/check-subdomain'
   );

@@ -39,6 +39,7 @@ import {
   ArrowTopRightOnSquareIcon,
   GiftIcon,
   CalendarDaysIcon,
+  SignalIcon,
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -83,6 +84,7 @@ const navigation: NavigationItem[] = [
   
   // 6. Marketing group (Sales, Promotions, Analytics)
   { name: 'Sales', href: '/dashboard/sales', icon: FireIcon, group: 'Marketing' },
+  { name: 'In-store ads', href: '/dashboard/proximity', icon: SignalIcon, group: 'Marketing' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: ArrowTrendingUpIcon, group: 'Marketing' },
   
   // 7. Content group (Website content)

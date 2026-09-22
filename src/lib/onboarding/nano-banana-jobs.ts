@@ -30,6 +30,10 @@ export const GEMINI_IMAGE_FALLBACK_MODELS = ['gemini-2.5-flash-image'];
 const IMAGE_NEGATIVE_PROMPT =
   'Do NOT include bananas, banana fruit, banana peels, or any banana-shaped props. Keep the scene strictly relevant to the target product.';
 
+/** Appended for sale/marketing banners — merchants overlay their own titles in the editor. */
+const NO_TEXT_IN_IMAGE_PROMPT =
+  'CRITICAL: Do NOT include any text, letters, words, numbers, typography, captions, logos with readable text, watermarks, price tags with writing, or signage with writing anywhere in the image. Pure visual photography/illustration only — leave the image completely text-free.';
+
 export function withImageNegativePrompt(prompt: string): string {
   const trimmed = prompt.trim();
   if (!trimmed) return IMAGE_NEGATIVE_PROMPT;
@@ -38,6 +42,20 @@ export function withImageNegativePrompt(prompt: string): string {
     return trimmed;
   }
   return `${trimmed}. ${IMAGE_NEGATIVE_PROMPT}`;
+}
+
+/** Like withImageNegativePrompt, plus a hard ban on rendered text in the image. */
+export function withNoTextInImagePrompt(prompt: string): string {
+  const withBananaGuard = withImageNegativePrompt(prompt);
+  const lower = withBananaGuard.toLowerCase();
+  if (
+    lower.includes('do not include any text') ||
+    lower.includes('completely text-free') ||
+    lower.includes('no text, letters, words')
+  ) {
+    return withBananaGuard;
+  }
+  return `${withBananaGuard} ${NO_TEXT_IN_IMAGE_PROMPT}`;
 }
 
 /**
@@ -151,6 +169,9 @@ function buildGenericImageStyleBase(businessType: string, niche?: string): strin
   );
 }
 
+const HOMEPAGE_BANNER_NO_TEXT =
+  'CRITICAL: the finished image must contain ZERO text, letters, words, numbers, captions, price tags, watermarks, or signage with writing — pure photography only; the store overlays its own titles later.';
+
 const GENERIC_IMAGE_SLOT_DEFS: Record<string, GenericImageSlotDef> = {
   hero: {
     productName: 'Hero',
@@ -162,19 +183,19 @@ const GENERIC_IMAGE_SLOT_DEFS: Record<string, GenericImageSlotDef> = {
     productName: 'Banner 1',
     kind: 'banner',
     style: 'realistic-promotional-banner',
-    promptSuffix: 'Banner composition themed around "New Arrivals" for this kind of store.',
+    promptSuffix: `Wide banner composition themed around new arrivals for this kind of store (fresh products, opening displays, inviting lifestyle mood) — do NOT paint the words "New Arrivals" or any other text. ${HOMEPAGE_BANNER_NO_TEXT}`,
   },
   banner2: {
     productName: 'Banner 2',
     kind: 'banner',
     style: 'realistic-promotional-banner',
-    promptSuffix: 'Banner composition themed around "Best Sellers" for this kind of store.',
+    promptSuffix: `Wide banner composition themed around best sellers for this kind of store (popular, desirable products in an appealing retail setting) — do NOT paint the words "Best Sellers" or any other text. ${HOMEPAGE_BANNER_NO_TEXT}`,
   },
   banner3: {
     productName: 'Banner 3',
     kind: 'banner',
     style: 'realistic-promotional-banner',
-    promptSuffix: 'Banner composition themed around "Special Offers" for this kind of store.',
+    promptSuffix: `Wide banner composition themed around special offers for this kind of store (festive/promotional retail mood without writing) — do NOT paint the words "Special Offers", percentages, or any other text. ${HOMEPAGE_BANNER_NO_TEXT}`,
   },
   split_layout: {
     productName: 'Split Layout',
@@ -205,11 +226,16 @@ export function buildGenericHomepageImageJobs(businessType: string, niche?: stri
   const baseStyle = buildGenericImageStyleBase(businessType, niche);
   return GENERIC_IMAGE_SLOTS.map((slot, index) => {
     const def = GENERIC_IMAGE_SLOT_DEFS[slot];
+    const raw = `${baseStyle} ${def.promptSuffix}`;
+    // The 3 homepage banners under the hero must stay text-free so section
+    // titles can be overlaid in the page builder.
+    const prompt =
+      def.kind === 'banner' ? withNoTextInImagePrompt(raw) : withImageNegativePrompt(raw);
     return {
       index: index + 1,
       kind: def.kind,
       productName: def.productName,
-      prompt: withImageNegativePrompt(`${baseStyle} ${def.promptSuffix}`),
+      prompt,
       output: { resolution: '4k', format: 'png', style: def.style },
     };
   });
@@ -229,11 +255,14 @@ export function buildSingleHomepageImageJob(
 ): NanoBananaJob {
   const baseStyle = buildGenericImageStyleBase(businessType, niche);
   const def = GENERIC_IMAGE_SLOT_DEFS[slot];
+  const raw = `${baseStyle} ${def.promptSuffix}`;
+  const prompt =
+    def.kind === 'banner' ? withNoTextInImagePrompt(raw) : withImageNegativePrompt(raw);
   return {
     index: 1,
     kind: def.kind,
     productName: def.productName,
-    prompt: withImageNegativePrompt(`${baseStyle} ${def.promptSuffix}`),
+    prompt,
     output: { resolution: '4k', format: 'png', style: def.style },
   };
 }

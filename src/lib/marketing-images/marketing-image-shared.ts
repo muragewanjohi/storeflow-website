@@ -28,6 +28,7 @@ import { generateJson, type AiUsage } from '@/lib/ai/claude-client';
 import {
   executeNanoBananaJobs,
   withImageNegativePrompt,
+  withNoTextInImagePrompt,
   type NanoBananaJob,
   type NanoBananaExecution,
 } from '@/lib/onboarding/nano-banana-jobs';
@@ -98,6 +99,7 @@ function buildMarketingImageBatchSystemPrompt(params: {
   requestedCount: number;
   activeSales: Array<{ name: string; description: string | null; badge_text: string | null }>;
   productNames: string[];
+  allowTextInImage: boolean;
 }): string {
   const businessContext = params.businessType
     ? `The store's recorded business type is "${params.businessType}"${params.niche ? ` and its niche is "${params.niche}"` : ''}.`
@@ -106,12 +108,19 @@ function buildMarketingImageBatchSystemPrompt(params: {
     params.activeSales.length > 0
       ? `Their REAL currently active sales/promotions are: ${params.activeSales
           .map((s) => `"${s.name}"${s.badge_text ? ` (badge: ${s.badge_text})` : ''}${s.description ? ` — ${s.description}` : ''}`)
-          .join('; ')}. If the merchant's request refers to a current sale/promotion (e.g. "my flash sale", "the discount I'm running"), ground the imagery/text in ONE of these REAL ones by name — never invent a sale name, discount percentage, or dates that aren't in this real list.`
-      : `This store has no currently active sales/promotions. If the merchant's request implies referencing a specific sale, do not invent one — use generic promotional imagery/wording instead (e.g. a plain "Shop Now" or "New Arrivals" theme) and say so plainly in the summary.`;
+          .join('; ')}. If the merchant's request refers to a current sale/promotion (e.g. "my flash sale", "the discount I'm running"), ground the imagery${params.allowTextInImage ? '/text' : ''} in ONE of these REAL ones by ${params.allowTextInImage ? 'name' : 'mood/theme'} — never invent a discount percentage or dates that aren't in this real list${params.allowTextInImage ? '' : ', and never ask the image model to paint the sale name as text'}.`
+      : `This store has no currently active sales/promotions. If the merchant's request implies referencing a specific sale, do not invent one — use generic promotional imagery${params.allowTextInImage ? '/wording (e.g. a plain "Shop Now" or "New Arrivals" theme)' : ''} instead and say so plainly in the summary.`;
   const productContext =
     params.productNames.length > 0
-      ? `A sample of their REAL current products: ${params.productNames.join(', ')}. If the request names a real product, you may reference it by its real name. Never invent a product name that isn't in this list.`
+      ? `A sample of their REAL current products: ${params.productNames.join(', ')}. If the request names a real product, you may reference it ${params.allowTextInImage ? 'by its real name' : 'visually (the product itself), never as written labels in the image'}. Never invent a product name that isn't in this list.`
       : 'This store has no products listed yet — never invent a specific product name.';
+
+  const textRule = params.allowTextInImage
+    ? 'Each prompt must describe a professional, appealing promotional/marketing photograph or graphic — studio-quality or natural lighting, clean composition suitable for a banner, social post, or ad. Text elements (like a real sale name or "Shop Now") may be described as rendered IN the image where relevant, using only real facts from above.'
+    : [
+        'Each prompt must describe a professional, appealing promotional/marketing photograph or graphic — studio-quality or natural lighting, clean composition suitable for a banner, social post, or ad.',
+        'CRITICAL — NO TEXT IN THE IMAGE: every prompt must explicitly forbid text. The finished image must contain ZERO letters, words, numbers, captions, price tags with writing, logos with readable text, watermarks, or signage with writing. Do not describe "Shop Now", sale titles, percentages, or any typography as part of the scene. Merchants add their own text later in the editor. Describe products, people (generic), colors, lighting, and composition only.',
+      ].join(' ');
 
   return [
     'You are a marketing-image prompt writer for DukaNest, a Kenyan multi-tenant ecommerce platform. You write detailed image-generation prompts for an AI image model (Gemini/Nano Banana) — you never generate the image yourself, only the text prompt describing it.',
@@ -119,8 +128,8 @@ function buildMarketingImageBatchSystemPrompt(params: {
     salesContext,
     productContext,
     `Generate exactly ${params.requestedCount} distinct image prompt(s) fulfilling the merchant's request below. Each should be visually distinct (different composition, framing, or theme) even if they share a subject — never near-duplicate prompts.`,
-    'Each prompt must describe a professional, appealing promotional/marketing photograph or graphic — studio-quality or natural lighting, clean composition suitable for a banner, social post, or ad. Text elements (like a real sale name or "Shop Now") may be described as rendered IN the image where relevant, using only real facts from above.',
-    'Never depict a specific real person, brand logo other than the merchant\'s own described business, or copyrighted character.',
+    textRule,
+    'Never depict a specific real person, brand logo other than a vague non-readable mark, or copyrighted character.',
     'summary: a short (under 15 words), honest, plain-English description of what you are about to generate — shown to the merchant for confirmation. Do not oversell it.',
     'Return ONLY valid JSON with no markdown and no extra prose.',
   ].join(' ');
@@ -140,9 +149,12 @@ export async function writeMarketingImageBatch(params: {
   niche: string | null;
   requestDescription: string;
   requestedCount: number;
+  /** Default false — sale/marketing banners stay text-free. Social shareables pass true. */
+  allowTextInImage?: boolean;
 }): Promise<{ data: MarketingImageBatchResult; usage: AiUsage }> {
   const count = Math.min(Math.max(1, params.requestedCount), MAX_MARKETING_IMAGES_PER_BATCH);
   const { activeSales, productNames } = await getMarketingImageContext(params.tenantId);
+  const allowTextInImage = params.allowTextInImage === true;
 
   return generateJson<MarketingImageBatchResult>({
     system: buildMarketingImageBatchSystemPrompt({
@@ -151,6 +163,7 @@ export async function writeMarketingImageBatch(params: {
       requestedCount: count,
       activeSales,
       productNames,
+      allowTextInImage,
     }),
     userContent: `The merchant's request: "${params.requestDescription}"`,
     schema: marketingImageBatchSchema,
@@ -184,12 +197,15 @@ export async function renderAndSaveMarketingImages(params: {
   apiKey: string;
   prompts: Array<{ label: string; prompt: string }>;
   bucket: AiUsageBucket;
+  /** Default false — sale/marketing banners stay text-free. Social shareables pass true. */
+  allowTextInImage?: boolean;
 }): Promise<MarketingImageBatchExecutionResult> {
+  const allowText = params.allowTextInImage === true;
   const jobs: NanoBananaJob[] = params.prompts.map((p, index) => ({
     index: index + 1,
     kind: 'marketing',
     productName: p.label,
-    prompt: withImageNegativePrompt(p.prompt),
+    prompt: allowText ? withImageNegativePrompt(p.prompt) : withNoTextInImagePrompt(p.prompt),
     output: { resolution: '4k', format: 'png', style: 'realistic-promotional-banner' },
   }));
 

@@ -38,6 +38,8 @@ interface HeaderProps {
   onMobileMenuClick?: () => void;
   onSidebarToggle?: () => void;
   sidebarCollapsed?: boolean;
+  workspaceTitle?: string;
+  navigationLabel?: string;
 }
 
 export default function DashboardHeader({ 
@@ -46,6 +48,8 @@ export default function DashboardHeader({
   onMobileMenuClick,
   onSidebarToggle,
   sidebarCollapsed = false,
+  workspaceTitle,
+  navigationLabel,
 }: Readonly<HeaderProps>) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -100,18 +104,30 @@ export default function DashboardHeader({
       {/* Sidebar collapse button (desktop only) */}
       {onSidebarToggle && (
         <Button
-          variant="ghost"
-          size="icon"
+          variant={navigationLabel ? 'outline' : 'ghost'}
+          size={navigationLabel ? 'sm' : 'icon'}
           className="hidden lg:flex"
           onClick={onSidebarToggle}
         >
           <span className="sr-only">{sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
-          {sidebarCollapsed ? (
+          {navigationLabel ? (
+            <>
+              <Bars3Icon className="mr-2 h-4 w-4" aria-hidden="true" />
+              {navigationLabel}
+            </>
+          ) : sidebarCollapsed ? (
             <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
           ) : (
             <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
           )}
         </Button>
+      )}
+
+      {workspaceTitle && (
+        <div className="hidden min-w-0 sm:block">
+          <p className="truncate text-sm font-semibold">{workspaceTitle}</p>
+          <p className="text-xs text-muted-foreground">Dedicated workspace</p>
+        </div>
       )}
 
       <div className="flex flex-1 items-center justify-end gap-2">

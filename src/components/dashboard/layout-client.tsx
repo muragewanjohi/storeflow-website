@@ -61,8 +61,10 @@ export default function DashboardLayoutClient({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileMoreMenuOpen, setMobileMoreMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [proximityStoreMenuVisible, setProximityStoreMenuVisible] = useState(false);
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
+  const isProximityWorkspace = pathname.startsWith('/dashboard/proximity');
   const useImmersiveMobileShell =
     pathname === '/dashboard' ||
     pathname.startsWith('/dashboard/analytics') ||
@@ -102,38 +104,75 @@ export default function DashboardLayoutClient({
   return (
     <CurrencyProvider>
       <div className="min-h-screen bg-background">
-        <DashboardSidebar 
-          user={user} 
-          tenant={tenant} 
-          mobileMenuOpen={mobileMenuOpen} 
-          setMobileMenuOpen={setMobileMenuOpen}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}>
+        {(!isProximityWorkspace || proximityStoreMenuVisible || mobileMenuOpen) && (
+          <DashboardSidebar
+            user={user}
+            tenant={tenant}
+            mobileMenuOpen={mobileMenuOpen}
+            setMobileMenuOpen={setMobileMenuOpen}
+            collapsed={isProximityWorkspace ? false : sidebarCollapsed}
+          />
+        )}
+        <div
+          className={
+            isProximityWorkspace
+              ? proximityStoreMenuVisible
+                ? 'lg:pl-64'
+                : 'lg:pl-0'
+              : sidebarCollapsed
+                ? 'lg:pl-20'
+                : 'lg:pl-64'
+          }
+        >
           <div className={useImmersiveMobileShell ? 'hidden md:block' : ''}>
             <DashboardHeader 
               user={user} 
               tenant={tenant} 
               onMobileMenuClick={() => setMobileMenuOpen(true)}
-              onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-              sidebarCollapsed={sidebarCollapsed}
+              onSidebarToggle={
+                isProximityWorkspace
+                  ? () => setProximityStoreMenuVisible((visible) => !visible)
+                  : () => setSidebarCollapsed(!sidebarCollapsed)
+              }
+              sidebarCollapsed={isProximityWorkspace ? !proximityStoreMenuVisible : sidebarCollapsed}
+              workspaceTitle={isProximityWorkspace ? 'Proximity marketing' : undefined}
+              navigationLabel={
+                isProximityWorkspace
+                  ? proximityStoreMenuVisible
+                    ? 'Hide store menu'
+                    : 'Show store menu'
+                  : undefined
+              }
             />
           </div>
           <main className={useImmersiveMobileShell ? 'py-0 md:py-6' : 'py-6'}>
-            <div className={useImmersiveMobileShell ? 'md:mx-auto md:max-w-7xl md:px-6 lg:px-8' : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'}>
+            <div
+              className={
+                isProximityWorkspace
+                  ? 'mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-10'
+                  : useImmersiveMobileShell
+                    ? 'md:mx-auto md:max-w-7xl md:px-6 lg:px-8'
+                    : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'
+              }
+            >
               <div className={useImmersiveMobileShell ? 'hidden md:block' : ''}>
                 <AccessRestrictionBanner restriction={accessRestriction} />
-                {!isDashboardHome && <UpdateNotificationBanner />}
-                <CompleteProfilePrompt
-                  openByDefault={shouldShowProfilePrompt}
-                  initialName={profileName}
-                />
+                {!isProximityWorkspace && (
+                  <>
+                    {!isDashboardHome && <UpdateNotificationBanner />}
+                    <CompleteProfilePrompt
+                      openByDefault={shouldShowProfilePrompt}
+                      initialName={profileName}
+                    />
+                  </>
+                )}
               </div>
               {children}
             </div>
           </main>
         </div>
 
+        {!isProximityWorkspace && (
         <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[#d1d5dc] bg-white md:hidden">
           <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
             <Link
@@ -187,6 +226,7 @@ export default function DashboardLayoutClient({
             </Link>
           </div>
         </nav>
+        )}
 
         {mobileMoreMenuOpen && (
           <div className="fixed inset-0 z-50 bg-white md:hidden">

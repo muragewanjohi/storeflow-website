@@ -40,11 +40,9 @@ export const createProductSchema = z.object({
   status: z.enum(['active', 'inactive', 'draft', 'archived']).default('active').optional(),
   image: z.string().url().optional().nullable(),
   gallery: z.array(z.string().url()).default([]).optional().or(z.literal(undefined).transform(() => [])),
-  // Required at create time — a product must always belong to a category
-  // (user-requested change). updateProductSchema below (.partial()) makes
-  // this optional again for edits, so tweaking price/stock on an existing
-  // product never forces re-picking a category.
-  category_id: z.string().uuid('Please select a category for this product'),
+  // Optional for quick product creation. Merchants can organize an item later;
+  // when supplied it must still be a valid category UUID for this tenant.
+  category_id: z.string().uuid('Please select a valid category').optional().nullable(),
   brand_id: z.string().uuid().optional().nullable(),
   metadata: z.record(z.string(), z.any()).default({}).optional(),
   // Estimated delivery time in days (null means use tenant default)

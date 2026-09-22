@@ -819,11 +819,12 @@ export async function POST(request: NextRequest) {
         created_by: user.id,
     });
 
-    // Ensure image URL doesn't exceed VARCHAR(255) limit
+    // Ensure image URL doesn't exceed column limit on older DBs; after
+    // 20260914120000_products_image_text migration this is TEXT and unlimited.
     let imageUrl = validatedData.image || null;
-    if (imageUrl && imageUrl.length > 255) {
-      console.warn('[Product Create] Image URL exceeds 255 characters, truncating');
-      imageUrl = imageUrl.substring(0, 255);
+    if (imageUrl && imageUrl.length > 2000) {
+      console.warn('[Product Create] Image URL unexpectedly long, omitting primary image field');
+      imageUrl = null;
     }
     
     // Prepare product data - explicitly define only allowed fields
