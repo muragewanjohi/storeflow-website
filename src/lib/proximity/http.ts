@@ -49,16 +49,30 @@ async function requireSdk(request: NextRequest, flavor: 'scan' | 'commission') {
 
 export async function requireAdvertiser(request: NextRequest) {
   const header = request.headers.get('authorization') || '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (!token) {
-    throw Object.assign(new Error('Advertiser token required'), { status: 401 });
+  const bearer = header.replace(/^Bearer\s+/i, '').trim();
+  if (bearer) {
+    const advertiser = await prisma.proximity_advertisers.findFirst({
+      where: { access_token_hash: hashToken(bearer), status: 'active' },
+    });
+    if (!advertiser) {
+      throw Object.assign(new Error('Invalid advertiser token'), { status: 401 });
+    }
+    return advertiser;
   }
-  const hash = hashToken(token);
+
+  const session = request.cookies.get('proximity_vendor_session')?.value;
+  if (!session) {
+    throw Object.assign(new Error('Sign in required'), { status: 401 });
+  }
   const advertiser = await prisma.proximity_advertisers.findFirst({
-    where: { access_token_hash: hash, status: 'active' },
+    where: {
+      session_token_hash: hashToken(session),
+      status: 'active',
+      session_expires_at: { gt: new Date() },
+    },
   });
   if (!advertiser) {
-    throw Object.assign(new Error('Invalid advertiser token'), { status: 401 });
+    throw Object.assign(new Error('Sign in required'), { status: 401 });
   }
   return advertiser;
 }

@@ -6,6 +6,9 @@ export const locationInputSchema = z.object({
   name: z.string().min(1).max(255),
   slug: z.string().max(120).optional(),
   address: z.string().max(2000).optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  geofence_radius_m: z.number().int().min(30).max(2000).optional(),
   timezone: z.string().max(64).optional(),
   status: z.enum(['active', 'inactive']).optional(),
 });
@@ -37,6 +40,12 @@ export const advertiserInputSchema = z.object({
   email: z.string().email().optional().nullable(),
   phone: z.string().max(40).optional().nullable(),
   notes: z.string().max(4000).optional().nullable(),
+  password: z.string().min(8).max(72).optional(),
+});
+
+export const vendorLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(72),
 });
 
 export const campaignInputSchema = z.object({
@@ -68,6 +77,14 @@ export const campaignInputSchema = z.object({
   visit_storm_cap: z.number().int().min(1).max(20).optional(),
   dwell_ms: z.number().int().min(0).max(15000).optional(),
   brand_safety_category: z.string().max(80).optional().nullable(),
+  purpose: z.enum(['standard', 'thank_you', 'winback']).optional(),
+  days_of_week: z.string().regex(/^[0-6]{0,7}$/).optional().nullable(),
+  headline_sw: z.string().max(255).optional().nullable(),
+  body_sw: z.string().max(4000).optional().nullable(),
+  headline_b: z.string().max(255).optional().nullable(),
+  body_b: z.string().max(4000).optional().nullable(),
+  headline_b_sw: z.string().max(255).optional().nullable(),
+  body_b_sw: z.string().max(4000).optional().nullable(),
   fee_amount: z.number().nonnegative().optional().nullable(),
   supermarket_share_pct: z.number().min(0).max(100).optional(),
   terms_accepted: z.boolean().optional(),
@@ -91,8 +108,9 @@ export const currentAdQuerySchema = z.object({
   opaque_customer_id: z.string().min(4).max(128),
   visit_id: z.string().max(64).optional(),
   consent: z.enum(['true', 'false']).optional(),
-  source: z.enum(['ble', 'qr']).optional(),
+  source: z.enum(['ble', 'qr', 'geofence']).optional(),
   dwell_elapsed_ms: z.coerce.number().int().min(0).max(60000).optional(),
+  locale: z.enum(['en', 'sw']).optional(),
 });
 
 export const eventInputSchema = z.object({
@@ -105,10 +123,12 @@ export const eventInputSchema = z.object({
   opaque_customer_id: z.string().min(4).max(128),
   visit_id: z.string().max(64).optional(),
   event_type: z.enum(['detected', 'delivered', 'clicked', 'claimed', 'nothing']),
-  source: z.enum(['ble', 'qr']).optional(),
+  source: z.enum(['ble', 'qr', 'geofence']).optional(),
   consent: z.boolean(),
   impression_on_screen: z.boolean().optional(),
   dwell_elapsed_ms: z.number().int().min(0).optional(),
+  battery_mv: z.number().int().min(0).max(5000).optional().nullable(),
+  locale: z.enum(['en', 'sw']).optional(),
 });
 
 export const claimInputSchema = z.object({

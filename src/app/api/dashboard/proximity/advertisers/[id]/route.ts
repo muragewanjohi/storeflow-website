@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma/client';
 import { jsonError, requireProximityStaff } from '@/lib/proximity/http';
 import { advertiserInputSchema } from '@/lib/proximity/validation';
+import { hashVendorPassword } from '@/lib/proximity/vendor-auth';
 
 const advertiserUpdateSchema = advertiserInputSchema.partial().extend({
   status: z.enum(['active', 'inactive']).optional(),
@@ -23,14 +24,28 @@ export async function PATCH(
       return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
     }
 
+    const email = body.email === undefined ? existing.email : body.email?.trim().toLowerCase() || null;
+    if (email) {
+      const duplicate = await prisma.proximity_advertisers.findFirst({
+        where: {
+          tenant_id: tenant.id,
+          id: { not: id },
+          email: { equals: email, mode: 'insensitive' },
+        },
+      });
+      if (duplicate) {
+        return NextResponse.json({ error: 'A vendor with this email already exists.' }, { status: 409 });
+      }
+    }
     const advertiser = await prisma.proximity_advertisers.update({
       where: { id },
       data: {
         name: body.name?.trim() || existing.name,
-        email: body.email === undefined ? existing.email : body.email || null,
+        email,
         phone: body.phone === undefined ? existing.phone : body.phone || null,
         notes: body.notes === undefined ? existing.notes : body.notes || null,
         status: body.status || existing.status,
+        ...(body.password ? { password_hash: await hashVendorPassword(body.password) } : {}),
         updated_at: new Date(),
       },
       select: {

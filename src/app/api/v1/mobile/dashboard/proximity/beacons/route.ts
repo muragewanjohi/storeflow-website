@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { requireMobileAuth } from '@/lib/auth/mobile-auth';
 import { mobileError, mobileSuccess } from '@/lib/api/mobile-response';
-import { DUKANEST_PROXIMITY_UUID } from '@/lib/proximity/constants';
+import {
+  CP35_ADV_INTERVAL_MS,
+  CP35_DEFAULT_PILOT_TX_DBM,
+  DUKANEST_PROXIMITY_UUID,
+  PROXIMITY_LOW_BATTERY_MV,
+} from '@/lib/proximity/constants';
 import { darkSlots } from '@/lib/proximity/service';
 
 export async function GET(request: NextRequest) {
@@ -25,7 +30,15 @@ export async function GET(request: NextRequest) {
         platform_uuid: DUKANEST_PROXIMITY_UUID,
         beacons,
         dark_beacon_ids: dark.map((beacon) => beacon.id),
-        commissioning: 'Pilot: configure TX/UUID in DX-SMART, then register the beacon on web dashboard.',
+        recommended_profile: {
+          uuid: DUKANEST_PROXIMITY_UUID,
+          tx_power_dbm: CP35_DEFAULT_PILOT_TX_DBM,
+          adv_interval_ms: CP35_ADV_INTERVAL_MS.recommended,
+          frames: 'ibeacon_only',
+          low_battery_mv: PROXIMITY_LOW_BATTERY_MV,
+        },
+        commissioning:
+          'Apply this profile in DX-SMART, then record it on the beacon. Recording does not write the radio.',
       })
     );
   } catch (error) {

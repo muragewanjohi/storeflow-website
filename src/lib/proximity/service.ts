@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma/client';
 import { DUKANEST_PROXIMITY_UUID, PROXIMITY_CLAIM_TTL_MS, PROXIMITY_DARK_SLOT_MS } from './constants';
-import { placementsOverlap, selectCampaign, slugify, type EngineCampaign } from './engine';
+import { insideGeofence, placementsOverlap, selectCampaign, slugify, type EngineCampaign } from './engine';
+import { pickCreative, splitInvoiceShares, summarizeProximityReports } from './rules';
 import { generateClaimCode, hashSecret, secretsEqual, generateAccessToken } from './tokens';
 import { campaignPriority } from './validation';
 
@@ -41,10 +42,14 @@ export async function findBeacon(params: {
   });
 }
 
-export async function touchBeaconSeen(beaconId: string) {
+export async function touchBeaconSeen(beaconId: string, batteryMv?: number | null) {
   await prisma.proximity_beacons.update({
     where: { id: beaconId },
-    data: { last_seen_at: new Date(), updated_at: new Date() },
+    data: {
+      last_seen_at: new Date(),
+      ...(batteryMv != null ? { battery_mv: batteryMv } : {}),
+      updated_at: new Date(),
+    },
   });
 }
 
@@ -74,6 +79,8 @@ async function loadEngineCampaigns(tenantId: string, locationId: string, zoneId:
     billingPaused: campaign.billing_paused,
     locationId,
     zoneId,
+    daysOfWeek: campaign.days_of_week,
+    purpose: campaign.purpose,
   }));
 }
 
@@ -137,8 +144,9 @@ export async function resolveCurrentAd(params: {
   opaqueCustomerId: string;
   visitId?: string;
   consent: boolean;
-  source: 'ble' | 'qr';
+  source: 'ble' | 'qr' | 'geofence';
   dwellElapsedMs: number;
+  locale?: 'en' | 'sw';
 }) {
   const beacon = await findBeacon(params);
   const locationId = params.locationId || beacon?.location_id;
@@ -172,12 +180,15 @@ export async function resolveCurrentAd(params: {
         billingPaused: campaign.billing_paused,
         locationId,
         zoneId,
+        daysOfWeek: campaign.days_of_week,
+        purpose: campaign.purpose,
       };
       const counts = await countDelivered({
         tenantId: params.tenantId,
         opaqueCustomerId: params.opaqueCustomerId,
         visitId: params.visitId,
       });
+      const context = await decisionContext(params.tenantId, zoneId, params.opaqueCustomerId);
       const decision = selectCampaign({
         now: new Date(),
         consent: params.consent,
@@ -186,20 +197,33 @@ export async function resolveCurrentAd(params: {
         deliveredTodayByCampaign: counts.todayByCampaign,
         deliveredThisVisit: counts.visit,
         campaigns: [engineCampaign],
+        zoneKind: context.zoneKind,
+        daysSinceLastVisit: context.daysSinceLastVisit,
       });
       if (decision.action === 'eligible') {
-        return decorateCard(params.tenantId, decision.campaign.id, beacon?.id || null, locationId, zoneId);
+        return decorateCard(
+          params.tenantId,
+          decision.campaign.id,
+          beacon?.id || null,
+          locationId,
+          zoneId,
+          params.opaqueCustomerId,
+          params.locale
+        );
       }
       return { action: 'none' as const, reason: decision.reason, privacyCopy: null, card: null };
     }
   }
 
-  const campaigns = await loadEngineCampaigns(params.tenantId, locationId, zoneId);
-  const counts = await countDelivered({
-    tenantId: params.tenantId,
-    opaqueCustomerId: params.opaqueCustomerId,
-    visitId: params.visitId,
-  });
+  const [campaigns, counts, context] = await Promise.all([
+    loadEngineCampaigns(params.tenantId, locationId, zoneId),
+    countDelivered({
+      tenantId: params.tenantId,
+      opaqueCustomerId: params.opaqueCustomerId,
+      visitId: params.visitId,
+    }),
+    decisionContext(params.tenantId, zoneId, params.opaqueCustomerId),
+  ]);
   const decision = selectCampaign({
     now: new Date(),
     consent: params.consent,
@@ -208,13 +232,41 @@ export async function resolveCurrentAd(params: {
     deliveredTodayByCampaign: counts.todayByCampaign,
     deliveredThisVisit: counts.visit,
     campaigns,
+    zoneKind: context.zoneKind,
+    daysSinceLastVisit: context.daysSinceLastVisit,
   });
 
   if (decision.action !== 'eligible') {
     return { action: 'none' as const, reason: decision.reason, privacyCopy: null, card: null, locationId, zoneId, beaconId: beacon?.id || null };
   }
 
-  return decorateCard(params.tenantId, decision.campaign.id, beacon?.id || null, locationId, zoneId);
+  return decorateCard(
+    params.tenantId,
+    decision.campaign.id,
+    beacon?.id || null,
+    locationId,
+    zoneId,
+    params.opaqueCustomerId,
+    params.locale
+  );
+}
+
+async function decisionContext(tenantId: string, zoneId: string, opaqueCustomerId: string) {
+  const [zone, lastSeen] = await Promise.all([
+    prisma.proximity_zones.findFirst({
+      where: { id: zoneId, tenant_id: tenantId },
+      select: { kind: true },
+    }),
+    prisma.proximity_events.findFirst({
+      where: { tenant_id: tenantId, opaque_customer_id: opaqueCustomerId, event_type: 'detected' },
+      orderBy: { created_at: 'desc' },
+      select: { created_at: true },
+    }),
+  ]);
+  const daysSinceLastVisit = lastSeen?.created_at
+    ? Math.floor((Date.now() - lastSeen.created_at.getTime()) / (24 * 60 * 60 * 1000))
+    : null;
+  return { zoneKind: zone?.kind || null, daysSinceLastVisit };
 }
 
 async function decorateCard(
@@ -222,7 +274,9 @@ async function decorateCard(
   campaignId: string,
   beaconId: string | null,
   locationId: string,
-  zoneId: string
+  zoneId: string,
+  opaqueCustomerId = '',
+  locale: 'en' | 'sw' = 'en'
 ) {
   const campaign = await prisma.proximity_campaigns.findFirst({
     where: { id: campaignId, tenant_id: tenantId },
@@ -231,6 +285,7 @@ async function decorateCard(
   if (!campaign) {
     return { action: 'none' as const, reason: 'campaign_missing', privacyCopy: null, card: null };
   }
+  const creative = pickCreative(campaign, opaqueCustomerId, locale);
   return {
     action: 'eligible' as const,
     reason: null,
@@ -240,8 +295,11 @@ async function decorateCard(
     card: {
       campaign_id: campaign.id,
       kind: campaign.advertiser_id ? 'vendor' : 'house',
-      headline: campaign.headline,
-      body: campaign.body,
+      purpose: campaign.purpose,
+      variant: creative.variant,
+      locale: creative.locale,
+      headline: creative.headline,
+      body: creative.body,
       image_url: campaign.image_url,
       cta_label: campaign.cta_label,
       cta_url: campaign.cta_url,
@@ -263,15 +321,16 @@ export async function recordEvent(input: {
   opaqueCustomerId: string;
   visitId?: string;
   eventType: 'detected' | 'delivered' | 'clicked' | 'claimed' | 'nothing';
-  source: 'ble' | 'qr';
+  source: 'ble' | 'qr' | 'geofence';
   consent: boolean;
   impressionOnScreen?: boolean;
+  batteryMv?: number | null;
 }) {
   if (input.eventType === 'delivered' && !input.impressionOnScreen) {
     throw new Error('Impressions are counted only when the in-app card is on screen.');
   }
   if (input.beaconId) {
-    await touchBeaconSeen(input.beaconId);
+    await touchBeaconSeen(input.beaconId, input.batteryMv);
   }
   return prisma.proximity_events.create({
     data: {
@@ -395,6 +454,14 @@ export type CampaignRecordInput = {
   visit_storm_cap?: number;
   dwell_ms?: number;
   brand_safety_category?: string | null;
+  purpose?: 'standard' | 'thank_you' | 'winback';
+  days_of_week?: string | null;
+  headline_sw?: string | null;
+  body_sw?: string | null;
+  headline_b?: string | null;
+  body_b?: string | null;
+  headline_b_sw?: string | null;
+  body_b_sw?: string | null;
   fee_amount?: number | null;
   supermarket_share_pct?: number;
   terms_accepted?: boolean;
@@ -442,6 +509,14 @@ export async function createCampaignRecord(
       dwell_ms: body.dwell_ms ?? 2500,
       priority: campaignPriority(body.advertiser_id),
       brand_safety_category: body.brand_safety_category || null,
+      purpose: body.purpose || 'standard',
+      days_of_week: body.days_of_week || '0123456',
+      headline_sw: body.headline_sw || null,
+      body_sw: body.body_sw || null,
+      headline_b: body.headline_b || null,
+      body_b: body.body_b || null,
+      headline_b_sw: body.headline_b_sw || null,
+      body_b_sw: body.body_b_sw || null,
       status,
       fee_amount: body.fee_amount ?? null,
       supermarket_share_pct: body.supermarket_share_pct ?? 70,
@@ -509,6 +584,14 @@ export async function updateCampaignRecord(
       dwell_ms: body.dwell_ms ?? existing.dwell_ms,
       priority: campaignPriority(body.advertiser_id),
       brand_safety_category: body.brand_safety_category || null,
+      purpose: body.purpose || existing.purpose,
+      days_of_week: body.days_of_week || existing.days_of_week,
+      headline_sw: body.headline_sw === undefined ? existing.headline_sw : body.headline_sw || null,
+      body_sw: body.body_sw === undefined ? existing.body_sw : body.body_sw || null,
+      headline_b: body.headline_b === undefined ? existing.headline_b : body.headline_b || null,
+      body_b: body.body_b === undefined ? existing.body_b : body.body_b || null,
+      headline_b_sw: body.headline_b_sw === undefined ? existing.headline_b_sw : body.headline_b_sw || null,
+      body_b_sw: body.body_b_sw === undefined ? existing.body_b_sw : body.body_b_sw || null,
       fee_amount: body.fee_amount ?? null,
       supermarket_share_pct:
         body.supermarket_share_pct ?? Number(existing.supermarket_share_pct),
@@ -585,8 +668,7 @@ export async function createManualInvoice(input: {
     throw new Error('House campaigns are not invoiced to vendors.');
   }
   const supermarketPct = Number(campaign.supermarket_share_pct);
-  const supermarketShare = Math.round(input.amount * supermarketPct) / 100;
-  const dukanestShare = Math.round((input.amount - supermarketShare) * 100) / 100;
+  const { supermarketShare, dukanestShare } = splitInvoiceShares(input.amount, supermarketPct);
   return prisma.proximity_invoices.create({
     data: {
       tenant_id: input.tenantId,
@@ -682,6 +764,112 @@ export async function assertNoActivePlacements(params: {
       { status: 409 }
     );
   }
+}
+
+export async function ensureCampaignInvoice(tenantId: string, campaignId: string) {
+  const campaign = await prisma.proximity_campaigns.findFirst({
+    where: { id: campaignId, tenant_id: tenantId },
+  });
+  if (!campaign?.advertiser_id || campaign.fee_amount == null) {
+    return null;
+  }
+  const existing = await prisma.proximity_invoices.findFirst({
+    where: { tenant_id: tenantId, campaign_id: campaign.id },
+  });
+  if (existing) {
+    return existing;
+  }
+  const amount = Number(campaign.fee_amount);
+  const supermarketPct = Number(campaign.supermarket_share_pct);
+  const { supermarketShare, dukanestShare } = splitInvoiceShares(amount, supermarketPct);
+  return prisma.proximity_invoices.create({
+    data: {
+      tenant_id: tenantId,
+      campaign_id: campaign.id,
+      advertiser_id: campaign.advertiser_id,
+      amount,
+      supermarket_share: supermarketShare,
+      dukanest_share: dukanestShare,
+      status: 'issued',
+      notes: 'Created automatically from the campaign fee when the flight was approved. Settlement stays offline.',
+    },
+  });
+}
+
+export async function redeemClaim(tenantId: string, code: string, note?: string | null) {
+  const claim = await prisma.proximity_claims.findFirst({
+    where: { tenant_id: tenantId, code: code.trim() },
+    include: { campaign: { select: { id: true, name: true, headline: true } } },
+  });
+  if (!claim) {
+    throw Object.assign(new Error('Claim code not found'), { status: 404 });
+  }
+  if (claim.expires_at.getTime() < Date.now()) {
+    throw Object.assign(new Error('This claim has expired'), { status: 409 });
+  }
+  if (claim.redeemed_at) {
+    return { claim, alreadyRedeemed: true };
+  }
+  const updated = await prisma.proximity_claims.update({
+    where: { id: claim.id },
+    data: { redeemed_at: new Date(), redeemed_note: note || null },
+    include: { campaign: { select: { id: true, name: true, headline: true } } },
+  });
+  return { claim: updated, alreadyRedeemed: false };
+}
+
+export async function proximityReports(tenantId: string) {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const events = await prisma.proximity_events.findMany({
+    where: { tenant_id: tenantId, created_at: { gte: since } },
+    select: {
+      location_id: true,
+      zone_id: true,
+      event_type: true,
+      opaque_customer_id: true,
+      impression_on_screen: true,
+    },
+  });
+  const locations = await prisma.proximity_locations.findMany({
+    where: { tenant_id: tenantId },
+    select: { id: true, name: true },
+  });
+  const zones = await prisma.proximity_zones.findMany({
+    where: { tenant_id: tenantId },
+    select: { id: true, name: true, location_id: true, kind: true },
+  });
+  return summarizeProximityReports({ locations, zones, events });
+}
+
+export async function nearbyBranches(tenantId: string, latitude: number, longitude: number) {
+  const locations = await prisma.proximity_locations.findMany({
+    where: { tenant_id: tenantId, status: 'active', latitude: { not: null }, longitude: { not: null } },
+    select: { id: true, name: true, latitude: true, longitude: true, geofence_radius_m: true },
+  });
+  const matches = locations
+    .filter(
+      (location) =>
+        location.latitude != null &&
+        location.longitude != null &&
+        insideGeofence(
+          { latitude, longitude },
+          { latitude: location.latitude, longitude: location.longitude },
+          location.geofence_radius_m
+        )
+    )
+    .map((location) => ({
+      id: location.id,
+      name: location.name,
+      geofence_radius_m: location.geofence_radius_m,
+      start_ble: true,
+    }));
+  return {
+    inside: matches.length > 0,
+    branches: matches,
+    instruction: matches.length
+      ? 'Shopper is near a branch. Start BLE scanning for the in-store card.'
+      : 'Outside every branch geofence. Keep BLE off until the shopper is near a store.',
+  };
 }
 
 export { slugify, generateAccessToken, hashSecret, secretsEqual, hmToTime };

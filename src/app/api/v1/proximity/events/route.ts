@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       source: body.source || 'ble',
       consent: body.consent,
       impressionOnScreen: body.impression_on_screen,
+      batteryMv: body.battery_mv,
     });
     return NextResponse.json({ data: { id: event.id, event_type: event.event_type } }, { status: 201 });
   } catch (error) {

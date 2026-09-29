@@ -20,6 +20,9 @@ export const PROXIMITY_VISIT_STORM_CAP = 3;
 export const PROXIMITY_DARK_SLOT_MS = 24 * 60 * 60 * 1000;
 export const PROXIMITY_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Replace a CP35 cell when TLM voltage falls below this millivolt reading. */
+export const PROXIMITY_LOW_BATTERY_MV = 2400;
+
 export const HOUSE_CAMPAIGN_PRIORITY = 40;
 export const VENDOR_CAMPAIGN_PRIORITY = 80;
 
@@ -48,6 +51,9 @@ export type ProximityEventType = (typeof PROXIMITY_EVENT_TYPES)[number];
 
 export const PRIVACY_COPY_EN =
   'Enable in-store experiences. We use Bluetooth to show relevant offers while you shop in this store. We do not sell your identity to advertisers. You can turn this off anytime. Location-in-store is not required to checkout.';
+
+export const PRIVACY_COPY_SW =
+  'Washa uzoefu wa dukani. Tunatumia Bluetooth kuonyesha ofa unaponunua dukani hapa. Hatuuzi utambulisho wako kwa watangazaji. Unaweza kuzima hii wakati wowote.';
 
 export const SPOOFING_DISCLOSURE_EN =
   'iBeacon identifiers are public. A nearby device can replay a zone ID. DukaNest v1 does not prove exclusive physical presence. Impressions are counted only when the in-app card is shown on screen after a short dwell. Shoppers with the phone in a pocket, Bluetooth off, or the app uninstalled are not reached. Purchases at till without claiming the offer cannot be measured until a POS or loyalty feed exists. This is not ROAS.';

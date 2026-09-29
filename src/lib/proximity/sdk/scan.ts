@@ -15,6 +15,7 @@ export type ScanConfig = {
   opaqueCustomerId: string;
   visitId?: string;
   consent: boolean;
+  locale?: 'en' | 'sw';
 };
 
 export type BeaconSighting = {
@@ -77,6 +78,7 @@ export class DukaNestProximityScan {
       dwell_elapsed_ms: String(dwellElapsedMs),
     });
     if (this.config.visitId) params.set('visit_id', this.config.visitId);
+    if (this.config.locale) params.set('locale', this.config.locale);
     const response = await fetch(`${this.config.baseUrl}/api/v1/proximity/ads/current?${params}`, {
       headers: { Authorization: `Bearer ${this.config.scanSdkKey}` },
     });
@@ -94,7 +96,8 @@ export class DukaNestProximityScan {
     major?: number;
     minor?: number;
     impression_on_screen?: boolean;
-    source?: 'ble' | 'qr';
+    source?: 'ble' | 'qr' | 'geofence';
+    battery_mv?: number | null;
   }) {
     if (body.event_type === 'delivered') {
       if (!body.impression_on_screen) {
@@ -137,6 +140,18 @@ export class DukaNestProximityScan {
         campaign_id: campaignId,
         opaque_customer_id: this.config.opaqueCustomerId,
       }),
+    });
+    return response.json();
+  }
+
+  async checkGeofence(latitude: number, longitude: number) {
+    const response = await fetch(`${this.config.baseUrl}/api/v1/proximity/geofence`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.config.scanSdkKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ latitude, longitude }),
     });
     return response.json();
   }

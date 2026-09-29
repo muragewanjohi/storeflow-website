@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { jsonError, requireProximityStaff } from '@/lib/proximity/http';
+import { ensureCampaignInvoice } from '@/lib/proximity/service';
 import { z } from 'zod';
 
 const bodySchema = z.object({
@@ -32,7 +33,8 @@ export async function POST(
         updated_at: new Date(),
       },
     });
-    return NextResponse.json({ data: updated });
+    const invoice = body.action === 'approve' ? await ensureCampaignInvoice(tenant.id, id) : null;
+    return NextResponse.json({ data: updated, invoice });
   } catch (error) {
     return jsonError(error);
   }

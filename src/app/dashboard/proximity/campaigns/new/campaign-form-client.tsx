@@ -158,6 +158,14 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   ends_at: new Date(String(form.get('ends_at'))).toISOString(),
                   trading_hours_start: form.get('trading_hours_start') || null,
                   trading_hours_end: form.get('trading_hours_end') || null,
+                  purpose: form.get('purpose') || 'standard',
+                  days_of_week: form.get('days_of_week') || '0123456',
+                  headline_sw: form.get('headline_sw') || null,
+                  body_sw: form.get('body_sw') || null,
+                  headline_b: form.get('headline_b') || null,
+                  body_b: form.get('body_b') || null,
+                  headline_b_sw: form.get('headline_b_sw') || null,
+                  body_b_sw: form.get('body_b_sw') || null,
                   terms_accepted: true,
                   fee_amount: form.get('fee_amount') ? Number(form.get('fee_amount')) : null,
                   placements,
@@ -305,9 +313,47 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   <Label>Daily end</Label>
                   <Input name="trading_hours_end" type="time" defaultValue={toTime(campaign?.trading_hours_end, '21:00')} step="60" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Purpose</Label>
+                  <select name="purpose" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" defaultValue={campaign?.purpose || 'standard'}>
+                    <option value="standard">Standard in-zone offer</option>
+                    <option value="thank_you">Checkout thank-you</option>
+                    <option value="winback">We miss you (7+ days away)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Days</Label>
+                  <Input name="days_of_week" defaultValue={campaign?.days_of_week || '0123456'} placeholder="0123456 (Sun–Sat)" />
+                  <p className="text-xs text-muted-foreground">0 is Sunday through 6 Saturday, Nairobi time. 12345 is weekdays.</p>
+                </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Fee (KSh, optional)</Label>
                   <Input name="fee_amount" type="number" min="0" step="0.01" defaultValue={campaign?.fee_amount ? String(campaign.fee_amount) : ''} placeholder="100000" />
+                  <p className="text-xs text-muted-foreground">Approving a vendor campaign with a fee drafts the 70/30 invoice automatically.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Swahili headline</Label>
+                  <Input name="headline_sw" defaultValue={campaign?.headline_sw || ''} placeholder="Kichwa cha Kiswahili" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Swahili body</Label>
+                  <Input name="body_sw" defaultValue={campaign?.body_sw || ''} placeholder="Maelezo ya Kiswahili" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Variant B headline</Label>
+                  <Input name="headline_b" defaultValue={campaign?.headline_b || ''} placeholder="Optional A/B headline" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Variant B body</Label>
+                  <Input name="body_b" defaultValue={campaign?.body_b || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Variant B Swahili headline</Label>
+                  <Input name="headline_b_sw" defaultValue={campaign?.headline_b_sw || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Variant B Swahili body</Label>
+                  <Input name="body_b_sw" defaultValue={campaign?.body_b_sw || ''} />
                 </div>
               </CardContent>
             </Card>

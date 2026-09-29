@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma/client';
 import { jsonError, requireProximityStaff } from '@/lib/proximity/http';
+import { splitInvoiceShares } from '@/lib/proximity/rules';
 
 const invoiceUpdateSchema = z.object({
   amount: z.number().positive().optional(),
   notes: z.string().max(4000).optional().nullable(),
   status: z.enum(['draft', 'issued', 'paid', 'void']).optional(),
 });
-
-function invoiceShares(amount: number, supermarketPct: number) {
-  const supermarketShare = Math.round(amount * supermarketPct) / 100;
-  const dukanestShare = Math.round((amount - supermarketShare) * 100) / 100;
-  return { supermarketShare, dukanestShare };
-}
 
 export async function PATCH(
   request: NextRequest,
@@ -39,7 +34,7 @@ export async function PATCH(
 
     const amount = body.amount ?? Number(existing.amount);
     const supermarketPct = Number(existing.campaign?.supermarket_share_pct ?? 70);
-    const shares = invoiceShares(amount, supermarketPct);
+    const shares = splitInvoiceShares(amount, supermarketPct);
 
     const invoice = await prisma.proximity_invoices.update({
       where: { id },

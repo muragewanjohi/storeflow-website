@@ -42,7 +42,7 @@ import {
   UserGroupIcon,
   XCircleIcon,
 } from '@heroicons/react/24/outline';
-import { CP35_TX_STEPS_DBM, DUKANEST_PROXIMITY_UUID } from '@/lib/proximity/constants';
+import { CP35_TX_STEPS_DBM, DUKANEST_PROXIMITY_UUID, PROXIMITY_LOW_BATTERY_MV } from '@/lib/proximity/constants';
 import { SaveButton } from './save-button';
 
 type InventoryKind = 'branch' | 'zone' | 'beacon' | 'campaign' | 'vendor' | 'invoice' | 'sdk';
@@ -100,7 +100,7 @@ const DELETE_COPY: Record<
   },
 };
 
-type Tab = 'overview' | 'branches' | 'beacons' | 'campaigns' | 'vendors' | 'invoices' | 'sdk';
+type Tab = 'overview' | 'branches' | 'beacons' | 'campaigns' | 'vendors' | 'invoices' | 'reports' | 'redeem' | 'sdk';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -109,6 +109,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'campaigns', label: 'Campaigns' },
   { id: 'vendors', label: 'Vendors' },
   { id: 'invoices', label: 'Invoices' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'redeem', label: 'Redeem' },
   { id: 'sdk', label: 'SDK keys' },
 ];
 
@@ -173,7 +175,8 @@ export default function ProximityHubClient() {
   const [advertisers, setAdvertisers] = useState<any[]>([]);
   const [sdkApps, setSdkApps] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [vendorTokenOnce, setVendorTokenOnce] = useState<string | null>(null);
+  const [reports, setReports] = useState<any>(null);
+  const [redemptions, setRedemptions] = useState<any[]>([]);
   const [sdkKeyOnce, setSdkKeyOnce] = useState<string | null>(null);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
@@ -181,7 +184,13 @@ export default function ProximityHubClient() {
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [editingSdkId, setEditingSdkId] = useState<string | null>(null);
-  const [locationDraft, setLocationDraft] = useState({ name: '', address: '' });
+  const [locationDraft, setLocationDraft] = useState({
+    name: '',
+    address: '',
+    latitude: '',
+    longitude: '',
+    geofence_radius_m: '150',
+  });
   const [zoneDraft, setZoneDraft] = useState({ name: '', location_id: '' });
   const [beaconDraft, setBeaconDraft] = useState({
     zone_id: '',
@@ -190,7 +199,8 @@ export default function ProximityHubClient() {
     minor: '',
     tx_power_dbm: '-13.5',
   });
-  const [vendorDraft, setVendorDraft] = useState({ name: '', email: '', phone: '' });
+  const [vendorDraft, setVendorDraft] = useState({ name: '', email: '', phone: '', password: '' });
+  const [vendorPasswordOnce, setVendorPasswordOnce] = useState<string | null>(null);
   const [invoiceDraft, setInvoiceDraft] = useState({ amount: '', notes: '', status: 'draft' });
   const [sdkDraft, setSdkDraft] = useState({ name: '' });
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -203,7 +213,7 @@ export default function ProximityHubClient() {
 
   async function refresh() {
     try {
-      const [over, loc, zon, bea, cam, adv, sdk, inv] = await Promise.all([
+      const [over, loc, zon, bea, cam, adv, sdk, inv, report, redeemed] = await Promise.all([
         api('/api/dashboard/proximity/overview'),
         api('/api/dashboard/proximity/locations'),
         api('/api/dashboard/proximity/zones'),
@@ -212,6 +222,8 @@ export default function ProximityHubClient() {
         api('/api/dashboard/proximity/advertisers'),
         api('/api/dashboard/proximity/sdk-apps'),
         api('/api/dashboard/proximity/invoices'),
+        api('/api/dashboard/proximity/reports'),
+        api('/api/dashboard/proximity/claims/redeem'),
       ]);
       setOverview(over.data);
       setLocations(loc.data);
@@ -221,6 +233,8 @@ export default function ProximityHubClient() {
       setAdvertisers(adv.data);
       setSdkApps(sdk.data);
       setInvoices(inv.data);
+      setReports(report.data);
+      setRedemptions(redeemed.data);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load proximity data');
     }
@@ -242,6 +256,9 @@ export default function ProximityHubClient() {
         body: JSON.stringify({
           name: locationDraft.name.trim(),
           address: locationDraft.address.trim() || null,
+          latitude: locationDraft.latitude.trim() ? Number(locationDraft.latitude) : null,
+          longitude: locationDraft.longitude.trim() ? Number(locationDraft.longitude) : null,
+          geofence_radius_m: Number(locationDraft.geofence_radius_m) || 150,
         }),
       });
       setEditingLocationId(null);
@@ -312,6 +329,10 @@ export default function ProximityHubClient() {
       toast.error('Vendor name is required');
       return;
     }
+    if (vendorDraft.password.trim() && vendorDraft.password.trim().length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
     setPendingAction(`save-vendor:${vendorId}`);
     try {
       await api(`/api/dashboard/proximity/advertisers/${vendorId}`, {
@@ -320,6 +341,7 @@ export default function ProximityHubClient() {
           name: vendorDraft.name.trim(),
           email: vendorDraft.email.trim() || null,
           phone: vendorDraft.phone.trim() || null,
+          ...(vendorDraft.password.trim() ? { password: vendorDraft.password.trim() } : {}),
         }),
       });
       setEditingVendorId(null);
@@ -733,6 +755,9 @@ export default function ProximityHubClient() {
                                 setLocationDraft({
                                   name: location.name,
                                   address: location.address || '',
+                                  latitude: location.latitude == null ? '' : String(location.latitude),
+                                  longitude: location.longitude == null ? '' : String(location.longitude),
+                                  geofence_radius_m: String(location.geofence_radius_m || 150),
                                 });
                               }}
                             >
@@ -783,6 +808,46 @@ export default function ProximityHubClient() {
                                 }
                               />
                             </div>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <div className="space-y-2">
+                                <Label>Latitude</Label>
+                                <Input
+                                  value={locationDraft.latitude}
+                                  onChange={(event) =>
+                                    setLocationDraft((current) => ({ ...current, latitude: event.target.value }))
+                                  }
+                                  placeholder="-1.286"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Longitude</Label>
+                                <Input
+                                  value={locationDraft.longitude}
+                                  onChange={(event) =>
+                                    setLocationDraft((current) => ({ ...current, longitude: event.target.value }))
+                                  }
+                                  placeholder="36.817"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Geofence (m)</Label>
+                                <Input
+                                  type="number"
+                                  min="30"
+                                  max="2000"
+                                  value={locationDraft.geofence_radius_m}
+                                  onChange={(event) =>
+                                    setLocationDraft((current) => ({
+                                      ...current,
+                                      geofence_radius_m: event.target.value,
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              GPS starts BLE only when the shopper is inside this circle. The beacon still decides the zone.
+                            </p>
                             <div className="flex gap-2">
                               <SaveButton
                                 type="button"
@@ -1009,11 +1074,19 @@ export default function ProximityHubClient() {
                 Register beacon
               </SaveButton>
             </form>
-              <div className="mt-5 rounded-lg bg-muted/40 p-3">
-                <p className="text-xs font-medium">Platform UUID</p>
-                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-                  {DUKANEST_PROXIMITY_UUID}
-                </p>
+              <div className="mt-5 space-y-3">
+                <div className="rounded-lg bg-muted/40 p-3">
+                  <p className="text-xs font-medium">Platform UUID</p>
+                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
+                    {DUKANEST_PROXIMITY_UUID}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+                  <p className="font-semibold">Battery swap</p>
+                  <p className="mt-1">
+                    The scan app should send TLM battery millivolts with each detection. Below {PROXIMITY_LOW_BATTERY_MV.toLocaleString('en-KE')} mV, replace the cell, then confirm last-seen and voltage recover on the next visit.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1102,6 +1175,8 @@ export default function ProximityHubClient() {
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">
                           Seen {formatDate(beacon.last_seen_at)}
+                          {beacon.battery_mv != null ? ` · ${beacon.battery_mv} mV` : ''}
+                          {beacon.battery_mv != null && beacon.battery_mv < PROXIMITY_LOW_BATTERY_MV ? ' · replace battery' : ''}
                           {beacon.mac_address ? ` · ${beacon.mac_address}` : ''}
                         </p>
                         {isEditing && (
@@ -1349,7 +1424,7 @@ export default function ProximityHubClient() {
                 <UserGroupIcon className="h-5 w-5" />
               </div>
               <CardTitle>Add a vendor</CardTitle>
-              <CardDescription>Create a pilot advertiser and issue temporary portal access.</CardDescription>
+              <CardDescription>Create an advertiser. They sign in with email and password on the vendor page.</CardDescription>
             </CardHeader>
             <CardContent>
             <form
@@ -1360,13 +1435,22 @@ export default function ProximityHubClient() {
                 const form = new FormData(formEl);
                 setPendingAction('create-vendor');
                 try {
+                  const password = String(form.get('password') || '').trim();
+                  if (password && password.length < 8) {
+                    toast.error('Password must be at least 8 characters');
+                    return;
+                  }
                   const result = await api('/api/dashboard/proximity/advertisers', {
                     method: 'POST',
-                    body: JSON.stringify({ name: form.get('name'), email: form.get('email') }),
+                    body: JSON.stringify({
+                      name: form.get('name'),
+                      email: form.get('email'),
+                      ...(password ? { password } : {}),
+                    }),
                   });
-                  setVendorTokenOnce(result.access_token);
+                  setVendorPasswordOnce(result.temporary_password || null);
                   formEl.reset();
-                  toast.success('Vendor created — copy the token now');
+                  toast.success(result.temporary_password ? 'Vendor created — copy the password now' : 'Vendor created');
                   await refresh();
                 } catch (error) {
                   toast.error(error instanceof Error ? error.message : 'Failed');
@@ -1381,34 +1465,38 @@ export default function ProximityHubClient() {
               </div>
               <div className="space-y-2">
                 <Label>Contact email</Label>
-                <Input name="email" type="email" placeholder="campaigns@vendor.com" />
+                <Input name="email" type="email" placeholder="campaigns@vendor.com" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Portal password</Label>
+                <Input name="password" type="password" minLength={8} placeholder="Leave blank to generate one" />
               </div>
               <SaveButton type="submit" className="w-full" pending={pendingAction === 'create-vendor'} pendingLabel="Saving">
                 Create vendor
               </SaveButton>
             </form>
-            {vendorTokenOnce && (
+            {vendorPasswordOnce && (
               <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div className="flex items-center gap-2 text-amber-900">
                   <KeyIcon className="h-5 w-5" />
-                  <p className="text-sm font-semibold">Pilot access token — shown once</p>
+                  <p className="text-sm font-semibold">Portal password — shown once</p>
                 </div>
-                <p className="mt-2 break-all rounded-lg bg-white/70 p-3 font-mono text-xs">{vendorTokenOnce}</p>
+                <p className="mt-2 break-all rounded-lg bg-white/70 p-3 font-mono text-xs">{vendorPasswordOnce}</p>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   className="mt-3"
                   onClick={async () => {
-                    await navigator.clipboard.writeText(vendorTokenOnce);
-                    toast.success('Token copied');
+                    await navigator.clipboard.writeText(vendorPasswordOnce);
+                    toast.success('Password copied');
                   }}
                 >
                   <ClipboardDocumentIcon className="mr-1.5 h-4 w-4" />
-                  Copy token
+                  Copy password
                 </Button>
                 <p className="mt-3 text-xs text-amber-800">
-                  Password-based vendor accounts should replace this pilot token before production.
+                  The vendor signs in at /vendor/proximity with this email and password.
                 </p>
               </div>
             )}
@@ -1448,6 +1536,9 @@ export default function ProximityHubClient() {
                       <p className="mt-1 truncate text-sm text-muted-foreground">
                         {advertiser.email || 'No contact email'}
                       </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {advertiser.has_password ? 'Can sign in' : 'No portal password'}
+                      </p>
                       {advertiser.phone && (
                         <p className="mt-1 text-sm text-muted-foreground">{advertiser.phone}</p>
                       )}
@@ -1462,6 +1553,7 @@ export default function ProximityHubClient() {
                               name: advertiser.name,
                               email: advertiser.email || '',
                               phone: advertiser.phone || '',
+                              password: '',
                             });
                           }}
                         >
@@ -1512,6 +1604,17 @@ export default function ProximityHubClient() {
                               value={vendorDraft.phone}
                               onChange={(event) =>
                                 setVendorDraft((current) => ({ ...current, phone: event.target.value }))
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>New portal password</Label>
+                            <Input
+                              type="password"
+                              value={vendorDraft.password}
+                              placeholder="Leave blank to keep the current password"
+                              onChange={(event) =>
+                                setVendorDraft((current) => ({ ...current, password: event.target.value }))
                               }
                             />
                           </div>
@@ -1924,6 +2027,136 @@ export default function ProximityHubClient() {
                     </div>
                     );
                   })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'reports' && (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="border-0 shadow-sm ring-1 ring-border">
+            <CardHeader>
+              <CardTitle>Zone traffic</CardTitle>
+              <CardDescription>
+                Distinct shoppers detected in the last {reports?.window_days || 7} days. No names or phone numbers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(reports?.zones || []).length === 0 ? (
+                <EmptyState
+                  icon={MapPinIcon}
+                  title="No zone traffic yet"
+                  description="Counts appear after the shopper app sends detected events."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {reports.zones.map((zone: any) => (
+                    <div key={zone.zone_id} className="flex items-center justify-between rounded-xl border p-4">
+                      <div>
+                        <p className="font-medium">{zone.branch_name} / {zone.zone_name}</p>
+                        <p className="text-xs text-muted-foreground">{zone.kind}</p>
+                      </div>
+                      <Badge variant="secondary">{zone.shoppers} shoppers</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm ring-1 ring-border">
+            <CardHeader>
+              <CardTitle>Cross-branch results</CardTitle>
+              <CardDescription>On-screen views, clicks, and claims for every branch in this chain.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(reports?.branches || []).length === 0 ? (
+                <EmptyState icon={BuildingStorefrontIcon} title="No branches" description="Add a branch to compare performance." />
+              ) : (
+                <div className="space-y-3">
+                  {reports.branches.map((branch: any) => (
+                    <div key={branch.location_id} className="rounded-xl border p-4">
+                      <p className="font-medium">{branch.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {branch.delivered} on-screen · {branch.clicked} clicks · {branch.claimed} claims
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'redeem' && (
+        <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <Card className="h-fit border-0 shadow-sm ring-1 ring-border">
+            <CardHeader>
+              <CardTitle>Cashier redeem</CardTitle>
+              <CardDescription>Mark a claimed offer as used at the till. This is not a POS sale.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                className="space-y-3"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const formEl = event.currentTarget;
+                  const form = new FormData(formEl);
+                  setPendingAction('redeem');
+                  try {
+                    const result = await api('/api/dashboard/proximity/claims/redeem', {
+                      method: 'POST',
+                      body: JSON.stringify({ code: form.get('code'), note: form.get('note') || null }),
+                    });
+                    formEl.reset();
+                    toast.success(
+                      result.data.already_redeemed
+                        ? `${result.data.code} was already redeemed`
+                        : `${result.data.code} redeemed for ${result.data.campaign_name}`
+                    );
+                    await refresh();
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Failed');
+                  } finally {
+                    setPendingAction(null);
+                  }
+                }}
+              >
+                <div className="space-y-2">
+                  <Label>Claim code</Label>
+                  <Input name="code" placeholder="Enter the shopper code" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Till note</Label>
+                  <Input name="note" placeholder="Optional cashier note" />
+                </div>
+                <SaveButton type="submit" className="w-full" pending={pendingAction === 'redeem'} pendingLabel="Saving">
+                  Redeem code
+                </SaveButton>
+              </form>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm ring-1 ring-border">
+            <CardHeader>
+              <CardTitle>Recent redemptions</CardTitle>
+              <CardDescription>Codes already marked used. Shopper identity stays hidden.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {redemptions.length === 0 ? (
+                <EmptyState icon={TicketIcon} title="No redemptions yet" description="Redeemed claim codes will show up here." />
+              ) : (
+                <div className="space-y-3">
+                  {redemptions.map((claim) => (
+                    <div key={claim.id} className="flex items-center justify-between rounded-xl border p-4">
+                      <div>
+                        <p className="font-mono text-sm font-medium">{claim.code}</p>
+                        <p className="text-sm text-muted-foreground">{claim.campaign_name}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{formatDate(claim.redeemed_at)}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

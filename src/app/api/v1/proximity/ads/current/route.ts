@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jsonError, requireScanSdk } from '@/lib/proximity/http';
 import { currentAdQuerySchema } from '@/lib/proximity/validation';
 import { resolveCurrentAd } from '@/lib/proximity/service';
-import { PRIVACY_COPY_EN, SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
+import { PRIVACY_COPY_EN, PRIVACY_COPY_SW, SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,10 +21,11 @@ export async function GET(request: NextRequest) {
       consent: parsed.consent !== 'false',
       source: parsed.source || 'ble',
       dwellElapsedMs: parsed.dwell_elapsed_ms ?? 0,
+      locale: parsed.locale,
     });
     return NextResponse.json({
       ...result,
-      privacy_copy: PRIVACY_COPY_EN,
+      privacy_copy: parsed.locale === 'sw' ? PRIVACY_COPY_SW : PRIVACY_COPY_EN,
       spoofing_disclosure: SPOOFING_DISCLOSURE_EN,
       impression_rule: 'Count delivered only after the in-app card is rendered on screen.',
     });

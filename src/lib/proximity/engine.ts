@@ -24,18 +24,25 @@ export type EngineCampaign = {
   billingPaused: boolean;
   locationId: string;
   zoneId: string;
+  /** 0=Sunday … 6=Saturday in the campaign timezone. Missing means every day. */
+  daysOfWeek?: string | null;
+  /** standard | thank_you | winback */
+  purpose?: string | null;
 };
 
 export type EngineInput = {
   now: Date;
   consent: boolean;
-  source: 'ble' | 'qr';
+  source: 'ble' | 'qr' | 'geofence';
   dwellElapsedMs: number;
   /** On-screen deliveries today, keyed by campaign id (1/campaign/customer/day). */
   deliveredTodayByCampaign: Record<string, number>;
   /** Visit-level storm cap across all campaigns. */
   deliveredThisVisit: number;
   campaigns: EngineCampaign[];
+  zoneKind?: string | null;
+  /** Whole days since this customer's last in-store detection. Null if they have never been seen. */
+  daysSinceLastVisit?: number | null;
 };
 
 export type EngineDecision =
@@ -47,6 +54,71 @@ export type EngineDecision =
       privacyCopy: string;
       spoofingDisclosure: string;
     };
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+export function weekdayIndex(now: Date, timezone: string): number {
+  try {
+    const label = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'Africa/Nairobi',
+      weekday: 'short',
+    }).format(now);
+    return WEEKDAY_INDEX[label] ?? now.getUTCDay();
+  } catch {
+    return now.getUTCDay();
+  }
+}
+
+export function matchesDaypart(campaign: EngineCampaign, now: Date): boolean {
+  const days = campaign.daysOfWeek || '0123456';
+  return days.includes(String(weekdayIndex(now, campaign.timezone)));
+}
+
+export function matchesPurpose(
+  campaign: EngineCampaign,
+  input: Pick<EngineInput, 'zoneKind' | 'daysSinceLastVisit'>
+): boolean {
+  const purpose = campaign.purpose || 'standard';
+  if (purpose === 'thank_you') {
+    return input.zoneKind === 'checkout';
+  }
+  if (purpose === 'winback') {
+    return (input.daysSinceLastVisit ?? -1) >= 7;
+  }
+  return true;
+}
+
+export function haversineMeters(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+): number {
+  const earth = 6371000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(to.latitude - from.latitude);
+  const dLng = toRad(to.longitude - from.longitude);
+  const lat1 = toRad(from.latitude);
+  const lat2 = toRad(to.latitude);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earth * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+export function insideGeofence(
+  point: { latitude: number; longitude: number },
+  center: { latitude: number; longitude: number },
+  radiusM: number
+): boolean {
+  return haversineMeters(point, center) <= radiusM;
+}
 
 function inTradingHours(campaign: EngineCampaign, now: Date): boolean {
   if (!campaign.tradingHoursStart || !campaign.tradingHoursEnd) {
@@ -106,7 +178,9 @@ export function selectCampaign(input: EngineInput): EngineDecision {
     (campaign) =>
       !campaign.billingPaused &&
       isLiveStatus(campaign.status, input.now, campaign.startsAt, campaign.endsAt) &&
-      inTradingHours(campaign, input.now)
+      inTradingHours(campaign, input.now) &&
+      matchesDaypart(campaign, input.now) &&
+      matchesPurpose(campaign, input)
   );
 
   if (live.length === 0) {
