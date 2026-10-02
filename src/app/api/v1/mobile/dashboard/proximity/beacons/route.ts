@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           low_battery_mv: PROXIMITY_LOW_BATTERY_MV,
         },
         commissioning:
-          'Apply this profile in DX-SMART, then record it on the beacon. Recording does not write the radio.',
+          'Configure the beacon from this phone. The shopper app cannot change the radio.',
       })
     );
   } catch (error) {

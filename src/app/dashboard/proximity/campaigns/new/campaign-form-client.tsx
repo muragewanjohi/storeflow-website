@@ -48,7 +48,7 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [previewHeadline, setPreviewHeadline] = useState('');
   const [previewBody, setPreviewBody] = useState('');
-  const [couponEnabled, setCouponEnabled] = useState(false);
+  const [daysOfWeek, setDaysOfWeek] = useState('0123456');
   const [loading, setLoading] = useState(Boolean(campaignId));
   const [saving, setSaving] = useState(false);
   const isEditing = Boolean(campaignId);
@@ -79,7 +79,7 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
         setImageUrl(existing.data.image_url || null);
         setPreviewHeadline(existing.data.headline || '');
         setPreviewBody(existing.data.body || '');
-        setCouponEnabled(Boolean(existing.data.coupon_enabled));
+        setDaysOfWeek(existing.data.days_of_week || '0123456');
         setPlacements(
           (existing.data.placements || []).map((placement: any) => ({
             location_id: placement.location_id,
@@ -135,6 +135,10 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
             toast.error('Select at least one branch/zone');
             return;
           }
+          if (!daysOfWeek) {
+            toast.error('Choose at least one day');
+            return;
+          }
           const form = new FormData(event.currentTarget);
           const advertiserId = String(form.get('advertiser_id') || '');
           setSaving(true);
@@ -152,20 +156,20 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   headline: form.get('headline'),
                   body: form.get('body'),
                   image_url: imageUrl,
-                  coupon_enabled: form.get('coupon_enabled') === 'on',
-                  coupon_label: form.get('coupon_label') || null,
+                  coupon_enabled: false,
+                  coupon_label: null,
                   starts_at: new Date(String(form.get('starts_at'))).toISOString(),
                   ends_at: new Date(String(form.get('ends_at'))).toISOString(),
                   trading_hours_start: form.get('trading_hours_start') || null,
                   trading_hours_end: form.get('trading_hours_end') || null,
-                  purpose: form.get('purpose') || 'standard',
-                  days_of_week: form.get('days_of_week') || '0123456',
-                  headline_sw: form.get('headline_sw') || null,
-                  body_sw: form.get('body_sw') || null,
-                  headline_b: form.get('headline_b') || null,
-                  body_b: form.get('body_b') || null,
-                  headline_b_sw: form.get('headline_b_sw') || null,
-                  body_b_sw: form.get('body_b_sw') || null,
+                  purpose: 'standard',
+                  days_of_week: daysOfWeek,
+                  headline_sw: null,
+                  body_sw: null,
+                  headline_b: null,
+                  body_b: null,
+                  headline_b_sw: null,
+                  body_b_sw: null,
                   terms_accepted: true,
                   fee_amount: form.get('fee_amount') ? Number(form.get('fee_amount')) : null,
                   placements,
@@ -255,31 +259,19 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   recommendedDimensions="1200×675 or larger (16:9)"
                   helpText="JPEG, PNG, WebP or GIF. Maximum 5MB."
                 />
-                <div className="rounded-xl border bg-muted/20 p-4">
-                  <label className="flex cursor-pointer items-center gap-3">
-                    <input
-                      id="coupon"
-                      name="coupon_enabled"
-                      type="checkbox"
-                      checked={couponEnabled}
-                      onChange={(event) => setCouponEnabled(event.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    <span>
-                      <span className="block text-sm font-medium">Add a claimable coupon</span>
-                      <span className="block text-xs text-muted-foreground">Shoppers receive a unique code in the app.</span>
-                    </span>
-                  </label>
-                  {couponEnabled && (
-                    <div className="mt-4 space-y-2">
-                      <Label>Coupon label</Label>
-                      <Input
-                        name="coupon_label"
-                        placeholder="Save KSh 50"
-                        defaultValue={campaign?.coupon_label || ''}
-                      />
+                <div className="rounded-xl border border-dashed bg-muted/30 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <TicketIcon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                      <span>
+                        <span className="block text-sm font-medium">Claimable coupon</span>
+                        <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                          Coming in version 2, after we align with the supermarket team. Shoppers will claim a unique code in the supermarket app.
+                        </span>
+                      </span>
                     </div>
-                  )}
+                    <Badge variant="outline" className="shrink-0">Coming soon</Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -313,47 +305,47 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   <Label>Daily end</Label>
                   <Input name="trading_hours_end" type="time" defaultValue={toTime(campaign?.trading_hours_end, '21:00')} step="60" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Purpose</Label>
-                  <select name="purpose" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm" defaultValue={campaign?.purpose || 'standard'}>
-                    <option value="standard">Standard in-zone offer</option>
-                    <option value="thank_you">Checkout thank-you</option>
-                    <option value="winback">We miss you (7+ days away)</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label>Days</Label>
-                  <Input name="days_of_week" defaultValue={campaign?.days_of_week || '0123456'} placeholder="0123456 (Sun–Sat)" />
-                  <p className="text-xs text-muted-foreground">0 is Sunday through 6 Saturday, Nairobi time. 12345 is weekdays.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ['0', 'Sun'],
+                      ['1', 'Mon'],
+                      ['2', 'Tue'],
+                      ['3', 'Wed'],
+                      ['4', 'Thu'],
+                      ['5', 'Fri'],
+                      ['6', 'Sat'],
+                    ].map(([id, label]) => {
+                      const selected = daysOfWeek.includes(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() =>
+                            setDaysOfWeek((current) => {
+                              const next = current.includes(id) ? current.replace(id, '') : `${current}${id}`;
+                              return next.split('').sort().join('');
+                            })
+                          }
+                          className={`rounded-full px-3 py-1.5 text-sm ${
+                            selected ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The offer appears only on the selected days, in Nairobi time. Leave every day on for the whole flight.
+                  </p>
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Fee (KSh, optional)</Label>
                   <Input name="fee_amount" type="number" min="0" step="0.01" defaultValue={campaign?.fee_amount ? String(campaign.fee_amount) : ''} placeholder="100000" />
                   <p className="text-xs text-muted-foreground">Approving a vendor campaign with a fee drafts the 70/30 invoice automatically.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Swahili headline</Label>
-                  <Input name="headline_sw" defaultValue={campaign?.headline_sw || ''} placeholder="Kichwa cha Kiswahili" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Swahili body</Label>
-                  <Input name="body_sw" defaultValue={campaign?.body_sw || ''} placeholder="Maelezo ya Kiswahili" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Variant B headline</Label>
-                  <Input name="headline_b" defaultValue={campaign?.headline_b || ''} placeholder="Optional A/B headline" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Variant B body</Label>
-                  <Input name="body_b" defaultValue={campaign?.body_b || ''} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Variant B Swahili headline</Label>
-                  <Input name="headline_b_sw" defaultValue={campaign?.headline_b_sw || ''} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Variant B Swahili body</Label>
-                  <Input name="body_b_sw" defaultValue={campaign?.body_b_sw || ''} />
                 </div>
               </CardContent>
             </Card>
@@ -426,12 +418,6 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   {previewBody || 'Your supporting campaign message will appear here.'}
                 </p>
-                {couponEnabled && (
-                  <div className="mt-4 flex items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
-                    <TicketIcon className="h-5 w-5" />
-                    Claim this offer
-                  </div>
-                )}
               </CardContent>
             </Card>
 

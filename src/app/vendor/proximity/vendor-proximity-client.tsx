@@ -280,18 +280,18 @@ export default function VendorProximityClient() {
                           name: form.get('name'),
                           headline,
                           body: body || null,
-                          headline_sw: form.get('headline_sw') || null,
-                          body_sw: form.get('body_sw') || null,
-                          headline_b: form.get('headline_b') || null,
-                          body_b: form.get('body_b') || null,
-                          coupon_enabled: form.get('coupon_enabled') === 'on',
-                          coupon_label: form.get('coupon_label') || null,
+                          headline_sw: null,
+                          body_sw: null,
+                          headline_b: null,
+                          body_b: null,
+                          coupon_enabled: false,
+                          coupon_label: null,
                           starts_at: new Date(String(form.get('starts_at'))).toISOString(),
                           ends_at: new Date(String(form.get('ends_at'))).toISOString(),
                           trading_hours_start: form.get('trading_hours_start') || null,
                           trading_hours_end: form.get('trading_hours_end') || null,
                           days_of_week: daysOfWeek,
-                          purpose: form.get('purpose') || 'standard',
+                          purpose: 'standard',
                           fee_amount: form.get('fee_amount') ? Number(form.get('fee_amount')) : null,
                           terms_accepted: true,
                           placements,
@@ -318,16 +318,12 @@ export default function VendorProximityClient() {
                   </div>
                   <Input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="Headline shoppers see" required />
                   <Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Supporting message" />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input name="headline_sw" placeholder="Swahili headline" />
-                    <Input name="body_sw" placeholder="Swahili message" />
-                    <Input name="headline_b" placeholder="Variant B headline" />
-                    <Input name="body_b" placeholder="Variant B message" />
+                  <div className="flex items-start justify-between gap-3 rounded-xl border border-dashed bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Claimable coupons are coming in version 2, after we align with the supermarket team.
+                    </p>
+                    <Badge variant="outline" className="shrink-0">Coming soon</Badge>
                   </div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="coupon_enabled" /> Claimable coupon
-                  </label>
-                  <Input name="coupon_label" placeholder="Coupon copy" />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="starts_at">Starts</Label>
@@ -345,14 +341,6 @@ export default function VendorProximityClient() {
                       <Label htmlFor="trading_hours_end">Daily end</Label>
                       <Input id="trading_hours_end" name="trading_hours_end" type="time" defaultValue="21:00" />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="purpose">When it can show</Label>
-                    <select id="purpose" name="purpose" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm">
-                      <option value="standard">Standard in-zone offer</option>
-                      <option value="thank_you">Checkout thank-you</option>
-                      <option value="winback">We miss you</option>
-                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label>Days</Label>
@@ -378,6 +366,9 @@ export default function VendorProximityClient() {
                         </button>
                       ))}
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      The offer appears only on the selected days, in Nairobi time.
+                    </p>
                   </div>
                   <div>
                     <p className="mb-2 text-sm font-medium">Zones</p>
@@ -412,7 +403,7 @@ export default function VendorProximityClient() {
             <Card className="h-fit border-0 shadow-sm ring-1 ring-border">
               <CardHeader>
                 <CardTitle>Shopper card</CardTitle>
-                <CardDescription>Preview of the English A version.</CardDescription>
+                <CardDescription>What shoppers see on the in-app card.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="rounded-2xl border bg-white p-4">
