@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -25,10 +25,7 @@ import {
   CalendarDaysIcon,
   CheckCircleIcon,
   ClipboardDocumentIcon,
-  CursorArrowRaysIcon,
   DevicePhoneMobileIcon,
-  ExclamationTriangleIcon,
-  EyeIcon,
   KeyIcon,
   MapPinIcon,
   MegaphoneIcon,
@@ -43,6 +40,7 @@ import {
   XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { CP35_TX_STEPS_DBM, DUKANEST_PROXIMITY_UUID, PROXIMITY_LOW_BATTERY_MV } from '@/lib/proximity/constants';
+import { OverviewPanel } from './overview-panel';
 import { SaveButton } from './save-button';
 
 type InventoryKind = 'branch' | 'zone' | 'beacon' | 'campaign' | 'vendor' | 'invoice' | 'sdk';
@@ -165,9 +163,15 @@ async function api(path: string, init?: RequestInit) {
   return json;
 }
 
-export default function ProximityHubClient() {
+export default function ProximityHubClient({
+  viewerName,
+  roleLabel,
+  storeName,
+}: Readonly<{ viewerName: string; roleLabel: string; storeName: string }>) {
   const [tab, setTab] = useState<Tab>('overview');
-  const [overview, setOverview] = useState<any>(null);
+  const [overviewRevision, setOverviewRevision] = useState(0);
+  const [attentionBeaconIds, setAttentionBeaconIds] = useState<string[]>([]);
+  const refreshCount = useRef(0);
   const [locations, setLocations] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
   const [beacons, setBeacons] = useState<any[]>([]);
@@ -213,8 +217,7 @@ export default function ProximityHubClient() {
 
   async function refresh() {
     try {
-      const [over, loc, zon, bea, cam, adv, sdk, inv, report, redeemed] = await Promise.all([
-        api('/api/dashboard/proximity/overview'),
+      const [loc, zon, bea, cam, adv, sdk, inv, report, redeemed] = await Promise.all([
         api('/api/dashboard/proximity/locations'),
         api('/api/dashboard/proximity/zones'),
         api('/api/dashboard/proximity/beacons'),
@@ -225,7 +228,6 @@ export default function ProximityHubClient() {
         api('/api/dashboard/proximity/reports'),
         api('/api/dashboard/proximity/claims/redeem'),
       ]);
-      setOverview(over.data);
       setLocations(loc.data);
       setZones(zon.data);
       setBeacons(bea.data);
@@ -237,6 +239,9 @@ export default function ProximityHubClient() {
       setRedemptions(redeemed.data);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load proximity data');
+    } finally {
+      refreshCount.current += 1;
+      if (refreshCount.current > 1) setOverviewRevision((value) => value + 1);
     }
   }
 
@@ -431,36 +436,77 @@ export default function ProximityHubClient() {
 
   function selectTab(nextTab: Tab) {
     setTab(nextTab);
-    window.history.replaceState(null, '', `/dashboard/proximity?tab=${nextTab}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', nextTab);
+    if (nextTab !== 'beacons') params.delete('beacon');
+    window.history.replaceState(null, '', `/dashboard/proximity?${params}`);
   }
+
+  function showBeacons(beaconIds: string[]) {
+    setAttentionBeaconIds(beaconIds);
+    setTab('beacons');
+    const params = new URLSearchParams(window.location.search);
+    params.set('tab', 'beacons');
+    if (beaconIds[0]) params.set('beacon', beaconIds[0]);
+    window.history.replaceState(null, '', `/dashboard/proximity?${params}`);
+  }
+
+  useEffect(() => {
+    if (tab !== 'beacons' || attentionBeaconIds.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`beacon-${attentionBeaconIds[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab, attentionBeaconIds, beacons]);
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 text-white shadow-sm">
-        <div className="flex flex-col gap-6 px-6 py-7 md:flex-row md:items-end md:justify-between md:px-8">
-          <div className="max-w-3xl">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/20">
-                <SignalIcon className="h-6 w-6" />
-              </span>
-              <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">
-                Retail media workspace
-              </Badge>
-            </div>
-            <h1 className="text-3xl font-semibold tracking-tight">Proximity marketing</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
-              Manage branch inventory, zone beacons, vendor bookings and on-screen campaign performance
-              from one focused workspace.
-            </p>
+      <section
+        className={
+          tab === 'overview'
+            ? 'overflow-hidden rounded-2xl border bg-white shadow-sm'
+            : 'overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 text-white shadow-sm'
+        }
+      >
+        {tab === 'overview' ? (
+          <div className="flex items-center justify-end px-4 pt-3">
+            <Button asChild>
+              <Link href="/dashboard/proximity/campaigns/new">
+                <MegaphoneIcon className="mr-2 h-4 w-4" />
+                Create campaign
+              </Link>
+            </Button>
           </div>
-          <Button asChild size="lg" className="bg-white text-emerald-950 shadow-sm hover:bg-emerald-50">
-            <Link href="/dashboard/proximity/campaigns/new">
-              <MegaphoneIcon className="mr-2 h-5 w-5" />
-              Create campaign
-            </Link>
-          </Button>
-        </div>
-        <div className="flex gap-1 overflow-x-auto border-t border-white/10 bg-black/10 px-4 py-3 md:px-6">
+        ) : (
+          <div className="flex flex-col gap-6 px-6 py-7 md:flex-row md:items-end md:justify-between md:px-8">
+            <div className="max-w-3xl">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/20">
+                  <SignalIcon className="h-6 w-6" />
+                </span>
+                <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">
+                  Retail media workspace
+                </Badge>
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight">Proximity marketing</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
+                Manage branch inventory, zone beacons, vendor bookings and on-screen campaign performance
+                from one focused workspace.
+              </p>
+            </div>
+            <Button asChild size="lg" className="bg-white text-emerald-950 shadow-sm hover:bg-emerald-50">
+              <Link href="/dashboard/proximity/campaigns/new">
+                <MegaphoneIcon className="mr-2 h-5 w-5" />
+                Create campaign
+              </Link>
+            </Button>
+          </div>
+        )}
+        <div
+          className={`flex gap-1 overflow-x-auto px-4 py-3 md:px-6 ${
+            tab === 'overview' ? '' : 'border-t border-white/10 bg-black/10'
+          }`}
+        >
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -468,8 +514,12 @@ export default function ProximityHubClient() {
               onClick={() => selectTab(item.id)}
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 tab === item.id
-                  ? 'bg-white text-emerald-950 shadow-sm'
-                  : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
+                  ? tab === 'overview'
+                    ? 'bg-emerald-950 text-white shadow-sm'
+                    : 'bg-white text-emerald-950 shadow-sm'
+                  : tab === 'overview'
+                    ? 'text-slate-600 hover:bg-slate-100'
+                    : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
               }`}
             >
               {item.label}
@@ -478,112 +528,28 @@ export default function ProximityHubClient() {
         </div>
       </section>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            {TABS.find((item) => item.id === tab)?.label}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Till purchases without a claim are not measured in Phase 1.
-          </p>
+      {tab !== 'overview' && (
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+              {TABS.find((item) => item.id === tab)?.label}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Till purchases without a claim are not measured in Phase 1.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {tab === 'overview' && (
-        <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {[
-              { label: 'Live campaigns', value: overview?.live_campaigns ?? 0, icon: MegaphoneIcon },
-              { label: 'Zone detections', value: overview?.stats?.detected ?? 0, icon: RadioIcon },
-              { label: 'On-screen views', value: overview?.stats?.delivered ?? 0, icon: EyeIcon },
-              { label: 'Clicks', value: overview?.stats?.clicked ?? 0, icon: CursorArrowRaysIcon },
-              { label: 'Claims', value: overview?.stats?.claimed ?? 0, icon: TicketIcon },
-            ].map((metric) => (
-              <Card key={metric.label} className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{metric.label}</p>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight">{metric.value}</p>
-                    </div>
-                    <span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700">
-                      <metric.icon className="h-5 w-5" />
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between">
-                <div>
-                  <CardTitle>Beacon health</CardTitle>
-                  <CardDescription>Paid inventory stops billing after 24 hours without a signal.</CardDescription>
-                </div>
-                <Badge
-                  className={
-                    (overview?.dark_beacons || []).length
-                      ? 'border-red-200 bg-red-50 text-red-700'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  }
-                  variant="outline"
-                >
-                  {(overview?.dark_beacons || []).length
-                    ? `${overview.dark_beacons.length} need attention`
-                    : 'All healthy'}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                {(overview?.dark_beacons || []).length === 0 ? (
-                  <EmptyState
-                    icon={CheckCircleIcon}
-                    title="No dark beacons"
-                    description="All registered placements have reported within the last 24 hours."
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {(overview?.dark_beacons || []).map((beacon: any) => (
-                      <div
-                        key={beacon.id}
-                        className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/50 p-4"
-                      >
-                        <div className="flex items-center gap-3">
-                          <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
-                          <div>
-                            <p className="text-sm font-medium">
-                              {beacon.location?.name} / {beacon.zone?.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Last seen {formatDate(beacon.last_seen_at)}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="destructive">Billing paused</Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-200 bg-amber-50/40">
-              <CardHeader>
-                <div className="mb-2 w-fit rounded-xl bg-amber-100 p-2.5 text-amber-700">
-                  <ShieldCheckIcon className="h-5 w-5" />
-                </div>
-                <CardTitle>Measurement rules</CardTitle>
-                <CardDescription>What Phase 1 reports to retailers and vendors.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-amber-950/80">
-                <p>Impressions count only when the campaign card renders on screen.</p>
-                <p>Detections remain retailer-only and are never sold as reach.</p>
-                <p>Till purchases without a coupon claim are not attributed.</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <OverviewPanel
+          viewerName={viewerName}
+          roleLabel={roleLabel}
+          storeName={storeName}
+          revision={overviewRevision}
+          onOpenTab={selectTab}
+          onShowBeacons={showBeacons}
+        />
       )}
 
       {tab === 'branches' && (
@@ -1115,7 +1081,13 @@ export default function ProximityHubClient() {
                       Date.now() - new Date(beacon.last_seen_at).getTime() > 24 * 60 * 60 * 1000;
                     const isEditing = editingBeaconId === beacon.id;
                     return (
-                      <div key={beacon.id} className="rounded-xl border p-4">
+                      <div
+                        id={`beacon-${beacon.id}`}
+                        key={beacon.id}
+                        className={`rounded-xl border p-4 ${
+                          attentionBeaconIds.includes(beacon.id) ? 'ring-2 ring-amber-400' : ''
+                        }`}
+                      >
                         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                           <div className="flex items-center gap-3">
                             <span className={`rounded-full p-2 ${isDark ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>

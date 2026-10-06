@@ -1,25 +1,22 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { jsonError, requireProximityStaff } from '@/lib/proximity/http';
-import { campaignStats, darkSlots, pauseBillingForDarkVendorSlots } from '@/lib/proximity/service';
-import { prisma } from '@/lib/prisma/client';
+import { pauseBillingForDarkVendorSlots, proximityOverview } from '@/lib/proximity/service';
 import { SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { tenant } = await requireProximityStaff();
-    const [stats, dark, paused, live] = await Promise.all([
-      campaignStats(tenant.id),
-      darkSlots(tenant.id),
-      pauseBillingForDarkVendorSlots(tenant.id),
-      prisma.proximity_campaigns.count({
-        where: { tenant_id: tenant.id, status: { in: ['approved', 'live', 'scheduled'] } },
+    const params = request.nextUrl.searchParams;
+    const [overview, paused] = await Promise.all([
+      proximityOverview(tenant.id, {
+        range: params.get('range'),
+        locationId: params.get('location_id'),
       }),
+      pauseBillingForDarkVendorSlots(tenant.id),
     ]);
     return NextResponse.json({
       data: {
-        stats,
-        live_campaigns: live,
-        dark_beacons: dark,
+        ...overview,
         billing_paused: paused.map((campaign) => campaign.id),
         disclosure: SPOOFING_DISCLOSURE_EN,
       },

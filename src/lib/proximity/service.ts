@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma/client';
 import { DUKANEST_PROXIMITY_UUID, PROXIMITY_CLAIM_TTL_MS, PROXIMITY_DARK_SLOT_MS } from './constants';
 import { insideGeofence, placementsOverlap, selectCampaign, slugify, type EngineCampaign } from './engine';
+import { buildProximityOverview, isOverviewRange, overviewWindow, type OverviewRange } from './overview';
 import { pickCreative, splitInvoiceShares, summarizeProximityReports } from './rules';
 import { generateClaimCode, hashSecret, secretsEqual, generateAccessToken } from './tokens';
 import { campaignPriority } from './validation';
@@ -839,6 +840,155 @@ export async function proximityReports(tenantId: string) {
     select: { id: true, name: true, location_id: true, kind: true },
   });
   return summarizeProximityReports({ locations, zones, events });
+}
+
+export async function proximityOverview(
+  tenantId: string,
+  input: { range?: string | null; locationId?: string | null; now?: Date }
+) {
+  const now = input.now ?? new Date();
+  const range: OverviewRange = isOverviewRange(input.range) ? input.range : 'this_month';
+  const locationId = input.locationId || null;
+  const comparisonStart = overviewWindow(range, now).previousStart.getTime();
+  const activityStart = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+  const fetchSince = new Date(Math.min(comparisonStart, activityStart));
+
+  const [locations, beacons, campaigns, events, invoices, claims] = await Promise.all([
+    prisma.proximity_locations.findMany({
+      where: { tenant_id: tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.proximity_beacons.findMany({
+      where: { tenant_id: tenantId },
+      select: {
+        id: true,
+        location_id: true,
+        zone_id: true,
+        name: true,
+        status: true,
+        last_seen_at: true,
+        battery_mv: true,
+        created_at: true,
+        location: { select: { name: true } },
+        zone: { select: { name: true } },
+      },
+    }),
+    prisma.proximity_campaigns.findMany({
+      where: { tenant_id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        starts_at: true,
+        ends_at: true,
+        updated_at: true,
+        advertiser: { select: { name: true } },
+        placements: { select: { location_id: true } },
+      },
+    }),
+    prisma.proximity_events.findMany({
+      where: { tenant_id: tenantId, created_at: { gte: fetchSince } },
+      select: {
+        created_at: true,
+        location_id: true,
+        campaign_id: true,
+        event_type: true,
+        opaque_customer_id: true,
+        impression_on_screen: true,
+      },
+    }),
+    prisma.proximity_invoices.findMany({
+      where: { tenant_id: tenantId, created_at: { gte: fetchSince }, status: { in: ['issued', 'paid'] } },
+      select: {
+        id: true,
+        amount: true,
+        supermarket_share: true,
+        dukanest_share: true,
+        status: true,
+        created_at: true,
+        campaign: { select: { name: true, placements: { select: { location_id: true } } } },
+      },
+    }),
+    prisma.proximity_claims.findMany({
+      where: {
+        tenant_id: tenantId,
+        OR: [{ claimed_at: { gte: fetchSince } }, { redeemed_at: { gte: fetchSince } }],
+      },
+      select: {
+        opaque_customer_id: true,
+        claimed_at: true,
+        redeemed_at: true,
+        campaign: { select: { name: true, placements: { select: { location_id: true } } } },
+      },
+    }),
+  ]);
+
+  return buildProximityOverview({
+    now,
+    range,
+    locationId,
+    locations,
+    events: events.flatMap((event) =>
+      event.created_at
+        ? [
+            {
+              created_at: event.created_at.toISOString(),
+              location_id: event.location_id,
+              campaign_id: event.campaign_id,
+              event_type: event.event_type,
+              opaque_customer_id: event.opaque_customer_id,
+              impression_on_screen: event.impression_on_screen,
+            },
+          ]
+        : []
+    ),
+    campaigns: campaigns.map((campaign) => ({
+      id: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      starts_at: campaign.starts_at.toISOString(),
+      ends_at: campaign.ends_at.toISOString(),
+      updated_at: campaign.updated_at ? campaign.updated_at.toISOString() : null,
+      advertiser_name: campaign.advertiser?.name || null,
+      location_ids: campaign.placements.map((placement) => placement.location_id),
+    })),
+    beacons: beacons.map((beacon) => ({
+      id: beacon.id,
+      location_id: beacon.location_id,
+      location_name: beacon.location.name,
+      zone_id: beacon.zone_id,
+      zone_name: beacon.zone.name,
+      name: beacon.name,
+      status: beacon.status,
+      last_seen_at: beacon.last_seen_at ? beacon.last_seen_at.toISOString() : null,
+      battery_mv: beacon.battery_mv,
+      created_at: beacon.created_at ? beacon.created_at.toISOString() : null,
+    })),
+    invoices: invoices.flatMap((invoice) =>
+      invoice.created_at
+        ? [
+            {
+              id: invoice.id,
+              amount: Number(invoice.amount),
+              supermarket_share: Number(invoice.supermarket_share),
+              dukanest_share: Number(invoice.dukanest_share),
+              status: invoice.status,
+              created_at: invoice.created_at.toISOString(),
+              campaign_name: invoice.campaign?.name || null,
+              location_ids: invoice.campaign?.placements.map((placement) => placement.location_id) || [],
+            },
+          ]
+        : []
+    ),
+    claims: claims.map((claim) => ({
+      opaque_customer_id: claim.opaque_customer_id,
+      claimed_at: claim.claimed_at ? claim.claimed_at.toISOString() : null,
+      redeemed_at: claim.redeemed_at ? claim.redeemed_at.toISOString() : null,
+      campaign_name: claim.campaign?.name || null,
+      location_ids: claim.campaign?.placements.map((placement) => placement.location_id) || [],
+    })),
+  });
 }
 
 export async function nearbyBranches(tenantId: string, latitude: number, longitude: number) {

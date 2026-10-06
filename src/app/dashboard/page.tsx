@@ -74,6 +74,13 @@ export default async function TenantDashboardPage() {
     }
   }
 
+  const proximityBranches = await prisma.proximity_locations.count({
+    where: { tenant_id: tenant.id },
+  });
+  if (proximityBranches > 0) {
+    redirect('/dashboard/proximity');
+  }
+
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'dukanest.com';
   const storeUrl = tenant.custom_domain
     ? `https://${tenant.custom_domain}`
