@@ -206,7 +206,9 @@ export default function ProximityMarketingPage() {
             </ScrollReveal>
 
             <div className="mx-auto mt-14 grid max-w-5xl gap-4 md:grid-cols-2">
-              {steps.slice(0, 2).map((step) => (
+              {steps.slice(0, 2).map((step) => {
+                if (!step.image || !step.alt) return null;
+                return (
                 <article key={step.n} className="overflow-hidden rounded-3xl border border-[#eaeaea] bg-white shadow-sm">
                   <div className="relative h-52">
                     <Image src={step.image} alt={step.alt} fill sizes="(max-width: 768px) 100vw, 480px" className="object-cover" />
@@ -222,7 +224,8 @@ export default function ProximityMarketingPage() {
                     <p className="mt-2 text-sm leading-relaxed text-[#555]">{step.body}</p>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
 
             <ScrollReveal className="mx-auto mt-6 max-w-5xl">
