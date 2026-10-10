@@ -195,8 +195,9 @@ export async function POST(request: NextRequest) {
     }
     const campaign = await createCampaignRecord(
       advertiser.tenant_id,
-      { ...body, advertiser_id: advertiser.id },
-      'submitted'
+      { ...body, advertiser_id: advertiser.id, fee_amount: null },
+      'submitted',
+      { ignoreClientFee: true }
     );
     return NextResponse.json({ data: campaign, next: 'Retailer must approve before the ad can go live.' }, { status: 201 });
   } catch (error) {

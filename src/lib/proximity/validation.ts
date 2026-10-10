@@ -48,6 +48,85 @@ export const vendorLoginSchema = z.object({
   password: z.string().min(8).max(72),
 });
 
+export const rateCardInputSchema = z.object({
+  default_weekly_rate: z.number().nonnegative().max(10_000_000).nullable(),
+  small_multiplier: z.number().gt(0).max(10),
+  large_multiplier: z.number().gt(0).max(10),
+  section_rates: z
+    .array(
+      z.object({
+        kind: z.string().trim().min(1).max(40),
+        weekly_rate: z.number().nonnegative().max(10_000_000),
+      })
+    )
+    .max(40),
+  week_indexes: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1).max(80),
+        starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        ends_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        multiplier: z.number().gt(0).max(10),
+      })
+    )
+    .max(40),
+  branches: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        price_tier: z.enum(['small', 'large']),
+        rate_multiplier: z.number().gt(0).max(10).nullable(),
+      })
+    )
+    .max(200),
+  sections: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        weekly_rate: z.number().nonnegative().max(10_000_000).nullable(),
+      })
+    )
+    .max(500),
+}).superRefine((body, ctx) => {
+  body.week_indexes.forEach((index, position) => {
+    if (index.ends_on < index.starts_on) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['week_indexes', position, 'ends_on'],
+        message: 'End date must be on or after the start date',
+      });
+    }
+  });
+  const kinds = new Set<string>();
+  body.section_rates.forEach((rate, position) => {
+    const kind = rate.kind.toLowerCase();
+    if (kinds.has(kind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['section_rates', position, 'kind'],
+        message: 'Each product section kind can have one rate',
+      });
+    }
+    kinds.add(kind);
+  });
+});
+
+export type RateCardInput = z.infer<typeof rateCardInputSchema>;
+
+export const proximityQuoteSchema = z.object({
+  starts_at: z.string().min(1),
+  ends_at: z.string().min(1),
+  placements: z
+    .array(
+      z.object({
+        location_id: z.string().uuid(),
+        zone_id: z.string().uuid(),
+      })
+    )
+    .min(1)
+    .max(50),
+});
+
 export const campaignInputSchema = z.object({
   advertiser_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1).max(255),

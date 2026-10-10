@@ -49,6 +49,9 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
   const [previewHeadline, setPreviewHeadline] = useState('');
   const [previewBody, setPreviewBody] = useState('');
   const [daysOfWeek, setDaysOfWeek] = useState('0123456');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [quote, setQuote] = useState<{ priced: boolean; total: number; message: string | null; lines: { location_name: string; zone_name: string; line_total: number }[] } | null>(null);
   const [loading, setLoading] = useState(Boolean(campaignId));
   const [saving, setSaving] = useState(false);
   const isEditing = Boolean(campaignId);
@@ -86,6 +89,8 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
             zone_id: placement.zone_id,
           }))
         );
+        setStartsAt(toLocalDateTime(existing.data.starts_at));
+        setEndsAt(toLocalDateTime(existing.data.ends_at));
       }
       setLoading(false);
     }).catch((error) => {
@@ -93,6 +98,37 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
       setLoading(false);
     });
   }, [campaignId, router]);
+
+  useEffect(() => {
+    if (!startsAt || !endsAt || placements.length === 0) {
+      setQuote(null);
+      return;
+    }
+    const starts = new Date(startsAt);
+    const ends = new Date(endsAt);
+    if (!(starts < ends)) {
+      setQuote(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void fetch('/api/dashboard/proximity/pricing/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          starts_at: starts.toISOString(),
+          ends_at: ends.toISOString(),
+          placements,
+        }),
+      })
+        .then(async (response) => {
+          const json = await response.json();
+          if (!response.ok) throw new Error(json.error || 'Could not price this flight');
+          setQuote(json.data);
+        })
+        .catch(() => setQuote(null));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [startsAt, endsAt, placements]);
 
   if (loading) {
     return <div className="py-16 text-center text-sm text-muted-foreground">Loading campaign…</div>;
@@ -291,11 +327,11 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
               <CardContent className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Starts</Label>
-                  <Input name="starts_at" type="datetime-local" defaultValue={toLocalDateTime(campaign?.starts_at)} required />
+                  <Input name="starts_at" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Ends</Label>
-                  <Input name="ends_at" type="datetime-local" defaultValue={toLocalDateTime(campaign?.ends_at)} required />
+                  <Input name="ends_at" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Daily start</Label>
@@ -343,9 +379,28 @@ export default function CampaignFormClient({ campaignId }: CampaignFormClientPro
                   </p>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Fee (KSh, optional)</Label>
-                  <Input name="fee_amount" type="number" min="0" step="0.01" defaultValue={campaign?.fee_amount ? String(campaign.fee_amount) : ''} placeholder="100000" />
-                  <p className="text-xs text-muted-foreground">Approving a vendor campaign with a fee drafts the 70/30 invoice automatically.</p>
+                  <Label>Rate card total</Label>
+                  <div className="rounded-xl border bg-slate-50 p-3 text-sm">
+                    {quote?.priced ? (
+                      <>
+                        {quote.lines.map((line) => (
+                          <p key={`${line.location_name}-${line.zone_name}`} className="text-muted-foreground">
+                            {line.location_name} / {line.zone_name} · KSh {Number(line.line_total).toLocaleString('en-KE')}
+                          </p>
+                        ))}
+                        <p className="mt-1 font-semibold">KSh {Number(quote.total).toLocaleString('en-KE')}</p>
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        {quote?.message || 'Choose dates and a product section. Rates are set on the Pricing tab.'}
+                      </p>
+                    )}
+                  </div>
+                  <Label htmlFor="fee_amount">Override total (KSh)</Label>
+                  <Input id="fee_amount" name="fee_amount" type="number" min="0" step="0.01" placeholder="Leave blank to use the rate card" />
+                  <p className="text-xs text-muted-foreground">
+                    Leave this blank to freeze the rate-card total. Approving a vendor campaign with a fee drafts the 70/30 invoice.
+                  </p>
                 </div>
               </CardContent>
             </Card>

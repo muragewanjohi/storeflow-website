@@ -41,6 +41,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { CP35_TX_STEPS_DBM, DUKANEST_PROXIMITY_UUID, PROXIMITY_LOW_BATTERY_MV } from '@/lib/proximity/constants';
 import { OverviewPanel } from './overview-panel';
+import { PricingPanel } from './pricing-panel';
 import { SaveButton } from './save-button';
 
 type InventoryKind = 'branch' | 'zone' | 'beacon' | 'campaign' | 'vendor' | 'invoice' | 'sdk';
@@ -98,7 +99,7 @@ const DELETE_COPY: Record<
   },
 };
 
-type Tab = 'overview' | 'branches' | 'beacons' | 'campaigns' | 'vendors' | 'invoices' | 'reports' | 'redeem' | 'sdk';
+type Tab = 'overview' | 'branches' | 'beacons' | 'campaigns' | 'vendors' | 'pricing' | 'invoices' | 'reports' | 'redeem' | 'sdk';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -106,6 +107,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'beacons', label: 'Beacons' },
   { id: 'campaigns', label: 'Campaigns' },
   { id: 'vendors', label: 'Vendors' },
+  { id: 'pricing', label: 'Pricing' },
   { id: 'invoices', label: 'Invoices' },
   { id: 'reports', label: 'Reports' },
   { id: 'redeem', label: 'Redeem' },
@@ -461,52 +463,31 @@ export default function ProximityHubClient({
 
   return (
     <div className="space-y-6">
-      <section
-        className={
-          tab === 'overview'
-            ? 'overflow-hidden rounded-2xl border bg-white shadow-sm'
-            : 'overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 text-white shadow-sm'
-        }
-      >
-        {tab === 'overview' ? (
-          <div className="flex items-center justify-end px-4 pt-3">
-            <Button asChild>
-              <Link href="/dashboard/proximity/campaigns/new">
-                <MegaphoneIcon className="mr-2 h-4 w-4" />
-                Create campaign
-              </Link>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6 px-6 py-7 md:flex-row md:items-end md:justify-between md:px-8">
-            <div className="max-w-3xl">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/20">
-                  <SignalIcon className="h-6 w-6" />
-                </span>
-                <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">
-                  Retail media workspace
-                </Badge>
-              </div>
-              <h1 className="text-3xl font-semibold tracking-tight">Proximity marketing</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
-                Manage branch inventory, zone beacons, vendor bookings and on-screen campaign performance
-                from one focused workspace.
-              </p>
+      <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 text-white shadow-sm">
+        <div className="flex flex-col gap-6 px-6 py-7 md:flex-row md:items-end md:justify-between md:px-8">
+          <div className="max-w-3xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="rounded-xl bg-white/10 p-2.5 ring-1 ring-white/20">
+                <SignalIcon className="h-6 w-6" />
+              </span>
+              <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">
+                Retail media workspace
+              </Badge>
             </div>
-            <Button asChild size="lg" className="bg-white text-emerald-950 shadow-sm hover:bg-emerald-50">
-              <Link href="/dashboard/proximity/campaigns/new">
-                <MegaphoneIcon className="mr-2 h-5 w-5" />
-                Create campaign
-              </Link>
-            </Button>
+            <h1 className="text-3xl font-semibold tracking-tight">Proximity marketing</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/80">
+              Manage branch inventory, zone beacons, vendor bookings and on-screen campaign performance
+              from one focused workspace.
+            </p>
           </div>
-        )}
-        <div
-          className={`flex gap-1 overflow-x-auto px-4 py-3 md:px-6 ${
-            tab === 'overview' ? '' : 'border-t border-white/10 bg-black/10'
-          }`}
-        >
+          <Button asChild size="lg" className="bg-white text-emerald-950 shadow-sm hover:bg-emerald-50">
+            <Link href="/dashboard/proximity/campaigns/new">
+              <MegaphoneIcon className="mr-2 h-5 w-5" />
+              Create campaign
+            </Link>
+          </Button>
+        </div>
+        <div className="flex gap-1 overflow-x-auto border-t border-white/10 bg-black/10 px-4 py-3 md:px-6">
           {TABS.map((item) => (
             <button
               key={item.id}
@@ -514,12 +495,8 @@ export default function ProximityHubClient({
               onClick={() => selectTab(item.id)}
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 tab === item.id
-                  ? tab === 'overview'
-                    ? 'bg-emerald-950 text-white shadow-sm'
-                    : 'bg-white text-emerald-950 shadow-sm'
-                  : tab === 'overview'
-                    ? 'text-slate-600 hover:bg-slate-100'
-                    : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
+                  ? 'bg-white text-emerald-950 shadow-sm'
+                  : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
               }`}
             >
               {item.label}
@@ -528,18 +505,16 @@ export default function ProximityHubClient({
         </div>
       </section>
 
-      {tab !== 'overview' && (
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-              {TABS.find((item) => item.id === tab)?.label}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Till purchases without a claim are not measured in Phase 1.
-            </p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            {TABS.find((item) => item.id === tab)?.label}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Till purchases without a claim are not measured in Phase 1.
+          </p>
         </div>
-      )}
+      </div>
 
       {tab === 'overview' && (
         <OverviewPanel
@@ -551,6 +526,8 @@ export default function ProximityHubClient({
           onShowBeacons={showBeacons}
         />
       )}
+
+      {tab === 'pricing' && <PricingPanel />}
 
       {tab === 'branches' && (
         <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">

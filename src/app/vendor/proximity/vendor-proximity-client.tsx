@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import ImageUploadField from '@/components/content/image-upload-field';
 import { toast } from 'sonner';
 import { SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
 import {
@@ -30,7 +32,7 @@ type VendorTab = 'results' | 'book' | 'campaigns' | 'invoices';
 const TABS: { id: VendorTab; label: string }[] = [
   { id: 'results', label: 'Overview' },
   { id: 'campaigns', label: 'Campaigns' },
-  { id: 'book', label: 'Book a flight' },
+  { id: 'book', label: 'Create campaign' },
   { id: 'invoices', label: 'Invoices' },
 ];
 
@@ -58,6 +60,21 @@ function statusLabel(status: string): string {
   if (status === 'submitted') return 'Waiting for approval';
   if (status === 'approved') return 'Approved';
   return status;
+}
+
+const WEEKDAYS: { id: string; label: string }[] = [
+  { id: '0', label: 'Sunday' },
+  { id: '1', label: 'Monday' },
+  { id: '2', label: 'Tuesday' },
+  { id: '3', label: 'Wednesday' },
+  { id: '4', label: 'Thursday' },
+  { id: '5', label: 'Friday' },
+  { id: '6', label: 'Saturday' },
+];
+
+function nairobiDayBound(date: string, end: boolean): string {
+  const time = end ? '23:59:59' : '00:00:00';
+  return new Date(`${date}T${time}+03:00`).toISOString();
 }
 
 function metricChange(current: number, previous: number): string {
@@ -91,9 +108,14 @@ export default function VendorProximityClient() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [placements, setPlacements] = useState<{ location_id: string; zone_id: string }[]>([]);
+  const [startsOn, setStartsOn] = useState('');
+  const [endsOn, setEndsOn] = useState('');
+  const [quote, setQuote] = useState<{ priced: boolean; total: number; billed_weeks: number; week_index: number; lines: { zone_name: string; location_name: string; line_total: number }[]; message: string | null } | null>(null);
+  const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [headline, setHeadline] = useState('');
   const [body, setBody] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [daysOfWeek, setDaysOfWeek] = useState('0123456');
 
   async function loadPortal() {
@@ -114,6 +136,40 @@ export default function VendorProximityClient() {
   useEffect(() => {
     void loadPortal().catch(() => setVendor(null));
   }, [range]);
+
+  useEffect(() => {
+    if (!vendor || !startsOn || !endsOn || placements.length === 0 || startsOn > endsOn) {
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setQuoting(true);
+      void vendorFetch('/api/v1/proximity/vendor/quote', {
+        method: 'POST',
+        body: JSON.stringify({
+          starts_at: nairobiDayBound(startsOn, false),
+          ends_at: nairobiDayBound(endsOn, true),
+          placements,
+        }),
+      })
+        .then((json) => {
+          if (!cancelled) setQuote(json.data);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setQuote(null);
+          toast.error(error instanceof Error ? error.message : 'Could not price this flight');
+        })
+        .finally(() => {
+          if (!cancelled) setQuoting(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [vendor, startsOn, endsOn, placements]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
@@ -145,10 +201,12 @@ export default function VendorProximityClient() {
     setInvoices([]);
   }
 
-  function toggleDay(day: string) {
+  function setDay(day: string, selected: boolean) {
     setDaysOfWeek((current) => {
-      const next = current.includes(day) ? current.replace(day, '') : `${current}${day}`;
-      return next.split('').sort().join('');
+      const has = current.includes(day);
+      if (selected && !has) return `${current}${day}`.split('').sort().join('');
+      if (!selected && has) return current.replace(day, '');
+      return current;
     });
   }
 
@@ -174,7 +232,7 @@ export default function VendorProximityClient() {
             <div className="text-center">
               <h1 className="text-[24px] font-black leading-8 text-[#101828]">Vendor sign in</h1>
               <p className="mt-2 text-base text-[#4a5565]">
-                Book in-store ads and see on-screen results. The supermarket approves each flight.
+                Book in-store ads and see on-screen results. The supermarket approves each campaign.
               </p>
             </div>
             <form onSubmit={signIn} className="mt-8 space-y-4">
@@ -387,7 +445,7 @@ export default function VendorProximityClient() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {(activeCreative?.placements || [])
                       .map((placement: any) => `${placement.location?.name} · ${placement.zone?.name}`)
-                      .join(' · ') || 'Book a branch and zone'}
+                      .join(' · ') || 'Book a branch and shelf section'}
                   </p>
                 </CardContent>
               </Card>
@@ -410,7 +468,7 @@ export default function VendorProximityClient() {
                       <tr>
                         <th className="pb-3 font-medium">Campaign</th>
                         <th className="pb-3 font-medium">Period</th>
-                        <th className="pb-3 font-medium">Zones</th>
+                        <th className="pb-3 font-medium">Shelf sections</th>
                         <th className="pb-3 font-medium">On screen</th>
                         <th className="pb-3 font-medium">Click rate</th>
                         <th className="pb-3 font-medium">Claims</th>
@@ -504,8 +562,8 @@ export default function VendorProximityClient() {
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-0 shadow-sm ring-1 ring-border">
               <CardHeader>
-                <CardTitle>Book a flight</CardTitle>
-                <CardDescription>Choose zones and dates. The supermarket approves before the ad can run.</CardDescription>
+                <CardTitle>Create campaign</CardTitle>
+                <CardDescription>Choose shelf sections and dates. The supermarket approves before the ad can run.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form
@@ -515,7 +573,7 @@ export default function VendorProximityClient() {
                     const formEl = event.currentTarget;
                     const form = new FormData(formEl);
                     if (!placements.length) {
-                      toast.error('Choose at least one zone');
+                      toast.error('Choose at least one shelf section');
                       return;
                     }
                     if (!daysOfWeek) {
@@ -536,13 +594,13 @@ export default function VendorProximityClient() {
                           body_b: null,
                           coupon_enabled: false,
                           coupon_label: null,
-                          starts_at: new Date(String(form.get('starts_at'))).toISOString(),
-                          ends_at: new Date(String(form.get('ends_at'))).toISOString(),
+                          image_url: imageUrl,
+                          starts_at: nairobiDayBound(String(form.get('starts_at')), false),
+                          ends_at: nairobiDayBound(String(form.get('ends_at')), true),
                           trading_hours_start: form.get('trading_hours_start') || null,
                           trading_hours_end: form.get('trading_hours_end') || null,
                           days_of_week: daysOfWeek,
                           purpose: 'standard',
-                          fee_amount: form.get('fee_amount') ? Number(form.get('fee_amount')) : null,
                           terms_accepted: true,
                           placements,
                         }),
@@ -550,8 +608,12 @@ export default function VendorProximityClient() {
                       formEl.reset();
                       setHeadline('');
                       setBody('');
+                      setImageUrl(null);
                       setDaysOfWeek('0123456');
                       setPlacements([]);
+                      setStartsOn('');
+                      setEndsOn('');
+                      setQuote(null);
                       toast.success('Submitted for supermarket approval');
                       await loadPortal();
                       setTab('campaigns');
@@ -562,12 +624,22 @@ export default function VendorProximityClient() {
                     }
                   }}
                 >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input name="name" placeholder="Campaign name" required />
-                    <Input name="fee_amount" type="number" min="0" placeholder="Fee KSh (optional)" />
-                  </div>
+                  <Input name="name" placeholder="Campaign name" required />
                   <Input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="Headline shoppers see" required />
                   <Input value={body} onChange={(event) => setBody(event.target.value)} placeholder="Supporting message" />
+                  <div className="rounded-xl border bg-white p-4">
+                    <ImageUploadField
+                      label="Campaign image"
+                      value={imageUrl}
+                      onChange={setImageUrl}
+                      uploadEndpoint="/api/v1/proximity/vendor/uploads"
+                      aspectRatio={16 / 9}
+                      allowSkipCrop
+                      maxSizeMB={5}
+                      recommendedDimensions="1200×675 or larger (16:9)"
+                      helpText="JPEG, PNG, WebP or GIF. Maximum 5MB. This image appears on the in-store campaign card."
+                    />
+                  </div>
                   <div className="flex items-start justify-between gap-3 rounded-xl border border-dashed bg-muted/30 p-3">
                     <p className="text-sm text-muted-foreground">
                       Claimable coupons are coming in version 2, after we align with the supermarket team.
@@ -577,11 +649,11 @@ export default function VendorProximityClient() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="starts_at">Starts</Label>
-                      <Input id="starts_at" name="starts_at" type="datetime-local" required />
+                      <Input id="starts_at" name="starts_at" type="date" required value={startsOn} onChange={(event) => setStartsOn(event.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="ends_at">Ends</Label>
-                      <Input id="ends_at" name="ends_at" type="datetime-local" required />
+                      <Input id="ends_at" name="ends_at" type="date" required value={endsOn} onChange={(event) => setEndsOn(event.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="trading_hours_start">Daily start</Label>
@@ -594,26 +666,19 @@ export default function VendorProximityClient() {
                   </div>
                   <div className="space-y-2">
                     <Label>Days</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        ['0', 'Sun'],
-                        ['1', 'Mon'],
-                        ['2', 'Tue'],
-                        ['3', 'Wed'],
-                        ['4', 'Thu'],
-                        ['5', 'Fri'],
-                        ['6', 'Sat'],
-                      ].map(([id, label]) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => toggleDay(id)}
-                          className={`rounded-full px-3 py-1.5 text-sm ${
-                            daysOfWeek.includes(id) ? 'bg-[#101828] text-white' : 'bg-slate-100 text-slate-700'
-                          }`}
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {WEEKDAYS.map((day) => (
+                        <label
+                          key={day.id}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border bg-white px-3 py-2.5 text-sm"
                         >
-                          {label}
-                        </button>
+                          <Checkbox
+                            id={`day-${day.id}`}
+                            checked={daysOfWeek.includes(day.id)}
+                            onCheckedChange={(checked) => setDay(day.id, checked === true)}
+                          />
+                          {day.label}
+                        </label>
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -621,7 +686,7 @@ export default function VendorProximityClient() {
                     </p>
                   </div>
                   <div>
-                    <p className="mb-2 text-sm font-medium">Zones</p>
+                    <p className="mb-2 text-sm font-medium">Shelf section</p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {inventory.flatMap((location: any) =>
                         (location.zones || []).map((zone: any) => {
@@ -637,14 +702,45 @@ export default function VendorProximityClient() {
                             >
                               <p className="font-medium">{location.name}</p>
                               <p className="text-muted-foreground">{zone.name}</p>
+                              <p className="mt-1 text-xs text-[#355cad]">
+                                {zone.list_weekly_rate == null
+                                  ? 'Rate not published'
+                                  : `KSh ${Number(zone.list_weekly_rate).toLocaleString('en-KE')} / week`}
+                              </p>
                             </button>
                           );
                         })
                       )}
                     </div>
                   </div>
+                  <div className="rounded-xl border bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-[#12376a]">Flight price</p>
+                    {quoting && <p className="mt-1 text-sm text-muted-foreground">Calculating…</p>}
+                    {!quoting && !quote && (
+                      <p className="mt-1 text-sm text-muted-foreground">Choose dates and a product section to see the price.</p>
+                    )}
+                    {!quoting && quote?.priced && (
+                      <div className="mt-2 space-y-1">
+                        {quote.lines.map((line) => (
+                          <p key={`${line.location_name}-${line.zone_name}`} className="text-sm text-muted-foreground">
+                            {line.location_name} / {line.zone_name} · KSh {Number(line.line_total).toLocaleString('en-KE')}
+                          </p>
+                        ))}
+                        <p className="pt-1 text-base font-semibold">
+                          KSh {Number(quote.total).toLocaleString('en-KE')}
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {quote.billed_weeks} week{quote.billed_weeks === 1 ? '' : 's'}
+                            {quote.week_index !== 1 ? ` · index ${quote.week_index}` : ''}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                    {!quoting && quote && !quote.priced && (
+                      <p className="mt-1 text-sm text-amber-700">{quote.message}</p>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{SPOOFING_DISCLOSURE_EN}</p>
-                  <Button type="submit" disabled={submitting}>
+                  <Button type="submit" disabled={submitting || quoting || quote?.priced === false}>
                     {submitting ? 'Submitting...' : 'Submit for approval'}
                   </Button>
                 </form>
@@ -657,6 +753,13 @@ export default function VendorProximityClient() {
               </CardHeader>
               <CardContent>
                 <div className="rounded-2xl border bg-white p-4">
+                  {imageUrl ? (
+                    <img src={imageUrl} alt="" className="mb-3 h-36 w-full rounded-xl object-cover" />
+                  ) : (
+                    <div className="mb-3 flex h-36 items-center justify-center rounded-xl bg-slate-100 text-sm text-muted-foreground">
+                      Campaign image
+                    </div>
+                  )}
                   <p className="text-lg font-semibold">{headline || 'Your headline'}</p>
                   <p className="mt-2 text-sm text-muted-foreground">{body || 'Your supporting message'}</p>
                 </div>
@@ -667,17 +770,20 @@ export default function VendorProximityClient() {
 
         {tab === 'campaigns' && (
           <div className="space-y-3">
-            {campaigns.length === 0 && <p className="text-sm text-muted-foreground">No flights yet.</p>}
+            {campaigns.length === 0 && <p className="text-sm text-muted-foreground">No campaigns yet.</p>}
             {campaigns.map((campaign) => (
               <Card key={campaign.id} className="border-0 shadow-sm ring-1 ring-border">
                 <CardContent className="flex flex-wrap items-start justify-between gap-3 pt-6">
                   <div>
                     <p className="font-semibold">{campaign.name}</p>
                     <p className="text-sm text-muted-foreground">{campaign.headline}</p>
+                    {campaign.fee_amount != null && (
+                      <p className="mt-1 text-sm font-medium">KSh {Number(campaign.fee_amount).toLocaleString('en-KE')}</p>
+                    )}
                     <p className="mt-2 text-xs text-muted-foreground">
                       {(campaign.placements || [])
                         .map((placement: any) => `${placement.location?.name} / ${placement.zone?.name}`)
-                        .join(' · ') || 'No zones'}
+                        .join(' · ') || 'No shelf sections'}
                     </p>
                   </div>
                   <Badge className={statusClass(campaign.status)} variant="outline">

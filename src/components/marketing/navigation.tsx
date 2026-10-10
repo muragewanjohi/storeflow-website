@@ -11,6 +11,7 @@ gsap.registerPlugin(useGSAP);
 
 const navLinks = [
   { href: '/#features', label: 'Features' },
+  { href: '/proximity-marketing', label: 'Proximity' },
   { href: '/#pricing', label: 'Pricing' },
   { href: '/#about', label: 'About' },
   { href: '/#faq', label: 'FAQ' },
@@ -58,7 +59,7 @@ export function Navigation() {
             />
           </Link>
 
-          <div className="hidden md:flex md:flex-1 md:items-center md:justify-center md:gap-10">
+          <div className="hidden md:flex md:flex-1 md:items-center md:justify-center md:gap-6 lg:gap-8">
             {navLinks.map((link) => (
               <Link
                 key={link.href}

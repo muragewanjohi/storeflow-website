@@ -16,6 +16,7 @@ export async function GET(
       include: {
         advertiser: true,
         placements: { include: { location: true, zone: true } },
+        quote_lines: true,
       },
     });
     if (!campaign) {

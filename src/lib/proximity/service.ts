@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma/client';
 import { DUKANEST_PROXIMITY_UUID, PROXIMITY_CLAIM_TTL_MS, PROXIMITY_DARK_SLOT_MS } from './constants';
 import { insideGeofence, placementsOverlap, selectCampaign, slugify, type EngineCampaign } from './engine';
 import { buildProximityOverview, isOverviewRange, overviewWindow, type OverviewRange } from './overview';
+import { quoteLineCreates, quoteTenantPlacements, resolveCampaignFee } from './rate-card';
 import { pickCreative, splitInvoiceShares, summarizeProximityReports } from './rules';
 import { generateClaimCode, hashSecret, secretsEqual, generateAccessToken } from './tokens';
 import { campaignPriority } from './validation';
@@ -313,6 +314,120 @@ async function decorateCard(
   };
 }
 
+const SHOWCASE_STATUSES = ['submitted', 'approved', 'live', 'scheduled'] as const;
+
+/** Campaign cards a presenter can swipe through. Views are not recorded. */
+export async function listShowcaseCards(tenantId: string) {
+  const campaigns = await prisma.proximity_campaigns.findMany({
+    where: {
+      tenant_id: tenantId,
+      billing_paused: false,
+      status: { in: [...SHOWCASE_STATUSES] },
+      ends_at: { gte: new Date() },
+    },
+    include: {
+      advertiser: { select: { name: true } },
+      placements: {
+        include: {
+          location: { select: { name: true } },
+          zone: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+
+  const cards: Array<{
+    campaign_id: string;
+    headline: string;
+    body: string | null;
+    image_url: string | null;
+    cta_label: string | null;
+    advertiser_name: string | null;
+    status: string;
+    branch: string | null;
+    shelf_section: string | null;
+  }> = [];
+
+  for (const campaign of campaigns) {
+    const creative = pickCreative(campaign, 'showcase', 'en');
+    const card = {
+      campaign_id: campaign.id,
+      headline: creative.headline,
+      body: creative.body,
+      image_url: campaign.image_url,
+      cta_label: campaign.cta_label,
+      advertiser_name: campaign.advertiser?.name || null,
+      status: campaign.status,
+    };
+    if (campaign.placements.length === 0) {
+      cards.push({ ...card, branch: null, shelf_section: null });
+      continue;
+    }
+    for (const placement of campaign.placements) {
+      cards.push({
+        ...card,
+        branch: placement.location?.name || null,
+        shelf_section: placement.zone?.name || null,
+      });
+    }
+  }
+  return cards;
+}
+
+/**
+ * The ad set on the shelf of one configured beacon.
+ * The beacon's uuid, major, and minor identify the store, so the phone does not need that store's Wi-Fi.
+ * Demo views are not counted.
+ */
+export async function resolveConfiguredBeaconAd(
+  major: number,
+  minor: number,
+  uuid?: string,
+  tenantId?: string
+) {
+  const beacon = await prisma.proximity_beacons.findFirst({
+    where: {
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+      ibeacon_uuid: (uuid || DUKANEST_PROXIMITY_UUID).toLowerCase(),
+      major,
+      minor,
+      status: 'active',
+    },
+    orderBy: { updated_at: 'desc' },
+    include: { location: true, zone: true },
+  });
+  if (!beacon) {
+    return { action: 'none' as const, reason: 'beacon_not_configured', card: null, branch: null, shelf_section: null };
+  }
+  await touchBeaconSeen(beacon.id);
+  const campaign = await prisma.proximity_campaigns.findFirst({
+    where: {
+      tenant_id: beacon.tenant_id,
+      billing_paused: false,
+      status: { in: [...SHOWCASE_STATUSES] },
+      ends_at: { gte: new Date() },
+      placements: { some: { location_id: beacon.location_id, zone_id: beacon.zone_id } },
+    },
+    orderBy: { updated_at: 'desc' },
+  });
+  const branch = beacon.location?.name || null;
+  const shelfSection = beacon.zone?.name || null;
+  if (!campaign) {
+    return { action: 'none' as const, reason: 'no_ad', card: null, branch, shelf_section: shelfSection };
+  }
+  const decorated = await decorateCard(
+    beacon.tenant_id,
+    campaign.id,
+    beacon.id,
+    beacon.location_id,
+    beacon.zone_id,
+    'showcase',
+    'en'
+  );
+  return { ...decorated, branch, shelf_section: shelfSection };
+}
+
 export async function recordEvent(input: {
   tenantId: string;
   campaignId?: string | null;
@@ -472,7 +587,8 @@ export type CampaignRecordInput = {
 export async function createCampaignRecord(
   tenantId: string,
   body: CampaignRecordInput,
-  status: string
+  status: string,
+  options?: { ignoreClientFee?: boolean }
 ) {
   const startsAt = new Date(body.starts_at);
   const endsAt = new Date(body.ends_at);
@@ -485,6 +601,12 @@ export async function createCampaignRecord(
     startsAt,
     endsAt,
     placements: body.placements,
+  });
+  const quote = await quoteTenantPlacements(tenantId, startsAt, endsAt, body.placements);
+  const feeAmount = resolveCampaignFee({
+    quote,
+    clientFee: body.fee_amount,
+    ignoreClientFee: Boolean(options?.ignoreClientFee),
   });
   return prisma.proximity_campaigns.create({
     data: {
@@ -519,7 +641,7 @@ export async function createCampaignRecord(
       headline_b_sw: body.headline_b_sw || null,
       body_b_sw: body.body_b_sw || null,
       status,
-      fee_amount: body.fee_amount ?? null,
+      fee_amount: feeAmount,
       supermarket_share_pct: body.supermarket_share_pct ?? 70,
       terms_accepted_at: body.terms_accepted ? new Date() : null,
       placements: {
@@ -529,8 +651,11 @@ export async function createCampaignRecord(
           zone_id: placement.zone_id,
         })),
       },
+      quote_lines: {
+        create: quote.priced ? quoteLineCreates(tenantId, quote.lines) : [],
+      },
     },
-    include: { placements: true, advertiser: true },
+    include: { placements: true, advertiser: true, quote_lines: true },
   });
 }
 
@@ -559,6 +684,13 @@ export async function updateCampaignRecord(
     startsAt,
     endsAt,
     placements: body.placements,
+  });
+
+  const quote = await quoteTenantPlacements(tenantId, startsAt, endsAt, body.placements);
+  const feeAmount = resolveCampaignFee({
+    quote,
+    clientFee: body.fee_amount,
+    ignoreClientFee: false,
   });
 
   return prisma.proximity_campaigns.update({
@@ -593,7 +725,7 @@ export async function updateCampaignRecord(
       body_b: body.body_b === undefined ? existing.body_b : body.body_b || null,
       headline_b_sw: body.headline_b_sw === undefined ? existing.headline_b_sw : body.headline_b_sw || null,
       body_b_sw: body.body_b_sw === undefined ? existing.body_b_sw : body.body_b_sw || null,
-      fee_amount: body.fee_amount ?? null,
+      fee_amount: feeAmount,
       supermarket_share_pct:
         body.supermarket_share_pct ?? Number(existing.supermarket_share_pct),
       updated_at: new Date(),
@@ -605,10 +737,15 @@ export async function updateCampaignRecord(
           zone_id: placement.zone_id,
         })),
       },
+      quote_lines: {
+        deleteMany: {},
+        create: quote.priced ? quoteLineCreates(tenantId, quote.lines) : [],
+      },
     },
     include: {
       advertiser: true,
       placements: { include: { location: true, zone: true } },
+      quote_lines: true,
     },
   });
 }
