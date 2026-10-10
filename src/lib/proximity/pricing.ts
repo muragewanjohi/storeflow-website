@@ -5,6 +5,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type RateCardInput = {
   defaultWeeklyRate: number | null;
+  defaultDailyRate?: number | null;
+  weekendMultiplier?: number;
+  /** Sunday through Saturday, matching Date.getUTCDay(). */
+  dayMultipliers?: number[] | null;
   smallMultiplier: number;
   largeMultiplier: number;
 };
@@ -39,6 +43,7 @@ export type QuoteLine = {
   weeklyRate: number;
   branchMultiplier: number;
   weekIndex: number;
+  weekendFactor: number;
   billedWeeks: number;
   lineTotal: number;
 };
@@ -46,8 +51,11 @@ export type QuoteLine = {
 export type PlacementQuote = {
   priced: boolean;
   total: number;
+  basis: 'week' | 'day';
   billedWeeks: number;
+  billedDays: number;
   weekIndex: number;
+  weekendFactor: number;
   lines: QuoteLine[];
   missing: { locationName: string; zoneName: string }[];
 };
@@ -88,6 +96,36 @@ export function blendedWeekIndex(days: string[], indexes: WeekIndexInput[]): num
   if (days.length === 0) return 1;
   const sum = days.reduce((total, day) => total + indexForDay(day, indexes), 0);
   return Math.round((sum / days.length) * 1000) / 1000;
+}
+
+/** Weekday of a Nairobi date key. 0 is Sunday. The key is already a calendar day, so UTC weekday matches it. */
+export function weekdayOf(day: string): number {
+  const [year, month, date] = day.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, date)).getUTCDay();
+}
+
+export function isWeekendDate(day: string): boolean {
+  const weekday = weekdayOf(day);
+  return weekday === 0 || weekday === 6;
+}
+
+/** Sunday first. Weekdays are 1. Saturday and Sunday use the weekend multiplier. */
+export function defaultDayMultipliers(weekendMultiplier: number): number[] {
+  return [0, 1, 2, 3, 4, 5, 6].map((weekday) => (weekday === 0 || weekday === 6 ? weekendMultiplier : 1));
+}
+
+/** Average day multiplier across the campaign. Custom days replace the weekend default. */
+export function blendedDayFactor(days: string[], dayMultipliers?: number[] | null, weekendMultiplier = 1): number {
+  if (days.length === 0) return 1;
+  const multipliers =
+    dayMultipliers && dayMultipliers.length === 7 ? dayMultipliers : defaultDayMultipliers(weekendMultiplier);
+  const sum = days.reduce((total, day) => total + (multipliers[weekdayOf(day)] ?? 1), 0);
+  return Math.round((sum / days.length) * 1000) / 1000;
+}
+
+/** Average of 1 on weekdays and the weekend multiplier on Saturday and Sunday. */
+export function blendedWeekendFactor(days: string[], weekendMultiplier = 1): number {
+  return blendedDayFactor(days, null, weekendMultiplier);
 }
 
 function indexForDay(day: string, indexes: WeekIndexInput[]): number {
@@ -134,16 +172,19 @@ export function quotePlacements(input: {
   const days = flightNairobiDays(input.startsAt, input.endsAt);
   const weeks = billedWeeks(days.length);
   const weekIndex = blendedWeekIndex(days, input.weekIndexes);
+  const weekendFactor = blendedDayFactor(days, input.card.dayMultipliers, input.card.weekendMultiplier ?? 1);
+  const daily = days.length > 0 && days.length < 7 && input.card.defaultDailyRate != null;
   const missing: PlacementQuote['missing'] = [];
   const lines: QuoteLine[] = [];
 
   for (const placement of input.placements) {
-    const weeklyRate = resolveWeeklyRate(placement, input.card, input.kindRates);
+    const weeklyRate = daily ? input.card.defaultDailyRate! : resolveWeeklyRate(placement, input.card, input.kindRates);
     if (weeklyRate == null) {
       missing.push({ locationName: placement.locationName, zoneName: placement.zoneName });
       continue;
     }
     const branchMultiplier = resolveBranchMultiplier(placement, input.card);
+    const units = daily ? days.length : weeks;
     lines.push({
       locationId: placement.locationId,
       zoneId: placement.zoneId,
@@ -152,8 +193,9 @@ export function quotePlacements(input: {
       weeklyRate,
       branchMultiplier,
       weekIndex,
-      billedWeeks: weeks,
-      lineTotal: money(weeklyRate * branchMultiplier * weeks * weekIndex),
+      weekendFactor,
+      billedWeeks: units,
+      lineTotal: money(weeklyRate * branchMultiplier * units * weekIndex * weekendFactor),
     });
   }
 
@@ -161,8 +203,11 @@ export function quotePlacements(input: {
   return {
     priced,
     total: priced ? money(lines.reduce((sum, line) => sum + line.lineTotal, 0)) : 0,
+    basis: daily ? 'day' : 'week',
     billedWeeks: weeks,
+    billedDays: days.length,
     weekIndex,
+    weekendFactor,
     lines: priced ? lines : [],
     missing,
   };

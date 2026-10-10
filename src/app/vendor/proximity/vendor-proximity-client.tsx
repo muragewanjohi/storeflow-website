@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,58 +10,30 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import ImageUploadField from '@/components/content/image-upload-field';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { toast } from 'sonner';
 import { SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
+import { isLocalTestHost, localVendorLogin } from '@/lib/dev/local-test-login';
 import {
   BarChart3,
   CheckCircle2,
   Eye,
   FileText,
-  LayoutDashboard,
   Lock,
   Mail,
   Megaphone,
   MousePointerClick,
   Plus,
-  ReceiptText,
   Store,
   Tag,
 } from 'lucide-react';
-
-type VendorTab = 'results' | 'book' | 'campaigns' | 'invoices';
-
-const TABS: { id: VendorTab; label: string }[] = [
-  { id: 'results', label: 'Overview' },
-  { id: 'campaigns', label: 'Campaigns' },
-  { id: 'book', label: 'Create campaign' },
-  { id: 'invoices', label: 'Invoices' },
-];
-
-const TAB_ICONS = {
-  results: LayoutDashboard,
-  campaigns: Megaphone,
-  book: Plus,
-  invoices: ReceiptText,
-} satisfies Record<VendorTab, typeof LayoutDashboard>;
-
-const RANGE_LABELS: Record<string, string> = {
-  this_month: 'This month',
-  last_7_days: 'Last 7 days',
-  last_30_days: 'Last 30 days',
-};
-
-function statusClass(status: string): string {
-  if (['approved', 'live', 'scheduled'].includes(status)) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'submitted') return 'border-amber-200 bg-amber-50 text-amber-800';
-  if (status === 'rejected') return 'border-red-200 bg-red-50 text-red-700';
-  return 'border-slate-200 bg-slate-50 text-slate-700';
-}
-
-function statusLabel(status: string): string {
-  if (status === 'submitted') return 'Waiting for approval';
-  if (status === 'approved') return 'Approved';
-  return status;
-}
+import {
+  RANGE_LABELS,
+  VendorPortalFrame,
+  statusClass,
+  statusLabel,
+  type VendorTab,
+} from './vendor-portal-frame';
 
 const WEEKDAYS: { id: string; label: string }[] = [
   { id: '0', label: 'Sunday' },
@@ -94,23 +67,33 @@ async function vendorFetch(path: string, init?: RequestInit) {
   return json;
 }
 
+function isVendorTab(value: string | null): value is VendorTab {
+  return value === 'results' || value === 'book' || value === 'campaigns' || value === 'invoices';
+}
+
 export default function VendorProximityClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const rangeParam = searchParams.get('range');
+  const tab: VendorTab = isVendorTab(tabParam) ? tabParam : 'results';
+  const range = rangeParam === 'last_7_days' || rangeParam === 'last_30_days' ? rangeParam : 'this_month';
+  const branchId = searchParams.get('location_id') || '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [localTestLogin, setLocalTestLogin] = useState<ReturnType<typeof localVendorLogin>>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [vendor, setVendor] = useState<{ name: string; email: string } | null>(null);
-  const [tab, setTab] = useState<VendorTab>('results');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [dashboard, setDashboard] = useState<any>(null);
-  const [range, setRange] = useState('this_month');
   const [inventory, setInventory] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [placements, setPlacements] = useState<{ location_id: string; zone_id: string }[]>([]);
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
-  const [quote, setQuote] = useState<{ priced: boolean; total: number; billed_weeks: number; week_index: number; lines: { zone_name: string; location_name: string; line_total: number }[]; message: string | null } | null>(null);
+  const [quote, setQuote] = useState<{ priced: boolean; total: number; basis?: 'week' | 'day'; billed_weeks: number; billed_days?: number; week_index: number; weekend_factor?: number; lines: { zone_name: string; location_name: string; line_total: number }[]; message: string | null } | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [headline, setHeadline] = useState('');
@@ -118,10 +101,35 @@ export default function VendorProximityClient() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [daysOfWeek, setDaysOfWeek] = useState('0123456');
 
+  function replacePortalQuery(patch: Partial<Record<'tab' | 'range' | 'location_id', string>>) {
+    const next = new URLSearchParams(searchParams.toString());
+    (['tab', 'range', 'location_id'] as const).forEach((key) => {
+      if (!(key in patch)) return;
+      const value = patch[key] || '';
+      const omit = !value || (key === 'tab' && value === 'results') || (key === 'range' && value === 'this_month');
+      if (omit) next.delete(key);
+      else next.set(key, value);
+    });
+    const query = next.toString();
+    router.replace(query ? `/vendor/proximity?${query}` : '/vendor/proximity', { scroll: false });
+  }
+
+  function setTab(next: VendorTab) {
+    replacePortalQuery({ tab: next });
+  }
+
+  function setRange(next: string) {
+    replacePortalQuery({ range: next });
+  }
+
+  function setBranchId(next: string) {
+    replacePortalQuery({ location_id: next });
+  }
+
   async function loadPortal() {
     const [session, list, inv, bills] = await Promise.all([
       vendorFetch('/api/v1/proximity/vendor/session'),
-      vendorFetch(`/api/v1/proximity/vendor/campaigns?range=${range}`),
+      vendorFetch(`/api/v1/proximity/vendor/campaigns?range=${range}${branchId ? `&location_id=${branchId}` : ''}`),
       vendorFetch('/api/v1/proximity/vendor/inventory'),
       vendorFetch('/api/v1/proximity/vendor/invoices'),
     ]);
@@ -134,8 +142,17 @@ export default function VendorProximityClient() {
   }
 
   useEffect(() => {
+    if (!isLocalTestHost(window.location.host)) return;
+    const filled = localVendorLogin();
+    if (!filled) return;
+    setLocalTestLogin(filled);
+    setEmail((current) => current || filled.email);
+    setPassword((current) => current || filled.password);
+  }, []);
+
+  useEffect(() => {
     void loadPortal().catch(() => setVendor(null));
-  }, [range]);
+  }, [range, branchId]);
 
   useEffect(() => {
     if (!vendor || !startsOn || !endsOn || placements.length === 0 || startsOn > endsOn) {
@@ -159,7 +176,7 @@ export default function VendorProximityClient() {
         .catch((error) => {
           if (cancelled) return;
           setQuote(null);
-          toast.error(error instanceof Error ? error.message : 'Could not price this flight');
+          toast.error(error instanceof Error ? error.message : 'Could not price this campaign');
         })
         .finally(() => {
           if (!cancelled) setQuoting(false);
@@ -275,6 +292,11 @@ export default function VendorProximityClient() {
                 </div>
               </div>
               <p className="text-right text-sm text-[#6a7282]">Ask the supermarket to reset your password.</p>
+              {localTestLogin && (
+                <p className="rounded-xl bg-[#f3f6fc] px-3 py-2 text-sm text-[#4a5565]">
+                  Local test sign-in is filled in: {localTestLogin.email} / {localTestLogin.password}
+                </p>
+              )}
               <Button
                 type="submit"
                 className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold text-white"
@@ -284,6 +306,13 @@ export default function VendorProximityClient() {
               </Button>
             </form>
           </div>
+          {localTestLogin && (
+            <p className="mt-5 text-center text-[14px] text-[#4a5565]">
+              <Link href="/dashboard" className="font-bold text-[#355cad]">
+                Open the supermarket dashboard
+              </Link>
+            </p>
+          )}
         </div>
       </main>
     );
@@ -292,8 +321,8 @@ export default function VendorProximityClient() {
   const ctr = stats?.delivered ? Math.round((stats.clicked / stats.delivered) * 1000) / 10 : 0;
   const activeCreative =
     campaigns.find((campaign) => ['live', 'approved', 'scheduled'].includes(campaign.status)) || campaigns[0];
-  const performanceById = new Map(
-    (dashboard?.performance || []).map((item: any) => [item.id, item])
+  const performanceById = new Map<string, any>(
+    (dashboard?.performance || []).map((item: any) => [item.id, item] as [string, any])
   );
   const maxFunnel = Math.max(stats?.delivered || 0, 1);
   const nairobiHour = Number(
@@ -304,66 +333,22 @@ export default function VendorProximityClient() {
     }).format(new Date())
   );
   const greeting = nairobiHour < 12 ? 'Good morning' : nairobiHour < 18 ? 'Good afternoon' : 'Good evening';
+  const listedInvoices = branchId
+    ? invoices.filter((invoice) => campaigns.some((campaign) => campaign.id === invoice.campaign_id))
+    : invoices;
 
   return (
-    <main className="min-h-screen bg-[#f5f8fc] lg:flex">
-      <aside className="border-b bg-[#082b55] text-white lg:fixed lg:inset-y-0 lg:w-60 lg:border-b-0">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-6 py-5">
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/logo_with_name.png" alt="DukaNest" className="h-9 w-auto brightness-0 invert" />
-            </Link>
-            <p className="mt-1 text-xs text-blue-200">Proximity advertiser portal</p>
-          </div>
-          <nav className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:p-4">
-          {TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={`flex shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold transition ${
-                  tab === item.id ? 'bg-[#1473e6] text-white shadow-sm' : 'text-blue-100 hover:bg-white/10'
-                }`}
-              >
-                {(() => {
-                  const Icon = TAB_ICONS[item.id];
-                  return <Icon className="h-4 w-4" />;
-                })()}
-                {item.label}
-              </button>
-          ))}
-          </nav>
-          <div className="hidden border-t border-white/10 p-5 text-xs text-blue-200 lg:block">
-            On-screen campaign measurement
-            <p className="mt-1 text-white">No attributed-sales claims</p>
-          </div>
-        </div>
-      </aside>
-
-      <section className="min-w-0 flex-1 lg:ml-60">
-        <header className="border-b bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#355cad]">Advertiser account</p>
-              <p className="font-semibold text-[#101828]">{vendor.name}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <select
-                aria-label="Date range"
-                value={range}
-                onChange={(event) => setRange(event.target.value)}
-                className="h-10 rounded-lg border bg-white px-3 text-sm"
-              >
-                {Object.entries(RANGE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-              <Button type="button" variant="outline" onClick={() => void signOut()}>Sign out</Button>
-            </div>
-          </div>
-        </header>
-
-        <div className="space-y-6 px-4 py-6 lg:px-8">
+    <VendorPortalFrame
+      vendorName={vendor.name}
+      active={tab}
+      branchId={branchId}
+      range={range}
+      locations={inventory}
+      onBranchChange={setBranchId}
+      onRangeChange={setRange}
+      onSignOut={() => void signOut()}
+      onTab={setTab}
+    >
         {tab === 'results' && (
           <>
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -582,7 +567,7 @@ export default function VendorProximityClient() {
                     }
                     setSubmitting(true);
                     try {
-                      await vendorFetch('/api/v1/proximity/vendor/campaigns', {
+                      const created = await vendorFetch('/api/v1/proximity/vendor/campaigns', {
                         method: 'POST',
                         body: JSON.stringify({
                           name: form.get('name'),
@@ -614,7 +599,12 @@ export default function VendorProximityClient() {
                       setStartsOn('');
                       setEndsOn('');
                       setQuote(null);
-                      toast.success('Submitted for supermarket approval');
+                      const price = created.price?.total;
+                      toast.success(
+                        price == null
+                          ? 'Submitted for supermarket approval'
+                          : `Submitted for approval. Campaign price is KSh ${Number(price).toLocaleString('en-KE')}.`
+                      );
                       await loadPortal();
                       setTab('campaigns');
                     } catch (error) {
@@ -714,7 +704,7 @@ export default function VendorProximityClient() {
                     </div>
                   </div>
                   <div className="rounded-xl border bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-[#12376a]">Flight price</p>
+                    <p className="text-sm font-medium text-[#12376a]">Campaign price</p>
                     {quoting && <p className="mt-1 text-sm text-muted-foreground">Calculating…</p>}
                     {!quoting && !quote && (
                       <p className="mt-1 text-sm text-muted-foreground">Choose dates and a product section to see the price.</p>
@@ -729,8 +719,11 @@ export default function VendorProximityClient() {
                         <p className="pt-1 text-base font-semibold">
                           KSh {Number(quote.total).toLocaleString('en-KE')}
                           <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            {quote.billed_weeks} week{quote.billed_weeks === 1 ? '' : 's'}
+                            {quote.basis === 'day'
+                              ? `${quote.billed_days ?? quote.billed_weeks} day${(quote.billed_days ?? quote.billed_weeks) === 1 ? '' : 's'}`
+                              : `${quote.billed_weeks} week${quote.billed_weeks === 1 ? '' : 's'}`}
                             {quote.week_index !== 1 ? ` · index ${quote.week_index}` : ''}
+                            {quote.weekend_factor && quote.weekend_factor !== 1 ? ` · weekend ${quote.weekend_factor}` : ''}
                           </span>
                         </p>
                       </div>
@@ -769,54 +762,276 @@ export default function VendorProximityClient() {
         )}
 
         {tab === 'campaigns' && (
-          <div className="space-y-3">
-            {campaigns.length === 0 && <p className="text-sm text-muted-foreground">No campaigns yet.</p>}
-            {campaigns.map((campaign) => (
-              <Card key={campaign.id} className="border-0 shadow-sm ring-1 ring-border">
-                <CardContent className="flex flex-wrap items-start justify-between gap-3 pt-6">
-                  <div>
-                    <p className="font-semibold">{campaign.name}</p>
-                    <p className="text-sm text-muted-foreground">{campaign.headline}</p>
-                    {campaign.fee_amount != null && (
-                      <p className="mt-1 text-sm font-medium">KSh {Number(campaign.fee_amount).toLocaleString('en-KE')}</p>
-                    )}
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {(campaign.placements || [])
-                        .map((placement: any) => `${placement.location?.name} / ${placement.zone?.name}`)
-                        .join(' · ') || 'No shelf sections'}
-                    </p>
-                  </div>
-                  <Badge className={statusClass(campaign.status)} variant="outline">
-                    {statusLabel(campaign.status)}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <CampaignBoard
+            campaigns={campaigns}
+            performanceById={performanceById}
+            branchId={branchId}
+            range={range}
+            periodLabel={RANGE_LABELS[range] || 'This month'}
+          />
         )}
 
         {tab === 'invoices' && (
           <Card className="border-0 shadow-sm ring-1 ring-border">
             <CardHeader>
               <CardTitle>Invoices</CardTitle>
-              <CardDescription>Pay the supermarket offline. Settlement is not automatic.</CardDescription>
+              <CardDescription>Each submitted campaign gets an invoice. Download the PDF and pay the supermarket offline.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {invoices.length === 0 && <p className="text-sm text-muted-foreground">No invoices yet.</p>}
-              {invoices.map((invoice) => (
-                <div key={invoice.id} className="flex items-center justify-between rounded-xl border p-4">
-                  <div>
-                    <p className="font-medium">{invoice.campaign?.name || 'Campaign'}</p>
-                    <p className="text-sm text-muted-foreground">KSh {Number(invoice.amount).toLocaleString('en-KE')}</p>
-                  </div>
-                  <Badge variant="secondary">{invoice.status}</Badge>
+            <CardContent>
+              {listedInvoices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {branchId ? 'No invoices for that branch.' : 'No invoices yet.'}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="py-2 pr-3 font-medium">Invoice</th>
+                        <th className="py-2 pr-3 font-medium">Issued</th>
+                        <th className="py-2 pr-3 font-medium">Vendor</th>
+                        <th className="py-2 pr-3 font-medium">Campaign</th>
+                        <th className="py-2 pr-3 font-medium">Amount</th>
+                        <th className="py-2 pr-3 font-medium">Status</th>
+                        <th className="py-2 font-medium">PDF</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listedInvoices.map((invoice) => (
+                        <tr key={invoice.id} className="border-b last:border-0">
+                          <td className="py-3 pr-3 font-medium">{invoice.invoice_number || 'Invoice'}</td>
+                          <td className="py-3 pr-3 text-muted-foreground">
+                            {invoice.created_at
+                              ? new Date(invoice.created_at).toLocaleDateString('en-KE', {
+                                  timeZone: 'Africa/Nairobi',
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              : '—'}
+                          </td>
+                          <td className="py-3 pr-3">{invoice.advertiser?.name || 'Vendor'}</td>
+                          <td className="py-3 pr-3">{invoice.campaign?.name || 'Campaign'}</td>
+                          <td className="py-3 pr-3">KSh {Number(invoice.amount).toLocaleString('en-KE')}</td>
+                          <td className="py-3 pr-3 capitalize">{invoice.status}</td>
+                          <td className="py-3">
+                            <a
+                              className="font-medium text-[#355cad] hover:underline"
+                              href={`/api/v1/proximity/vendor/invoices/${invoice.id}`}
+                              aria-label={`Download invoice for ${invoice.campaign?.name || 'campaign'}`}
+                            >
+                              Download
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         )}
+    </VendorPortalFrame>
+  );
+}
+
+const CAMPAIGN_ACCENTS = [
+  'from-sky-500 to-blue-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-400 to-orange-500',
+  'from-violet-500 to-fuchsia-600',
+];
+
+function campaignPerformance(performanceById: Map<string, any>, id: string) {
+  return performanceById.get(id) || { delivered: 0, clicked: 0, claimed: 0, redeemed: 0, click_rate: 0 };
+}
+
+function CampaignBoard({
+  campaigns,
+  performanceById,
+  branchId,
+  range,
+  periodLabel,
+}: {
+  campaigns: any[];
+  performanceById: Map<string, any>;
+  branchId: string;
+  range: string;
+  periodLabel: string;
+}) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const rows = campaigns.map((campaign) => {
+    const performance = campaignPerformance(performanceById, campaign.id);
+    return {
+      name: campaign.name,
+      screen: performance.delivered || 0,
+      clicks: performance.clicked || 0,
+    };
+  });
+  const onScreen = rows.reduce((total, row) => total + row.screen, 0);
+  const clicks = rows.reduce((total, row) => total + row.clicks, 0);
+  const booked = campaigns.reduce((total, campaign) => total + Number(campaign.fee_amount || 0), 0);
+  const clickRate = onScreen ? Math.round((clicks / onScreen) * 1000) / 10 : 0;
+  const tiles = [
+    { label: 'Campaigns', value: String(campaigns.length), note: periodLabel, className: 'bg-sky-600' },
+    { label: 'On screen', value: onScreen.toLocaleString('en-KE'), note: 'Cards shown', className: 'bg-emerald-600' },
+    { label: 'Clicks', value: clicks.toLocaleString('en-KE'), note: `${clickRate}% click rate`, className: 'bg-amber-500' },
+    { label: 'Booked', value: `KSh ${booked.toLocaleString('en-KE')}`, note: 'Campaign prices', className: 'bg-violet-600' },
+  ];
+
+  const statuses = Array.from(new Set(campaigns.map((campaign) => String(campaign.status || '')))).filter(Boolean);
+  const filtered = campaigns.filter((campaign) => {
+    if (status && campaign.status !== status) return false;
+    const shelf = (campaign.placements || [])
+      .map((placement: any) => `${placement.location?.name || ''} ${placement.zone?.name || ''}`)
+      .join(' ');
+    const haystack = [campaign.name, campaign.headline, campaign.advertiser?.name, shelf].join(' ').toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+
+  if (campaigns.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {branchId ? 'No campaigns for that branch.' : 'No campaigns yet.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {tiles.map((tile) => (
+          <div key={tile.label} className={`rounded-2xl p-4 text-white shadow-sm ${tile.className}`}>
+            <p className="text-xs font-medium uppercase tracking-wide text-white/80">{tile.label}</p>
+            <p className="mt-2 text-2xl font-bold">{tile.value}</p>
+            <p className="mt-1 text-xs text-white/80">{tile.note}</p>
+          </div>
+        ))}
       </div>
-      </section>
-    </main>
+
+      <Card className="border-0 shadow-sm ring-1 ring-border">
+        <CardHeader>
+          <CardTitle>On screen and clicks</CardTitle>
+          <CardDescription>Each campaign in {periodLabel.toLowerCase()}.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rows} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={32} />
+                <Tooltip />
+                <Bar dataKey="screen" name="On screen" fill="#059669" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="clicks" name="Clicks" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm ring-1 ring-border">
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle>Campaigns</CardTitle>
+            <CardDescription>Filter the list, then open a campaign.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search name, vendor, shelf"
+              aria-label="Filter campaigns"
+              className="h-10 w-56"
+            />
+            <select
+              aria-label="Status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="h-10 rounded-lg border bg-white px-3 text-sm"
+            >
+              <option value="">All statuses</option>
+              {statuses.map((item) => (
+                <option key={item} value={item}>{statusLabel(item)}</option>
+              ))}
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No campaigns match that filter.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-2 pr-3 font-medium">Campaign</th>
+                    <th className="py-2 pr-3 font-medium">Shelf</th>
+                    <th className="py-2 pr-3 font-medium">Price</th>
+                    <th className="py-2 pr-3 font-medium">On screen</th>
+                    <th className="py-2 pr-3 font-medium">Clicks</th>
+                    <th className="py-2 pr-3 font-medium">Status</th>
+                    <th className="py-2 text-right font-medium"> </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((campaign, index) => {
+                    const performance = campaignPerformance(performanceById, campaign.id);
+                    const rate = Math.round((performance.click_rate || 0) * 1000) / 10;
+                    const shelf = (campaign.placements || [])
+                      .map((placement: any) => `${placement.location?.name} / ${placement.zone?.name}`)
+                      .join(' · ');
+                    const detailQuery = new URLSearchParams();
+                    if (range !== 'this_month') detailQuery.set('range', range);
+                    if (branchId) detailQuery.set('location_id', branchId);
+                    const detailHref = `/vendor/proximity/campaigns/${campaign.id}${detailQuery.toString() ? `?${detailQuery}` : ''}`;
+                    return (
+                      <tr key={campaign.id} className="border-b last:border-0">
+                        <td className="py-3 pr-3">
+                          <div className="flex items-center gap-3">
+                            {campaign.image_url ? (
+                              <img src={campaign.image_url} alt="" className="h-12 w-16 rounded-lg object-cover" />
+                            ) : (
+                              <span className={`flex h-12 w-16 items-center justify-center rounded-lg bg-gradient-to-br ${CAMPAIGN_ACCENTS[index % CAMPAIGN_ACCENTS.length]} text-white`}>
+                                <Megaphone className="h-4 w-4" />
+                              </span>
+                            )}
+                            <div>
+                              <p className="font-semibold text-[#12376a]">{campaign.name}</p>
+                              <p className="text-xs text-muted-foreground">{campaign.advertiser?.name || campaign.headline}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">{shelf || '—'}</td>
+                        <td className="py-3 pr-3 font-medium text-violet-700">
+                          {campaign.fee_amount != null ? `KSh ${Number(campaign.fee_amount).toLocaleString('en-KE')}` : '—'}
+                        </td>
+                        <td className="py-3 pr-3 font-semibold text-emerald-700">{performance.delivered || 0}</td>
+                        <td className="py-3 pr-3">
+                          <span className="font-semibold text-amber-700">{performance.clicked || 0}</span>
+                          <span className="ml-1 text-xs text-sky-700">{rate}%</span>
+                        </td>
+                        <td className="py-3 pr-3">
+                          <Badge className={statusClass(campaign.status)} variant="outline">
+                            {statusLabel(campaign.status)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-right">
+                          <Button asChild size="sm" className="bg-[#1473e6]">
+                            <Link href={detailHref}>View more</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

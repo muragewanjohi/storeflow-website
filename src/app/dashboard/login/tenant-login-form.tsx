@@ -21,6 +21,7 @@ import {
   OTP_SENDGRID_CREDITS_ERROR_CODE,
   OTP_SUPPORT_EMAIL,
 } from '@/lib/mfa/otp-delivery-user-message';
+import { isLocalTestHost, localStoreLogin } from '@/lib/dev/local-test-login';
 
 type OtpHelpKind = 'delivery' | 'limits' | null;
 
@@ -43,6 +44,7 @@ export default function TenantLoginForm() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [localTestLogin, setLocalTestLogin] = useState<ReturnType<typeof localStoreLogin>>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +122,12 @@ export default function TenantLoginForm() {
       }
     }
     fetchTenantName();
+    if (!isLocalTestHost(window.location.host)) return;
+    const filled = localStoreLogin();
+    if (!filled) return;
+    setLocalTestLogin(filled);
+    setEmail((current) => current || filled.email);
+    setPassword((current) => current || filled.password);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,7 +158,7 @@ export default function TenantLoginForm() {
           // Only fall back to the onboarding-chat landing when the server
           // didn't already hand us a specific redirectTo (e.g. a stored
           // return URL) — that case is left completely alone.
-          const redirectTo = data.redirectTo || (needsOnboarding ? '/dashboard/onboarding/chat' : '/dashboard');
+          const redirectTo = data.redirectTo || (needsOnboarding && !localTestLogin ? '/dashboard/onboarding/chat' : '/dashboard');
           setIsRedirecting(true);
           window.location.href = redirectTo;
           return;
@@ -205,7 +213,7 @@ export default function TenantLoginForm() {
 
       // No 2FA - direct login
       setIsRedirecting(true);
-      window.location.href = needsOnboarding ? '/dashboard/onboarding/chat' : '/dashboard';
+      window.location.href = needsOnboarding && !localTestLogin ? '/dashboard/onboarding/chat' : '/dashboard';
       return;
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -436,6 +444,11 @@ export default function TenantLoginForm() {
               </>
             )}
 
+            {localTestLogin && (
+              <p className="rounded-xl bg-[#f3f6fc] px-3 py-2 text-sm text-[#4a5565]">
+                Local test sign-in is filled in: {localTestLogin.email} / {localTestLogin.password}
+              </p>
+            )}
             <Button
               type="submit"
               className="h-[68px] w-full rounded-2xl bg-gradient-to-b from-[#355cad] to-[#4a7bd9] text-[18px] font-bold tracking-[-0.44px] text-white shadow-[0_10px_15px_rgba(43,127,255,0.3),0_4px_6px_rgba(43,127,255,0.3)] hover:from-[#355cad] hover:to-[#4a7bd9]"
@@ -445,6 +458,14 @@ export default function TenantLoginForm() {
             </Button>
           </form>
         </div>
+
+        {localTestLogin && (
+          <p className="mt-5 text-center text-[14px] text-[#4a5565]">
+            <Link href="/vendor/proximity" className="font-bold text-[#355cad]">
+              Open the vendor dashboard
+            </Link>
+          </p>
+        )}
 
         <p className="mt-7 text-center text-[14px] text-[#4a5565]">
           Don&apos;t have a store?{' '}

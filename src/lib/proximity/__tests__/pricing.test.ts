@@ -42,6 +42,56 @@ describe('proximity rate card', () => {
     expect(quote.total).toBe(20000);
   });
 
+  it('bills a campaign under a week from the daily section rate', () => {
+    const quote = quotePlacements({
+      ...flight('2026-10-01', '2026-10-03'),
+      card: { ...card, defaultDailyRate: 2000 },
+      kindRates: [],
+      weekIndexes: [],
+      placements: [placement()],
+    });
+    expect(quote.basis).toBe('day');
+    expect(quote.billedDays).toBe(3);
+    expect(quote.total).toBe(6000);
+  });
+
+  it('keeps a two-week campaign on the section rate when a daily rate is also set', () => {
+    const quote = quotePlacements({
+      ...flight('2026-10-01', '2026-10-14'),
+      card: { ...card, defaultDailyRate: 2000 },
+      kindRates: [],
+      weekIndexes: [],
+      placements: [placement()],
+    });
+    expect(quote.basis).toBe('week');
+    expect(quote.total).toBe(20000);
+  });
+
+  it('uses a custom Monday multiplier without changing the other days', () => {
+    const quote = quotePlacements({
+      ...flight('2026-10-05', '2026-10-11'),
+      card: { ...card, weekendMultiplier: 1.4, dayMultipliers: [1.4, 2, 1, 1, 1, 1, 1.4] },
+      kindRates: [],
+      weekIndexes: [],
+      placements: [placement()],
+    });
+    expect(quote.weekendFactor).toBe(1.257);
+    expect(quote.total).toBe(12570);
+  });
+
+  it('raises every Saturday and Sunday without a list of weekend dates', () => {
+    const quote = quotePlacements({
+      ...flight('2026-10-05', '2026-10-11'),
+      card: { ...card, weekendMultiplier: 1.4 },
+      kindRates: [],
+      weekIndexes: [],
+      placements: [placement()],
+    });
+    expect(quote.basis).toBe('week');
+    expect(quote.weekendFactor).toBe(1.114);
+    expect(quote.total).toBe(11140);
+  });
+
   it('rounds a partial week up to one billed week', () => {
     const quote = quotePlacements({
       ...flight('2026-10-01', '2026-10-03'),

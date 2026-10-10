@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma/client';
 import {
+  defaultDayMultipliers,
   listWeeklyPrice,
   quotePlacements,
   type PlacementPriceInput,
@@ -7,6 +8,13 @@ import {
   type QuoteLine,
 } from './pricing';
 import type { RateCardInput } from './validation';
+
+function readDayMultipliers(value: unknown, weekendMultiplier: number): number[] {
+  if (Array.isArray(value) && value.length === 7 && value.every((item) => Number(item) > 0)) {
+    return value.map(Number);
+  }
+  return defaultDayMultipliers(weekendMultiplier);
+}
 
 function dateKey(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -17,8 +25,10 @@ function asNumber(value: { toString(): string } | number | null | undefined): nu
   return Number(value);
 }
 
-const EMPTY_CARD = {
-  defaultWeeklyRate: null as number | null,
+const RATE_CARD_DEFAULTS = {
+  defaultWeeklyRate: 10000,
+  defaultDailyRate: 2000,
+  weekendMultiplier: 1.4,
   smallMultiplier: 1,
   largeMultiplier: 2,
   currency: 'KES',
@@ -54,9 +64,12 @@ export async function loadRateCard(tenantId: string) {
 
   return {
     currency: card?.currency || 'KES',
-    default_weekly_rate: asNumber(card?.default_weekly_rate),
-    small_multiplier: asNumber(card?.small_multiplier) ?? 1,
-    large_multiplier: asNumber(card?.large_multiplier) ?? 2,
+    default_weekly_rate: asNumber(card?.default_weekly_rate) ?? RATE_CARD_DEFAULTS.defaultWeeklyRate,
+    default_daily_rate: asNumber(card?.default_daily_rate) ?? RATE_CARD_DEFAULTS.defaultDailyRate,
+    weekend_multiplier: asNumber(card?.weekend_multiplier) ?? RATE_CARD_DEFAULTS.weekendMultiplier,
+    day_multipliers: readDayMultipliers(card?.day_multipliers, asNumber(card?.weekend_multiplier) ?? RATE_CARD_DEFAULTS.weekendMultiplier),
+    small_multiplier: asNumber(card?.small_multiplier) ?? RATE_CARD_DEFAULTS.smallMultiplier,
+    large_multiplier: asNumber(card?.large_multiplier) ?? RATE_CARD_DEFAULTS.largeMultiplier,
     section_rates: sectionRates.map((rate) => ({
       kind: rate.kind,
       weekly_rate: Number(rate.weekly_rate),
@@ -95,12 +108,18 @@ export async function saveRateCard(tenantId: string, body: RateCardInput) {
       create: {
         tenant_id: tenantId,
         default_weekly_rate: body.default_weekly_rate,
+        default_daily_rate: body.default_daily_rate,
+        weekend_multiplier: body.weekend_multiplier,
+        day_multipliers: body.day_multipliers,
         small_multiplier: body.small_multiplier,
         large_multiplier: body.large_multiplier,
         currency: 'KES',
       },
       update: {
         default_weekly_rate: body.default_weekly_rate,
+        default_daily_rate: body.default_daily_rate,
+        weekend_multiplier: body.weekend_multiplier,
+        day_multipliers: body.day_multipliers,
         small_multiplier: body.small_multiplier,
         large_multiplier: body.large_multiplier,
         updated_at: now,
@@ -157,8 +176,11 @@ export function presentQuote(quote: PlacementQuote) {
   return {
     priced: quote.priced,
     total: quote.total,
+    basis: quote.basis,
     billed_weeks: quote.billedWeeks,
+    billed_days: quote.billedDays,
     week_index: quote.weekIndex,
+    weekend_factor: quote.weekendFactor,
     currency: 'KES',
     lines: quote.lines.map((line) => ({
       location_id: line.locationId,
@@ -174,7 +196,7 @@ export function presentQuote(quote: PlacementQuote) {
     missing: quote.missing,
     message: quote.priced
       ? null
-      : 'Publish a weekly rate on the Pricing tab before this flight can be priced.',
+      : 'Publish a section rate on the Pricing tab before this campaign can be priced.',
   };
 }
 
@@ -197,9 +219,12 @@ export async function quoteTenantPlacements(
   ]);
 
   const card = {
-    defaultWeeklyRate: asNumber(cardRow?.default_weekly_rate) ?? EMPTY_CARD.defaultWeeklyRate,
-    smallMultiplier: asNumber(cardRow?.small_multiplier) ?? EMPTY_CARD.smallMultiplier,
-    largeMultiplier: asNumber(cardRow?.large_multiplier) ?? EMPTY_CARD.largeMultiplier,
+    defaultWeeklyRate: asNumber(cardRow?.default_weekly_rate) ?? RATE_CARD_DEFAULTS.defaultWeeklyRate,
+    defaultDailyRate: asNumber(cardRow?.default_daily_rate) ?? RATE_CARD_DEFAULTS.defaultDailyRate,
+    weekendMultiplier: asNumber(cardRow?.weekend_multiplier) ?? RATE_CARD_DEFAULTS.weekendMultiplier,
+    dayMultipliers: readDayMultipliers(cardRow?.day_multipliers, asNumber(cardRow?.weekend_multiplier) ?? RATE_CARD_DEFAULTS.weekendMultiplier),
+    smallMultiplier: asNumber(cardRow?.small_multiplier) ?? RATE_CARD_DEFAULTS.smallMultiplier,
+    largeMultiplier: asNumber(cardRow?.large_multiplier) ?? RATE_CARD_DEFAULTS.largeMultiplier,
   };
   const kindRates = kindRows.map((rate) => ({ kind: rate.kind, weeklyRate: Number(rate.weekly_rate) }));
   const weekIndexes = indexRows.map((index) => ({
@@ -247,9 +272,9 @@ export async function listPricesForInventory(tenantId: string) {
     }),
   ]);
   const card = {
-    defaultWeeklyRate: asNumber(cardRow?.default_weekly_rate),
-    smallMultiplier: asNumber(cardRow?.small_multiplier) ?? 1,
-    largeMultiplier: asNumber(cardRow?.large_multiplier) ?? 2,
+    defaultWeeklyRate: asNumber(cardRow?.default_weekly_rate) ?? RATE_CARD_DEFAULTS.defaultWeeklyRate,
+    smallMultiplier: asNumber(cardRow?.small_multiplier) ?? RATE_CARD_DEFAULTS.smallMultiplier,
+    largeMultiplier: asNumber(cardRow?.large_multiplier) ?? RATE_CARD_DEFAULTS.largeMultiplier,
   };
   const kindRates = kindRows.map((rate) => ({ kind: rate.kind, weeklyRate: Number(rate.weekly_rate) }));
 
@@ -287,7 +312,7 @@ export function quoteLineCreates(tenantId: string, lines: QuoteLine[]) {
     zone_name: line.zoneName,
     weekly_rate: line.weeklyRate,
     branch_multiplier: line.branchMultiplier,
-    week_index: line.weekIndex,
+    week_index: Math.round(line.weekIndex * line.weekendFactor * 1000) / 1000,
     billed_weeks: line.billedWeeks,
     line_total: line.lineTotal,
   }));

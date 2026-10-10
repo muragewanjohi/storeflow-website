@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { BanknotesIcon, BuildingStorefrontIcon, CalendarDaysIcon, TagIcon } from '@heroicons/react/24/outline';
 import { SaveButton } from './save-button';
+import { blendedDayFactor, defaultDayMultipliers } from '@/lib/proximity/pricing';
 
 type BranchRate = {
   id: string;
@@ -32,6 +33,30 @@ type WeekIndex = { label: string; starts_on: string; ends_on: string; multiplier
 
 const selectClassName =
   'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-ring';
+const SECTION_PAGE_SIZE = 10;
+const DAY_FIELDS = [
+  { index: 1, label: 'Monday' },
+  { index: 2, label: 'Tuesday' },
+  { index: 3, label: 'Wednesday' },
+  { index: 4, label: 'Thursday' },
+  { index: 5, label: 'Friday' },
+  { index: 6, label: 'Saturday' },
+  { index: 0, label: 'Sunday' },
+];
+
+function dayInputs(weekend: string): string[] {
+  return defaultDayMultipliers(Number(weekend) || 1.4).map(String);
+}
+
+function kes(value: number): string {
+  return `KSh ${value.toLocaleString('en-KE', { maximumFractionDigits: 2 })}`;
+}
+
+function positiveAmount(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
 
 function moneyInput(value: number | null | undefined): string {
   return value == null ? '' : String(value);
@@ -40,7 +65,11 @@ function moneyInput(value: number | null | undefined): string {
 export function PricingPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [defaultRate, setDefaultRate] = useState('');
+  const [defaultRate, setDefaultRate] = useState('10000');
+  const [dailyRate, setDailyRate] = useState('2000');
+  const [weekendMultiplier, setWeekendMultiplier] = useState('1.4');
+  const [dayMultipliers, setDayMultipliers] = useState<string[]>(() => dayInputs('1.4'));
+  const [daysOpen, setDaysOpen] = useState(false);
   const [smallMultiplier, setSmallMultiplier] = useState('1');
   const [largeMultiplier, setLargeMultiplier] = useState('2');
   const [kindRates, setKindRates] = useState<KindRate[]>([]);
@@ -48,6 +77,8 @@ export function PricingPanel() {
   const [branches, setBranches] = useState<BranchRate[]>([]);
   const [sections, setSections] = useState<SectionRate[]>([]);
   const [weekIndexes, setWeekIndexes] = useState<WeekIndex[]>([]);
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [sectionPage, setSectionPage] = useState(1);
 
   useEffect(() => {
     void fetch('/api/dashboard/proximity/pricing')
@@ -55,7 +86,15 @@ export function PricingPanel() {
         const json = await response.json();
         if (!response.ok) throw new Error(json.error || 'Failed to load pricing');
         const data = json.data;
-        setDefaultRate(moneyInput(data.default_weekly_rate));
+        setDefaultRate(moneyInput(data.default_weekly_rate) || '10000');
+        setDailyRate(moneyInput(data.default_daily_rate) || '2000');
+        const weekend = String(data.weekend_multiplier ?? 1.4);
+        setWeekendMultiplier(weekend);
+        setDayMultipliers(
+          Array.isArray(data.day_multipliers) && data.day_multipliers.length === 7
+            ? data.day_multipliers.map(String)
+            : dayInputs(weekend)
+        );
         setSmallMultiplier(String(data.small_multiplier ?? 1));
         setLargeMultiplier(String(data.large_multiplier ?? 2));
         const kinds = new Map<string, string>(
@@ -97,10 +136,25 @@ export function PricingPanel() {
 
   async function save() {
     const parsedDefault = defaultRate.trim() === '' ? null : Number(defaultRate);
+    const parsedDaily = dailyRate.trim() === '' ? null : Number(dailyRate);
+    const parsedWeekend = Number(weekendMultiplier);
     const parsedSmall = Number(smallMultiplier);
     const parsedLarge = Number(largeMultiplier);
     if (parsedDefault != null && (!Number.isFinite(parsedDefault) || parsedDefault < 0)) {
-      toast.error('Default weekly rate must be a positive amount');
+      toast.error('Default section rate must be a positive amount');
+      return;
+    }
+    if (parsedDaily != null && (!Number.isFinite(parsedDaily) || parsedDaily < 0)) {
+      toast.error('Default daily section rate must be a positive amount');
+      return;
+    }
+    if (!(parsedWeekend > 0) || parsedWeekend > 10) {
+      toast.error('Weekend multiplier must be between 0 and 10');
+      return;
+    }
+    const parsedDays = dayMultipliers.map(Number);
+    if (parsedDays.length !== 7 || parsedDays.some((value) => !(value > 0) || value > 10)) {
+      toast.error('Each day multiplier must be between 0 and 10');
       return;
     }
     if (!(parsedSmall > 0) || !(parsedLarge > 0)) {
@@ -129,6 +183,9 @@ export function PricingPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           default_weekly_rate: parsedDefault,
+          default_daily_rate: parsedDaily,
+          weekend_multiplier: parsedWeekend,
+          day_multipliers: parsedDays,
           small_multiplier: parsedSmall,
           large_multiplier: parsedLarge,
           section_rates: sectionRates,
@@ -163,10 +220,19 @@ export function PricingPanel() {
     return <p className="text-sm text-muted-foreground">Loading pricing…</p>;
   }
 
-  const sectionsByBranch = branches.map((branch) => ({
-    branch,
-    sections: sections.filter((section) => section.location_id === branch.id),
-  }));
+  const sectionQuery = sectionFilter.trim().toLowerCase();
+  const filteredSections = sections.filter((section) => {
+    if (!sectionQuery) return true;
+    return (
+      section.name.toLowerCase().includes(sectionQuery) ||
+      String(section.kind || '').toLowerCase().includes(sectionQuery) ||
+      String(section.location_name || '').toLowerCase().includes(sectionQuery)
+    );
+  });
+  const sectionPageCount = Math.max(1, Math.ceil(filteredSections.length / SECTION_PAGE_SIZE));
+  const sectionPageIndex = Math.min(sectionPage, sectionPageCount);
+  const sectionStart = (sectionPageIndex - 1) * SECTION_PAGE_SIZE;
+  const visibleSections = filteredSections.slice(sectionStart, sectionStart + SECTION_PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -180,7 +246,7 @@ export function PricingPanel() {
               <div>
                 <CardTitle>Rate card</CardTitle>
                 <CardDescription>
-                  A flight is priced as section weekly rate × branch multiplier × weeks × week index. Vendors see the total. They do not type it.
+                  A campaign is priced from these defaults. Saturday and Sunday use the weekend multiplier on their own. Change the number to change every weekend. You do not enter weekend dates.
                 </CardDescription>
               </div>
             </div>
@@ -189,11 +255,12 @@ export function PricingPanel() {
             </SaveButton>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-2">
-            <Label htmlFor="default-weekly-rate">Default weekly rate (KSh)</Label>
+            <Label htmlFor="default-section-rate">Default section rate (KSh)</Label>
             <Input
-              id="default-weekly-rate"
+              id="default-section-rate"
               type="number"
               min="0"
               step="0.01"
@@ -201,7 +268,41 @@ export function PricingPanel() {
               onChange={(event) => setDefaultRate(event.target.value)}
               placeholder="10000"
             />
-            <p className="text-xs text-muted-foreground">Used when a product section has no rate of its own.</p>
+            <p className="text-xs text-muted-foreground">One week on a shelf that has no rate of its own.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="default-daily-rate">Default daily section rate (KSh)</Label>
+            <Input
+              id="default-daily-rate"
+              type="number"
+              min="0"
+              step="0.01"
+              value={dailyRate}
+              onChange={(event) => setDailyRate(event.target.value)}
+              placeholder="2000"
+            />
+            <p className="text-xs text-muted-foreground">Used when a campaign runs for fewer than 7 days.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="weekend-multiplier">Weekend multiplier</Label>
+            <Input
+              id="weekend-multiplier"
+              type="number"
+              min="0.01"
+              max="10"
+              step="0.001"
+              value={weekendMultiplier}
+              onChange={(event) => {
+                const next = event.target.value;
+                setDayMultipliers((current) =>
+                  current.map((value, index) =>
+                    (index === 0 || index === 6) && value === weekendMultiplier ? next : value
+                  )
+                );
+                setWeekendMultiplier(next);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">1.4 means every Saturday and Sunday costs 40% more. Set 1 to charge them the same as weekdays.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="small-multiplier">Smaller branch multiplier</Label>
@@ -227,6 +328,44 @@ export function PricingPanel() {
               onChange={(event) => setLargeMultiplier(event.target.value)}
             />
           </div>
+          </div>
+          <button
+            type="button"
+            className="text-sm font-medium text-emerald-800 hover:underline"
+            aria-expanded={daysOpen}
+            onClick={() => setDaysOpen((open) => !open)}
+          >
+            {daysOpen ? 'Hide day multipliers' : 'Adjust each day'}
+          </button>
+          {daysOpen && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+              {DAY_FIELDS.map((day) => (
+                <div key={day.label} className="space-y-2">
+                  <Label htmlFor={`day-multiplier-${day.index}`}>{day.label}</Label>
+                  <Input
+                    id={`day-multiplier-${day.index}`}
+                    type="number"
+                    min="0.01"
+                    max="10"
+                    step="0.001"
+                    aria-label={`${day.label} multiplier`}
+                    value={dayMultipliers[day.index] ?? '1'}
+                    onChange={(event) =>
+                      setDayMultipliers((current) =>
+                        current.map((value, index) => (index === day.index ? event.target.value : value))
+                      )
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <RateExample
+            sectionRate={defaultRate}
+            dailyRate={dailyRate}
+            branchMultiplier={smallMultiplier}
+            dayMultipliers={dayMultipliers}
+          />
         </CardContent>
       </Card>
 
@@ -350,36 +489,90 @@ export function PricingPanel() {
       <Card className="border-0 shadow-sm ring-1 ring-border">
         <CardHeader>
           <CardTitle>Section overrides</CardTitle>
-          <CardDescription>A rate here replaces the kind rate for that one product section.</CardDescription>
+          <CardDescription>A rate here replaces the kind rate for that one shelf section.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
-          {sections.length === 0 && <p className="text-sm text-muted-foreground">No product sections yet.</p>}
-          {sectionsByBranch.map(({ branch, sections: branchSections }) =>
-            branchSections.length === 0 ? null : (
-              <div key={branch.id} className="space-y-2">
-                <p className="text-sm font-semibold">{branch.name}</p>
-                {branchSections.map((section) => (
-                  <div key={section.id} className="grid grid-cols-[1fr_140px] items-center gap-3">
-                    <p className="text-sm">
-                      {section.name} <span className="text-muted-foreground">· {section.kind}</span>
-                    </p>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      aria-label={`${section.name} weekly rate`}
-                      placeholder="Uses kind rate"
-                      value={section.weekly_rate}
-                      onChange={(event) =>
-                        setSections((current) =>
-                          current.map((item) => (item.id === section.id ? { ...item, weekly_rate: event.target.value } : item))
-                        )
-                      }
-                    />
+        <CardContent className="space-y-4">
+          {sections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No shelf sections yet.</p>
+          ) : (
+            <>
+              <Input
+                value={sectionFilter}
+                placeholder="Filter by branch, section, or kind"
+                aria-label="Filter shelf sections"
+                onChange={(event) => {
+                  setSectionFilter(event.target.value);
+                  setSectionPage(1);
+                }}
+              />
+              {filteredSections.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No shelf sections match that filter.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="py-2 pr-3 font-medium">Branch</th>
+                          <th className="py-2 pr-3 font-medium">Shelf section</th>
+                          <th className="py-2 pr-3 font-medium">Kind</th>
+                          <th className="py-2 font-medium">Section rate (KSh)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleSections.map((section) => (
+                          <tr key={section.id} className="border-b last:border-0">
+                            <td className="py-2 pr-3">{section.location_name}</td>
+                            <td className="py-2 pr-3">{section.name}</td>
+                            <td className="py-2 pr-3 capitalize">{section.kind}</td>
+                            <td className="py-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                aria-label={`${section.location_name} ${section.name} section rate`}
+                                placeholder="Uses kind rate"
+                                value={section.weekly_rate}
+                                onChange={(event) =>
+                                  setSections((current) =>
+                                    current.map((item) =>
+                                      item.id === section.id ? { ...item, weekly_rate: event.target.value } : item
+                                    )
+                                  )
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </div>
-            )
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                    <p>
+                      {sectionStart + 1}–{Math.min(sectionStart + SECTION_PAGE_SIZE, filteredSections.length)} of {filteredSections.length}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
+                        disabled={sectionPageIndex <= 1}
+                        onClick={() => setSectionPage(sectionPageIndex - 1)}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
+                        disabled={sectionPageIndex >= sectionPageCount}
+                        onClick={() => setSectionPage(sectionPageIndex + 1)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -393,7 +586,9 @@ export function PricingPanel() {
               </span>
               <div>
                 <CardTitle>Week indexes</CardTitle>
-                <CardDescription>Holiday or payday weeks multiply the rate. Other days stay at 1.</CardDescription>
+                <CardDescription>
+                  Holiday or payday dates multiply the rate. Weekends are already included by the weekend multiplier.
+                </CardDescription>
               </div>
             </div>
             <SaveButton
@@ -456,6 +651,54 @@ export function PricingPanel() {
           ))}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+const SAMPLE_WEEK = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
+const SAMPLE_WEEKEND = ['2026-10-10', '2026-10-11'];
+
+function RateExample({
+  sectionRate,
+  dailyRate,
+  branchMultiplier,
+  dayMultipliers,
+}: {
+  sectionRate: string;
+  dailyRate: string;
+  branchMultiplier: string;
+  dayMultipliers: string[];
+}) {
+  const section = positiveAmount(sectionRate) ?? 10000;
+  const daily = positiveAmount(dailyRate) ?? 2000;
+  const branch = positiveAmount(branchMultiplier) ?? 1;
+  const days = dayMultipliers.map((value) => positiveAmount(value) ?? 1);
+  const weekFactor = blendedDayFactor(SAMPLE_WEEK, days);
+  const weekendOnly = blendedDayFactor(SAMPLE_WEEKEND, days);
+  const oneWeek = section * branch * weekFactor;
+  const saturdaySunday = daily * 2 * branch * weekendOnly;
+
+  return (
+    <div className="rounded-xl bg-slate-50 p-4 text-sm">
+      <p className="font-medium">Example</p>
+      <p className="mt-1 text-muted-foreground">
+        Monday 5 October to Sunday 11 October. The two weekend days are included automatically.
+      </p>
+      <p className="mt-2">
+        One week on a smaller branch:{' '}
+        <span className="font-medium">
+          {kes(section)} × {branch} × {weekFactor} day blend = {kes(oneWeek)}
+        </span>
+      </p>
+      <p className="mt-2">
+        Saturday and Sunday only, using the daily rate:{' '}
+        <span className="font-medium">
+          {kes(daily)} × 2 days × {branch} × {weekendOnly} = {kes(saturdaySunday)}
+        </span>
+      </p>
+      <p className="mt-2 text-muted-foreground">
+        Change the weekend multiplier to change Saturday and Sunday together. Open Adjust each day when one weekday should differ.
+      </p>
     </div>
   );
 }

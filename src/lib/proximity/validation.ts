@@ -50,6 +50,9 @@ export const vendorLoginSchema = z.object({
 
 export const rateCardInputSchema = z.object({
   default_weekly_rate: z.number().nonnegative().max(10_000_000).nullable(),
+  default_daily_rate: z.number().nonnegative().max(10_000_000).nullable(),
+  weekend_multiplier: z.number().gt(0).max(10),
+  day_multipliers: z.array(z.number().gt(0).max(10)).length(7),
   small_multiplier: z.number().gt(0).max(10),
   large_multiplier: z.number().gt(0).max(10),
   section_rates: z

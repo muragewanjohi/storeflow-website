@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma/client';
 import { z } from 'zod';
 import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 import { shouldBypassMfaForReviewer } from '@/lib/auth/reviewer-mfa-bypass';
+import { isLocalTestHost, LOCAL_STORE_EMAIL } from '@/lib/dev/local-test-login';
 import {
   getOtpEmailDeliveryFailureMessage,
   getOtpEmailSendingLimitMessage,
@@ -272,16 +273,24 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const bypassMFA = shouldBypassMfaForReviewer(authData.user.email);
+    const localTestLogin =
+      process.env.NODE_ENV === 'development' &&
+      isLocalTestHost(request.headers.get('host') || '') &&
+      email.trim().toLowerCase() === LOCAL_STORE_EMAIL;
+    const bypassMFA = localTestLogin || shouldBypassMfaForReviewer(authData.user.email);
     if (bypassMFA) {
-      console.warn('[Login API] Reviewer MFA bypass applied for Play Store review account');
+      console.warn(
+        localTestLogin
+          ? '[Login API] Local test account skipped email verification'
+          : '[Login API] Reviewer MFA bypass applied for Play Store review account'
+      );
 
       // Complete login without 2FA
       const response = NextResponse.json({
         success: true,
         requiresMFA: false,
         message: 'Login successful',
-        warning: 'Reviewer MFA bypass is currently active for this account.',
+        ...(localTestLogin ? {} : { warning: 'Reviewer MFA bypass is currently active for this account.' }),
         user: {
           id: authData.user.id,
           email: authData.user.email,

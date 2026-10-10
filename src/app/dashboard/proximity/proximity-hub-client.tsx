@@ -510,9 +510,6 @@ export default function ProximityHubClient({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
             {TABS.find((item) => item.id === tab)?.label}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Till purchases without a claim are not measured in Phase 1.
-          </p>
         </div>
       </div>
 
@@ -1246,7 +1243,9 @@ export default function ProximityHubClient({
             />
           ) : (
             <div className="grid gap-5 xl:grid-cols-2">
-              {campaigns.map((campaign) => (
+              {[...campaigns]
+                .sort((left, right) => Number(right.status === 'submitted') - Number(left.status === 'submitted'))
+                .map((campaign) => (
                 <Card key={campaign.id} className="overflow-hidden border-0 shadow-sm ring-1 ring-border">
                   <div className="grid min-h-56 sm:grid-cols-[180px_1fr]">
                     <div className="relative min-h-44 bg-gradient-to-br from-emerald-100 to-teal-50 sm:min-h-full">
@@ -1270,7 +1269,7 @@ export default function ProximityHubClient({
                         <div>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline" className={campaignStatusClass(campaign.status)}>
-                              {campaign.status}
+                              {campaign.status === 'submitted' ? 'Waiting for approval' : campaign.status}
                             </Badge>
                             <Badge variant="secondary">
                               {campaign.advertiser ? campaign.advertiser.name : 'House'}
@@ -1278,6 +1277,11 @@ export default function ProximityHubClient({
                           </div>
                           <h3 className="mt-3 text-lg font-semibold">{campaign.name}</h3>
                           <p className="mt-1 text-sm text-muted-foreground">{campaign.headline}</p>
+                          {campaign.fee_amount != null && (
+                            <p className="mt-2 text-sm font-medium">
+                              Campaign price · KSh {Number(campaign.fee_amount).toLocaleString('en-KE')}
+                            </p>
+                          )}
                         </div>
                       </div>
 

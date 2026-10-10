@@ -929,7 +929,74 @@ export async function ensureCampaignInvoice(tenantId: string, campaignId: string
       supermarket_share: supermarketShare,
       dukanest_share: dukanestShare,
       status: 'issued',
-      notes: 'Created automatically from the campaign fee when the flight was approved. Settlement stays offline.',
+      notes: 'Issued from the campaign price. Pay the supermarket offline.',
+    },
+  });
+}
+
+/** Price and issue an invoice for vendor campaigns that were booked before invoicing. */
+export async function backfillCampaignInvoices(tenantId: string, advertiserId?: string) {
+  const campaigns = await prisma.proximity_campaigns.findMany({
+    where: {
+      tenant_id: tenantId,
+      advertiser_id: advertiserId ?? { not: null },
+      status: { not: 'rejected' },
+      invoices: { none: {} },
+    },
+    include: { placements: { select: { location_id: true, zone_id: true } } },
+  });
+  for (const campaign of campaigns) {
+    if (!campaign.advertiser_id || campaign.placements.length === 0 || !(campaign.starts_at < campaign.ends_at)) {
+      continue;
+    }
+    try {
+      if (campaign.fee_amount == null) {
+        const quote = await quoteTenantPlacements(
+          tenantId,
+          campaign.starts_at,
+          campaign.ends_at,
+          campaign.placements.map((placement) => ({
+            location_id: placement.location_id,
+            zone_id: placement.zone_id,
+          }))
+        );
+        if (!quote.priced) continue;
+        await prisma.proximity_campaigns.update({
+          where: { id: campaign.id },
+          data: {
+            fee_amount: quote.total,
+            updated_at: new Date(),
+            quote_lines: {
+              deleteMany: {},
+              create: quoteLineCreates(tenantId, quote.lines),
+            },
+          },
+        });
+      }
+      const invoice = await ensureCampaignInvoice(tenantId, campaign.id);
+      if (invoice && campaign.created_at && (!invoice.created_at || invoice.created_at > campaign.created_at)) {
+        await prisma.proximity_invoices.update({
+          where: { id: invoice.id },
+          data: { created_at: campaign.created_at },
+        });
+      }
+    } catch {
+      // A campaign that cannot be priced stays off the invoice list.
+    }
+  }
+}
+
+export async function voidCampaignInvoice(tenantId: string, campaignId: string) {
+  await prisma.proximity_invoices.updateMany({
+    where: {
+      tenant_id: tenantId,
+      campaign_id: campaignId,
+      status: { notIn: ['paid', 'void'] },
+    },
+    data: {
+      status: 'void',
+      notes: 'Voided because the supermarket rejected the campaign.',
+      updated_at: new Date(),
     },
   });
 }

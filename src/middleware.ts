@@ -25,6 +25,19 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const code = request.nextUrl.searchParams.get('code');
 
+  if (process.env.NODE_ENV === 'development') {
+    const hostOnly = hostname.split(':')[0].toLowerCase();
+    const opensTheTestStore =
+      pathname === '/' || pathname === '/dashboard' || pathname === '/login' || pathname === '/dashboard/login';
+    if ((hostOnly === 'localhost' || hostOnly === '127.0.0.1') && opensTheTestStore) {
+      const url = request.nextUrl.clone();
+      url.hostname = 'supermarket.localhost';
+      url.pathname = '/dashboard';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (code && (pathname === '/' || pathname === '/index' || pathname === '/reset-password')) {
     const callbackUrl = request.nextUrl.clone();
     callbackUrl.pathname = '/auth/callback';

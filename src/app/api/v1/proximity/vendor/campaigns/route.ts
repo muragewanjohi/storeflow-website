@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isLocalVendorOverview } from '@/lib/dev/local-test-login';
 import { jsonError, requireAdvertiser } from '@/lib/proximity/http';
 import { campaignInputSchema } from '@/lib/proximity/validation';
-import { createCampaignRecord } from '@/lib/proximity/service';
+import { createCampaignRecord, ensureCampaignInvoice } from '@/lib/proximity/service';
 import { prisma } from '@/lib/prisma/client';
 import { SPOOFING_DISCLOSURE_EN } from '@/lib/proximity/constants';
 
@@ -9,6 +10,8 @@ export async function GET(request: NextRequest) {
   try {
     const advertiser = await requireAdvertiser(request);
     const range = request.nextUrl.searchParams.get('range') || 'this_month';
+    const locationId = request.nextUrl.searchParams.get('location_id') || '';
+    const overview = isLocalVendorOverview(request.headers.get('host') || '', advertiser.email);
     const now = new Date();
     const currentStart =
       range === 'last_7_days'
@@ -25,9 +28,14 @@ export async function GET(request: NextRequest) {
     const spanMs = now.getTime() - currentStart.getTime();
     const previousStart = new Date(currentStart.getTime() - spanMs);
     const campaigns = await prisma.proximity_campaigns.findMany({
-      where: { tenant_id: advertiser.tenant_id, advertiser_id: advertiser.id },
+      where: {
+        tenant_id: advertiser.tenant_id,
+        ...(overview ? {} : { advertiser_id: advertiser.id }),
+        ...(locationId ? { placements: { some: { location_id: locationId } } } : {}),
+      },
       include: {
-        placements: { include: { location: { select: { name: true } }, zone: { select: { name: true } } } },
+        advertiser: { select: { id: true, name: true } },
+        placements: { include: { location: { select: { id: true, name: true } }, zone: { select: { name: true } } } },
       },
       orderBy: { created_at: 'desc' },
     });
@@ -37,6 +45,7 @@ export async function GET(request: NextRequest) {
         where: {
           tenant_id: advertiser.tenant_id,
           campaign_id: { in: campaignIds },
+          ...(locationId ? { location_id: locationId } : {}),
           created_at: { gte: previousStart },
         },
         select: {
@@ -199,7 +208,21 @@ export async function POST(request: NextRequest) {
       'submitted',
       { ignoreClientFee: true }
     );
-    return NextResponse.json({ data: campaign, next: 'Retailer must approve before the ad can go live.' }, { status: 201 });
+    const invoice = await ensureCampaignInvoice(advertiser.tenant_id, campaign.id);
+    return NextResponse.json(
+      {
+        data: campaign,
+        price: {
+          total: campaign.fee_amount == null ? null : Number(campaign.fee_amount),
+          currency: 'KES',
+        },
+        invoice: invoice
+          ? { id: invoice.id, amount: Number(invoice.amount), status: invoice.status }
+          : null,
+        next: 'The supermarket must approve before the ad can go live.',
+      },
+      { status: 201 }
+    );
   } catch (error) {
     return jsonError(error);
   }

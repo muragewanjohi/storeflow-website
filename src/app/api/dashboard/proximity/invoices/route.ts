@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma/client';
 import { jsonError, requireProximityStaff } from '@/lib/proximity/http';
-import { createManualInvoice } from '@/lib/proximity/service';
+import { backfillCampaignInvoices, createManualInvoice } from '@/lib/proximity/service';
 import { z } from 'zod';
 
 const invoiceSchema = z.object({
@@ -13,6 +13,7 @@ const invoiceSchema = z.object({
 export async function GET() {
   try {
     const { tenant } = await requireProximityStaff();
+    await backfillCampaignInvoices(tenant.id);
     const invoices = await prisma.proximity_invoices.findMany({
       where: { tenant_id: tenant.id },
       include: {

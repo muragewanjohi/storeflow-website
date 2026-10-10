@@ -1648,6 +1648,9 @@ model proximity_rate_cards {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id           String    @unique @db.Uuid
   default_weekly_rate Decimal?  @db.Decimal(12, 2)
+  default_daily_rate  Decimal?  @db.Decimal(12, 2)
+  weekend_multiplier  Decimal   @default(1.4) @db.Decimal(6, 3)
+  day_multipliers     Json      @default("[1.4, 1, 1, 1, 1, 1, 1.4]")
   small_multiplier    Decimal   @default(1) @db.Decimal(6, 3)
   large_multiplier    Decimal   @default(2) @db.Decimal(6, 3)
   currency            String    @default("KES") @db.VarChar(3)
